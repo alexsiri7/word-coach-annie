@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      # Prevent node_modules from being overwritten by mount
+      - /app/node_modules
+      # Persist SQLite database outside the container
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=file:/app/data/word-coach-annie.db

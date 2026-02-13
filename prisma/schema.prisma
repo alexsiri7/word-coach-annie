@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  title     String
+  author    String   @default("")
+  synopsis  String   @default("")
+  genre     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  structureNodes StructureNode[]
+  storyObjects   StoryObject[]
+}
+
+model StructureNode {
+  id         String   @id @default(cuid())
+  projectId  String
+  parentId   String?
+  type       String   // PART, CHAPTER, SCENE
+  title      String
+  synopsis   String   @default("")
+  status     String   @default("OUTLINE") // OUTLINE, DRAFT, REVISED, FINAL
+  orderIndex Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   StructureNode?  @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children StructureNode[] @relation("NodeHierarchy")
+
+  contentVersions ContentVersion[]
+  relationships   Relationship[]    @relation("RelationshipFromNode")
+  relatedBy       Relationship[]    @relation("RelationshipToNode")
+
+  @@index([projectId])
+  @@index([parentId, orderIndex])
+}
+
+model StoryObject {
+  id                String   @id @default(cuid())
+  projectId         String
+  type              String   // CHARACTER, LOCATION, PLOTLINE, WORLD_ELEMENT, NOTE
+  name              String
+  description       String   @default("")
+  notes             String   @default("")
+  role              String?  // For CHARACTER: protagonist, antagonist, supporting, minor
+  tags              String   @default("") // Comma-separated tags
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  relationships Relationship[] @relation("RelationshipFromObject")
+  relatedBy     Relationship[] @relation("RelationshipToObject")
+
+  @@index([projectId, type])
+}
+
+model ContentVersion {
+  id        String   @id @default(cuid())
+  nodeId    String
+  content   String   @default("")
+  wordCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  node StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, createdAt(sort: Desc)])
+}
+
+// Relationships link any entity to any entity via string IDs + entity type markers
+model Relationship {
+  id          String  @id @default(cuid())
+  type        String  // APPEARS_IN, LOCATED_AT, PART_OF_PLOTLINE, RELATED_TO, etc.
+  label       String  @default("")
+
+  // Source can be a StructureNode or StoryObject
+  fromNodeId   String?
+  fromObjectId String?
+
+  // Target can be a StructureNode or StoryObject
+  toNodeId     String?
+  toObjectId   String?
+
+  createdAt DateTime @default(now())
+
+  fromNode   StructureNode? @relation("RelationshipFromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  fromObject StoryObject?   @relation("RelationshipFromObject", fields: [fromObjectId], references: [id], onDelete: Cascade)
+  toNode     StructureNode? @relation("RelationshipToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  toObject   StoryObject?   @relation("RelationshipToObject", fields: [toObjectId], references: [id], onDelete: Cascade)
+
+  @@index([fromNodeId])
+  @@index([fromObjectId])
+  @@index([toNodeId])
+  @@index([toObjectId])
+}
