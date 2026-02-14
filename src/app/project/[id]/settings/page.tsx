@@ -1,23 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, Save, Check, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Project } from "@/lib/types";
 
-export default function ProjectSettings() {
-  const params = useParams();
+interface ProjectSettings {
+  id: string;
+  title: string;
+  author: string;
+  synopsis: string;
+  genre: string;
+}
+
+export default function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const projectId = resolvedParams.id;
   const router = useRouter();
-  const projectId = params.id as string;
-
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectSettings | null>(null);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [genre, setGenre] = useState("");
   const [synopsis, setSynopsis] = useState("");
+  const [genre, setGenre] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -26,10 +32,10 @@ export default function ProjectSettings() {
       .then((res) => res.json())
       .then((data) => {
         setProject(data);
-        setTitle(data.title);
-        setAuthor(data.author);
-        setGenre(data.genre);
-        setSynopsis(data.synopsis);
+        setTitle(data.title || "");
+        setAuthor(data.author || "");
+        setSynopsis(data.synopsis || "");
+        setGenre(data.genre || "");
       });
   }, [projectId]);
 
@@ -39,82 +45,100 @@ export default function ProjectSettings() {
     await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, author, genre, synopsis }),
+      body: JSON.stringify({ title, author, synopsis, genre }),
     });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleExport = async (type: "manuscript" | "story-bible") => {
+    const res = await fetch(`/api/projects/${projectId}/export?type=${type}`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title || "export"}-${type}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   if (!project) {
-    return <div className="flex items-center justify-center min-h-screen text-gray-400">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen">
+      <div className="h-1 accent-gradient" />
       <div className="max-w-2xl mx-auto px-6 py-10">
+        {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/project/${projectId}`)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => router.push(`/project/${projectId}`)}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-2xl font-bold">Project Settings</h1>
+          <div className="flex items-center gap-2">
+            <PenLine className="h-4 w-4 text-accent" />
+            <h1 className="text-xl font-semibold text-text-primary">Project Settings</h1>
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg border p-6 space-y-6">
+        {/* Form */}
+        <div className="glass-card p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Title</label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Author</label>
-            <Input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name" />
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Author</label>
+            <Input value={author} onChange={(e) => setAuthor(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Genre</label>
-            <Input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="e.g. Fantasy" />
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Genre</label>
+            <Input value={genre} onChange={(e) => setGenre(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Synopsis</label>
-            <Textarea
-              value={synopsis}
-              onChange={(e) => setSynopsis(e.target.value)}
-              rows={5}
-              placeholder="Brief description of your project..."
-            />
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Synopsis</label>
+            <Textarea value={synopsis} onChange={(e) => setSynopsis(e.target.value)} rows={4} />
           </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={handleSave} disabled={saving || !title.trim()}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Saving..." : "Save"}
-            </Button>
-            {saved && <span className="text-sm text-green-600">Saved!</span>}
-          </div>
-        </div>
 
-        <div className="mt-8 bg-white rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-2">Export</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Export your manuscript as Markdown for sharing with readers.
-          </p>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => window.open(`/api/projects/${projectId}/export?format=full`, "_blank")}
-            >
-              Full Manuscript (.md)
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.open(`/api/projects/${projectId}/export?format=bible`, "_blank")}
-            >
-              Story Bible (.md)
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSave} disabled={saving || !title.trim()} className="gap-1.5">
+              {saving ? (
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : saved ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
             </Button>
           </div>
         </div>
 
-        <div className="mt-4 text-xs text-gray-400">
-          Created: {new Date(project.createdAt).toLocaleDateString()} &middot;
-          Last updated: {new Date(project.updatedAt).toLocaleDateString()}
+        {/* Export */}
+        <div className="glass-card p-6 mt-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Export</h2>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button variant="outline" onClick={() => handleExport("manuscript")} className="gap-1.5">
+              <Download className="h-4 w-4" />
+              Export Manuscript
+            </Button>
+            <Button variant="outline" onClick={() => handleExport("story-bible")} className="gap-1.5">
+              <Download className="h-4 w-4" />
+              Export Story Bible
+            </Button>
+          </div>
         </div>
       </div>
     </main>

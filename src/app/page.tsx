@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, BookOpen, MoreVertical, Trash2, Pencil } from "lucide-react";
+import { Plus, BookOpen, MoreVertical, Trash2, Pencil, PenLine, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,45 +108,73 @@ export default function Dashboard() {
     return count.toString();
   };
 
+  const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-8">
+    <main className="min-h-screen">
+      {/* Accent gradient line at top */}
+      <div className="h-1 accent-gradient" />
+
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Word Coach Annie</h1>
-            <p className="text-gray-500 mt-1">Your writing projects</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                <PenLine className="h-5 w-5 text-accent" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-text-primary">
+                Word Coach Annie
+              </h1>
+            </div>
+            <p className="text-text-muted ml-[52px]">
+              {projects.length > 0
+                ? `${projects.length} project${projects.length !== 1 ? "s" : ""} · ${formatWordCount(totalWords)} words total`
+                : "Your writing projects"}
+            </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
             New Project
           </Button>
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-400">Loading...</div>
+          <div className="flex items-center justify-center py-32">
+            <div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : projects.length === 0 ? (
-          <div className="text-center py-20">
-            <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-lg font-medium text-gray-600 mb-2">No projects yet</h2>
-            <p className="text-gray-400 mb-6">Create your first writing project to get started.</p>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="text-center py-32 animate-fade-in">
+            <div className="h-20 w-20 rounded-2xl bg-surface-raised border border-border flex items-center justify-center mx-auto mb-6">
+              <Sparkles className="h-9 w-9 text-accent" />
+            </div>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">
+              Start your story
+            </h2>
+            <p className="text-text-muted mb-8 max-w-sm mx-auto">
+              Create your first writing project. Organize chapters, characters, and plotlines all in one place.
+            </p>
+            <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
+              <Plus className="h-4 w-4" />
               Create Project
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+            {projects.map((project, i) => (
               <div
                 key={project.id}
-                className="group relative bg-white rounded-lg border border-gray-200 p-5 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer"
+                className="group glass-card p-5 cursor-pointer animate-slide-up"
+                style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}
                 onClick={() => router.push(`/project/${project.id}`)}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{project.title}</h3>
+                    <h3 className="font-semibold text-text-primary truncate group-hover:text-accent transition-colors">
+                      {project.title}
+                    </h3>
                     {project.author && (
-                      <p className="text-sm text-gray-500 mt-0.5">by {project.author}</p>
+                      <p className="text-sm text-text-muted mt-0.5">by {project.author}</p>
                     )}
                   </div>
                   <DropdownMenu>
@@ -154,7 +182,7 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <MoreVertical className="h-4 w-4" />
@@ -166,7 +194,7 @@ export default function Dashboard() {
                         Settings
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="text-red-600"
+                        className="text-danger"
                         onClick={() => setDeleteTarget(project)}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -175,15 +203,19 @@ export default function Dashboard() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+
                 {project.synopsis && (
-                  <p className="text-sm text-gray-500 mt-2 line-clamp-2">{project.synopsis}</p>
+                  <p className="text-sm text-text-secondary mt-1 line-clamp-2 leading-relaxed">
+                    {project.synopsis}
+                  </p>
                 )}
-                <div className="flex items-center gap-3 mt-4 text-xs text-gray-400">
+
+                <div className="flex items-center gap-3 mt-4 text-xs text-text-muted">
                   {project.genre && (
-                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{project.genre}</span>
+                    <span className="tag-pill">{project.genre}</span>
                   )}
-                  <span>{formatWordCount(project.wordCount)} words</span>
-                  <span>Updated {formatDate(project.updatedAt)}</span>
+                  <span className="tabular-nums">{formatWordCount(project.wordCount)} words</span>
+                  <span className="ml-auto">{formatDate(project.updatedAt)}</span>
                 </div>
               </div>
             ))}
@@ -200,7 +232,7 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700">Title *</label>
+              <label className="text-sm font-medium text-text-secondary">Title *</label>
               <Input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
@@ -210,7 +242,7 @@ export default function Dashboard() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Author</label>
+              <label className="text-sm font-medium text-text-secondary">Author</label>
               <Input
                 value={newAuthor}
                 onChange={(e) => setNewAuthor(e.target.value)}
@@ -218,7 +250,7 @@ export default function Dashboard() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Genre</label>
+              <label className="text-sm font-medium text-text-secondary">Genre</label>
               <Input
                 value={newGenre}
                 onChange={(e) => setNewGenre(e.target.value)}
@@ -226,7 +258,7 @@ export default function Dashboard() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Synopsis</label>
+              <label className="text-sm font-medium text-text-secondary">Synopsis</label>
               <Textarea
                 value={newSynopsis}
                 onChange={(e) => setNewSynopsis(e.target.value)}
@@ -260,7 +292,7 @@ export default function Dashboard() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-danger hover:bg-danger-hover"
             >
               Delete
             </AlertDialogAction>

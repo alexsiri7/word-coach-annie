@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { OutlineNode, SceneStatus } from "@/lib/types";
-import { SCENE_STATUS_COLORS } from "@/lib/types";
 
 interface OutlineTreeProps {
   nodes: OutlineNode[];
@@ -35,12 +34,12 @@ interface OutlineTreeProps {
 
 function StatusDot({ status }: { status: SceneStatus }) {
   const colors: Record<SceneStatus, string> = {
-    OUTLINE: "bg-gray-400",
-    DRAFT: "bg-yellow-400",
-    REVISED: "bg-blue-400",
-    FINAL: "bg-green-400",
+    OUTLINE: "bg-text-muted/50",
+    DRAFT: "bg-warning",
+    REVISED: "bg-accent",
+    FINAL: "bg-success",
   };
-  return <span className={cn("inline-block w-2 h-2 rounded-full", colors[status])} />;
+  return <span className={cn("inline-block w-2 h-2 rounded-full flex-shrink-0", colors[status])} />;
 }
 
 function TreeNode({
@@ -69,8 +68,10 @@ function TreeNode({
     <div>
       <div
         className={cn(
-          "group flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer text-sm hover:bg-gray-100",
-          isSelected && "bg-gray-100 font-medium"
+          "group flex items-center gap-1.5 py-1.5 px-2 rounded-lg cursor-pointer text-sm transition-all duration-150",
+          "hover:bg-surface-overlay/60",
+          isSelected && "bg-accent/10 text-accent font-medium",
+          !isSelected && "text-text-secondary"
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => {
@@ -82,28 +83,28 @@ function TreeNode({
         }}
       >
         {!isScene && (
-          <span className="text-gray-400 w-4 flex-shrink-0">
+          <span className="text-text-muted w-4 flex-shrink-0">
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </span>
         )}
         {isScene ? (
-          <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <FileText className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-accent" : "text-text-muted")} />
         ) : node.type === "CHAPTER" ? (
-          <FolderOpen className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <FolderOpen className="h-4 w-4 text-text-muted flex-shrink-0" />
         ) : (
-          <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <BookOpen className="h-4 w-4 text-text-muted flex-shrink-0" />
         )}
         <span className="truncate flex-1">{node.title}</span>
         {isScene && <StatusDot status={node.status as SceneStatus} />}
         {isScene && node.wordCount !== undefined && node.wordCount > 0 && (
-          <span className="text-xs text-gray-400 tabular-nums">{node.wordCount}</span>
+          <span className="text-xs text-text-muted tabular-nums">{node.wordCount}</span>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-3 w-3" />
@@ -130,7 +131,7 @@ function TreeNode({
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-red-600"
+              className="text-danger"
               onClick={() => onDeleteNode(node.id, node.title)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -170,7 +171,7 @@ export function OutlineTree({
   return (
     <div className="py-2">
       {nodes.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-gray-400">
+        <div className="px-4 py-8 text-center text-sm text-text-muted">
           <p>No chapters yet.</p>
           <Button
             variant="ghost"

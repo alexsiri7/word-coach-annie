@@ -70,10 +70,17 @@ export interface ContentVersion {
 }
 
 export const SCENE_STATUS_COLORS: Record<SceneStatus, string> = {
-  OUTLINE: "bg-gray-200 text-gray-700",
-  DRAFT: "bg-yellow-100 text-yellow-800",
-  REVISED: "bg-blue-100 text-blue-800",
-  FINAL: "bg-green-100 text-green-800",
+  OUTLINE: "bg-surface-overlay text-text-muted",
+  DRAFT: "bg-warning/15 text-warning",
+  REVISED: "bg-accent/15 text-accent",
+  FINAL: "bg-success/15 text-success",
+};
+
+export const SCENE_STATUS_DOT_COLORS: Record<SceneStatus, string> = {
+  OUTLINE: "status-outline",
+  DRAFT: "status-draft",
+  REVISED: "status-revised",
+  FINAL: "status-final",
 };
 
 export const STORY_OBJECT_ICONS: Record<StoryObjectType, string> = {
