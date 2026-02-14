@@ -6,16 +6,19 @@
 | Framework | Next.js 15 (App Router) | Full-stack, TypeScript strict |
 | Database | SQLite via Prisma ORM | File: `data/word-coach-annie.db` |
 | UI | React + Tailwind CSS | Will add shadcn/ui as needed |
-| Editor | Tiptap (ProseMirror) | Not yet installed |
-| AI | Gemini CLI (subprocess) | Not yet integrated |
-| Agent API | MCP Server | Running via `src/mcp/` |
-| Testing | Vitest | Configured, no tests yet |
+| Editor | Tiptap (ProseMirror) | Installed and functional |
+| AI | Gemini CLI (subprocess) | Partially integrated (MCP Server) |
+| Agent API | MCP Server | Running (25+ tools) via `src/mcp/` |
+| Testing | Vitest | Configured and passing (50+ tests) |
 | Container | Docker Compose | Running on port 3000 |
 
 ## Project Structure
 ```
 word-coach-annie/
-  memory-bank/         # This context system
+  docs/                # Project documentation
+    memory-bank/       # Progressive context system
+    REQUIREMENTS.md    # Detailed specifications
+    RULES.md           # Instructions for AI agents
   prisma/
     schema.prisma      # Database schema (5 models)
   src/
@@ -28,7 +31,8 @@ word-coach-annie/
   data/
     word-coach-annie.db  # SQLite database
   docker-compose.yml
-  REQUIREMENTS.md
+  CLAUDE.md            # Redirect (root)
+  GEMINI.md            # Redirect (root)
 ```
 
 ## Database Models
