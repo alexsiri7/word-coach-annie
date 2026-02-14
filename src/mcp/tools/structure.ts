@@ -49,6 +49,18 @@ export async function restoreSceneVersion(nodeId: string, versionId: string) {
     return StructureController.restoreSceneVersion(nodeId, versionId);
 }
 
+export async function addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
+    return StructureController.addAnnotation(nodeId, content, range, selectedText);
+}
+
+export async function updateAnnotation(annotationId: string, data: { content?: string; resolved?: boolean }) {
+    return StructureController.updateAnnotation(annotationId, data);
+}
+
+export async function deleteAnnotation(annotationId: string) {
+    return StructureController.deleteAnnotation(annotationId);
+}
+
 export async function resolveAnnotation(annotationId: string, resolved: boolean) {
     return StructureController.resolveAnnotation(annotationId, resolved);
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, BookOpen, MoreVertical, Trash2, Pencil, PenLine, Sparkles } from "lucide-react";
+import { Plus, BookOpen, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -133,10 +133,16 @@ export default function Dashboard() {
                 : "Your writing projects"}
             </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => router.push("/universe")} className="gap-2">
+              <Globe className="h-4 w-4" />
+              Universes
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Project
+            </Button>
+          </div>
         </div>
 
         {loading ? (

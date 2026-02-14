@@ -14,6 +14,9 @@ import {
     writeSceneContent,
     getSceneVersions,
     restoreSceneVersion,
+    addAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
     resolveAnnotation,
     getOpenAnnotations,
 } from "./tools/structure";
@@ -39,6 +42,23 @@ import {
     listDatabaseSnapshots,
     restoreDatabaseSnapshot,
 } from "./tools/snapshots";
+import {
+    listUniverses,
+    getUniverse,
+    createUniverse,
+    updateUniverse,
+    deleteUniverse,
+    listWorldObjects,
+    getWorldObject,
+    createWorldObject,
+    updateWorldObject,
+    deleteWorldObject,
+    addTimelineEntry,
+    updateTimelineEntry,
+    deleteTimelineEntry,
+    linkProjectToUniverse,
+    unlinkProjectFromUniverse,
+} from "./tools/universes";
 
 // Initialize snapshot repo on startup
 try {
@@ -106,6 +126,31 @@ server.tool(
     },
     async ({ projectId, title, author, synopsis, genre }) => {
         const result = await updateProject(projectId, { title, author, synopsis, genre });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "link_project_to_universe",
+    "Link a project to a universe",
+    {
+        projectId: z.string().describe("The project ID"),
+        universeId: z.string().describe("The universe ID"),
+    },
+    async ({ projectId, universeId }) => {
+        const result = await linkProjectToUniverse(projectId, universeId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "unlink_project_from_universe",
+    "Unlink a project from its universe",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async ({ projectId }) => {
+        const result = await unlinkProjectFromUniverse(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -225,11 +270,52 @@ server.tool(
 );
 
 server.tool(
-    "resolve_annotation",
-    "Mark an annotation as resolved (or unresolved).",
+    "add_annotation",
+    "Add an annotation to a node",
     {
-        annotationId: z.string().describe("The annotation ID"),
-        resolved: z.boolean().describe("Whether the annotation is resolved (true) or open (false)"),
+        nodeId: z.string(),
+        content: z.string(),
+        range: z.string().optional(),
+        selectedText: z.string().optional(),
+    },
+    async ({ nodeId, content, range, selectedText }) => {
+        const result = await addAnnotation(nodeId, content, range, selectedText);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_annotation",
+    "Update an existing annotation",
+    {
+        annotationId: z.string(),
+        content: z.string().optional(),
+        resolved: z.boolean().optional(),
+    },
+    async ({ annotationId, ...data }) => {
+        const result = await updateAnnotation(annotationId, data);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "delete_annotation",
+    "Delete an annotation",
+    {
+        annotationId: z.string(),
+    },
+    async ({ annotationId }) => {
+        const result = await deleteAnnotation(annotationId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "resolve_annotation",
+    "Resolve or unresolve an annotation",
+    {
+        annotationId: z.string(),
+        resolved: z.boolean(),
     },
     async ({ annotationId, resolved }) => {
         const result = await resolveAnnotation(annotationId, resolved);
@@ -442,6 +528,185 @@ server.tool(
     },
     async ({ commitHash }) => {
         const result = await restoreDatabaseSnapshot(commitHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Universe Tools ──────────────────────────────────────────────────────────
+
+server.tool(
+    "list_universes",
+    "List all universes",
+    {},
+    async () => {
+        const result = await listUniverses();
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_universe",
+    "Get a universe by ID with its world objects and linked projects",
+    {
+        universeId: z.string().describe("The universe ID"),
+    },
+    async ({ universeId }) => {
+        const result = await getUniverse(universeId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "create_universe",
+    "Create a new universe",
+    {
+        title: z.string().describe("Universe title"),
+        description: z.string().optional().describe("Universe description"),
+    },
+    async (params) => {
+        const result = await createUniverse(params);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_universe",
+    "Update a universe's metadata",
+    {
+        universeId: z.string().describe("The universe ID"),
+        title: z.string().optional().describe("New title"),
+        description: z.string().optional().describe("New description"),
+    },
+    async ({ universeId, ...data }) => {
+        const result = await updateUniverse(universeId, data);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "delete_universe",
+    "Delete a universe and all its world objects and timeline entries",
+    {
+        universeId: z.string().describe("The universe ID"),
+    },
+    async ({ universeId }) => {
+        const result = await deleteUniverse(universeId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "list_world_objects",
+    "List world objects in a universe",
+    {
+        universeId: z.string().describe("The universe ID"),
+        type: z.string().optional().describe("Filter by type (CHARACTER, LOCATION, WORLD_ELEMENT)"),
+    },
+    async ({ universeId, type }) => {
+        const result = await listWorldObjects(universeId, type);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_world_object",
+    "Get a world object by ID with its full timeline",
+    {
+        objectId: z.string().describe("The world object ID"),
+    },
+    async ({ objectId }) => {
+        const result = await getWorldObject(objectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "create_world_object",
+    "Create a new world object in a universe",
+    {
+        universeId: z.string().describe("The universe ID"),
+        type: z.enum(["CHARACTER", "LOCATION", "WORLD_ELEMENT"]).describe("Object type"),
+        name: z.string().describe("Object name"),
+        description: z.string().optional().describe("Description"),
+        notes: z.string().optional().describe("Additional notes"),
+        tags: z.string().optional().describe("Comma-separated tags"),
+    },
+    async (params) => {
+        const result = await createWorldObject(params);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_world_object",
+    "Update a world object's fields",
+    {
+        objectId: z.string().describe("The world object ID"),
+        name: z.string().optional().describe("New name"),
+        description: z.string().optional().describe("New description"),
+        notes: z.string().optional().describe("New notes"),
+        tags: z.string().optional().describe("New tags"),
+        type: z.string().optional().describe("New type"),
+    },
+    async ({ objectId, ...data }) => {
+        const result = await updateWorldObject(objectId, data);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "delete_world_object",
+    "Delete a world object and its timeline",
+    {
+        objectId: z.string().describe("The world object ID"),
+    },
+    async ({ objectId }) => {
+        const result = await deleteWorldObject(objectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "add_timeline_entry",
+    "Add a timeline entry to a world object",
+    {
+        worldObjectId: z.string().describe("The world object ID"),
+        label: z.string().describe("Entry label (e.g. 'Birth')"),
+        description: z.string().optional().describe("Detailed description"),
+        attributes: z.string().optional().describe("JSON blob for structured data"),
+        projectId: z.string().optional().describe("Optional project ID this entry relates to"),
+        orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
+    },
+    async (params) => {
+        const result = await addTimelineEntry(params);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_timeline_entry",
+    "Update a timeline entry",
+    {
+        entryId: z.string().describe("The entry ID"),
+        label: z.string().optional().describe("New label"),
+        description: z.string().optional().describe("New description"),
+        attributes: z.string().optional().describe("New JSON blob"),
+        orderIndex: z.number().optional().describe("New order index"),
+    },
+    async ({ entryId, ...data }) => {
+        const result = await updateTimelineEntry(entryId, data);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "delete_timeline_entry",
+    "Delete a timeline entry",
+    {
+        entryId: z.string().describe("The entry ID"),
+    },
+    async ({ entryId }) => {
+        const result = await deleteTimelineEntry(entryId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

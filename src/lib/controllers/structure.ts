@@ -376,18 +376,24 @@ export class StructureController {
     }
 
     static async resolveAnnotation(annotationId: string, resolved: boolean) {
-        const annotation = await prisma.annotation.update({
+        return prisma.annotation.update({
             where: { id: annotationId },
             data: { resolved },
         });
-
-        return {
-            id: annotation.id,
-            resolved: annotation.resolved,
-            nodeId: annotation.nodeId,
-        };
     }
 
+    static async updateAnnotation(annotationId: string, data: { content?: string; resolved?: boolean }) {
+        return prisma.annotation.update({
+            where: { id: annotationId },
+            data,
+        });
+    }
+
+    static async deleteAnnotation(annotationId: string) {
+        return prisma.annotation.delete({
+            where: { id: annotationId },
+        });
+    }
     static async getOpenAnnotations(projectId?: string) {
         const where: any = { resolved: false };
         if (projectId) {

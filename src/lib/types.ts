@@ -2,11 +2,47 @@
 
 export interface Project {
   id: string;
+  universeId?: string | null;
   title: string;
   author: string;
   synopsis: string;
   genre: string;
   wordCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Universe {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  projects?: { id: string; title: string }[];
+  worldObjects?: WorldObject[];
+}
+
+export interface WorldObject {
+  id: string;
+  universeId: string;
+  type: "CHARACTER" | "LOCATION" | "WORLD_ELEMENT";
+  name: string;
+  description: string;
+  notes: string;
+  tags: string;
+  createdAt: string;
+  updatedAt: string;
+  timeline?: WorldObjectTimelineEntry[];
+}
+
+export interface WorldObjectTimelineEntry {
+  id: string;
+  worldObjectId: string;
+  label: string;
+  orderIndex: number;
+  description: string;
+  attributes: string;
+  projectId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

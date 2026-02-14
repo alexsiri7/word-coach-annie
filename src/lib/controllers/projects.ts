@@ -113,7 +113,7 @@ export class ProjectsController {
 
     static async updateProject(
         projectId: string,
-        data: { title?: string; author?: string; synopsis?: string; genre?: string }
+        data: { title?: string; author?: string; synopsis?: string; genre?: string; universeId?: string | null }
     ) {
         const existing = await prisma.project.findUnique({ where: { id: projectId } });
         if (!existing) throw new Error(`Project not found: ${projectId}`);
@@ -123,6 +123,7 @@ export class ProjectsController {
         if (data.author !== undefined) updateData.author = data.author.trim();
         if (data.synopsis !== undefined) updateData.synopsis = data.synopsis.trim();
         if (data.genre !== undefined) updateData.genre = data.genre.trim();
+        if (data.universeId !== undefined) (updateData as any).universeId = data.universeId;
 
         if (Object.keys(updateData).length === 0) {
             throw new Error("No fields to update");
