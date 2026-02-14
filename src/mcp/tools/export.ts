@@ -1,4 +1,4 @@
-import { prisma } from "../db.js";
+import { prisma } from "@/lib/db";
 
 function htmlToMarkdown(html: string): string {
     if (!html || html === "<p></p>") return "";
@@ -163,7 +163,6 @@ export async function exportStoryBible(projectId: string): Promise<string> {
         }
     }
 
-    // Add relationships
     const relationships = await prisma.relationship.findMany({
         include: {
             fromNode: true,
@@ -201,7 +200,6 @@ export async function getProjectSummary(projectId: string) {
     });
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
-    // Node counts by type and status
     const nodes = await prisma.structureNode.findMany({
         where: { projectId },
         select: { type: true, status: true, id: true },
@@ -217,7 +215,6 @@ export async function getProjectSummary(projectId: string) {
         }
     }
 
-    // Story object counts by type
     const storyObjects = await prisma.storyObject.groupBy({
         by: ["type"],
         where: { projectId },
@@ -229,7 +226,6 @@ export async function getProjectSummary(projectId: string) {
         objectsByType[group.type] = group._count;
     }
 
-    // Total word count
     const sceneIds = nodes.filter((n) => n.type === "SCENE").map((n) => n.id);
     let totalWordCount = 0;
 
@@ -246,7 +242,6 @@ export async function getProjectSummary(projectId: string) {
         totalWordCount = latestVersions.reduce((sum, v) => sum + (v?.wordCount || 0), 0);
     }
 
-    // Relationship count
     const objectIdsForCount = await prisma.storyObject.findMany({
         where: { projectId },
         select: { id: true },
@@ -283,4 +278,3 @@ export async function getProjectSummary(projectId: string) {
         updatedAt: project.updatedAt.toISOString(),
     };
 }
-

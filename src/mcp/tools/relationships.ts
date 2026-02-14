@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import { autoSnapshot } from "../snapshot.js";
+import { prisma } from "@/lib/db";
+import { autoSnapshot } from "../snapshot";
 
 const VALID_RELATIONSHIP_TYPES = [
     "APPEARS_IN",
@@ -98,41 +98,30 @@ export async function createRelationship(params: {
         );
     }
 
-    // Validate exactly one from-field
     const fromFields = [fromNodeId, fromObjectId].filter(Boolean);
     if (fromFields.length !== 1) {
         throw new Error("Exactly one from-field must be provided (fromNodeId or fromObjectId)");
     }
 
-    // Validate exactly one to-field
     const toFields = [toNodeId, toObjectId].filter(Boolean);
     if (toFields.length !== 1) {
         throw new Error("Exactly one to-field must be provided (toNodeId or toObjectId)");
     }
 
-    // Verify entities exist in this project
     if (fromNodeId) {
-        const node = await prisma.structureNode.findFirst({
-            where: { id: fromNodeId, projectId },
-        });
+        const node = await prisma.structureNode.findFirst({ where: { id: fromNodeId, projectId } });
         if (!node) throw new Error("fromNodeId not found in this project");
     }
     if (fromObjectId) {
-        const obj = await prisma.storyObject.findFirst({
-            where: { id: fromObjectId, projectId },
-        });
+        const obj = await prisma.storyObject.findFirst({ where: { id: fromObjectId, projectId } });
         if (!obj) throw new Error("fromObjectId not found in this project");
     }
     if (toNodeId) {
-        const node = await prisma.structureNode.findFirst({
-            where: { id: toNodeId, projectId },
-        });
+        const node = await prisma.structureNode.findFirst({ where: { id: toNodeId, projectId } });
         if (!node) throw new Error("toNodeId not found in this project");
     }
     if (toObjectId) {
-        const obj = await prisma.storyObject.findFirst({
-            where: { id: toObjectId, projectId },
-        });
+        const obj = await prisma.storyObject.findFirst({ where: { id: toObjectId, projectId } });
         if (!obj) throw new Error("toObjectId not found in this project");
     }
 
@@ -185,7 +174,6 @@ export async function deleteRelationship(relationshipId: string) {
     const fromName = existing.fromNode?.title || existing.fromObject?.name || "?";
     const toName = existing.toNode?.title || existing.toObject?.name || "?";
 
-    // Auto-snapshot before deletion
     autoSnapshot("delete_relationship", `${fromName} → ${toName}`);
 
     await prisma.relationship.delete({ where: { id: relationshipId } });

@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import { autoSnapshot } from "../snapshot.js";
+import { prisma } from "@/lib/db";
+import { autoSnapshot } from "../snapshot";
 
 interface OutlineNode {
     id: string;
@@ -32,7 +32,6 @@ export async function getOutline(projectId: string): Promise<OutlineNode[]> {
         },
     });
 
-    // Build tree
     const nodeMap = new Map<string, OutlineNode>();
     const roots: OutlineNode[] = [];
 
@@ -96,7 +95,6 @@ export async function createNode(params: {
         if (!parentNode) throw new Error("Parent node not found in this project");
     }
 
-    // Calculate orderIndex
     let orderIndex: number;
     if (insertAfterIndex !== undefined && insertAfterIndex !== null) {
         orderIndex = insertAfterIndex + 1;
@@ -129,7 +127,6 @@ export async function createNode(params: {
         },
     });
 
-    // Create initial empty content version for scenes
     if (type === "SCENE") {
         await prisma.contentVersion.create({
             data: { nodeId: node.id, content: "", wordCount: 0 },
@@ -204,12 +201,10 @@ export async function deleteNode(nodeId: string) {
     const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
     if (!node) throw new Error(`Node not found: ${nodeId}`);
 
-    // Auto-snapshot before deletion
     autoSnapshot("delete_node", node.title);
 
     await prisma.structureNode.delete({ where: { id: nodeId } });
 
-    // Reindex siblings
     const siblings = await prisma.structureNode.findMany({
         where: { projectId: node.projectId, parentId: node.parentId },
         orderBy: { orderIndex: "asc" },
@@ -310,7 +305,6 @@ export async function restoreSceneVersion(nodeId: string, versionId: string) {
     });
     if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
-    // Create a new version from the old content
     const newVersion = await prisma.contentVersion.create({
         data: {
             nodeId,

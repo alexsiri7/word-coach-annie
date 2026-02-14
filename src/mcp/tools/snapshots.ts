@@ -1,4 +1,8 @@
-import { createSnapshot, listSnapshots as listSnapshotsImpl, restoreSnapshot as restoreSnapshotImpl } from "../snapshot.js";
+import {
+    createSnapshot,
+    listSnapshots as listSnapshotsImpl,
+    restoreSnapshot as restoreSnapshotImpl,
+} from "../snapshot";
 
 export async function snapshotDatabase(message: string) {
     if (!message || message.trim().length === 0) {
@@ -31,6 +35,7 @@ export async function restoreDatabaseSnapshot(commitHash: string) {
         success: true,
         hash: result.hash,
         message: result.message,
-        warning: "The database has been restored. The Prisma client may need to reconnect — if you see errors, restart the MCP server.",
+        warning:
+            "The database has been restored. The Prisma client may need to reconnect — if you see errors, restart the MCP server.",
     };
 }

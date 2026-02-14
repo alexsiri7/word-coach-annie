@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,12 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [genre, setGenre] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Export options
+  const [includeSynopsis, setIncludeSynopsis] = useState(true);
+  const [includeSceneBreaks, setIncludeSceneBreaks] = useState(true);
+  const [chapterNumbering, setChapterNumbering] = useState(true);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -52,16 +58,63 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const buildExportParams = () => {
+    const params = new URLSearchParams();
+    if (!includeSynopsis) params.set("includeSynopsis", "false");
+    if (!includeSceneBreaks) params.set("includeSceneBreaks", "false");
+    if (!chapterNumbering) params.set("chapterNumbering", "false");
+    return params.toString();
+  };
+
   const handleExport = async (type: "manuscript" | "story-bible") => {
-    const res = await fetch(`/api/projects/${projectId}/export?type=${type}`);
-    if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title || "export"}-${type}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
+    setExporting(type);
+    try {
+      const exportParams = buildExportParams();
+      const sep = exportParams ? "&" : "";
+      const res = await fetch(`/api/projects/${projectId}/export?type=${type}${sep}${exportParams}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${title || "export"}-${type}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleChapterExport = async () => {
+    setExporting("chapters");
+    try {
+      const exportParams = buildExportParams();
+      const sep = exportParams ? "&" : "";
+      const res = await fetch(`/api/projects/${projectId}/export?type=chapters${sep}${exportParams}`);
+      if (res.ok) {
+        const data = await res.json();
+        const chapters = data.chapters as { filename: string; content: string }[];
+
+        if (chapters.length === 0) {
+          return;
+        }
+
+        // Download each chapter as a separate file
+        for (const chapter of chapters) {
+          const blob = new Blob([chapter.content], { type: "text/markdown" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = chapter.filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          // Small delay between downloads to avoid browser blocking
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -129,14 +182,102 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         {/* Export */}
         <div className="glass-card p-6 mt-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">Export</h2>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="outline" onClick={() => handleExport("manuscript")} className="gap-1.5">
-              <Download className="h-4 w-4" />
-              Export Manuscript
+
+          {/* Export options */}
+          <div className="mb-5 p-4 rounded-lg bg-surface-overlay/30 border border-border-subtle space-y-3">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Export Options</p>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={includeSynopsis}
+                  onChange={(e) => setIncludeSynopsis(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 rounded-full bg-surface-overlay border border-border peer-checked:bg-accent/30 peer-checked:border-accent/50 transition-all" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-text-muted peer-checked:bg-accent peer-checked:translate-x-4 transition-all" />
+              </div>
+              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                Include synopses
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={includeSceneBreaks}
+                  onChange={(e) => setIncludeSceneBreaks(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 rounded-full bg-surface-overlay border border-border peer-checked:bg-accent/30 peer-checked:border-accent/50 transition-all" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-text-muted peer-checked:bg-accent peer-checked:translate-x-4 transition-all" />
+              </div>
+              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                Scene break dividers
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={chapterNumbering}
+                  onChange={(e) => setChapterNumbering(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 rounded-full bg-surface-overlay border border-border peer-checked:bg-accent/30 peer-checked:border-accent/50 transition-all" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-text-muted peer-checked:bg-accent peer-checked:translate-x-4 transition-all" />
+              </div>
+              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                Chapter numbering
+              </span>
+            </label>
+          </div>
+
+          {/* Export buttons */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Button
+              variant="outline"
+              onClick={() => handleExport("manuscript")}
+              disabled={!!exporting}
+              className="gap-1.5 h-auto py-3 flex-col"
+            >
+              {exporting === "manuscript" ? (
+                <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              <span className="text-xs">Full Manuscript</span>
             </Button>
-            <Button variant="outline" onClick={() => handleExport("story-bible")} className="gap-1.5">
-              <Download className="h-4 w-4" />
-              Export Story Bible
+
+            <Button
+              variant="outline"
+              onClick={handleChapterExport}
+              disabled={!!exporting}
+              className="gap-1.5 h-auto py-3 flex-col"
+            >
+              {exporting === "chapters" ? (
+                <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <BookOpen className="h-4 w-4" />
+              )}
+              <span className="text-xs">Per Chapter</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => handleExport("story-bible")}
+              disabled={!!exporting}
+              className="gap-1.5 h-auto py-3 flex-col"
+            >
+              {exporting === "story-bible" ? (
+                <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="text-xs">Story Bible</span>
             </Button>
           </div>
         </div>

@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { initSnapshotRepo } from "./snapshot.js";
+import { initSnapshotRepo } from "./snapshot";
 
 // Tool implementations
-import { listProjects, getProject, updateProject } from "./tools/projects.js";
+import { listProjects, getProject, updateProject } from "./tools/projects";
 import {
     getOutline,
     createNode,
@@ -14,29 +14,29 @@ import {
     writeSceneContent,
     getSceneVersions,
     restoreSceneVersion,
-} from "./tools/structure.js";
+} from "./tools/structure";
 import {
     listStoryObjects,
     getStoryObject,
     createStoryObject,
     updateStoryObject,
     deleteStoryObject,
-} from "./tools/story-objects.js";
+} from "./tools/story-objects";
 import {
     listRelationships,
     createRelationship,
     deleteRelationship,
-} from "./tools/relationships.js";
+} from "./tools/relationships";
 import {
     exportManuscript,
     exportStoryBible,
     getProjectSummary,
-} from "./tools/export.js";
+} from "./tools/export";
 import {
     snapshotDatabase,
     listDatabaseSnapshots,
     restoreDatabaseSnapshot,
-} from "./tools/snapshots.js";
+} from "./tools/snapshots";
 
 // Initialize snapshot repo on startup
 try {

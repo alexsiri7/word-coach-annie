@@ -1,15 +1,17 @@
 {
     "mcpServers": {
         "word-coach-annie": {
-            "command": "npx",
+            "command": "docker",
             "args": [
+                "compose",
+                "exec",
+                "-T",
+                "app",
+                "npx",
                 "tsx",
-                "mcp-server/src/index.ts"
+                "src/mcp/index.ts"
             ],
-            "cwd": ".",
-            "env": {
-                "DATABASE_URL": "file:../data/word-coach-annie.db"
-            }
+            "cwd": "."
         }
     }
 }

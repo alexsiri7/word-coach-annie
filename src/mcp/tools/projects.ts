@@ -1,4 +1,4 @@
-import { prisma } from "../db.js";
+import { prisma } from "@/lib/db";
 
 export async function listProjects(limit: number = 20, offset: number = 0) {
     const [projects, total] = await Promise.all([
@@ -15,7 +15,6 @@ export async function listProjects(limit: number = 20, offset: number = 0) {
         prisma.project.count(),
     ]);
 
-    // Calculate word counts
     const result = await Promise.all(
         projects.map(async (project) => {
             const scenes = await prisma.structureNode.findMany({

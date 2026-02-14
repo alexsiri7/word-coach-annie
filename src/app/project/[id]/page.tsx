@@ -12,6 +12,7 @@ import {
   Globe,
   StickyNote,
   PenLine,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ import {
 import { OutlineTree } from "@/components/outline-tree";
 import { SceneEditor } from "@/components/scene-editor";
 import { StoryObjectPanel } from "@/components/story-object-panel";
+import { SearchPanel } from "@/components/search-panel";
 import { cn } from "@/lib/utils";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
@@ -76,6 +78,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const [addObjectDialogOpen, setAddObjectDialogOpen] = useState(false);
   const [addObjectType, setAddObjectType] = useState<StoryObjectType>("CHARACTER");
+  const [showSearch, setShowSearch] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
 
   // Data fetching
@@ -194,6 +197,28 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const totalWordCount = project?.wordCount || 0;
 
+  // Map story object types to sidebar tabs
+  const OBJECT_TYPE_TO_TAB: Record<string, SidebarTab> = {
+    CHARACTER: "characters",
+    LOCATION: "locations",
+    PLOTLINE: "plotlines",
+    WORLD_ELEMENT: "world",
+    NOTE: "notes",
+  };
+
+  const handleSearchSelectScene = (sceneId: string) => {
+    setSelectedNodeId(sceneId);
+    setSelectedObjectId(null);
+    setActiveTab("outline");
+  };
+
+  const handleSearchSelectObject = (objectId: string, objectType: string) => {
+    setSelectedObjectId(objectId);
+    setSelectedNodeId(null);
+    const tab = OBJECT_TYPE_TO_TAB[objectType];
+    if (tab) setActiveTab(tab);
+  };
+
   if (!project) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -231,11 +256,30 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          onClick={() => setShowSearch(!showSearch)}
+          title="Search project"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
         >
           <Settings className="h-4 w-4" />
         </Button>
       </header>
+
+      {/* Search panel */}
+      {showSearch && (
+        <SearchPanel
+          projectId={projectId}
+          onSelectScene={handleSearchSelectScene}
+          onSelectObject={handleSearchSelectObject}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}

@@ -13,6 +13,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "@prisma/client": "^6.4.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -34,7 +35,8 @@
     "next": "^15.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
@@ -44,6 +46,7 @@
     "postcss": "^8.5.3",
     "prisma": "^6.4.1",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.7"
   }

@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import { autoSnapshot } from "../snapshot.js";
+import { prisma } from "@/lib/db";
+import { autoSnapshot } from "../snapshot";
 
 const VALID_TYPES = ["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"] as const;
 type StoryObjectType = (typeof VALID_TYPES)[number];
@@ -74,7 +74,6 @@ export async function getStoryObject(objectId: string) {
 
     if (!obj) throw new Error(`Story object not found: ${objectId}`);
 
-    // Flatten relationships into a readable format
     const relatedTo = [
         ...obj.relationships.map((r) => ({
             relationshipId: r.id,
@@ -213,7 +212,6 @@ export async function deleteStoryObject(objectId: string) {
     const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
     if (!obj) throw new Error(`Story object not found: ${objectId}`);
 
-    // Auto-snapshot before deletion
     autoSnapshot("delete_story_object", obj.name);
 
     await prisma.storyObject.delete({ where: { id: objectId } });

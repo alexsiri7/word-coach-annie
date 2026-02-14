@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Resolve the data directory (relative to mcp-server/)
+// Resolve the data directory (relative to src/mcp/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../../data");
 const DB_FILE = "word-coach-annie.db";
@@ -29,6 +29,16 @@ function isGitRepo(): boolean {
  * Called once on MCP server startup.
  */
 export function initSnapshotRepo(): void {
+    // Docker volume mounts may have different ownership — mark data dir as safe
+    try {
+        execSync(`git config --global --add safe.directory ${DATA_DIR}`, {
+            encoding: "utf-8",
+            timeout: 5000,
+        });
+    } catch {
+        // Non-fatal — may already be configured
+    }
+
     if (!isGitRepo()) {
         git("init");
         git(`add ${DB_FILE}`);
@@ -45,10 +55,10 @@ export function createSnapshot(message: string): { hash: string; message: string
         // Check if there are changes to commit
         try {
             git("diff --cached --quiet");
-            // No changes, but we still allow the snapshot with --allow-empty if the message is meaningful
+            // No changes — commit with --allow-empty for the record
             git(`commit --allow-empty -m "${message.replace(/"/g, '\\"')}"`);
         } catch {
-            // There are changes, commit them
+            // There are staged changes, commit them
             git(`commit -m "${message.replace(/"/g, '\\"')}"`);
         }
         const hash = git("rev-parse --short HEAD");
@@ -88,13 +98,9 @@ export function listSnapshots(limit: number = 20): Array<{
  */
 export function restoreSnapshot(commitHash: string): { hash: string; message: string } {
     try {
-        // Verify the commit exists
         git(`cat-file -t ${commitHash}`);
-
-        // Get the DB file content from that commit
         git(`checkout ${commitHash} -- ${DB_FILE}`);
 
-        // Commit as a restore point
         const restoreMessage = `restore: reverted to snapshot ${commitHash}`;
         git(`add ${DB_FILE}`);
         git(`commit -m "${restoreMessage}"`);
