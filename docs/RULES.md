@@ -33,3 +33,8 @@ For project origins: `docs/memory-bank/projectBrief.md`
 - Always run npm/node commands inside the container, never on host
 - Tests should accompany API routes and core logic
 - Keep the memory bank in `docs/memory-bank/` updated so future sessions have full context
+- **MANDATORY**: Follow `.agent/workflows/dev.md` for every code change (test → change → typecheck → test → build → smoke test)
+- **MANDATORY**: Follow `.agent/workflows/implement-feature.md` when implementing new features
+- **Do NOT** make design decisions — if something is ambiguous, ask the user
+- For future features, see `docs/FUTURE_REQUIREMENTS.md` (includes step-by-step Appendix A)
+
