@@ -34,6 +34,7 @@ model ContentVersion {
 
 model Project {
   id             String          @id @default(cuid())
+  universeId     String?
   title          String
   author         String          @default("")
   synopsis       String          @default("")
@@ -42,6 +43,7 @@ model Project {
   updatedAt      DateTime        @updatedAt
   storyObjects   StoryObject[]
   structureNodes StructureNode[]
+  universe       Universe?       @relation(fields: [universeId], references: [id])
 }
 
 model Relationship {
@@ -103,4 +105,45 @@ model StructureNode {
 
   @@index([parentId, orderIndex])
   @@index([projectId])
+}
+
+model Universe {
+  id           String        @id @default(cuid())
+  title        String
+  description  String        @default("")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  projects     Project[]
+  worldObjects WorldObject[]
+}
+
+model WorldObject {
+  id          String                     @id @default(cuid())
+  universeId  String
+  type        String // CHARACTER, LOCATION, WORLD_ELEMENT
+  name        String
+  description String                     @default("")
+  notes       String                     @default("")
+  tags        String                     @default("")
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  universe    Universe                   @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  timeline    WorldObjectTimelineEntry[]
+
+  @@index([universeId, type])
+}
+
+model WorldObjectTimelineEntry {
+  id            String      @id @default(cuid())
+  worldObjectId String
+  label         String // Free-form: "Around 20 years old", "Post-war"
+  orderIndex    Int         @default(0)
+  description   String      @default("")
+  attributes    String      @default("") // JSON blob
+  projectId     String? // Optional: tie to a specific project
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  worldObject   WorldObject @relation(fields: [worldObjectId], references: [id], onDelete: Cascade)
+
+  @@index([worldObjectId, orderIndex])
 }

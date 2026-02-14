@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Word Coach Annie",
   description: "Local fiction writing & book management tool",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

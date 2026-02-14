@@ -17,5 +17,8 @@ beforeEach(async () => {
   await testPrisma.contentVersion.deleteMany();
   await testPrisma.storyObject.deleteMany();
   await testPrisma.structureNode.deleteMany();
+  await testPrisma.worldObjectTimelineEntry.deleteMany();
+  await testPrisma.worldObject.deleteMany();
   await testPrisma.project.deleteMany();
+  await testPrisma.universe.deleteMany();
 });
