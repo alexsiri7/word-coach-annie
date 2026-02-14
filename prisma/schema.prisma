@@ -37,6 +37,7 @@ model StructureNode {
   children StructureNode[] @relation("NodeHierarchy")
 
   contentVersions ContentVersion[]
+  annotations     Annotation[]
   relationships   Relationship[]    @relation("RelationshipFromNode")
   relatedBy       Relationship[]    @relation("RelationshipToNode")
 
@@ -100,4 +101,19 @@ model Relationship {
   @@index([fromObjectId])
   @@index([toNodeId])
   @@index([toObjectId])
+}
+
+model Annotation {
+  id           String   @id @default(cuid())
+  nodeId       String
+  content      String   @default("")
+  resolved     Boolean  @default(false)
+  range        String   @default("") // JSON string {from, to} or similar
+  selectedText String?  // Optional: store selected text for reference
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  node StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
 }

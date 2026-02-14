@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { StructureController } from "@/lib/controllers/structure";
 
+// Deprecated: Use GET /api/projects/[id]/outline instead for the tree structure.
+// If a flat list is needed, we should add a specific method for it, but the UI seems to want a tree.
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -8,43 +10,25 @@ export async function GET(
   const { id: projectId } = await params;
 
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
-    });
+    // For now, return the tree structure as 'tree' property to match what might be expected if we change the frontend
+    // OR if we want to fix the bug, we should probably check what the frontend expects.
+    // The frontend `ProjectPage` calls `/api/projects/${projectId}/nodes` and expects `data.tree`?
+    // Wait, let's look at `src/components/outline-tree.tsx` or `ProjectPage`.
+    // The ProjectPage `fetchOutline` calls `/api/projects/${projectId}/nodes` and expects `res.json()` then `setOutline(data.tree || [])`.
+    // BUT the previous implementation of GET /nodes returned a FLAT list array directly: `return NextResponse.json(result);`.
+    // This means `data.tree` would be undefined on a flat array.
+    // THE BUG is that the frontend expects `{ tree: ... }` or a tree structure, but `/nodes` returned a flat list.
+    // AND the frontend probably changed recently to expect a tree structure from `/nodes`?
+    // actually `src/app/project/[id]/page.tsx` line 94: `setOutline(data.tree || []);`
+    // The `outline` endpoint returns an array of roots.
+    // So I should make this return `{ tree: roots }` using the controller.
 
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
+    const roots = await StructureController.getOutline(projectId);
+    return NextResponse.json({ tree: roots });
+  } catch (error: any) {
+    if (error.message.includes("Project not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-
-    const nodes = await prisma.structureNode.findMany({
-      where: { projectId },
-      orderBy: { orderIndex: "asc" },
-      include: {
-        contentVersions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { wordCount: true },
-        },
-      },
-    });
-
-    const result = nodes.map((node) => {
-      const { contentVersions, ...rest } = node;
-      return {
-        ...rest,
-        wordCount:
-          node.type === "SCENE"
-            ? (contentVersions[0]?.wordCount ?? 0)
-            : undefined,
-      };
-    });
-
-    return NextResponse.json(result);
-  } catch (error) {
     console.error("Failed to list nodes:", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -60,107 +44,29 @@ export async function POST(
   const { id: projectId } = await params;
 
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
-    });
-
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
     const body = await request.json();
-    const { type, title, parentId, synopsis, status, insertAfterIndex } = body;
-
-    if (!type || !title) {
+    // Validate required fields that might trigger controller errors if missing
+    if (!body.type || !body.title) {
       return NextResponse.json(
         { error: "type and title are required" },
         { status: 400 }
       );
     }
 
-    const validTypes = ["PART", "CHAPTER", "SCENE"];
-    if (!validTypes.includes(type)) {
-      return NextResponse.json(
-        { error: `type must be one of: ${validTypes.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `status must be one of: ${validStatuses.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (parentId) {
-      const parentNode = await prisma.structureNode.findFirst({
-        where: { id: parentId, projectId },
-      });
-      if (!parentNode) {
-        return NextResponse.json(
-          { error: "Parent node not found in this project" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Calculate orderIndex
-    let orderIndex: number;
-
-    if (insertAfterIndex !== undefined && insertAfterIndex !== null) {
-      orderIndex = insertAfterIndex + 1;
-
-      // Shift siblings that are at or after the new index
-      await prisma.structureNode.updateMany({
-        where: {
-          projectId,
-          parentId: parentId ?? null,
-          orderIndex: { gte: orderIndex },
-        },
-        data: { orderIndex: { increment: 1 } },
-      });
-    } else {
-      // Append at the end
-      const lastSibling = await prisma.structureNode.findFirst({
-        where: { projectId, parentId: parentId ?? null },
-        orderBy: { orderIndex: "desc" },
-        select: { orderIndex: true },
-      });
-      orderIndex = lastSibling ? lastSibling.orderIndex + 1 : 0;
-    }
-
-    const node = await prisma.structureNode.create({
-      data: {
-        projectId,
-        type,
-        title,
-        parentId: parentId ?? null,
-        synopsis: synopsis ?? "",
-        status: status ?? "OUTLINE",
-        orderIndex,
-      },
+    const node = await StructureController.createNode({
+      projectId,
+      ...body
     });
 
-    // If this is a SCENE, create an initial empty ContentVersion
-    if (type === "SCENE") {
-      await prisma.contentVersion.create({
-        data: {
-          nodeId: node.id,
-          content: "",
-          wordCount: 0,
-        },
-      });
-    }
-
     return NextResponse.json(node, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to create node:", error);
+    if (error.message.includes("Project not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    if (error.message.includes("type must be") || error.message.includes("status must be") || error.message.includes("Parent node not found")) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

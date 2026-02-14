@@ -41,8 +41,20 @@ export function initSnapshotRepo(): void {
 
     if (!isGitRepo()) {
         git("init");
+        // Configure user for this repo
+        git('config user.name "Alex"');
+        git('config user.email "alexsiri7@gmail.com"');
+
         git(`add ${DB_FILE}`);
         git(`commit -m "initial: database snapshot repo initialized"`);
+    } else {
+        // Ensure user config exists even if repo already exists
+        try {
+            git('config user.name "Alex"');
+            git('config user.email "alexsiri7@gmail.com"');
+        } catch {
+            // Ignore errors
+        }
     }
 }
 

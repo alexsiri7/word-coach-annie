@@ -12,6 +12,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - **SQLite**: Single portable database file. Easy to backup, version, or move.
 - **Markdown export**: The primary output is a clean `.md` file ready for readers.
 - **AI-assisted via Gemini CLI**: Uses your existing Gemini quota for brainstorming, analysis, and drafting assistance.
+- **MCP Server**: Provides direct CLI access to project data for AI agents.
 - **Docker-contained**: Runs in a container so it can't mess with your system.
 
 ## Data Model
@@ -116,6 +117,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - **UI**: React + Tailwind CSS + shadcn/ui
 - **Editor**: Tiptap (ProseMirror)
 - **AI**: Gemini CLI (subprocess calls from API routes)
+- **Agent Interface**: MCP Server (Model Context Protocol) via stdio
 - **Testing**: Vitest + React Testing Library
 - **Container**: Docker + Docker Compose
 
@@ -144,3 +146,9 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - Gemini CLI integration for brainstorming/summarization
 - Full-text search
 - UI polish and edge cases
+
+### M6: MCP Server (Agentic Access)
+- Standalone MCP server running inside Docker
+- 25+ tools for project structure, story objects, relationships, and export
+- Git-based database versioning for safety
+- Full read/write access for Gemini CLI agents

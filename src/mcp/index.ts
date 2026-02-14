@@ -4,7 +4,7 @@ import { z } from "zod";
 import { initSnapshotRepo } from "./snapshot";
 
 // Tool implementations
-import { listProjects, getProject, updateProject } from "./tools/projects";
+import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
 import {
     getOutline,
     createNode,
@@ -14,6 +14,8 @@ import {
     writeSceneContent,
     getSceneVersions,
     restoreSceneVersion,
+    resolveAnnotation,
+    getOpenAnnotations,
 } from "./tools/structure";
 import {
     listStoryObjects,
@@ -73,6 +75,21 @@ server.tool(
     },
     async ({ projectId }) => {
         const result = await getProject(projectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "create_project",
+    "Create a new writing project",
+    {
+        title: z.string().describe("Project title"),
+        author: z.string().optional().describe("Author name"),
+        synopsis: z.string().optional().describe("Project synopsis"),
+        genre: z.string().optional().describe("Genre"),
+    },
+    async (params) => {
+        const result = await createProject(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -158,7 +175,7 @@ server.tool(
 
 server.tool(
     "read_scene_content",
-    "Read the latest content of a scene (returns HTML content and word count)",
+    "Read the latest content of a scene (returns HTML content, word count, and list of annotations)",
     {
         nodeId: z.string().describe("The scene node ID"),
     },
@@ -203,6 +220,31 @@ server.tool(
     },
     async ({ nodeId, versionId }) => {
         const result = await restoreSceneVersion(nodeId, versionId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "resolve_annotation",
+    "Mark an annotation as resolved (or unresolved).",
+    {
+        annotationId: z.string().describe("The annotation ID"),
+        resolved: z.boolean().describe("Whether the annotation is resolved (true) or open (false)"),
+    },
+    async ({ annotationId, resolved }) => {
+        const result = await resolveAnnotation(annotationId, resolved);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_open_annotations",
+    "Get all unresolved annotations across the project (or filtered by project ID). Useful as an inbox of tasks.",
+    {
+        projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns all open annotations in the database."),
+    },
+    async ({ projectId }) => {
+        const result = await getOpenAnnotations(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

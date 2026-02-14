@@ -1,9 +1,9 @@
-"use client";
-
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
+import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold,
@@ -23,6 +23,10 @@ import {
   RotateCcw,
   Eye,
   X,
+  MessageSquare,
+  AlertTriangle,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,8 +46,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { StructureNode, SceneStatus, ContentVersion } from "@/lib/types";
+import type { StructureNode, SceneStatus, ContentVersion, Annotation } from "@/lib/types";
+
+// Custom Highlight extension to support IDs
+const AnnotationMark = Highlight.extend({
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-annotation-id'),
+        renderHTML: (attributes) => {
+          if (!attributes.id) {
+            return {};
+          }
+          return {
+            'data-annotation-id': attributes.id,
+            'class': 'bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer',
+          };
+        },
+      },
+    };
+  },
+});
 
 function timeAgo(dateStr: string): string {
   const date = new Date(dateStr);
@@ -82,6 +113,11 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
   const [versionToRestore, setVersionToRestore] = useState<ContentVersion | null>(null);
   const [restoring, setRestoring] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [showAnnotations, setShowAnnotations] = useState(false);
+  const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
+  const [externalChangeDetected, setExternalChangeDetected] = useState(false);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const contentRef = useRef<string>("");
 
   // Load initial content
@@ -91,23 +127,60 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
       .then((data) => {
         setInitialContent(data.latest?.content || "");
         setVersionHistory(data.history || []);
-        if (data.latest?.wordCount !== undefined) {
+        if (data.latest) {
           setWordCount(data.latest.wordCount);
+          setLatestVersionId(data.latest.id);
+        }
+      });
+
+    // Load annotations
+    fetch(`/api/nodes/${node.id}/annotations`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setAnnotations(data);
         }
       });
   }, [node.id]);
+
+  // Polling for external changes
+  useEffect(() => {
+    if (!latestVersionId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        // Just fetch metadata to check latest version
+        const res = await fetch(`/api/nodes/${node.id}/content`);
+        const data = await res.json();
+
+        if (data.latest && data.latest.id !== latestVersionId) {
+          setExternalChangeDetected(true);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [node.id, latestVersionId]);
 
   const saveContent = useCallback(
     async (content: string) => {
       setSaving(true);
       try {
-        await fetch(`/api/nodes/${node.id}/content`, {
+        const res = await fetch(`/api/nodes/${node.id}/content`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         });
-        setLastSaved(new Date().toLocaleTimeString());
-        onNodeUpdated();
+
+        if (res.ok) {
+          const newVersion = await res.json();
+          setLatestVersionId(newVersion.id);
+          setLastSaved(new Date().toLocaleTimeString());
+          setExternalChangeDetected(false);
+          onNodeUpdated();
+        }
       } finally {
         setSaving(false);
       }
@@ -115,11 +188,17 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
     [node.id, onNodeUpdated]
   );
 
+
   const editor = useEditor(
     {
       extensions: [
         StarterKit,
         Underline,
+        AnnotationMark.configure({
+          HTMLAttributes: {
+            class: "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer",
+          },
+        }),
         Placeholder.configure({
           placeholder: "Start writing your scene...",
         }),
@@ -130,6 +209,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
           class: "prose-editor focus:outline-none min-h-full",
         },
       },
+      immediatelyRender: false,
       onUpdate: ({ editor }) => {
         const html = editor.getHTML();
         contentRef.current = html;
@@ -148,6 +228,94 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
     },
     [initialContent]
   );
+
+  const addAnnotation = useCallback(async (text: string) => {
+    if (!editor) return;
+
+    // Get selection range
+    const { from, to } = editor.state.selection;
+    if (from === to) return; // No selection
+
+    const selectedText = editor.state.doc.textBetween(from, to);
+
+    try {
+      const res = await fetch(`/api/nodes/${node.id}/annotations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: text,
+          range: JSON.stringify({ from, to }),
+          selectedText,
+        }),
+      });
+
+      if (res.ok) {
+        const newAnnotation = await res.json();
+        setAnnotations((prev) => [newAnnotation, ...prev]);
+        setShowAnnotations(true);
+        editor.chain().focus().setTextSelection({ from, to }).setMark("annotation", { id: newAnnotation.id }).run();
+        saveContent(editor.getHTML());
+      }
+    } catch (e) {
+      console.error("Failed to add annotation", e);
+    }
+  }, [editor, node.id, saveContent]);
+
+  const deleteAnnotation = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/annotations/${id}`, { method: "DELETE" });
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
+
+      if (editor) {
+        const tr = editor.state.tr;
+        editor.state.doc.descendants((node, pos) => {
+          if (!node.marks) return;
+          node.marks.forEach(mark => {
+            if (mark.type.name === 'annotation' && mark.attrs.id === id) {
+              tr.removeMark(pos, pos + node.nodeSize, mark.type);
+            }
+          });
+        });
+        editor.view.dispatch(tr);
+        saveContent(editor.getHTML());
+      }
+    } catch (e) {
+      console.error("Failed to delete annotation", e);
+    }
+  }, [editor, saveContent]);
+
+  const resolveAnnotation = useCallback(async (id: string, resolved: boolean) => {
+    try {
+      const res = await fetch(`/api/annotations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolved }),
+      });
+
+      if (res.ok) {
+        setAnnotations((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, resolved } : a))
+        );
+      }
+    } catch (e) {
+      console.error("Failed to update annotation status", e);
+    }
+  }, []);
+
+  const handleExternalChange = useCallback(async () => {
+    const res = await fetch(`/api/nodes/${node.id}/content`);
+    const data = await res.json();
+    if (data.latest) {
+      setInitialContent(data.latest.content);
+      if (editor) {
+        editor.commands.setContent(data.latest.content);
+        contentRef.current = data.latest.content;
+      }
+      setLatestVersionId(data.latest.id);
+      setExternalChangeDetected(false);
+      setLastSaved(new Date().toLocaleTimeString());
+    }
+  }, [node.id, editor]);
 
   // Manual save
   const handleManualSave = useCallback(() => {
@@ -261,9 +429,23 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface">
+    <div className="flex flex-col h-full bg-surface relative">
+      {/* External Change Banner */}
+      {externalChangeDetected && (
+        <div className="bg-warning/20 border-b border-warning/30 px-4 py-2 flex items-center justify-between z-50 animate-slide-down">
+          <span className="text-sm text-warning flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            External changes detected
+          </span>
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 hover:bg-warning/20 text-warning" onClick={handleExternalChange}>
+            <RefreshCw className="h-3 w-3" />
+            Refresh
+          </Button>
+        </div>
+      )}
+
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0">
         <div className="flex items-center gap-0.5 mr-3">
           {[
             { icon: Bold, action: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive("bold") },
@@ -333,185 +515,321 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
 
         <div className="flex-1" />
 
-        {/* Status */}
-        <Select value={status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-28 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="OUTLINE">Outline</SelectItem>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="REVISED">Revised</SelectItem>
-            <SelectItem value="FINAL">Final</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", showAnnotations && "bg-accent/15 text-accent")}
+            onClick={() => setShowAnnotations(!showAnnotations)}
+            title={showAnnotations ? "Hide annotations" : "Show annotations"}
+          >
+            <div className="relative">
+              <MessageSquare className="h-4 w-4" />
+              {annotations.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent animate-pulse" />
+              )}
+            </div>
+          </Button>
 
-        {/* Save button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs gap-1.5 ml-2"
-          onClick={handleManualSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <div className="h-3 w-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          ) : lastSaved ? (
-            <Check className="h-3 w-3 text-success" />
-          ) : (
-            <Save className="h-3 w-3" />
-          )}
-          {saving ? "Saving..." : lastSaved ? `Saved` : "Save"}
-        </Button>
+          <Select value={status} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-28 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="OUTLINE">Outline</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="REVISED">Revised</SelectItem>
+              <SelectItem value="FINAL">Final</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Version history */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn("h-8 w-8 ml-1", showVersions && "bg-accent/15 text-accent")}
-          onClick={loadVersionHistory}
-          title="Version history"
-        >
-          <Clock className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs gap-1.5 ml-2"
+            onClick={handleManualSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <div className="h-3 w-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            ) : lastSaved ? (
+              <Check className="h-3 w-3 text-success" />
+            ) : (
+              <Save className="h-3 w-3" />
+            )}
+            {saving ? "Saving..." : lastSaved ? `Saved` : "Save"}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8 ml-1", showVersions && "bg-accent/15 text-accent")}
+            onClick={loadVersionHistory}
+            title="Version history"
+          >
+            <Clock className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Version history panel */}
-      {showVersions && (
-        <div className="border-b border-border bg-surface-raised animate-slide-up">
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-accent" />
-              <span className="text-xs font-medium text-text-secondary">
-                Version History
-              </span>
-              <span className="text-xs text-text-muted">
-                ({versionHistory.length} version{versionHistory.length !== 1 ? "s" : ""})
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => {
-                setShowVersions(false);
-                setPreviewVersion(null);
-                setPreviewContent(null);
-              }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          <div className="space-y-0.5 px-3 pb-3 max-h-48 overflow-y-auto">
-            {versionHistory.length === 0 ? (
-              <div className="text-xs text-text-muted py-3 text-center">No versions saved yet</div>
-            ) : (
-              versionHistory.map((v, i) => (
-                <div
-                  key={v.id}
-                  className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
-                    previewVersion?.id === v.id
-                      ? "bg-accent/10 border border-accent/20"
-                      : i === 0
-                        ? "bg-surface-overlay/30"
-                        : "hover:bg-surface-overlay/50"
-                  )}
+      <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
+        {/* Main Editor Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Version history panel */}
+          {showVersions && (
+            <div className="border-b border-border bg-surface-raised animate-slide-up shrink-0">
+              <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-xs font-medium text-text-secondary">
+                    Version History
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    ({versionHistory.length} version{versionHistory.length !== 1 ? "s" : ""})
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => {
+                    setShowVersions(false);
+                    setPreviewVersion(null);
+                    setPreviewContent(null);
+                  }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-text-secondary whitespace-nowrap">
-                      {timeAgo(v.createdAt)}
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              <div className="space-y-0.5 px-3 pb-3 max-h-48 overflow-y-auto">
+                {versionHistory.length === 0 ? (
+                  <div className="text-xs text-text-muted py-3 text-center">No versions saved yet</div>
+                ) : (
+                  versionHistory.map((v, i) => (
+                    <div
+                      key={v.id}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
+                        previewVersion?.id === v.id
+                          ? "bg-accent/10 border border-accent/20"
+                          : i === 0
+                            ? "bg-surface-overlay/30"
+                            : "hover:bg-surface-overlay/50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-text-secondary whitespace-nowrap">
+                          {timeAgo(v.createdAt)}
+                        </span>
+                        <span className="text-text-muted tabular-nums whitespace-nowrap">
+                          {v.wordCount.toLocaleString()} words
+                        </span>
+                        {i === 0 && (
+                          <span className="tag-pill text-accent text-[10px] py-0">Current</span>
+                        )}
+                      </div>
+
+                      {i > 0 && (
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] px-2 gap-1 text-text-muted hover:text-text-primary"
+                            onClick={() => handlePreviewVersion(v)}
+                          >
+                            <Eye className="h-3 w-3" />
+                            {previewVersion?.id === v.id ? "Hide" : "Preview"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] px-2 gap-1 text-accent hover:text-accent-hover"
+                            onClick={() => {
+                              setVersionToRestore(v);
+                              setRestoreDialogOpen(true);
+                            }}
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Restore
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Version preview */}
+              {previewVersion && (
+                <div className="border-t border-border px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
+                      <Eye className="h-3 w-3 text-accent" />
+                      Preview: {timeAgo(previewVersion.createdAt)}
                     </span>
-                    <span className="text-text-muted tabular-nums whitespace-nowrap">
-                      {v.wordCount.toLocaleString()} words
-                    </span>
-                    {i === 0 && (
-                      <span className="tag-pill text-accent text-[10px] py-0">Current</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[11px] px-2 gap-1 text-accent"
+                      onClick={() => {
+                        setVersionToRestore(previewVersion);
+                        setRestoreDialogOpen(true);
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Restore this version
+                    </Button>
+                  </div>
+                  <div className="version-preview-content rounded-lg bg-surface-sunken border border-border-subtle p-4 max-h-64 overflow-y-auto">
+                    {loadingPreview ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      <div
+                        className="text-sm text-text-secondary leading-relaxed prose-preview"
+                        dangerouslySetInnerHTML={{ __html: previewContent || "" }}
+                      />
                     )}
                   </div>
-
-                  {i > 0 && (
-                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[11px] px-2 gap-1 text-text-muted hover:text-text-primary"
-                        onClick={() => handlePreviewVersion(v)}
-                      >
-                        <Eye className="h-3 w-3" />
-                        {previewVersion?.id === v.id ? "Hide" : "Preview"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[11px] px-2 gap-1 text-accent hover:text-accent-hover"
-                        onClick={() => {
-                          setVersionToRestore(v);
-                          setRestoreDialogOpen(true);
-                        }}
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Restore
-                      </Button>
-                    </div>
-                  )}
                 </div>
-              ))
+              )}
+            </div>
+          )}
+
+          {/* Editor */}
+          <div className="flex-1 overflow-y-auto tiptap-editor relative">
+            <EditorContent editor={editor} className="h-full" />
+            {editor && (
+              <BubbleMenu editor={editor}>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="shadow-lg gap-1.5 h-8 px-2 bg-surface-raised border border-border text-xs"
+                      onClick={(e) => {
+                        // Prevent default if necessary, but PopoverTrigger handles it
+                        const { from, to } = editor.state.selection;
+                        if (from === to) e.preventDefault();
+                      }}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" /> Comment
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-3" align="start" sideOffset={5}>
+                    <div className="flex flex-col gap-2">
+                      <h4 className="font-medium text-xs text-text-secondary">Add Annotation</h4>
+                      <Textarea
+                        placeholder="Type your comment..."
+                        className="text-sm min-h-[80px] w-full"
+                        id="new-annotation-input"
+                        autoFocus
+                      />
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={() => {
+                          const el = document.getElementById('new-annotation-input') as HTMLTextAreaElement;
+                          if (el && el.value.trim()) {
+                            addAnnotation(el.value);
+                            // The mark will be persistent
+                          }
+                        }}>Save</Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </BubbleMenu>
             )}
           </div>
 
-          {/* Version preview */}
-          {previewVersion && (
-            <div className="border-t border-border px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
-                  <Eye className="h-3 w-3 text-accent" />
-                  Preview: {timeAgo(previewVersion.createdAt)}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-[11px] px-2 gap-1 text-accent"
-                  onClick={() => {
-                    setVersionToRestore(previewVersion);
-                    setRestoreDialogOpen(true);
-                  }}
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Restore this version
-                </Button>
-              </div>
-              <div className="version-preview-content rounded-lg bg-surface-sunken border border-border-subtle p-4 max-h-64 overflow-y-auto">
-                {loadingPreview ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <div
-                    className="text-sm text-text-secondary leading-relaxed prose-preview"
-                    dangerouslySetInnerHTML={{ __html: previewContent || "" }}
-                  />
-                )}
-              </div>
-            </div>
-          )}
+          {/* Bottom bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0">
+            <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
+            {lastSaved && (
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3 text-success" />
+                Last saved {lastSaved}
+              </span>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Editor */}
-      <div className="flex-1 overflow-y-auto tiptap-editor">
-        <EditorContent editor={editor} className="h-full" />
-      </div>
+        {/* Annotations Sidebar */}
+        {showAnnotations && (
+          <div className="w-80 border-l border-border bg-surface-raised flex flex-col animate-slide-in-right shrink-0">
+            <div className="p-3 border-b border-border font-medium text-sm flex items-center justify-between bg-surface">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-3.5 w-3.5 text-accent" />
+                <span>Annotations ({annotations.length})</span>
+              </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAnnotations(false)}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {annotations.length === 0 ? (
+                <div className="text-text-muted text-xs text-center py-4 flex flex-col items-center gap-2">
+                  <MessageSquare className="h-8 w-8 opacity-20" />
+                  <p>No annotations yet</p>
+                  <p className="opacity-70">Select text to add a comment</p>
+                </div>
+              ) : (
+                annotations.map(a => (
+                  <div
+                    key={a.id}
+                    className={cn(
+                      "bg-surface border rounded-lg p-3 text-sm shadow-sm group transition-all",
+                      a.resolved
+                        ? "border-border-subtle opacity-60 hover:opacity-100"
+                        : "border-border hover:border-accent/40"
+                    )}
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-5 w-5 mt-0.5 shrink-0 rounded-full border",
+                          a.resolved
+                            ? "bg-accent text-white border-accent hover:bg-accent-hover hover:border-accent-hover"
+                            : "bg-transparent border-input hover:bg-accent/10 hover:border-accent text-transparent hover:text-accent/50"
+                        )}
+                        onClick={() => resolveAnnotation(a.id, !a.resolved)}
+                        title={a.resolved ? "Mark as unresolved" : "Mark as resolved"}
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                      <div className={cn("text-text-secondary whitespace-pre-wrap leading-relaxed flex-1", a.resolved && "line-through text-text-muted")}>
+                        {a.content}
+                      </div>
+                    </div>
 
-      {/* Bottom bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted">
-        <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
-        {lastSaved && (
-          <span className="flex items-center gap-1">
-            <Check className="h-3 w-3 text-success" />
-            Last saved {lastSaved}
-          </span>
+                    {a.selectedText && (
+                      <div className="mb-2 pl-7">
+                        <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic truncate border border-border-subtle">
+                          "{a.selectedText}"
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs text-text-muted pl-7">
+                      <span>{timeAgo(a.createdAt)}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 -mr-1 text-text-muted hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => deleteAnnotation(a.id)}
+                        title="Delete annotation"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         )}
       </div>
 

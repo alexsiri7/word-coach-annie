@@ -70,6 +70,17 @@ export interface ContentVersion {
   createdAt: string;
 }
 
+export interface Annotation {
+  id: string;
+  nodeId: string;
+  content: string;
+  range: string;
+  selectedText?: string | null;
+  resolved: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const SCENE_STATUS_COLORS: Record<SceneStatus, string> = {
   OUTLINE: "bg-surface-overlay text-text-muted",
   DRAFT: "bg-warning/15 text-warning",

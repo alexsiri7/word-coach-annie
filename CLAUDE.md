@@ -17,6 +17,8 @@ For project origins: `memory-bank/projectBrief.md`
 - Push DB schema: `docker compose exec app npx prisma db push`
 - View DB: `docker compose exec app npx prisma studio`
 - View logs: `docker compose logs -f`
+- Run MCP Server (manual): `docker compose exec app npx tsx src/mcp/index.ts`
+- **Gemini CLI**: Run `gemini` in project root (auto-connects to MCP)
 
 ## Workflow
 1. Edit source files directly (they're volume-mounted into the container)

@@ -11,14 +11,15 @@ M5: AI Integration & Polish
 - Markdown export: full manuscript, per-chapter, story bible — all with configurable options
 - Full-text search API across scenes and story objects
 - Dashboard, Project page, Scene Editor, Story Object panel all functional
-- Dark theme premium UI design
+- Dashboard, Project page, Scene Editor, Story Object panel all functional
+- Dark theme premium UI design (Search, Version History, Settings updated)
+- MCP Server integrated (25 tools + git safety snapshots)
 - 49 tests passing (Prisma-level + API-level)
 
 ## Immediate Goals
+## Immediate Goals
 1. Gemini CLI integration for AI features (F8)
-2. Search UI in Project page connected to /api/projects/[id]/search
-3. UI polish and edge case handling
-4. Consider full-text search UI (search bar in header)
+2. UI polish and edge case handling
 
 ## Blockers
 None.

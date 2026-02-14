@@ -8,6 +8,7 @@
 | UI | React + Tailwind CSS | Will add shadcn/ui as needed |
 | Editor | Tiptap (ProseMirror) | Not yet installed |
 | AI | Gemini CLI (subprocess) | Not yet integrated |
+| Agent API | MCP Server | Running via `src/mcp/` |
 | Testing | Vitest | Configured, no tests yet |
 | Container | Docker Compose | Running on port 3000 |
 
@@ -21,6 +22,9 @@ word-coach-annie/
     app/               # Next.js App Router pages
     lib/
       db.ts            # Prisma client singleton
+    mcp/               # MCP Server implementation
+      index.ts         # Server entry point
+      tools/           # Tool implementations
   data/
     word-coach-annie.db  # SQLite database
   docker-compose.yml
@@ -40,6 +44,7 @@ word-coach-annie/
 - SQLite file persisted via Docker volume mount to `./data/`
 - Source mounted into container for hot reload
 - Commands run inside container: `docker compose exec app <cmd>`
+- MCP server runs inside Docker for shared environment/schema
 
 ## Conventions
 - TypeScript strict mode

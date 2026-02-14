@@ -7,6 +7,7 @@
 - [x] **M3**: Story objects & relationships
 - [x] **M4**: Export & versioning
 - [ ] **M5**: AI integration & polish
+- [x] **M6**: MCP Server (Agentic Access)
 
 ## Completed Work
 
@@ -44,7 +45,22 @@
 - Fixed Project type to include optional wordCount field
 - All 49 tests passing
 
+### 2026-02-14: M6 - MCP Server Integration
+- Implemented full MCP server with 25 tools
+- Integrated into main project (`src/mcp/`) running inside Docker
+- Added Git-based database snapshots for safety
+- Configured Gemini CLI to connect via Docker exec
+- Added `create_project` tool per user request
+- Consolidated documentation (`CLAUDE.md`, `REQUIREMENTS.md`, `memory-bank`)
+
+### 2026-02-14: M5 - UI Integration (Backend Features)
+- **Search**: Integrated `SearchPanel` with debounced input and highlighted snippets
+- **Versioning**: Enhanced `SceneEditor` with version preview and restore confirmation
+- **Export**: Added toggle options and per-chapter export to Settings page
+- **Fixes**: Resolved 500 error on app startup (corrupted build)
+- **Verification**: Manually verified all new UI flows
+
+
 ## Next Steps
-- **M5**: Gemini CLI integration for AI brainstorming/summarization
-- **M5**: Full-text search UI in the project page
+- **M5**: Gemini CLI integration for AI brainstorming/summarization (F8)
 - **M5**: UI polish and edge case handling

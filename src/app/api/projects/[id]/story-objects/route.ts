@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-
-const VALID_TYPES = [
-  "CHARACTER",
-  "LOCATION",
-  "PLOTLINE",
-  "WORLD_ELEMENT",
-  "NOTE",
-] as const;
-
-type StoryObjectType = (typeof VALID_TYPES)[number];
+import { StoryObjectController } from "@/lib/controllers/story-objects";
 
 export async function GET(
   request: NextRequest,
@@ -17,9 +7,11 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params;
-
     const { searchParams } = request.nextUrl;
-    const type = searchParams.get("type");
+
+    // Extract query params
+    const type = searchParams.get("type") || undefined;
+    const search = searchParams.get("search") || undefined;
     const limit = Math.min(
       Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
       200
@@ -28,58 +20,33 @@ export async function GET(
       parseInt(searchParams.get("offset") || "0", 10) || 0,
       0
     );
-    const search = searchParams.get("search");
 
-    // Validate type filter if provided
-    if (type && !VALID_TYPES.includes(type as StoryObjectType)) {
-      return NextResponse.json(
-        {
-          error: `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
+    const result = await StoryObjectController.listStoryObjects({
+      projectId,
+      type,
+      search,
+      limit,
+      offset
     });
 
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
-    const where: Record<string, unknown> = { projectId };
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (search) {
-      where.name = { contains: search };
-    }
-
-    const [storyObjects, total] = await Promise.all([
-      prisma.storyObject.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.storyObject.count({ where }),
-    ]);
+    // The controller returns { objects, total }
+    // The API previously returned { data: storyObjects, total, limit, offset }
+    // We map `objects` to `data` to maintain API compatibility
 
     return NextResponse.json({
-      data: storyObjects,
-      total,
+      data: result.objects,
+      total: result.total,
       limit,
       offset,
     });
-  } catch (error) {
+
+  } catch (error: any) {
+    if (error.message.includes("Project not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    if (error.message.includes("Invalid type")) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("GET /api/projects/[id]/story-objects error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -95,19 +62,6 @@ export async function POST(
   try {
     const { id: projectId } = await params;
 
-    // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
-    });
-
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -118,53 +72,22 @@ export async function POST(
       );
     }
 
-    const { type, name, description, notes, role, tags } = body as {
-      type?: string;
-      name?: string;
-      description?: string;
-      notes?: string;
-      role?: string;
-      tags?: string;
-    };
+    // We pass the body directly to the controller, casting it to the expected type
+    // The controller validates required fields like name and type.
 
-    // Validate required fields
-    if (!type) {
-      return NextResponse.json(
-        { error: "type is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!VALID_TYPES.includes(type as StoryObjectType)) {
-      return NextResponse.json(
-        {
-          error: `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: "name is required and must be a non-empty string" },
-        { status: 400 }
-      );
-    }
-
-    const storyObject = await prisma.storyObject.create({
-      data: {
-        projectId,
-        type,
-        name: name.trim(),
-        ...(description !== undefined && { description }),
-        ...(notes !== undefined && { notes }),
-        ...(role !== undefined && { role }),
-        ...(tags !== undefined && { tags }),
-      },
+    const storyObject = await StoryObjectController.createStoryObject({
+      projectId,
+      ...(body as any)
     });
 
     return NextResponse.json(storyObject, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes("Project not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    if (error.message.includes("name is required") || error.message.includes("Invalid type") || error.message.includes("type is required")) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("POST /api/projects/[id]/story-objects error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
