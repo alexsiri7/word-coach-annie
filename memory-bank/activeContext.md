@@ -14,7 +14,7 @@ M5: AI Integration & Polish
 - Dashboard, Project page, Scene Editor, Story Object panel all functional
 - Dark theme premium UI design (Search, Version History, Settings updated)
 - MCP Server integrated (25 tools + git safety snapshots)
-- 49 tests passing (Prisma-level + API-level)
+- 53 tests passing (Prisma-level + Controller-level + API-level)
 
 ## Immediate Goals
 ## Immediate Goals

@@ -13,6 +13,7 @@ export const testPrisma = new PrismaClient({
 // Clean all tables before each test
 beforeEach(async () => {
   await testPrisma.relationship.deleteMany();
+  await testPrisma.annotation.deleteMany();
   await testPrisma.contentVersion.deleteMany();
   await testPrisma.storyObject.deleteMany();
   await testPrisma.structureNode.deleteMany();
