@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { StructureController } from "@/lib/controllers/structure";
 
 export async function GET(
     request: NextRequest,
@@ -11,16 +12,6 @@ export async function GET(
         const annotations = await prisma.annotation.findMany({
             where: { nodeId },
             orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                content: true,
-                resolved: true,
-                range: true,
-                selectedText: true,
-                createdAt: true,
-                updatedAt: true,
-                nodeId: true
-            }
         });
 
         return NextResponse.json(annotations);
@@ -43,28 +34,20 @@ export async function POST(
         const body = await request.json();
         const { content, range, selectedText } = body;
 
-        if (!content) {
-            return NextResponse.json(
-                { error: "Content is required" },
-                { status: 400 }
-            );
-        }
-
-        const annotation = await prisma.annotation.create({
-            data: {
-                nodeId,
-                content,
-                range: range || "",
-                selectedText: selectedText || null,
-            },
-        });
+        const annotation = await StructureController.addAnnotation(
+            nodeId,
+            content,
+            range,
+            selectedText
+        );
 
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {
         console.error("Failed to create annotation:", error);
+        const message = error instanceof Error ? error.message : "Internal server error";
         return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
+            { error: message },
+            { status: message === "Content is required" ? 400 : 500 }
         );
     }
 }

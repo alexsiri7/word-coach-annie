@@ -17,7 +17,7 @@ export class ProjectsController {
         ]);
 
         const result = await Promise.all(
-            projects.map(async (project) => {
+            projects.map(async (project: any) => {
                 const scenes = await prisma.structureNode.findMany({
                     where: { projectId: project.id, type: "SCENE" },
                     select: { id: true },
@@ -26,7 +26,7 @@ export class ProjectsController {
                 let wordCount = 0;
                 if (scenes.length > 0) {
                     const latestVersions = await Promise.all(
-                        scenes.map((scene) =>
+                        scenes.map((scene: any) =>
                             prisma.contentVersion.findFirst({
                                 where: { nodeId: scene.id },
                                 orderBy: { createdAt: "desc" },
@@ -34,7 +34,7 @@ export class ProjectsController {
                             })
                         )
                     );
-                    wordCount = latestVersions.reduce((sum, v) => sum + (v?.wordCount || 0), 0);
+                    wordCount = latestVersions.reduce((sum: number, v: any) => sum + (v?.wordCount || 0), 0);
                 }
 
                 return {

@@ -231,6 +231,24 @@ export class StructureController {
         return { deleted: true, id: nodeId, title: node.title };
     }
 
+    static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
+        if (!content) throw new Error("Content is required");
+
+        // Manual ID and timestamp generation as a workaround for Prisma client issues
+        const annotation = await prisma.annotation.create({
+            data: {
+                id: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                nodeId,
+                content,
+                range,
+                selectedText,
+                updatedAt: new Date(),
+            },
+        });
+
+        return annotation;
+    }
+
     static async readSceneContent(nodeId: string) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
@@ -255,7 +273,7 @@ export class StructureController {
             wordCount: version?.wordCount ?? 0,
             versionId: version?.id ?? null,
             lastModified: version?.createdAt.toISOString() ?? null,
-            annotations: annotations.map(a => ({
+            annotations: annotations.map((a: any) => ({
                 id: a.id,
                 content: a.content,
                 resolved: a.resolved,
@@ -278,6 +296,20 @@ export class StructureController {
         const version = await prisma.contentVersion.create({
             data: { nodeId, content, wordCount },
         });
+
+        // Prune old versions (keep latest 50)
+        const allVersions = await prisma.contentVersion.findMany({
+            where: { nodeId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+        });
+
+        if (allVersions.length > 50) {
+            const idsToDelete = allVersions.slice(50).map((v: { id: string }) => v.id);
+            await prisma.contentVersion.deleteMany({
+                where: { id: { in: idsToDelete } },
+            });
+        }
 
         return {
             nodeId,
@@ -305,7 +337,7 @@ export class StructureController {
         return {
             nodeId,
             title: node.title,
-            versions: versions.map((v) => ({
+            versions: versions.map((v: any) => ({
                 id: v.id,
                 wordCount: v.wordCount,
                 createdAt: v.createdAt.toISOString(),
@@ -376,7 +408,7 @@ export class StructureController {
             orderBy: { createdAt: "desc" }
         });
 
-        return annotations.map(a => ({
+        return annotations.map((a: any) => ({
             id: a.id,
             content: a.content,
             nodeId: a.nodeId,

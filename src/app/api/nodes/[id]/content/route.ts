@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-// Maximum number of content versions to keep per scene
-const MAX_VERSIONS_PER_SCENE = 50;
+import { StructureController } from "@/lib/controllers/structure";
 
 export async function GET(
   request: NextRequest,
@@ -11,15 +9,6 @@ export async function GET(
   const { id: nodeId } = await params;
 
   try {
-    const node = await prisma.structureNode.findUnique({
-      where: { id: nodeId },
-      select: { id: true, type: true },
-    });
-
-    if (!node) {
-      return NextResponse.json({ error: "Node not found" }, { status: 404 });
-    }
-
     const searchParams = request.nextUrl.searchParams;
     const versionId = searchParams.get("versionId");
 
@@ -36,27 +25,23 @@ export async function GET(
       return NextResponse.json(version);
     }
 
-    // Otherwise return latest + history
+    // Otherwise use controller to get latest + history + annotations
+    const result = await StructureController.readSceneContent(nodeId);
+
     const versions = await prisma.contentVersion.findMany({
       where: { nodeId },
       orderBy: { createdAt: "desc" },
+      select: { id: true, wordCount: true, createdAt: true },
     });
 
-    if (versions.length === 0) {
-      return NextResponse.json({
-        latest: null,
-        history: [],
-      });
-    }
-
-    const latest = versions[0];
-    const history = versions.map((v: { id: string; wordCount: number; createdAt: Date }) => ({
-      id: v.id,
-      wordCount: v.wordCount,
-      createdAt: v.createdAt,
-    }));
-
-    return NextResponse.json({ latest, history });
+    return NextResponse.json({
+      latest: result,
+      history: versions.map((v: { id: string; wordCount: number; createdAt: Date }) => ({
+        id: v.id,
+        wordCount: v.wordCount,
+        createdAt: v.createdAt
+      }))
+    });
   } catch (error) {
     console.error("Failed to get content:", error);
     return NextResponse.json(
@@ -73,15 +58,6 @@ export async function POST(
   const { id: nodeId } = await params;
 
   try {
-    const node = await prisma.structureNode.findUnique({
-      where: { id: nodeId },
-      select: { id: true, type: true },
-    });
-
-    if (!node) {
-      return NextResponse.json({ error: "Node not found" }, { status: 404 });
-    }
-
     const body = await request.json();
     const { content } = body;
 
@@ -92,38 +68,8 @@ export async function POST(
       );
     }
 
-    if (typeof content !== "string") {
-      return NextResponse.json(
-        { error: "content must be a string" },
-        { status: 400 }
-      );
-    }
-
-    const wordCount = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
-
-    const version = await prisma.contentVersion.create({
-      data: {
-        nodeId,
-        content,
-        wordCount,
-      },
-    });
-
-    // Prune old versions beyond MAX_VERSIONS_PER_SCENE
-    const allVersions = await prisma.contentVersion.findMany({
-      where: { nodeId },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-
-    if (allVersions.length > MAX_VERSIONS_PER_SCENE) {
-      const idsToDelete = allVersions.slice(MAX_VERSIONS_PER_SCENE).map((v: { id: string }) => v.id);
-      await prisma.contentVersion.deleteMany({
-        where: { id: { in: idsToDelete } },
-      });
-    }
-
-    return NextResponse.json(version, { status: 201 });
+    const result = await StructureController.writeSceneContent(nodeId, content);
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("Failed to save content:", error);
     return NextResponse.json(
@@ -133,7 +79,6 @@ export async function POST(
   }
 }
 
-// PATCH /api/nodes/[id]/content - Restore a previous version
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -141,15 +86,6 @@ export async function PATCH(
   const { id: nodeId } = await params;
 
   try {
-    const node = await prisma.structureNode.findUnique({
-      where: { id: nodeId },
-      select: { id: true, type: true },
-    });
-
-    if (!node) {
-      return NextResponse.json({ error: "Node not found" }, { status: 404 });
-    }
-
     const body = await request.json();
     const { versionId } = body;
 
@@ -160,32 +96,8 @@ export async function PATCH(
       );
     }
 
-    // Find the version to restore
-    const sourceVersion = await prisma.contentVersion.findFirst({
-      where: { id: versionId, nodeId },
-    });
-
-    if (!sourceVersion) {
-      return NextResponse.json(
-        { error: "Version not found for this node" },
-        { status: 404 }
-      );
-    }
-
-    // Create a new version with the old content (restore = create new from old)
-    const wordCount = sourceVersion.content.trim() === ""
-      ? 0
-      : sourceVersion.content.trim().split(/\s+/).length;
-
-    const restoredVersion = await prisma.contentVersion.create({
-      data: {
-        nodeId,
-        content: sourceVersion.content,
-        wordCount,
-      },
-    });
-
-    return NextResponse.json(restoredVersion, { status: 201 });
+    const result = await StructureController.restoreSceneVersion(nodeId, versionId);
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("Failed to restore content version:", error);
     return NextResponse.json(
