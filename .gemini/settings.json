@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+        "word-coach-annie": {
+            "command": "npx",
+            "args": [
+                "tsx",
+                "mcp-server/src/index.ts"
+            ],
+            "cwd": ".",
+            "env": {
+                "DATABASE_URL": "file:../data/word-coach-annie.db"
+            }
+        }
+    }
+}

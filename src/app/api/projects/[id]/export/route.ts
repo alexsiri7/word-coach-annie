@@ -13,6 +13,12 @@ interface OutlineNode {
   content?: string;
 }
 
+interface ExportOptions {
+  includeSynopsis: boolean;
+  includeSceneBreaks: boolean;
+  chapterNumbering: boolean;
+}
+
 function htmlToMarkdown(html: string): string {
   if (!html || html === "<p></p>") return "";
 
@@ -62,7 +68,7 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   });
 
   // Get latest content for all scenes
-  const sceneIds = nodes.filter((n) => n.type === "SCENE").map((n) => n.id);
+  const sceneIds = nodes.filter((n: { type: string }) => n.type === "SCENE").map((n: { id: string }) => n.id);
   const contentMap: Record<string, string> = {};
 
   for (const sceneId of sceneIds) {
@@ -101,7 +107,8 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
 
 function exportFullManuscript(
   project: { title: string; author: string; synopsis: string; genre: string },
-  outline: OutlineNode[]
+  outline: OutlineNode[],
+  options: ExportOptions = { includeSynopsis: true, includeSceneBreaks: true, chapterNumbering: true }
 ): string {
   const lines: string[] = [];
 
@@ -109,7 +116,7 @@ function exportFullManuscript(
   lines.push(`# ${project.title}`);
   if (project.author) lines.push(`\n*by ${project.author}*`);
   if (project.genre) lines.push(`\n**Genre:** ${project.genre}`);
-  if (project.synopsis) lines.push(`\n> ${project.synopsis}`);
+  if (options.includeSynopsis && project.synopsis) lines.push(`\n> ${project.synopsis}`);
   lines.push("\n---\n");
 
   let chapterNum = 0;
@@ -117,21 +124,37 @@ function exportFullManuscript(
   function renderNode(node: OutlineNode, depth: number) {
     if (node.type === "PART") {
       lines.push(`\n# ${node.title}\n`);
+      if (options.includeSynopsis && node.synopsis) {
+        lines.push(`> ${node.synopsis}\n`);
+      }
       for (const child of node.children) {
         renderNode(child, depth + 1);
       }
     } else if (node.type === "CHAPTER") {
       chapterNum++;
-      lines.push(`\n## Chapter ${chapterNum}: ${node.title}\n`);
+      const heading = options.chapterNumbering
+        ? `\n## Chapter ${chapterNum}: ${node.title}\n`
+        : `\n## ${node.title}\n`;
+      lines.push(heading);
+      if (options.includeSynopsis && node.synopsis) {
+        lines.push(`> ${node.synopsis}\n`);
+      }
       for (const child of node.children) {
         renderNode(child, depth + 1);
       }
     } else if (node.type === "SCENE") {
+      if (options.includeSynopsis && node.synopsis) {
+        lines.push(`*${node.synopsis}*\n`);
+      }
       if (node.content) {
         const md = htmlToMarkdown(node.content);
         if (md) {
           lines.push(md);
-          lines.push("\n\n---\n");
+          if (options.includeSceneBreaks) {
+            lines.push("\n\n---\n");
+          } else {
+            lines.push("\n");
+          }
         }
       }
     }
@@ -142,6 +165,61 @@ function exportFullManuscript(
   }
 
   return lines.join("\n").replace(/\n{4,}/g, "\n\n\n");
+}
+
+function exportChapters(
+  project: { title: string },
+  outline: OutlineNode[],
+  options: ExportOptions
+): { filename: string; content: string }[] {
+  const chapters: { filename: string; content: string }[] = [];
+  let chapterNum = 0;
+
+  function collectChapters(nodes: OutlineNode[]) {
+    for (const node of nodes) {
+      if (node.type === "PART") {
+        collectChapters(node.children);
+      } else if (node.type === "CHAPTER") {
+        chapterNum++;
+        const lines: string[] = [];
+        const heading = options.chapterNumbering
+          ? `# Chapter ${chapterNum}: ${node.title}`
+          : `# ${node.title}`;
+        lines.push(heading);
+        if (options.includeSynopsis && node.synopsis) {
+          lines.push(`\n> ${node.synopsis}`);
+        }
+        lines.push("\n");
+
+        for (const scene of node.children) {
+          if (scene.type === "SCENE" && scene.content) {
+            if (options.includeSynopsis && scene.synopsis) {
+              lines.push(`*${scene.synopsis}*\n`);
+            }
+            const md = htmlToMarkdown(scene.content);
+            if (md) {
+              lines.push(md);
+              if (options.includeSceneBreaks) {
+                lines.push("\n\n---\n");
+              } else {
+                lines.push("\n");
+              }
+            }
+          }
+        }
+
+        const safeTitle = node.title.replace(/[^a-zA-Z0-9]/g, "_");
+        const numStr = String(chapterNum).padStart(2, "0");
+        chapters.push({
+          filename: `${numStr}_${safeTitle}.md`,
+          content: lines.join("\n").replace(/\n{4,}/g, "\n\n\n"),
+        });
+      }
+    }
+  }
+
+  collectChapters(outline);
+  return chapters;
 }
 
 async function exportStoryBible(projectId: string, projectTitle: string): Promise<string> {
@@ -194,7 +272,7 @@ async function exportStoryBible(projectId: string, projectTitle: string): Promis
   });
 
   // Filter to only this project's relationships
-  const projectRelationships = relationships.filter((r) => {
+  const projectRelationships = relationships.filter((r: { fromNode?: { projectId: string } | null; fromObject?: { projectId: string } | null; toNode?: { projectId: string } | null; toObject?: { projectId: string } | null }) => {
     const fromProjectId = r.fromNode?.projectId || r.fromObject?.projectId;
     const toProjectId = r.toNode?.projectId || r.toObject?.projectId;
     return fromProjectId === projectId || toProjectId === projectId;
@@ -219,24 +297,49 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const format = request.nextUrl.searchParams.get("format") || "full";
+  const searchParams = request.nextUrl.searchParams;
+
+  // Accept both "format" and "type" params for compatibility
+  const format = searchParams.get("format") || searchParams.get("type") || "full";
+
+  // Parse export options
+  const options: ExportOptions = {
+    includeSynopsis: searchParams.get("includeSynopsis") !== "false",
+    includeSceneBreaks: searchParams.get("includeSceneBreaks") !== "false",
+    chapterNumbering: searchParams.get("chapterNumbering") !== "false",
+  };
 
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  let markdown: string;
-  let filename: string;
+  // Map aliases: "manuscript" -> "full", "story-bible" -> "bible"
+  let resolvedFormat = format;
+  if (format === "manuscript") resolvedFormat = "full";
+  if (format === "story-bible") resolvedFormat = "bible";
 
-  if (format === "bible") {
-    markdown = await exportStoryBible(id, project.title);
-    filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}_story_bible.md`;
-  } else {
-    const outline = await buildOutlineTree(id);
-    markdown = exportFullManuscript(project, outline);
-    filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`;
+  if (resolvedFormat === "bible") {
+    const markdown = await exportStoryBible(id, project.title);
+    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}_story_bible.md`;
+    return new NextResponse(markdown, {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
   }
+
+  if (resolvedFormat === "chapters") {
+    const outline = await buildOutlineTree(id);
+    const chapters = exportChapters(project, outline, options);
+    return NextResponse.json({ chapters });
+  }
+
+  // Default: full manuscript
+  const outline = await buildOutlineTree(id);
+  const markdown = exportFullManuscript(project, outline, options);
+  const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`;
 
   return new NextResponse(markdown, {
     headers: {

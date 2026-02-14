@@ -6,6 +6,7 @@ export interface Project {
   author: string;
   synopsis: string;
   genre: string;
+  wordCount?: number;
   createdAt: string;
   updatedAt: string;
 }
