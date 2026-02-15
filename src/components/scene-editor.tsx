@@ -27,7 +27,6 @@ import {
   AlertTriangle,
   RefreshCw,
   Trash2,
-  Trash2,
   Bookmark,
   Maximize,
 } from "lucide-react";

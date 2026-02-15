@@ -13,6 +13,7 @@ import {
   StickyNote,
   PenLine,
   Search,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -265,7 +266,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/timeline`)}
+          title="Timeline View"
+        >
+          <Activity className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
+          title="Project Settings"
         >
           <Settings className="h-4 w-4" />
         </Button>
