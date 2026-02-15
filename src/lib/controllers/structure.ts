@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../../mcp/snapshot";
+import type { SceneBlock } from "@/lib/types";
 
 export interface OutlineNode {
     id: string;
@@ -14,6 +15,47 @@ export interface OutlineNode {
 }
 
 export class StructureController {
+    static parseSceneContent(content: string): SceneBlock[] {
+        const blocks: SceneBlock[] = [];
+        const regex = /(<!-- beat:[\s\S]*?-->)/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(content)) !== null) {
+            // Content before the beat
+            if (match.index > lastIndex) {
+                const text = content.substring(lastIndex, match.index);
+                if (text) {
+                    blocks.push({ type: "CONTENT", content: text });
+                }
+            }
+
+            // The beat itself
+            const beatComment = match[1];
+            // Extract content inside <!-- beat: ... -->
+            const beatContent = beatComment.replace(/^<!-- beat:\s*/, "").replace(/\s*-->$/, "");
+            blocks.push({ type: "BEAT", content: beatContent });
+
+            lastIndex = regex.lastIndex;
+        }
+
+        // Remaining content
+        if (lastIndex < content.length) {
+            blocks.push({ type: "CONTENT", content: content.substring(lastIndex) });
+        }
+
+        return blocks;
+    }
+
+    static serializeSceneContent(blocks: SceneBlock[]): string {
+        return blocks.map(block => {
+            if (block.type === "BEAT") {
+                return `<!-- beat: ${block.content.trim()} -->`;
+            }
+            return block.content;
+        }).join("");
+    }
+
     private static validateSceneContent(content: string) {
         // Validate beats: ensure they don't contain nested comments or broken syntax
         // Simple check: count of "<!-- beat:" must match count of "-->" (roughly)
@@ -296,10 +338,13 @@ export class StructureController {
             orderBy: { createdAt: "asc" },
         });
 
+        const content = version?.content ?? "";
+
         return {
             nodeId,
             title: node.title,
-            content: version?.content ?? "",
+            content: content,
+            blocks: StructureController.parseSceneContent(content),
             wordCount: version?.wordCount ?? 0,
             versionId: version?.id ?? null,
             lastModified: version?.createdAt.toISOString() ?? null,
@@ -350,6 +395,11 @@ export class StructureController {
             wordCount,
             createdAt: version.createdAt.toISOString(),
         };
+    }
+
+    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[]) {
+        const content = StructureController.serializeSceneContent(blocks);
+        return StructureController.writeSceneContent(nodeId, content);
     }
 
     static async getSceneVersions(nodeId: string, limit: number = 20) {

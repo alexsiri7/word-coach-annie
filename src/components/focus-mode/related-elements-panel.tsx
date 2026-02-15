@@ -35,7 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
 export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedElementsPanelProps) {
     if (collapsed) {
         return (
-            <div className="w-12 border-l bg-background flex flex-col items-center py-4 gap-4 h-screen">
+            <div className="w-12 border-l bg-background flex flex-col items-center py-4 gap-4 h-full">
                 <Button variant="ghost" size="icon" onClick={onToggle} title="Expand Related">
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -46,7 +46,7 @@ export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedE
     const hasElements = Object.values(elements).some(arr => arr.length > 0);
 
     return (
-        <div className="w-80 border-l bg-background flex flex-col h-screen">
+        <div className="w-80 border-l bg-background flex flex-col h-full">
             <div className="p-4 border-b flex items-center justify-between">
                 <Button variant="ghost" size="icon" onClick={onToggle} className="h-6 w-6">
                     <ChevronRight className="h-4 w-4" />
@@ -79,7 +79,7 @@ export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedE
                                                 <div className="font-medium text-sm mb-1">{item.name}</div>
                                                 {item.role && <div className="text-xs text-muted-foreground italic mb-2">{item.role}</div>}
                                                 {item.description && (
-                                                    <div className="text-xs text-muted-foreground line-clamp-3 mb-2">{item.description}</div>
+                                                    <div className="text-xs text-muted-foreground mb-2">{item.description}</div>
                                                 )}
                                                 {item.notes && (
                                                     <div className="text-xs bg-muted/50 p-2 rounded mt-2 border-l-2 border-primary/20">

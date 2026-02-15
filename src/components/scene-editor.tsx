@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -59,13 +61,34 @@ import type { StructureNode, SceneStatus, ContentVersion, Annotation } from "@/l
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
 
 // Helper to convert HTML comments to beat nodes for Tiptap
-const commentsToBeats = (html: string) => {
-  return html.replace(/<!-- beat: (.*?) -->/g, '<div data-beat="$1" data-type="beat-annotation"></div>');
+export const commentsToBeats = (html: string) => {
+  return html.replace(/<!-- beat: ([\s\S]*?) -->/g, (match, content) => {
+    return `<div data-type="beat-annotation">${content}</div>`;
+  });
 };
 
 // Helper to convert beat nodes back to HTML comments for storage
-const beatsToComments = (html: string) => {
-  return html.replace(/<div data-beat="(.*?)" data-type="beat-annotation"><\/div>/g, '<!-- beat: $1 -->');
+export const beatsToComments = (html: string) => {
+  if (typeof window === "undefined") return html;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const beats = doc.querySelectorAll('div[data-type="beat-annotation"]');
+
+  beats.forEach((beat) => {
+    const content = beat.innerHTML;
+    // Create comment with the content
+    // We use the exact format expected by the regex: " beat: " + content + " "
+    // Actually the regex is /<!-- beat: (.*?) -->/g
+    // So we just need to ensure it matches.
+    // The previous implementation used space padding sometimes?
+    // Let's construct the string manually to be safe and replace the outerHTML
+    // replacing with comment node might be cleaner but we need the string representation eventually.
+    // But beat.replaceWith(commentNode) works in the DOM.
+    const comment = doc.createComment(` beat: ${content} `);
+    beat.replaceWith(comment);
+  });
+
+  return doc.body.innerHTML;
 };
 
 // Custom Highlight extension to support IDs
@@ -193,7 +216,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
           setLatestVersionId(newVersion.id);
           setLastSaved(new Date().toLocaleTimeString());
           setExternalChangeDetected(false);
-          onNodeUpdated();
+          onNodeUpdated?.();
         }
       } finally {
         setSaving(false);
@@ -229,8 +252,19 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         const html = editor.getHTML();
         contentRef.current = html;
 
-        const text = editor.state.doc.textContent;
-        const words = text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+        // Custom word count excluding beats
+        let textContent = "";
+        editor.state.doc.descendants((node) => {
+          if (node.type.name === "beatAnnotation") {
+            return false; // Skip traversing children of beats (though they are inline currently)
+          }
+          if (node.isText) {
+            textContent += node.text + " ";
+          }
+          return true;
+        });
+
+        const words = textContent.trim() === "" ? 0 : textContent.trim().split(/\s+/).length;
         setWordCount(words);
 
         if (saveTimeoutRef.current) {
@@ -346,21 +380,16 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const insertBeat = useCallback(() => {
     if (!editor) return;
 
-    // Prompt for beat content
-    // In a real app we might use a custom dialog, but prompt() is fine for now
-    // or insert empty and let user edit (but our node is text-based attr, not editable text content for now)
-    // The BeatComponent displays node.attrs.text. 
-    // We should probably make it editable or prompt.
-    // For this iteration, let's use prompt to be safe.
-    const text = window.prompt("Enter beat description:");
-    if (text) {
-      editor.chain().focus().insertContent({
-        type: "beatAnnotation",
-        attrs: { text },
-      }).run();
-    }
-  }, [editor]);
+    editor.chain().focus().insertContent({
+      type: "beatAnnotation",
+      content: [], // Empty content
+    }).run();
 
+    // Attempt to focus the last inserted node? 
+    // insertContent moves selection to end of inserted content.
+    // Since it's empty, it should be inside the beat?
+    // Let's verify. If fails, we might need to select it explicitly.
+  }, [editor]);
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -378,7 +407,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
-    onNodeUpdated();
+    onNodeUpdated?.();
   };
 
   // Load version history
@@ -440,7 +469,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         setPreviewVersion(null);
         setPreviewContent(null);
         setShowVersions(false);
-        onNodeUpdated();
+        onNodeUpdated?.();
 
         // Reload version history
         const histRes = await fetch(`/api/nodes/${node.id}/content`);

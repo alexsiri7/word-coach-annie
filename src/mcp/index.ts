@@ -13,6 +13,7 @@ import {
     deleteNode,
     readSceneContent,
     writeSceneContent,
+    writeSceneContentFromBlocks,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -261,14 +262,25 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Creates a new version (previous versions are preserved). Content should be HTML formatted (the editor uses Tiptap/ProseMirror).",
+    "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array). Creates a new version.",
     {
         nodeId: z.string().describe("The scene node ID"),
-        content: z.string().describe("The HTML content to write"),
+        content: z.string().optional().describe("The HTML content to write"),
+        blocks: z.array(z.object({
+            type: z.enum(["CONTENT", "BEAT"]),
+            content: z.string()
+        })).optional().describe("Structured content blocks")
     },
-    async ({ nodeId, content }) => {
-        const result = await writeSceneContent(nodeId, content);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    async ({ nodeId, content, blocks }) => {
+        if (blocks) {
+            const result = await writeSceneContentFromBlocks(nodeId, blocks as any[]);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        if (content !== undefined) {
+            const result = await writeSceneContent(nodeId, content);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        throw new Error("Either 'content' or 'blocks' must be provided");
     }
 );
 

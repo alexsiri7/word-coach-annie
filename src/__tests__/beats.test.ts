@@ -62,7 +62,7 @@ describe("Scene Beats", () => {
 
         it("should accept content without beats", async () => {
             (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
-            (prisma.contentVersion.create as any).mockResolvedValue({});
+            (prisma.contentVersion.create as any).mockResolvedValue({ id: "v1", createdAt: new Date() });
             (prisma.contentVersion.findMany as any).mockResolvedValue([]);
 
             const content = "<p>Just normal text.</p>";
@@ -114,6 +114,63 @@ describe("Scene Beats", () => {
             expect(markdown).toContain("Text.");
             expect(markdown).toContain("More.");
             expect(markdown).not.toContain("Multi-line");
+        });
+    });
+
+    describe("Parsing and Logic (StructureController)", () => {
+        it("should parse content into blocks correctly", () => {
+            const raw = "<p>Opening.</p><!-- beat: Action --> <p>Closing.</p>";
+            const blocks = StructureController.parseSceneContent(raw);
+
+            expect(blocks).toHaveLength(3);
+            expect(blocks[0]).toEqual({ type: "CONTENT", content: "<p>Opening.</p>" });
+            expect(blocks[1]).toEqual({ type: "BEAT", content: "Action" }); // My impl trims beat content inside? Let's check impl.
+            // Ah, my impl does `beatComment.replace(/^<!-- beat:\s*/, "").replace(/\s*-->$/, "")`
+            // So if raw is `<!-- beat: Action -->`, `beatContent` becomes `Action`.
+            // But if there are trailing/leading spaces inside the comment, they might remain if regex doesn't catch them all or trims them.
+            // My regex was `replace(/\s*-->$/, "")`. So it trims trailing spaces before `-->`.
+            // `replace(/^<!-- beat:\s*/, "")`. It trims leading spaces after `beat:`.
+            // So `Action` (with space before Action but handled by `\s*`) -> `Action`.
+            // Wait, `<!-- beat: Action -->`. `^<!-- beat:\s*` matches `<!-- beat: ` (space).
+            // So content is `Action `. Wait, `\s*-->$` matches ` -->`.
+            // So `Action`. Correct.
+
+            expect(blocks[2]).toEqual({ type: "CONTENT", content: " <p>Closing.</p>" });
+        });
+
+        it("should serialize blocks back to HTML string with beat comments", () => {
+            const blocks = [
+                { type: "CONTENT", content: "<p>Start</p>" },
+                { type: "BEAT", content: "Middle Beat" },
+                { type: "CONTENT", content: "<p>End</p>" }
+            ] as any; // Cast to avoid TS issues if defining blocks manually in test without full type import
+
+            const serialized = StructureController.serializeSceneContent(blocks);
+            expect(serialized).toBe("<p>Start</p><!-- beat: Middle Beat --><p>End</p>");
+        });
+
+        it("should handle writeSceneContentFromBlocks", async () => {
+            const mockNode = { id: "scene-blocks", type: "SCENE", title: "Blocks Test" };
+            (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
+            (prisma.contentVersion.create as any).mockResolvedValue({ id: "v2", wordCount: 5, createdAt: new Date() });
+            (prisma.contentVersion.findMany as any).mockResolvedValue([]);
+
+            const blocks = [
+                { type: "CONTENT", content: "Text" },
+                { type: "BEAT", content: "Beat" }
+            ];
+
+            await StructureController.writeSceneContentFromBlocks("scene-blocks", blocks as any);
+
+            expect(prisma.structureNode.findUnique).toHaveBeenCalledWith({ where: { id: "scene-blocks" }, select: expect.any(Object) });
+            // Verify create was called with serialized content
+            const expectedContent = "Text<!-- beat: Beat -->";
+            expect(prisma.contentVersion.create).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({
+                    nodeId: "scene-blocks",
+                    content: expectedContent
+                })
+            }));
         });
     });
 });

@@ -13,3 +13,4 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=file:/app/data/word-coach-annie.db
+    command: npm run dev:secure

@@ -41,6 +41,10 @@ export async function writeSceneContent(nodeId: string, content: string) {
     return StructureController.writeSceneContent(nodeId, content);
 }
 
+export async function writeSceneContentFromBlocks(nodeId: string, blocks: any[]) {
+    return StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+}
+
 export async function getSceneVersions(nodeId: string, limit: number = 20) {
     return StructureController.getSceneVersions(nodeId, limit);
 }

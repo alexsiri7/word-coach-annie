@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        const projectId = params.projectId;
+        const { projectId } = await params;
         const data = await TimelineController.getTimelineData(projectId);
         return NextResponse.json(data);
     } catch (error) {

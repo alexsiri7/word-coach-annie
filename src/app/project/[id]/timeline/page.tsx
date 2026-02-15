@@ -9,9 +9,10 @@ export const metadata: Metadata = {
 export default async function TimelinePage({
     params,
 }: {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 }) {
-    const projectId = params.id;
+    const { id } = await params;
+    const projectId = id;
     const timelineData = await TimelineController.getTimelineData(projectId);
 
     return (

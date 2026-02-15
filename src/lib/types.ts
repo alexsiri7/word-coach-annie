@@ -138,3 +138,10 @@ export const STORY_OBJECT_ICONS: Record<StoryObjectType, string> = {
   WORLD_ELEMENT: "Globe",
   NOTE: "StickyNote",
 };
+
+export type SceneBlockType = "CONTENT" | "BEAT";
+
+export interface SceneBlock {
+  type: SceneBlockType;
+  content: string;
+}
