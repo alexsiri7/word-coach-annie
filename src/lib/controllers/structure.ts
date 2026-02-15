@@ -14,6 +14,36 @@ export interface OutlineNode {
 }
 
 export class StructureController {
+    private static validateSceneContent(content: string) {
+        // Validate beats: ensure they don't contain nested comments or broken syntax
+        // Simple check: count of "<!-- beat:" must match count of "-->" (roughly)
+        // Better: ensure every "<!-- beat:" is closed by "-->" and no nesting.
+
+        const openBeats = (content.match(/<!-- beat:/g) || []).length;
+        const closeComments = (content.match(/-->/g) || []).length;
+
+        // This is a loose check because "-->" checks for any comment closure.
+        // But since we only use comments for beats mostly, it's a good heuristic.
+        // If content has normal HTML comments, this might be strict. 
+        // But we want to discourage manual HTML comments in scenes anyway.
+
+        if (content.includes("<!-- beat:")) {
+            // Basic structure check
+            const segments = content.split("<!-- beat:");
+            for (let i = 1; i < segments.length; i++) {
+                const segment = segments[i];
+                const closeIndex = segment.indexOf("-->");
+                if (closeIndex === -1) {
+                    throw new Error("Malformed scene content: Unclosed beat annotation found.");
+                }
+                // Check for nesting
+                if (segment.substring(0, closeIndex).includes("<!--")) {
+                    throw new Error("Malformed scene content: Nested comments in beats are not allowed.");
+                }
+            }
+        }
+    }
+
     static async getOutline(projectId: string): Promise<OutlineNode[]> {
         const project = await prisma.project.findUnique({
             where: { id: projectId },
@@ -290,6 +320,8 @@ export class StructureController {
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
+
+        StructureController.validateSceneContent(content);
 
         const wordCount = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
 

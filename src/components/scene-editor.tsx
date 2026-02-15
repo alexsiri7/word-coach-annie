@@ -27,6 +27,9 @@ import {
   AlertTriangle,
   RefreshCw,
   Trash2,
+  Trash2,
+  Bookmark,
+  Maximize,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +57,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { StructureNode, SceneStatus, ContentVersion, Annotation } from "@/lib/types";
+import { BeatAnnotation } from "@/components/editor/extensions/beat";
+
+// Helper to convert HTML comments to beat nodes for Tiptap
+const commentsToBeats = (html: string) => {
+  return html.replace(/<!-- beat: (.*?) -->/g, '<div data-beat="$1" data-type="beat-annotation"></div>');
+};
+
+// Helper to convert beat nodes back to HTML comments for storage
+const beatsToComments = (html: string) => {
+  return html.replace(/<div data-beat="(.*?)" data-type="beat-annotation"><\/div>/g, '<!-- beat: $1 -->');
+};
 
 // Custom Highlight extension to support IDs
 const AnnotationMark = Highlight.extend({
@@ -95,10 +109,11 @@ function timeAgo(dateStr: string): string {
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
-  onNodeUpdated: () => void;
+  onNodeUpdated?: () => void;
+  showFocusButton?: boolean;
 }
 
-export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps) {
+export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -125,7 +140,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
     fetch(`/api/nodes/${node.id}/content`)
       .then((res) => res.json())
       .then((data) => {
-        setInitialContent(data.latest?.content || "");
+        setInitialContent(commentsToBeats(data.latest?.content || ""));
         setVersionHistory(data.history || []);
         if (data.latest) {
           setWordCount(data.latest.wordCount);
@@ -171,7 +186,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
         const res = await fetch(`/api/nodes/${node.id}/content`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content: beatsToComments(content) }),
         });
 
         if (res.ok) {
@@ -202,6 +217,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
         Placeholder.configure({
           placeholder: "Start writing your scene...",
         }),
+        BeatAnnotation,
       ],
       content: initialContent || "",
       editorProps: {
@@ -306,10 +322,11 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
     const res = await fetch(`/api/nodes/${node.id}/content`);
     const data = await res.json();
     if (data.latest) {
-      setInitialContent(data.latest.content);
+      const converted = commentsToBeats(data.latest.content);
+      setInitialContent(converted);
       if (editor) {
-        editor.commands.setContent(data.latest.content);
-        contentRef.current = data.latest.content;
+        editor.commands.setContent(converted);
+        contentRef.current = converted;
       }
       setLatestVersionId(data.latest.id);
       setExternalChangeDetected(false);
@@ -326,6 +343,24 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
       saveContent(contentRef.current);
     }
   }, [saveContent]);
+
+  const insertBeat = useCallback(() => {
+    if (!editor) return;
+
+    // Prompt for beat content
+    // In a real app we might use a custom dialog, but prompt() is fine for now
+    // or insert empty and let user edit (but our node is text-based attr, not editable text content for now)
+    // The BeatComponent displays node.attrs.text. 
+    // We should probably make it editable or prompt.
+    // For this iteration, let's use prompt to be safe.
+    const text = window.prompt("Enter beat description:");
+    if (text) {
+      editor.chain().focus().insertContent({
+        type: "beatAnnotation",
+        attrs: { text },
+      }).run();
+    }
+  }, [editor]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -506,6 +541,18 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
 
         <div className="w-px h-5 bg-border mx-1" />
 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={insertBeat}
+          title="Insert Beat"
+        >
+          <Bookmark className="h-4 w-4" />
+        </Button>
+
+        <div className="w-px h-5 bg-border mx-1" />
+
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().undo().run()}>
           <Undo className="h-4 w-4" />
         </Button>
@@ -530,6 +577,18 @@ export function SceneEditor({ node, projectId, onNodeUpdated }: SceneEditorProps
               )}
             </div>
           </Button>
+
+          {showFocusButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => window.location.href = `/project/${projectId}/scene/${node.id}/focus`}
+              title="Focus Mode"
+            >
+              <Maximize className="h-4 w-4" />
+            </Button>
+          )}
 
           <Select value={status} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-28 h-8 text-xs">

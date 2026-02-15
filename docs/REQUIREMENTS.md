@@ -43,6 +43,12 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - Optional label/description on each relationship
 - Examples: "Alice APPEARS_IN Chapter 3 Scene 2", "Tavern LOCATED_AT Kingdom of Eld"
 
+### Universes
+- **Universe**: High-level container for shared world-building (optional)
+- **WorldObject**: Renamed from StoryObject when scoped to a Universe (CHARACTER, LOCATION, WORLD_ELEMENT)
+- **WorldObjectTimelineEntry**: Ordered events tracking how a world object evolves over time
+- Note: Characters/Locations/WorldElements are now primarily Universe-scoped entities linked to projects.
+
 ### Content Versioning
 - Scene content is versioned: each save creates a new version
 - Can view history and restore previous versions
@@ -100,6 +106,20 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F9.1: Full-text search across all scene content
 - F9.2: Search/filter story objects by name
 
+### F10: Universe Management (Implemented)
+- F10.1: Create, rename, delete universes
+- F10.2: Link/unlink projects to/from a universe
+- F10.3: CRUD for universe-scoped world objects (Characters, Locations, World Elements)
+- F10.4: Timeline entries: track character evolution with ordered events
+- F10.5: Top-level Universes page alongside Dashboard
+
+### F11: MCP Skills Architecture (Implemented)
+- F11.1: Curated `.skills/` directory with writing skill instruction sets (Markdown)
+- F11.2: Skill loader parses metadata from SKILL.md
+- F11.3: Skills registered as MCP Prompts (discoverable via list_prompts)
+- F11.4: `list_skills` tool returns metadata
+- F11.5: 6 core skills: Developmental Edit, Line Edit, Consistency Check, Plot Structure, Character Arc, Scene Drafting
+
 ## Non-Functional Requirements
 
 - **NF1**: Response time < 200ms for all local operations
@@ -149,6 +169,16 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 
 ### M6: MCP Server (Agentic Access)
 - Standalone MCP server running inside Docker
-- 25+ tools for project structure, story objects, relationships, and export
+- 40+ tools including Universe and WorldObject management
 - Git-based database versioning for safety
 - Full read/write access for Gemini CLI agents
+
+### M7: Universes (Completed)
+- Universe data model and API
+- WorldObject timeline entries
+- MCP tools for world building
+
+### M8: MCP Skills (Completed)
+- Skill loader and registry
+- Initial set of 6 writing skills
+- Integration with MCP Prompts

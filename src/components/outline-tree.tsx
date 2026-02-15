@@ -11,6 +11,7 @@ import {
   Trash2,
   Pencil,
   BookOpen,
+  Maximize,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +131,12 @@ function TreeNode({
               <Pencil className="h-4 w-4 mr-2" />
               Rename
             </DropdownMenuItem>
+            {isScene && (
+              <DropdownMenuItem onClick={() => window.location.href = `/project/${node.projectId}/scene/${node.id}/focus`}>
+                <Maximize className="h-4 w-4 mr-2" />
+                Focus Mode
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="text-danger"
               onClick={() => onDeleteNode(node.id, node.title)}

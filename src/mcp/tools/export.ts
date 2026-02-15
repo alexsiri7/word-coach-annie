@@ -4,6 +4,11 @@ function htmlToMarkdown(html: string): string {
     if (!html || html === "<p></p>") return "";
 
     let md = html;
+
+    // Valid HTML comments for beats (<!-- beat: ... -->)
+    // We strip these first to ensure they don't get mangled by the tag stripper
+    md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
+
     md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
     md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
     md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");

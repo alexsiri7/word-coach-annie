@@ -79,90 +79,7 @@ The MCP spec (as of Nov 2025) supports **OAuth 2.1** natively:
 
 ---
 
-## FR2: Decoupling World Building from Stories
 
-### Problem
-Currently, `StoryObject` (characters, locations, world elements, etc.) belongs to a single
-`Project`. But world-building assets — magic systems, factions, geographies, character
-backstories — often span multiple stories set in the same universe.
-
-### Proposed Model: Universes
-
-```
-Universe (NEW)
-  ├── WorldObject (renamed from StoryObject when type = WORLD_ELEMENT, LOCATION, CHARACTER)
-  │     ├── name, description, notes, tags
-  │     └── belongs to Universe, can be linked to many Projects
-  │
-  └── Projects[]
-        └── Project-scoped StoryObject (PLOTLINE, NOTE — story-specific)
-```
-
-#### Schema Changes
-
-```prisma
-model Universe {
-  id          String         @id @default(cuid())
-  userId      String?        // for cloud mode
-  title       String
-  description String         @default("")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  projects    Project[]
-  worldObjects WorldObject[]
-}
-
-model WorldObject {
-  id          String    @id @default(cuid())
-  universeId  String
-  type        String    // CHARACTER, LOCATION, WORLD_ELEMENT
-  name        String
-  description String    @default("")
-  notes       String    @default("")
-  tags        String    @default("")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  universe    Universe  @relation(fields: [universeId], references: [id])
-  timeline    WorldObjectTimelineEntry[]
-  // relationships remain polymorphic — add worldObjectId columns
-}
-
-// Timeline tracks how a WorldObject (especially characters) evolves over time.
-// Each entry is a snapshot: "At this point in the timeline, here's what's true."
-// This enables consistency checks within a story and across stories.
-model WorldObjectTimelineEntry {
-  id            String      @id @default(cuid())
-  worldObjectId String
-  label         String      // Free-form: "Around 20 years old", "Post-war", "Book 2 Ch.3"
-  orderIndex    Int         @default(0)  // ENFORCED ordering — defines canonical sequence
-  description   String      @default("")  // What changed / what's true at this point
-  attributes    String      @default("")  // JSON blob for structured data (age, status, etc.)
-  projectId     String?     // Optional: which project/story this entry relates to
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  worldObject   WorldObject @relation(fields: [worldObjectId], references: [id], onDelete: Cascade)
-
-  @@index([worldObjectId, orderIndex])
-}
-// Labels start vague ("Around 20 years old, lost all his hair") and get refined
-// as stories develop ("At 22 years old, during the Siege of Keld"). The orderIndex
-// is the source of truth for sequence; labels are descriptive, not structural.
-```
-
-#### Key Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| **`Universe` is optional** | A Project can exist without a Universe (standalone stories). `Project.universeId` is nullable. |
-| **✅ Universe is a top-level page** | Universe gets its own page alongside the Dashboard (not a tab inside Project). Users manage universes, their world objects, and see which projects are linked. |
-| **✅ Characters have a timeline** | Instead of simple project-level overrides, characters (and other world objects) have an ordered timeline of entries tracking how they evolve. This lets you see "Kira at age 15" vs "Kira at age 30" and maintain consistency within and across stories. |
-| **Plotlines stay project-scoped** | A plotline is specific to a story's arc. Notes too. |
-| **Backward compatible** | Existing data migrates by auto-creating a Universe per Project and moving world-type StoryObjects into WorldObjects. |
-
-#### MCP Updates
-New tools: `list_universes`, `create_universe`, `get_universe`, `list_world_objects`, `create_world_object`, `link_project_to_universe`.
-
----
 
 ## FR3: Article / Non-Fiction Writing Use Case
 
@@ -207,112 +124,7 @@ perspective, terminology, and argument framework.
 
 ---
 
-## FR4: MCP Skills Architecture
 
-### The Insight
-The MCP server currently provides **data access tools** (CRUD for projects, nodes, objects,
-relationships). The *intelligence* — knowing how to use those tools to accomplish writing
-tasks like developmental editing, line editing, or plot analysis — should live as
-**shareable, discoverable Skills**.
-
-### 4.1 What Is a Skill?
-
-A Skill is a structured instruction set that teaches an AI agent *how* to accomplish a
-specific writing task using the available MCP tools. It combines:
-
-1. **Instructions** — step-by-step workflow (in Markdown).
-2. **Metadata** — name, description, required tools, trigger conditions.
-3. **Examples** — sample inputs/outputs for the agent to learn from.
-
-```
-.skills/
-  developmental-edit/
-    SKILL.md          # Main instructions
-    examples/         # Example before/after
-  line-edit/
-    SKILL.md
-  consistency-check/
-    SKILL.md
-  plot-structure-analysis/
-    SKILL.md
-  character-arc-review/
-    SKILL.md
-  medium-article-draft/
-    SKILL.md
-```
-
-### 4.2 Skill Lifecycle
-
-```mermaid
-flowchart LR
-    A["Author defines Skill"] --> B["Skill stored in project or shared repo"]
-    B --> C["MCP Server exposes Skill as Prompt"]
-    C --> D["AI Agent discovers Skill via list_prompts"]
-    D --> E["Agent executes Skill using MCP tools"]
-    E --> F["Results reviewed by author"]
-```
-
-### 4.3 Publishing Skills via MCP Prompts
-
-The MCP spec has a **Prompts** primitive — servers can expose structured prompt templates
-that clients discover via `list_prompts` and invoke via `get_prompt`. This is the natural
-vehicle for Skills.
-
-**Implementation:**
-
-```typescript
-// In the MCP server, register each Skill as a Prompt
-server.prompt(
-  "developmental_edit",
-  "Perform a developmental edit on a scene or chapter",
-  {
-    nodeId: z.string().describe("The structure node ID to edit"),
-    focus: z.string().optional().describe("Focus area: pacing | character | plot | all"),
-  },
-  async ({ nodeId, focus }) => {
-    // Load the Skill instructions from .skills/developmental-edit/SKILL.md
-    // Return them as the prompt messages for the agent to follow
-    return {
-      messages: [
-        { role: "user", content: { type: "text", text: skillInstructions } }
-      ]
-    };
-  }
-);
-```
-
-### 4.4 Writing Process Skills (Full Coverage)
-
-| Phase | Skill | Description |
-|---|---|---|
-| **Planning** | `plot-structure-analysis` | Analyze story structure against frameworks (3-act, hero's journey, etc.) |
-| **Planning** | `character-arc-review` | Map character arcs across scenes, identify flat arcs |
-| **Planning** | `world-consistency-check` | Cross-reference world elements for contradictions |
-| **Drafting** | `scene-drafting-assistant` | Help draft a scene given outline + characters + setting |
-| **Drafting** | `medium-article-draft` | Draft an article section from thesis + key concepts |
-| **Editing** | `developmental-edit` | Big-picture feedback: structure, pacing, character development |
-| **Editing** | `line-edit` | Sentence-level: clarity, voice, word choice, rhythm |
-| **Editing** | `copy-edit` | Grammar, punctuation, consistency of style |
-| **Review** | `continuity-check` | Flag timeline/setting/character inconsistencies |
-| **Review** | `sensitivity-read` | Flag potentially problematic representations |
-| **Publishing** | `manuscript-format` | Prepare export for submission (standard manuscript format) |
-| **Publishing** | `medium-publish` | Format and publish to Medium via API |
-
-### 4.5 Sharing & Discovery
-
-The MCP ecosystem is evolving toward shareable Skills:
-
-- **✅ Skills are curated, read-only for users.** The `.skills/` folder ships with the project. Users consume skills; they don't edit them. This ensures quality and consistency.
-- **Author-maintained:** The project author (you) crafts and refines skills. Updates ship via git.
-- **MCP Prompt Registry:** As the spec matures, expect a standardized way to publish prompts/skills to a registry (similar to npm for packages). The Nov 2025 spec update added prompt metadata and icons — a step toward discoverability.
-- **Community Skills:** Curated skill packs could be published as GitHub repos (e.g., `word-coach-skills`) and installed into any Word Coach Annie instance.
-
-> [!NOTE]
-> Skills are *not* plugins or code extensions. They are instruction documents that any
-> sufficiently capable LLM can follow. This makes them model-agnostic and safe to share.
-> No skill authoring UI is needed — skills are Markdown files maintained by the author.
-
----
 
 ## FR5: Scene Beats
 
@@ -500,18 +312,18 @@ Accessible via a "Timeline" tab or button on the project page.
 
 ```mermaid
 graph TD
-    FR2["FR2: Universes<br/>(Decouple World Building)"] --> FR3["FR3: Article Use Case"]
+    FR2["FR2: Universes<br/>(Done)"] --> FR3["FR3: Article Use Case"]
     FR1["FR1: Cloud Deployment"] --> FR1_MCP["FR1.5: MCP Auth"]
-    FR4["FR4: MCP Skills"] --> FR4_PUB["FR4.5: Skill Publishing"]
+    FR4["FR4: MCP Skills<br/>(Done)"] --> FR4_PUB["FR4.5: Skill Publishing"]
     FR3 --> FR4_ARTICLE["FR4: Article Skills"]
     FR5["FR5: Scene Beats"] --> FR6["FR6: Scene Focus Mode"]
     FR7["FR7: Timeline View"] --> FR2
 
-    style FR2 fill:#4a6fa5,color:#fff
-    style FR1 fill:#4a6fa5,color:#fff
-    style FR4 fill:#4a6fa5,color:#fff
+    style FR2 fill:#a5d6a7,color:#000
+    style FR4 fill:#a5d6a7,color:#000
     style FR5 fill:#4a6fa5,color:#fff
-    style FR3 fill:#6b8cae,color:#fff
+    style FR3 fill:#4a6fa5,color:#fff
+    style FR1 fill:#6b8cae,color:#fff
     style FR1_MCP fill:#6b8cae,color:#fff
     style FR4_PUB fill:#6b8cae,color:#fff
     style FR4_ARTICLE fill:#6b8cae,color:#fff
@@ -521,15 +333,13 @@ graph TD
 
 | Priority | Requirement | Effort | Blocked By |
 |---|---|---|---|
-| 🟢 **Do first** | FR2: Universe model | Medium | Nothing — pure schema evolution |
-| 🟢 **Do first** | FR4: Skills (local) | Medium | Nothing — add `.skills/` + MCP prompts |
 | 🟢 **Do first** | FR5: Scene Beats | Small | Nothing — markdown annotations + editor UI |
+| 🟢 **Do first** | FR3: Article templates | Small | FR2 (Completed) |
 | 🟡 **Do second** | FR6: Scene Focus Mode | Medium | FR5 (beats integrate into the writing surface) |
-| 🟡 **Do second** | FR3: Article templates | Small | FR2 (benefits from Universes) |
-| 🟡 **Do second** | FR7: Timeline View | Medium | Benefits from FR2 (WorldObject timeline entries) |
+| 🟡 **Do second** | FR7: Timeline View | Medium | Benefits from FR2 (Completed) |
 | 🟡 **Do second** | FR1: Cloud (auth + Supabase) | Large | Nothing, but high effort |
 | 🔴 **Do last** | FR1.5: MCP auth (cloud) | Medium | FR1 (needs cloud infra first) |
-| 🔴 **Do last** | FR4.5: Skill publishing | Small | FR4 + ecosystem maturity |
+| 🔴 **Do last** | FR4.5: Skill publishing | Small | FR4 (Completed) + ecosystem maturity |
 
 ---
 
@@ -559,223 +369,14 @@ graph TD
 
 ---
 
-### A1: FR2 — Universe Model (Do First)
-
-#### Step 1: Schema — Add 3 new models to `prisma/schema.prisma`
-
-Add these models to the **end** of the existing schema file. Do NOT modify existing models yet.
-
-```prisma
-model Universe {
-  id           String         @id @default(cuid())
-  title        String
-  description  String         @default("")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  projects     Project[]
-  worldObjects WorldObject[]
-}
-
-model WorldObject {
-  id          String                    @id @default(cuid())
-  universeId  String
-  type        String                    // CHARACTER, LOCATION, WORLD_ELEMENT
-  name        String
-  description String                    @default("")
-  notes       String                    @default("")
-  tags        String                    @default("")
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  universe    Universe                  @relation(fields: [universeId], references: [id], onDelete: Cascade)
-  timeline    WorldObjectTimelineEntry[]
-
-  @@index([universeId, type])
-}
-
-model WorldObjectTimelineEntry {
-  id            String      @id @default(cuid())
-  worldObjectId String
-  label         String      // Free-form: "Around 20 years old", "Post-war"
-  orderIndex    Int         @default(0)
-  description   String      @default("")
-  attributes    String      @default("")  // JSON blob
-  projectId     String?     // Optional: tie to a specific project
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  worldObject   WorldObject @relation(fields: [worldObjectId], references: [id], onDelete: Cascade)
-
-  @@index([worldObjectId, orderIndex])
-}
-```
-
-Then add to the **existing** `Project` model:
-```prisma
-  universeId   String?
-  universe     Universe? @relation(fields: [universeId], references: [id])
-```
-
-Run: `prisma generate` → `prisma db push` → `docker compose restart app`
-
-#### Step 2: Controller — Create `src/lib/controllers/universes.ts`
-
-Must export these functions (follow the pattern in `projects.ts`):
-
-| Function | Signature | Description |
-|---|---|---|
-| `listUniverses()` | `() → Universe[]` | All universes with project count and world object count |
-| `getUniverse(id)` | `(id: string) → Universe + worldObjects + projects` | Single universe with related data |
-| `createUniverse(data)` | `({title, description?}) → Universe` | Create a universe |
-| `updateUniverse(id, data)` | `(id, {title?, description?}) → Universe` | Update |
-| `deleteUniverse(id)` | `(id: string) → void` | Delete (cascades) |
-| `listWorldObjects(universeId, type?)` | `(universeId, type?) → WorldObject[]` | Filter by type |
-| `getWorldObject(id)` | `(id: string) → WorldObject + timeline` | With timeline entries ordered by orderIndex |
-| `createWorldObject(data)` | `({universeId, type, name, description?, notes?, tags?}) → WorldObject` | Create |
-| `updateWorldObject(id, data)` | Same pattern as story-objects.ts | Update fields |
-| `deleteWorldObject(id)` | `(id: string) → void` | Delete (cascades timeline) |
-| `addTimelineEntry(data)` | `({worldObjectId, label, description?, attributes?, projectId?, orderIndex?}) → Entry` | Add entry; if orderIndex omitted, append at end |
-| `updateTimelineEntry(id, data)` | `(id, {label?, description?, attributes?, orderIndex?}) → Entry` | Update |
-| `deleteTimelineEntry(id)` | `(id: string) → void` | Delete |
-| `reorderTimelineEntries(worldObjectId, orderedIds)` | `(woId, ids[]) → void` | Bulk reorder by setting orderIndex |
-| `linkProjectToUniverse(projectId, universeId)` | Set `Project.universeId` | Link |
-| `unlinkProjectFromUniverse(projectId)` | Set `Project.universeId = null` | Unlink |
-
-#### Step 3: Tests — Create `src/__tests__/universes.test.ts`
-
-Test every function above. Use the same pattern as `projects.test.ts`:
-- Import `testPrisma` from `./setup`
-- Clean up in `beforeEach` (add `testPrisma.worldObjectTimelineEntry.deleteMany()`, `testPrisma.worldObject.deleteMany()`, `testPrisma.universe.deleteMany()` to `setup.ts`)
-- At minimum: create/read/update/delete universe, CRUD world objects, add/reorder/delete timeline entries, link/unlink project
-
-#### Step 4: API Routes
-
-Create these route files:
-
-| Route File | Methods |
-|---|---|
-| `src/app/api/universes/route.ts` | GET (list), POST (create) |
-| `src/app/api/universes/[id]/route.ts` | GET, PATCH, DELETE |
-| `src/app/api/universes/[id]/world-objects/route.ts` | GET (list, ?type=), POST (create) |
-| `src/app/api/world-objects/[id]/route.ts` | GET, PATCH, DELETE |
-| `src/app/api/world-objects/[id]/timeline/route.ts` | GET (list), POST (add entry) |
-| `src/app/api/world-objects/[id]/timeline/[entryId]/route.ts` | PATCH, DELETE |
-| `src/app/api/world-objects/[id]/timeline/reorder/route.ts` | POST (bulk reorder) |
-
-#### Step 5: MCP Tools — Add to `src/mcp/index.ts`
-
-Register these tools (follow existing patterns):
-- `list_universes`, `get_universe`, `create_universe`, `update_universe`, `delete_universe`
-- `list_world_objects`, `get_world_object`, `create_world_object`, `update_world_object`, `delete_world_object`
-- `add_timeline_entry`, `update_timeline_entry`, `delete_timeline_entry`
-- `link_project_to_universe`, `unlink_project_from_universe`
-
-Create `src/mcp/tools/universes.ts` for the imports (follow `projects.ts` pattern).
-
-#### Step 6: UI — Universe Page
-
-Create `src/app/universe/page.tsx` and `src/app/universe/[id]/page.tsx`:
-- Universe list page (top-level, alongside Dashboard)
-- Universe detail page showing world objects grouped by type, with timeline view
-- Add "Universes" link to the app layout/nav
+### A1: FR2 — Universe Model (Completed)
+[Moved to REQUIREMENTS.md]
 
 ---
 
-### A2: FR4 — MCP Skills (Do First, parallel with A1)
+### A2: FR4 — MCP Skills (Completed)
+[Moved to REQUIREMENTS.md]
 
-#### Step 1: Create the Skills folder structure
-
-```
-.skills/
-  developmental-edit/
-    SKILL.md
-  line-edit/
-    SKILL.md
-  consistency-check/
-    SKILL.md
-  plot-structure-analysis/
-    SKILL.md
-  character-arc-review/
-    SKILL.md
-  scene-drafting-assistant/
-    SKILL.md
-```
-
-Each `SKILL.md` follows this format:
-```markdown
----
-name: developmental-edit
-description: Perform a developmental edit on a scene or chapter
-required_tools:
-  - read_scene_content
-  - get_story_object
-  - list_relationships
-  - get_outline
-triggers:
-  - "developmental edit"
-  - "big picture feedback"
----
-
-# Developmental Edit
-
-## When to Use
-[When the author wants structural/story-level feedback on a scene or chapter]
-
-## Steps
-1. Use `get_outline` to understand the manuscript structure
-2. Use `read_scene_content` to read the target scene
-3. Use `list_relationships` to find linked characters/locations/plotlines
-4. For each linked story object, use `get_story_object` to load details
-5. Analyze the scene for:
-   - [ ] Pacing: Does the scene drag or rush?
-   - [ ] Character voice: Is dialogue consistent with character?
-   - [ ] Plot advancement: Does the scene move the story forward?
-   - [ ] Setting: Is the location grounded and vivid?
-   - [ ] Conflict: Is there tension driving the scene?
-6. Write feedback as a structured report
-
-## Output Format
-[Structured markdown with sections for each analysis area]
-```
-
-#### Step 2: Add a skill loader utility
-
-Create `src/mcp/skills.ts`:
-```typescript
-import { readFileSync, readdirSync, existsSync } from "fs";
-import { join } from "path";
-
-const SKILLS_DIR = join(process.cwd(), ".skills");
-
-export interface SkillMetadata {
-  name: string;
-  description: string;
-  required_tools: string[];
-  triggers: string[];
-}
-
-export interface Skill {
-  metadata: SkillMetadata;
-  instructions: string;
-}
-
-export function listSkills(): SkillMetadata[] { /* scan .skills/ dirs */ }
-export function loadSkill(name: string): Skill { /* read SKILL.md, parse frontmatter */ }
-```
-
-#### Step 3: Register skills as MCP Prompts in `src/mcp/index.ts`
-
-For each skill in `.skills/`, register as:
-```typescript
-server.prompt(
-  skill.metadata.name,
-  skill.metadata.description,
-  { nodeId: z.string().optional(), projectId: z.string().optional() },
-  async (args) => ({
-    messages: [{ role: "user", content: { type: "text", text: skill.instructions } }]
-  })
-);
-```
-
-Also add a `list_skills` tool that returns all available skill metadata.
 
 ---
 
