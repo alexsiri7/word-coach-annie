@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2 } from "lucide-react";
+import { X, Save, Trash2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { StoryObject, StoryObjectType } from "@/lib/types";
+import type { StoryObject, StoryObjectType, Project } from "@/lib/types";
 
 interface StoryObjectPanelProps {
     objectId: string;
@@ -49,6 +49,9 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [project, setProject] = useState<Project | null>(null);
+    const [transferOpen, setTransferOpen] = useState(false);
+    const [transferring, setTransferring] = useState(false);
 
     useEffect(() => {
         fetch(`/api/story-objects/${objectId}`)
@@ -60,6 +63,11 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
                 setNotes(data.notes || "");
                 setRole(data.role || "");
                 setTags(data.tags || "");
+
+                // Fetch project to see if it's linked to a universe
+                fetch(`/api/projects/${data.projectId}`)
+                    .then(res => res.json())
+                    .then(p => setProject(p));
             });
     }, [objectId]);
 
@@ -81,6 +89,34 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
         await fetch(`/api/story-objects/${objectId}`, { method: "DELETE" });
         setDeleteOpen(false);
         onDeleted();
+    };
+
+    const handleTransfer = async () => {
+        if (!project?.universeId) return;
+        setTransferring(true);
+        try {
+            const res = await fetch("/api/universes/transfer-object", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    storyObjectId: objectId,
+                    universeId: project.universeId
+                })
+            });
+            if (res.ok) {
+                setTransferOpen(false);
+                onDeleted(); // Treat as deleted from project context
+            } else {
+                const errorData = await res.json();
+                console.error("Transfer failed:", errorData.error);
+                alert(`Transfer failed: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Transfer error:", error);
+            alert("An unexpected error occurred during transfer.");
+        } finally {
+            setTransferring(false);
+        }
     };
 
     if (!obj) {
@@ -159,7 +195,7 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-surface-raised">
+            <div className="flex items-center justify-between px-5 py-4 pb-6 border-t border-border bg-surface-raised">
                 <Button
                     variant="ghost"
                     size="sm"
@@ -170,6 +206,17 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
                     Delete
                 </Button>
                 <div className="flex items-center gap-2">
+                    {project?.universeId && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setTransferOpen(true)}
+                        >
+                            <Globe className="h-4 w-4" />
+                            Move to Universe
+                        </Button>
+                    )}
                     {saved && <span className="text-xs text-success">Saved!</span>}
                     <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
                         <Save className="h-4 w-4 mr-1.5" />
@@ -191,6 +238,30 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} className="bg-danger hover:bg-danger-hover">
                             Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Transfer confirmation */}
+            <AlertDialog open={transferOpen} onOpenChange={setTransferOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Move to Universe?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will move &ldquo;{obj.name}&rdquo; from this project to the shared universe.
+                            Existing project relationships (like scene appearances) will be preserved.
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleTransfer}
+                            disabled={transferring}
+                            className="bg-accent hover:bg-accent-hover"
+                        >
+                            {transferring ? "Moving..." : "Move to Universe"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

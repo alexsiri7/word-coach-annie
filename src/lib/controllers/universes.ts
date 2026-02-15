@@ -292,4 +292,66 @@ export class UniversesController {
             data: { universeId: null },
         });
     }
+
+    static async transferStoryObjectToUniverse(storyObjectId: string, universeId: string) {
+        return prisma.$transaction(async (tx: any) => {
+            // 1. Fetch story object
+            const obj = await tx.storyObject.findUnique({
+                where: { id: storyObjectId },
+            });
+            if (!obj) throw new Error(`Story object not found: ${storyObjectId}`);
+
+            // 2. Create WorldObject
+            const wo = await tx.worldObject.create({
+                data: {
+                    universeId,
+                    type: obj.type,
+                    name: obj.name,
+                    description: obj.description,
+                    notes: obj.notes,
+                    tags: obj.tags,
+                },
+            });
+
+            // 3. Create Timeline Entry (linked to the project)
+            await tx.worldObjectTimelineEntry.create({
+                data: {
+                    worldObjectId: wo.id,
+                    label: "Initial State (Transferred)",
+                    description: "Transferred from project story object.",
+                    projectId: obj.projectId,
+                    orderIndex: 0,
+                },
+            });
+
+            // 4. Update Relationships
+            // Replace story object with world object in relationships
+            await tx.relationship.updateMany({
+                where: { fromObjectId: storyObjectId },
+                data: {
+                    fromObjectId: null,
+                    fromWorldObjectId: wo.id,
+                },
+            });
+
+            await tx.relationship.updateMany({
+                where: { toObjectId: storyObjectId },
+                data: {
+                    toObjectId: null,
+                    toWorldObjectId: wo.id,
+                },
+            });
+
+            // 5. Delete original StoryObject
+            await tx.storyObject.delete({
+                where: { id: storyObjectId },
+            });
+
+            return {
+                ...wo,
+                createdAt: wo.createdAt.toISOString(),
+                updatedAt: wo.updatedAt.toISOString(),
+            };
+        });
+    }
 }

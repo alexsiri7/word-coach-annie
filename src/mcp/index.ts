@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { initSnapshotRepo } from "./snapshot";
+import { listSkills, loadSkill } from "./skills";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -56,6 +57,8 @@ import {
     addTimelineEntry,
     updateTimelineEntry,
     deleteTimelineEntry,
+    reorderTimelineEntries,
+    transferStoryObjectToUniverse,
     linkProjectToUniverse,
     unlinkProjectFromUniverse,
 } from "./tools/universes";
@@ -126,6 +129,32 @@ server.tool(
     },
     async ({ projectId, title, author, synopsis, genre }) => {
         const result = await updateProject(projectId, { title, author, synopsis, genre });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "reorder_timeline_entries",
+    "Reorder timeline entries for a world object",
+    {
+        worldObjectId: z.string(),
+        orderedIds: z.array(z.string()),
+    },
+    async ({ worldObjectId, orderedIds }: { worldObjectId: string; orderedIds: string[] }) => {
+        const result = await reorderTimelineEntries(worldObjectId, orderedIds);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "transfer_story_object_to_universe",
+    "Transfer a story object (from a project) into a universe as a world object",
+    {
+        storyObjectId: z.string(),
+        universeId: z.string(),
+    },
+    async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
+        const result = await transferStoryObjectToUniverse(storyObjectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -278,7 +307,7 @@ server.tool(
         range: z.string().optional(),
         selectedText: z.string().optional(),
     },
-    async ({ nodeId, content, range, selectedText }) => {
+    async ({ nodeId, content, range, selectedText }: { nodeId: string; content: string; range?: string; selectedText?: string }) => {
         const result = await addAnnotation(nodeId, content, range, selectedText);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -357,9 +386,9 @@ server.tool(
     "get_story_object",
     "Get a single story object with all its details and relationships",
     {
-        objectId: z.string().describe("The story object ID"),
+        objectId: z.string(),
     },
-    async ({ objectId }) => {
+    async ({ objectId }: { objectId: string }) => {
         const result = await getStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -710,6 +739,61 @@ server.tool(
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
+
+// ─── Skills Tool ─────────────────────────────────────────────────────────────
+
+server.tool(
+    "list_skills",
+    "List all available writing skills (structured instruction sets for writing tasks like developmental editing, line editing, etc). Use get_prompt to invoke a skill.",
+    {},
+    async () => {
+        const skills = listSkills();
+        return { content: [{ type: "text", text: JSON.stringify(skills, null, 2) }] };
+    }
+);
+
+// ─── Register Skills as MCP Prompts ──────────────────────────────────────────
+
+const availableSkills = listSkills();
+for (const skillMeta of availableSkills) {
+    const skill = loadSkill(skillMeta.name);
+    if (!skill) continue;
+
+    server.prompt(
+        skillMeta.name,
+        skillMeta.description,
+        {
+            nodeId: z.string().optional().describe("The structure node ID to focus on (scene or chapter)"),
+            projectId: z.string().optional().describe("The project ID for context"),
+        },
+        async (args) => {
+            let contextHeader = "";
+            if (args.projectId) {
+                contextHeader += `Project ID: ${args.projectId}\n`;
+            }
+            if (args.nodeId) {
+                contextHeader += `Target Node ID: ${args.nodeId}\n`;
+            }
+            if (contextHeader) {
+                contextHeader = `## Context\n${contextHeader}\n---\n\n`;
+            }
+
+            return {
+                messages: [
+                    {
+                        role: "user",
+                        content: {
+                            type: "text",
+                            text: contextHeader + skill.instructions,
+                        },
+                    },
+                ],
+            };
+        }
+    );
+}
+
+console.error(`Registered ${availableSkills.length} skill(s) as MCP prompts`);
 
 // ─── Start server ────────────────────────────────────────────────────────────
 

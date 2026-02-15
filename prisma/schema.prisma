@@ -52,18 +52,24 @@ model Relationship {
   label        String         @default("")
   fromNodeId   String?
   fromObjectId String?
+  fromWorldObjectId String?
   toNodeId     String?
   toObjectId   String?
+  toWorldObjectId   String?
   createdAt    DateTime       @default(now())
   toObject     StoryObject?   @relation("Relationship_toObjectIdToStoryObject", fields: [toObjectId], references: [id], onDelete: Cascade)
   toNode       StructureNode? @relation("Relationship_toNodeIdToStructureNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  toWorldObject WorldObject?  @relation("Relationship_toWorldObjectIdToWorldObject", fields: [toWorldObjectId], references: [id], onDelete: Cascade)
   fromObject   StoryObject?   @relation("Relationship_fromObjectIdToStoryObject", fields: [fromObjectId], references: [id], onDelete: Cascade)
   fromNode     StructureNode? @relation("Relationship_fromNodeIdToStructureNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  fromWorldObject WorldObject? @relation("Relationship_fromWorldObjectIdToWorldObject", fields: [fromWorldObjectId], references: [id], onDelete: Cascade)
 
   @@index([toObjectId])
   @@index([toNodeId])
+  @@index([toWorldObjectId])
   @@index([fromObjectId])
   @@index([fromNodeId])
+  @@index([fromWorldObjectId])
 }
 
 model StoryObject {
@@ -129,6 +135,8 @@ model WorldObject {
   updatedAt   DateTime                   @updatedAt
   universe    Universe                   @relation(fields: [universeId], references: [id], onDelete: Cascade)
   timeline    WorldObjectTimelineEntry[]
+  relationships Relationship[]           @relation("Relationship_toWorldObjectIdToWorldObject")
+  relatedBy     Relationship[]           @relation("Relationship_fromWorldObjectIdToWorldObject")
 
   @@index([universeId, type])
 }

@@ -61,6 +61,21 @@
 - **Verification**: Manually verified all new UI flows
 
 
+### 2026-02-15: FR4 — MCP Skills Architecture
+- Created `.skills/` directory with 6 curated writing skills:
+  - `developmental-edit` — structural/story-level feedback
+  - `line-edit` — sentence-level clarity, voice, word choice
+  - `consistency-check` — cross-reference world elements for contradictions
+  - `plot-structure-analysis` — analyze structure against frameworks (3-act, hero's journey, etc.)
+  - `character-arc-review` — map character arcs, identify flat arcs
+  - `scene-drafting-assistant` — help draft scenes from outline context
+- Created `src/mcp/skills.ts` — skill loader utility (parses YAML frontmatter from SKILL.md files)
+- Registered all 6 skills as **MCP Prompts** (discoverable via `list_prompts`, invocable via `get_prompt`)
+- Added `list_skills` tool to MCP server (returns metadata for all skills)
+- Added 11 new tests in `src/__tests__/skills.test.ts` — all passing
+- Total: 69 tests passing across 9 test files
+
 ## Next Steps
 - **M5**: Gemini CLI integration for AI brainstorming/summarization (F8)
 - **M5**: UI polish and edge case handling
+- **FR3**: Article templates (depends on FR2)

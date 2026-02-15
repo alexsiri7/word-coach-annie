@@ -83,6 +83,14 @@ export async function deleteTimelineEntry(id: string) {
     return UniversesController.deleteTimelineEntry(id);
 }
 
+export async function reorderTimelineEntries(worldObjectId: string, orderedIds: string[]) {
+    return UniversesController.reorderTimelineEntries(worldObjectId, orderedIds);
+}
+
+export async function transferStoryObjectToUniverse(storyObjectId: string, universeId: string) {
+    return UniversesController.transferStoryObjectToUniverse(storyObjectId, universeId);
+}
+
 export async function linkProjectToUniverse(projectId: string, universeId: string) {
     return UniversesController.linkProjectToUniverse(projectId, universeId);
 }

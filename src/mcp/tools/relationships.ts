@@ -30,8 +30,8 @@ export async function listRelationships(projectId: string) {
         }),
     ]);
 
-    const nodeIds = nodes.map((n) => n.id);
-    const objectIds = objects.map((o) => o.id);
+    const nodeIds = nodes.map((n: any) => n.id);
+    const objectIds = objects.map((o: any) => o.id);
 
     const relationships = await prisma.relationship.findMany({
         where: {
@@ -40,19 +40,23 @@ export async function listRelationships(projectId: string) {
                 { fromObjectId: { in: objectIds } },
                 { toNodeId: { in: nodeIds } },
                 { toObjectId: { in: objectIds } },
+                { fromWorldObjectId: { not: null } },
+                { toWorldObjectId: { not: null } },
             ],
         },
         include: {
             fromNode: { select: { id: true, title: true, type: true } },
             fromObject: { select: { id: true, name: true, type: true } },
+            fromWorldObject: { select: { id: true, name: true, type: true } },
             toNode: { select: { id: true, title: true, type: true } },
             toObject: { select: { id: true, name: true, type: true } },
+            toWorldObject: { select: { id: true, name: true, type: true } },
         },
         orderBy: { createdAt: "desc" },
     });
 
     return {
-        relationships: relationships.map((r) => ({
+        relationships: relationships.map((r: any) => ({
             id: r.id,
             type: r.type,
             label: r.label,
@@ -60,12 +64,16 @@ export async function listRelationships(projectId: string) {
                 ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
                 : r.fromObject
                     ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                    : null,
+                    : r.fromWorldObject
+                        ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
+                        : null,
             to: r.toNode
                 ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
                 : r.toObject
                     ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                    : null,
+                    : r.toWorldObject
+                        ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
+                        : null,
         })),
         total: relationships.length,
     };
@@ -137,8 +145,10 @@ export async function createRelationship(params: {
         include: {
             fromNode: { select: { id: true, title: true, type: true } },
             fromObject: { select: { id: true, name: true, type: true } },
+            fromWorldObject: { select: { id: true, name: true, type: true } },
             toNode: { select: { id: true, title: true, type: true } },
             toObject: { select: { id: true, name: true, type: true } },
+            toWorldObject: { select: { id: true, name: true, type: true } },
         },
     });
 
@@ -150,12 +160,16 @@ export async function createRelationship(params: {
             ? { id: relationship.fromNode.id, name: relationship.fromNode.title, entityType: relationship.fromNode.type }
             : relationship.fromObject
                 ? { id: relationship.fromObject.id, name: relationship.fromObject.name, entityType: relationship.fromObject.type }
-                : null,
+                : relationship.fromWorldObject
+                    ? { id: relationship.fromWorldObject.id, name: relationship.fromWorldObject.name, entityType: relationship.fromWorldObject.type }
+                    : null,
         to: relationship.toNode
             ? { id: relationship.toNode.id, name: relationship.toNode.title, entityType: relationship.toNode.type }
             : relationship.toObject
                 ? { id: relationship.toObject.id, name: relationship.toObject.name, entityType: relationship.toObject.type }
-                : null,
+                : relationship.toWorldObject
+                    ? { id: relationship.toWorldObject.id, name: relationship.toWorldObject.name, entityType: relationship.toWorldObject.type }
+                    : null,
     };
 }
 
@@ -165,14 +179,16 @@ export async function deleteRelationship(relationshipId: string) {
         include: {
             fromNode: { select: { title: true } },
             fromObject: { select: { name: true } },
+            fromWorldObject: { select: { name: true } },
             toNode: { select: { title: true } },
             toObject: { select: { name: true } },
+            toWorldObject: { select: { name: true } },
         },
     });
     if (!existing) throw new Error(`Relationship not found: ${relationshipId}`);
 
-    const fromName = existing.fromNode?.title || existing.fromObject?.name || "?";
-    const toName = existing.toNode?.title || existing.toObject?.name || "?";
+    const fromName = existing.fromNode?.title || existing.fromObject?.name || existing.fromWorldObject?.name || "?";
+    const toName = existing.toNode?.title || existing.toObject?.name || existing.toWorldObject?.name || "?";
 
     autoSnapshot("delete_relationship", `${fromName} → ${toName}`);
 
