@@ -81,7 +81,7 @@ The MCP spec (as of Nov 2025) supports **OAuth 2.1** natively:
 
 
 
-## FR3: Article / Non-Fiction Writing Use Case
+## FR3: Article / Non-Fiction Writing Use Case (Completed)
 
 ### Vision
 Use Word Coach Annie as a consistent-voice article factory. A "project" called
@@ -308,37 +308,195 @@ Accessible via a "Timeline" tab or button on the project page.
 
 ---
 
+## FR8: Google Docs Export / Sync
+
+### Problem
+The writer needs to share their work externally — with beta readers, co-authors, or editors —
+and also wants a portable backup outside the application. Currently, the only export is in-app
+Markdown text returned by MCP tools. There's no way to push content to a live, shareable
+document that stays in sync as the story evolves.
+
+### Vision
+One-click export to **Google Docs** that creates (or updates) a document the writer owns.
+Three distinct export modes serve different audiences:
+
+| Mode | Audience | Content | Use Case |
+|---|---|---|---|
+| **Universe Export** | Author / world-building reference | All world objects, timeline entries, descriptions | Shareable world bible for collaborators |
+| **Story Internal Export** | Author / editor | Full story bible + manuscript with synopsis, statuses, notes, beats, annotations, relationships | Working document for developmental editing |
+| **Story Reader Export** | Beta readers / public | Clean manuscript only — no beats, annotations, notes, or internal metadata | External reading copy |
+
+### Key Requirement: Idempotent Sync
+
+Every export **always updates the same Google Doc** rather than creating a new one each time.
+This means:
+
+- The first export for a given (entity + mode) creates a new Google Doc and stores its `documentId`.
+- Subsequent exports **replace the document body** with fresh content.
+- The Google Doc URL is stable and can be bookmarked / shared once.
+- The writer can trigger re-sync at any time to push the latest version.
+
+Stored mapping:
+```
+(projectId | universeId) + exportMode → googleDocId
+```
+
+### Authentication & Credentials
+
+| Concern | Approach |
+|---|---|
+| **API** | Google Docs API v1 + Google Drive API v3 |
+| **Auth flow** | OAuth 2.0 with `documents` and `drive.file` scopes |
+| **Token storage** | Refresh token stored encrypted in the database (new `GoogleCredential` model) |
+| **Scope principle** | `drive.file` — app can only access files it creates, not the user's entire Drive |
+| **Local mode** | OAuth consent screen runs during first export; tokens cached locally |
+| **Cloud mode** | Integrates with the existing auth system (FR1); tokens tied to `userId` |
+
+### Data Model Additions
+
+#### `GoogleCredential` (new model)
+Stores the user's OAuth tokens for Google API access.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | String (cuid) | Primary key |
+| `accessToken` | String | Encrypted OAuth access token |
+| `refreshToken` | String | Encrypted OAuth refresh token |
+| `expiresAt` | DateTime | Token expiry |
+| `scope` | String | Granted scopes |
+| `createdAt` | DateTime | — |
+| `updatedAt` | DateTime | — |
+
+#### `GoogleDocExport` (new model)
+Tracks which Google Doc corresponds to which export.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | String (cuid) | Primary key |
+| `projectId` | String? | Linked project (null for universe exports) |
+| `universeId` | String? | Linked universe (null for story exports) |
+| `exportMode` | String | `UNIVERSE`, `STORY_INTERNAL`, or `STORY_READER` |
+| `googleDocId` | String | The Google Docs document ID |
+| `googleDocUrl` | String | Shareable URL |
+| `lastSyncedAt` | DateTime | Last successful sync timestamp |
+| `createdAt` | DateTime | — |
+
+Unique constraint: `(projectId, universeId, exportMode)` — one doc per entity per mode.
+
+### Export Content per Mode
+
+#### Universe Export
+Uses the existing Universe + WorldObject data:
+```
+# Universe: {title}
+> {description}
+
+## Characters
+### {name}
+{description}
+**Timeline:**
+- {label}: {entry description}
+
+## Locations
+...
+
+## World Elements
+...
+```
+
+#### Story Internal Export
+Combines `exportStoryBible` + `exportManuscript` with **all** metadata preserved:
+- Project metadata (title, author, genre, synopsis)
+- Story objects (with descriptions, notes, tags, roles)
+- Relationships
+- Full outline with synopses and statuses
+- Scene content **with beats and annotations**
+- Word counts per scene
+
+#### Story Reader Export
+Clean manuscript only (same as `exportManuscript` today):
+- Title, author, genre, synopsis
+- Parts → Chapters → Scenes
+- Scene content with beats **stripped**
+- No annotations, notes, story objects, or relationships
+
+### MCP Tools
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `google_auth_status` | Check if Google credentials are configured and valid | — |
+| `google_auth_connect` | Initiate OAuth flow; returns auth URL for the user to visit | `redirectUri?` |
+| `google_auth_callback` | Complete OAuth flow with the authorization code | `code` |
+| `google_auth_disconnect` | Revoke and delete stored Google credentials | — |
+| `export_to_google_docs` | Export/sync a project or universe to Google Docs | `projectId?`, `universeId?`, `exportMode` |
+| `get_google_doc_exports` | List all Google Doc exports for a project or universe | `projectId?`, `universeId?` |
+| `unlink_google_doc` | Remove the stored doc mapping (does not delete the Google Doc) | `exportId` |
+
+### UI Integration
+
+| Location | Element |
+|---|---|
+| **Project page** | "Export to Google Docs" dropdown with three mode options (Internal, Reader, Universe — if linked) |
+| **Universe page** | "Export to Google Docs" button (Universe mode only) |
+| **Export panel** | Shows sync status: last synced time, Google Doc link, re-sync button |
+| **Settings page** | Google account connection status with connect/disconnect |
+
+### Error Handling
+
+| Scenario | Behavior |
+|---|---|
+| Token expired | Auto-refresh using refresh token; if refresh fails, prompt re-auth |
+| Google Doc deleted externally | Detect 404, clear mapping, create a new doc on next sync |
+| Rate limiting | Exponential backoff with user-facing status |
+| Large documents | Batch API requests (Google Docs API supports batch updates) |
+| No credentials | MCP tools return clear error: "Google account not connected. Use google_auth_connect first." |
+
+> [!IMPORTANT]
+> The `drive.file` scope is critical — it limits the app to files it creates. The app
+> **cannot** read or modify any other files in the user's Google Drive. This is the
+> minimum-privilege scope for this feature.
+
+> [!NOTE]
+> Google Docs formatting is intentionally basic (headings, bold, italic, lists). Rich
+> formatting like custom fonts or colors is out of scope for v1. The Google Doc is a
+> faithful plain-text rendering of the Markdown export.
+
+---
+
 ## Priority & Dependencies
 
 ```mermaid
 graph TD
-    FR2["FR2: Universes<br/>(Done)"] --> FR3["FR3: Article Use Case"]
+    FR2["FR2: Universes<br/>(Done)"] --> FR3["FR3: Article Use Case<br/>(Done)"]
     FR1["FR1: Cloud Deployment"] --> FR1_MCP["FR1.5: MCP Auth"]
     FR4["FR4: MCP Skills<br/>(Done)"] --> FR4_PUB["FR4.5: Skill Publishing"]
     FR3 --> FR4_ARTICLE["FR4: Article Skills"]
-    FR5["FR5: Scene Beats"] --> FR6["FR6: Scene Focus Mode"]
-    FR7["FR7: Timeline View"] --> FR2
+    FR5["FR5: Scene Beats<br/>(Done)"] --> FR6["FR6: Scene Focus Mode<br/>(Done)"]
+    FR7["FR7: Timeline View<br/>(Done)"] --> FR2
+    FR8["FR8: Google Docs Export"] --> FR2
 
     style FR2 fill:#a5d6a7,color:#000
     style FR4 fill:#a5d6a7,color:#000
-    style FR5 fill:#4a6fa5,color:#fff
+    style FR5 fill:#a5d6a7,color:#000
     style FR3 fill:#4a6fa5,color:#fff
     style FR1 fill:#6b8cae,color:#fff
     style FR1_MCP fill:#6b8cae,color:#fff
     style FR4_PUB fill:#6b8cae,color:#fff
     style FR4_ARTICLE fill:#6b8cae,color:#fff
-    style FR6 fill:#6b8cae,color:#fff
-    style FR7 fill:#6b8cae,color:#fff
+    style FR6 fill:#a5d6a7,color:#000
+    style FR7 fill:#a5d6a7,color:#000
+    style FR8 fill:#4a6fa5,color:#fff
 ```
 
 | Priority | Requirement | Effort | Blocked By |
 |---|---|---|---|
-| 🟢 **Do first** | FR5: Scene Beats | Small | Nothing — markdown annotations + editor UI |
-| 🟢 **Do first** | FR3: Article templates | Small | FR2 (Completed) |
-| 🟡 **Do second** | FR6: Scene Focus Mode | Medium | FR5 (beats integrate into the writing surface) |
-| 🟡 **Do second** | FR7: Timeline View | Medium | Benefits from FR2 (Completed) |
+| ✅ **Done** | FR5: Scene Beats | Small | Nothing — markdown annotations + editor UI |
+| ✅ **Done** | FR3: Article templates | Small | FR2 (Completed) |
+| ✅ **Done** | FR6: Scene Focus Mode | Medium | FR5 (beats integrate into the writing surface) |
+| ✅ **Done** | FR7: Timeline View | Medium | Benefits from FR2 (Completed) |
 | 🟡 **Do second** | FR1: Cloud (auth + Supabase) | Large | Nothing, but high effort |
 | 🔴 **Do last** | FR1.5: MCP auth (cloud) | Medium | FR1 (needs cloud infra first) |
+| 🟡 **Do second** | FR8: Google Docs Export | Medium | Benefits from FR2 (Completed); needs Google Cloud project setup |
 | 🔴 **Do last** | FR4.5: Skill publishing | Small | FR4 (Completed) + ecosystem maturity |
 
 ---
@@ -357,6 +515,9 @@ graph TD
 | 8 | Beat storage format | ✅ **HTML comments** (`<!-- beat: ... -->`) inline in scene markdown. No separate DB model. Lightweight, portable, stripped on export. |
 | 9 | Focus Mode layout | ✅ **Three-panel layout**: scene info (left), writing surface (center), related elements (right). Both sidebars collapsible for distraction-free mode. |
 | 10 | Timeline data source | ✅ **Derived from relationships**. Timeline plots which scenes each story object appears in — no new data model. Optional integration with WorldObject timeline entries (FR2) when available. |
+| 11 | Google Docs sync strategy | ✅ **Idempotent upsert.** Each (entity + mode) maps to exactly one Google Doc ID. First export creates; all subsequent exports replace the document body. Stored in `GoogleDocExport` model. |
+| 12 | Google API scope | ✅ **`drive.file` only.** App can only access files it creates — minimum-privilege scope. Combined with `documents` scope for content manipulation. |
+| 13 | Google Docs export modes | ✅ **Three modes:** Universe (world bible), Story Internal (full bible + manuscript with all metadata), Story Reader (clean manuscript, beats stripped). |
 
 ---
 
@@ -377,48 +538,26 @@ graph TD
 ### A2: FR4 — MCP Skills (Completed)
 [Moved to REQUIREMENTS.md]
 
+---
+
+### A5: FR5 — Scene Beats (Completed)
+[Moved to REQUIREMENTS.md]
 
 ---
 
-### A3: FR3 — Article Templates (Do Second, after A1)
+### A6: FR6 — Scene Focus Mode (Completed)
+[Moved to REQUIREMENTS.md]
 
-#### Step 1: Schema — Add `projectType` to `Project`
+---
 
-Add to existing `Project` model in `prisma/schema.prisma`:
-```prisma
-  projectType  String @default("FICTION")  // FICTION, ARTICLE_COLLECTION, GENERAL
-```
+### A7: FR7 — Timeline View (Completed)
+[Moved to REQUIREMENTS.md]
 
-#### Step 2: Types — Add label maps to `src/lib/types.ts`
 
-```typescript
-export const PROJECT_TYPE_LABELS: Record<string, Record<string, string>> = {
-  FICTION: {
-    PART: "Part", CHAPTER: "Chapter", SCENE: "Scene",
-    CHARACTER: "Character", LOCATION: "Location",
-    PLOTLINE: "Plotline", WORLD_ELEMENT: "World Element", NOTE: "Note"
-  },
-  ARTICLE_COLLECTION: {
-    PART: "Series", CHAPTER: "Article", SCENE: "Section",
-    CHARACTER: "Persona", LOCATION: "—",
-    PLOTLINE: "Thesis", WORLD_ELEMENT: "Key Concept", NOTE: "Research Note"
-  },
-  GENERAL: {
-    PART: "Part", CHAPTER: "Chapter", SCENE: "Section",
-    CHARACTER: "Character", LOCATION: "Location",
-    PLOTLINE: "Thread", WORLD_ELEMENT: "Element", NOTE: "Note"
-  }
-};
-```
+---
 
-#### Step 3: UI — Use label maps throughout
-
-Replace hardcoded strings in `src/components/` and `src/app/project/` with lookups from `PROJECT_TYPE_LABELS[project.projectType]`.
-
-#### Step 4: Export — Add Medium format
-
-Add to `src/mcp/tools/export.ts` and `src/lib/controllers/structure.ts`:
-- `exportForMedium(nodeId)` — export a single Chapter/Article as Markdown with Medium front matter (title, subtitle, tags pulled from StoryObject tags)
+### A3: FR3 — Article Templates (Completed)
+[Moved to REQUIREMENTS.md]
 
 ---
 
@@ -585,3 +724,213 @@ Create `src/__tests__/timeline.test.ts`:
 - Test timeline data fetching with mock relationships
 - Test filtering logic
 - Test that correct markers appear for given relationships
+
+---
+
+### A8: FR8 — Google Docs Export / Sync (Do Second, after Google Cloud project setup)
+
+#### Step 1: Google Cloud Project Setup
+
+Manual prerequisite (not code):
+1. Create a Google Cloud project at https://console.cloud.google.com
+2. Enable **Google Docs API** and **Google Drive API**
+3. Create **OAuth 2.0 Client ID** (type: Web Application)
+4. Set authorized redirect URI to `http://localhost:3000/api/auth/google/callback` (local) and the cloud URL equivalent
+5. Save the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env`
+
+#### Step 2: Environment Variables
+
+Add to `.env.example` and `.env`:
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+```
+
+#### Step 3: Schema — Add `GoogleCredential` and `GoogleDocExport`
+
+Add to `prisma/schema.prisma`:
+```prisma
+model GoogleCredential {
+  id           String   @id @default(cuid())
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scope        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GoogleDocExport {
+  id           String   @id @default(cuid())
+  projectId    String?
+  universeId   String?
+  exportMode   String   // UNIVERSE, STORY_INTERNAL, STORY_READER
+  googleDocId  String
+  googleDocUrl String
+  lastSyncedAt DateTime
+  createdAt    DateTime @default(now())
+  project      Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  universe     Universe? @relation(fields: [universeId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, universeId, exportMode])
+  @@index([projectId])
+  @@index([universeId])
+}
+```
+
+Also add the reverse relations to `Project` and `Universe`:
+```prisma
+// In Project model:
+googleDocExports GoogleDocExport[]
+
+// In Universe model:
+googleDocExports GoogleDocExport[]
+```
+
+Run: `npx prisma db push`
+
+#### Step 4: Google Auth Controller — Create `src/lib/controllers/google-auth.ts`
+
+Create a controller that handles:
+```typescript
+export class GoogleAuthController {
+  // Returns { connected: boolean, email?: string, expiresAt?: string }
+  static async getStatus(): Promise<AuthStatus>
+
+  // Returns the OAuth consent URL for the user to visit
+  static async getAuthUrl(redirectUri?: string): Promise<string>
+
+  // Exchanges the auth code for tokens, stores them in GoogleCredential
+  static async handleCallback(code: string): Promise<void>
+
+  // Revokes tokens with Google, deletes GoogleCredential row
+  static async disconnect(): Promise<void>
+
+  // Internal: returns a valid access token (auto-refreshes if expired)
+  static async getValidAccessToken(): Promise<string>
+}
+```
+
+Dependencies: `googleapis` npm package (add to `package.json`).
+
+#### Step 5: Google Docs Service — Create `src/lib/services/google-docs.ts`
+
+Create a service that handles the actual Google Docs API interaction:
+```typescript
+export class GoogleDocsService {
+  // Creates a new Google Doc with the given title and markdown content
+  // Returns { documentId, documentUrl }
+  static async createDocument(title: string, markdownContent: string): Promise<DocResult>
+
+  // Replaces the entire body of an existing Google Doc with new content
+  // Uses batchUpdate: delete all content, then insert new content
+  static async updateDocument(documentId: string, markdownContent: string): Promise<void>
+
+  // Checks if a document still exists (returns true/false)
+  static async documentExists(documentId: string): Promise<boolean>
+}
+```
+
+Markdown → Google Docs conversion:
+- `# Heading` → heading paragraph style (HEADING_1, HEADING_2, etc.)
+- `**bold**` → bold text run
+- `*italic*` → italic text run
+- `- item` → bulleted list
+- `> quote` → indented paragraph
+- `---` → horizontal rule (section break)
+- Plain text → normal paragraph
+
+#### Step 6: Export Controller — Create `src/lib/controllers/google-export.ts`
+
+Orchestrates the export flow:
+```typescript
+export class GoogleExportController {
+  // Main export function: assembles content, creates/updates Google Doc, stores mapping
+  static async exportToGoogleDocs(params: {
+    projectId?: string;
+    universeId?: string;
+    exportMode: 'UNIVERSE' | 'STORY_INTERNAL' | 'STORY_READER';
+  }): Promise<ExportResult>
+
+  // List all exports for a project or universe
+  static async listExports(params: {
+    projectId?: string;
+    universeId?: string;
+  }): Promise<GoogleDocExport[]>
+
+  // Remove the mapping (does NOT delete the Google Doc)
+  static async unlinkExport(exportId: string): Promise<void>
+}
+```
+
+Content assembly per mode:
+- `UNIVERSE`: Fetch universe + world objects + timeline entries → format as markdown
+- `STORY_INTERNAL`: Call existing `exportStoryBible` + `exportManuscript` (with beats preserved) → concatenate
+- `STORY_READER`: Call existing `exportManuscript` (beats already stripped) → use as-is
+
+Sync logic:
+1. Look up `GoogleDocExport` for the (entity + mode) combination
+2. If found → check if the Google Doc still exists
+   - If exists → update the document body
+   - If deleted → clear the mapping, create a new doc
+3. If not found → create a new Google Doc, save the mapping
+4. Update `lastSyncedAt`
+
+#### Step 7: MCP Tools — Create `src/mcp/tools/google-export.ts`
+
+Implement the MCP tool functions:
+```typescript
+export async function googleAuthStatus(): Promise<AuthStatus>
+export async function googleAuthConnect(redirectUri?: string): Promise<{ authUrl: string }>
+export async function googleAuthCallback(code: string): Promise<{ success: boolean }>
+export async function googleAuthDisconnect(): Promise<{ success: boolean }>
+export async function exportToGoogleDocs(params: ExportParams): Promise<ExportResult>
+export async function getGoogleDocExports(params: ListParams): Promise<GoogleDocExport[]>
+export async function unlinkGoogleDoc(exportId: string): Promise<{ success: boolean }>
+```
+
+#### Step 8: Register MCP Tools — Update `src/mcp/index.ts`
+
+Add all seven tools under a new `// ─── Google Docs Export Tools ──────` section:
+- `google_auth_status` — no params
+- `google_auth_connect` — `redirectUri?`
+- `google_auth_callback` — `code`
+- `google_auth_disconnect` — no params
+- `export_to_google_docs` — `projectId?`, `universeId?`, `exportMode`
+- `get_google_doc_exports` — `projectId?`, `universeId?`
+- `unlink_google_doc` — `exportId`
+
+#### Step 9: API Routes (for OAuth callback)
+
+Create `src/app/api/auth/google/callback/route.ts`:
+- GET handler that receives the OAuth callback
+- Extracts the `code` query parameter
+- Calls `GoogleAuthController.handleCallback(code)`
+- Redirects to the settings page with a success/error message
+
+#### Step 10: UI — Settings Page Google Connection
+
+Add a "Google Account" section to the settings page (or create one if none exists):
+- Shows connection status (connected / not connected)
+- "Connect Google Account" button → opens OAuth consent in new tab
+- "Disconnect" button → calls the disconnect API
+- Shows connected email/scope info when connected
+
+#### Step 11: UI — Export Buttons
+
+Add export controls to:
+- **Project page**: Dropdown "Export to Google Docs" with options:
+  - "Full Story (Internal)" → `STORY_INTERNAL`
+  - "Reader Copy" → `STORY_READER`
+- **Universe page**: Button "Export to Google Docs" → `UNIVERSE`
+- Each shows the last sync time and a link to the Google Doc if already exported
+
+#### Step 12: Tests
+
+Create `src/__tests__/google-export.test.ts`:
+- Test content assembly for each export mode
+- Test idempotent sync logic (create on first call, update on subsequent)
+- Test handling of deleted Google Docs (re-create)
+- Test auth status checks
+- Mock the Google API calls — do not make real API requests in tests

@@ -7,6 +7,7 @@ export interface Project {
   author: string;
   synopsis: string;
   genre: string;
+  projectType: ProjectType;
   wordCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -117,31 +118,4 @@ export interface Annotation {
   updatedAt: string;
 }
 
-export const SCENE_STATUS_COLORS: Record<SceneStatus, string> = {
-  OUTLINE: "bg-surface-overlay text-text-muted",
-  DRAFT: "bg-warning/15 text-warning",
-  REVISED: "bg-accent/15 text-accent",
-  FINAL: "bg-success/15 text-success",
-};
 
-export const SCENE_STATUS_DOT_COLORS: Record<SceneStatus, string> = {
-  OUTLINE: "status-outline",
-  DRAFT: "status-draft",
-  REVISED: "status-revised",
-  FINAL: "status-final",
-};
-
-export const STORY_OBJECT_ICONS: Record<StoryObjectType, string> = {
-  CHARACTER: "Users",
-  LOCATION: "MapPin",
-  PLOTLINE: "GitBranch",
-  WORLD_ELEMENT: "Globe",
-  NOTE: "StickyNote",
-};
-
-export type SceneBlockType = "CONTENT" | "BEAT";
-
-export interface SceneBlock {
-  type: SceneBlockType;
-  content: string;
-}

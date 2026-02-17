@@ -44,6 +44,7 @@ model Project {
   storyObjects   StoryObject[]
   structureNodes StructureNode[]
   universe       Universe?       @relation(fields: [universeId], references: [id])
+  projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
 }
 
 model Relationship {

@@ -10,18 +10,57 @@ export interface TimelineData {
 export class TimelineController {
 
     static async getTimelineData(projectId: string): Promise<TimelineData> {
-        // 1. Fetch scenes in order
-        const scenes = await prisma.structureNode.findMany({
-            where: {
-                projectId,
-                type: "SCENE",
-            },
-            orderBy: {
-                orderIndex: "asc",
-            },
+        // 1. Fetch all structure nodes for the project to rebuild hierarchy
+        const allNodes = await prisma.structureNode.findMany({
+            where: { projectId },
+            orderBy: { orderIndex: "asc" },
         });
 
-        // 2. Fetch all story objects
+        // 2. Build tree and flatten scenes in order
+        const nodeMap = new Map<string, StructureNode>();
+        const childrenMap = new Map<string, StructureNode[]>();
+        const rootNodes: StructureNode[] = [];
+
+        // Initialize maps
+        allNodes.forEach((node) => {
+            nodeMap.set(node.id, node as unknown as StructureNode);
+            if (!childrenMap.has(node.id)) {
+                childrenMap.set(node.id, []);
+            }
+        });
+
+        // Build hierarchy
+        allNodes.forEach((node) => {
+            if (node.parentId) {
+                const siblings = childrenMap.get(node.parentId);
+                if (siblings) {
+                    siblings.push(node as unknown as StructureNode);
+                    // Sort siblings by orderIndex just to be safe (though DB query helped)
+                    siblings.sort((a, b) => a.orderIndex - b.orderIndex);
+                }
+            } else {
+                rootNodes.push(node as unknown as StructureNode);
+            }
+        });
+
+        // Sort roots
+        rootNodes.sort((a, b) => a.orderIndex - b.orderIndex);
+
+        // Recursive traversal to collect scenes in order
+        const sortedScenes: StructureNode[] = [];
+
+        const traverse = (node: StructureNode) => {
+            if (node.type === "SCENE") {
+                sortedScenes.push(node);
+            }
+
+            const children = childrenMap.get(node.id) || [];
+            children.forEach(traverse);
+        };
+
+        rootNodes.forEach(traverse);
+
+        // 3. Fetch all story objects
         const objects = await prisma.storyObject.findMany({
             where: {
                 projectId,
@@ -31,14 +70,8 @@ export class TimelineController {
             },
         });
 
-        // 3. Fetch relationships connecting these objects to these scenes
-        // We want relationships where source is an object and target is a scene, OR vice versa.
-        // For simplicity, let's just fetch all relationships involving the project's objects and scenes.
-        // However, relationships link two node IDs.
-        // A StoryObject has an ID. A StructureNode has an ID.
-        // The link is stored in the Relationship table: sourceId, targetId.
-
-        const sceneIds = scenes.map((s) => s.id);
+        // 4. Fetch relationships connecting these objects to these scenes
+        const sceneIds = sortedScenes.map((s) => s.id);
         const objectIds = objects.map((o) => o.id);
 
         const events = await prisma.relationship.findMany({
@@ -62,14 +95,8 @@ export class TimelineController {
             }
         });
 
-        // Map Prisma result to our internal types if necessary
-        // Assuming simple mapping is okay for now.
-        // Note: Prisma returns dates as Date objects, but our types might expect strings.
-        // We should ensure the return type matches what the client expects (usually JSON with strings).
-        // For the server component or API route, we return plain objects.
-
         return {
-            scenes: scenes as unknown as StructureNode[],
+            scenes: sortedScenes,
             objects: objects as unknown as StoryObject[],
             events: events as unknown as Relationship[],
         };

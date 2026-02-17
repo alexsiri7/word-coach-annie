@@ -43,6 +43,7 @@ export class ProjectsController {
                     author: project.author,
                     synopsis: project.synopsis,
                     genre: project.genre,
+                    projectType: project.projectType,
                     wordCount,
                     nodeCount: project._count.structureNodes,
                     storyObjectCount: project._count.storyObjects,
@@ -73,6 +74,7 @@ export class ProjectsController {
             author: project.author,
             synopsis: project.synopsis,
             genre: project.genre,
+            projectType: project.projectType,
             nodeCount: project._count.structureNodes,
             storyObjectCount: project._count.storyObjects,
             createdAt: project.createdAt.toISOString(),
@@ -85,8 +87,9 @@ export class ProjectsController {
         author?: string;
         synopsis?: string;
         genre?: string;
+        projectType?: string;
     }) {
-        const { title, author, synopsis, genre } = params;
+        const { title, author, synopsis, genre, projectType } = params;
 
         if (!title || title.trim().length === 0) {
             throw new Error("Title is required");
@@ -98,6 +101,7 @@ export class ProjectsController {
                 ...(author && { author: author.trim() }),
                 ...(synopsis && { synopsis: synopsis.trim() }),
                 ...(genre && { genre: genre.trim() }),
+                ...(projectType && { projectType }),
             },
         });
 
@@ -107,13 +111,14 @@ export class ProjectsController {
             author: project.author,
             synopsis: project.synopsis,
             genre: project.genre,
+            projectType: project.projectType,
             createdAt: project.createdAt.toISOString(),
         };
     }
 
     static async updateProject(
         projectId: string,
-        data: { title?: string; author?: string; synopsis?: string; genre?: string; universeId?: string | null }
+        data: { title?: string; author?: string; synopsis?: string; genre?: string; universeId?: string | null; projectType?: string }
     ) {
         const existing = await prisma.project.findUnique({ where: { id: projectId } });
         if (!existing) throw new Error(`Project not found: ${projectId}`);
@@ -123,6 +128,7 @@ export class ProjectsController {
         if (data.author !== undefined) updateData.author = data.author.trim();
         if (data.synopsis !== undefined) updateData.synopsis = data.synopsis.trim();
         if (data.genre !== undefined) updateData.genre = data.genre.trim();
+        if (data.projectType !== undefined) updateData.projectType = data.projectType;
         if (data.universeId !== undefined) (updateData as any).universeId = data.universeId;
 
         if (Object.keys(updateData).length === 0) {
@@ -140,6 +146,7 @@ export class ProjectsController {
             author: project.author,
             synopsis: project.synopsis,
             genre: project.genre,
+            projectType: project.projectType,
             updatedAt: project.updatedAt.toISOString(),
         };
     }

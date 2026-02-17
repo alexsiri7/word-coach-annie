@@ -182,3 +182,15 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - Skill loader and registry
 - Initial set of 6 writing skills
 - Integration with MCP Prompts
+
+### F12: Article / Non-Fiction Support (Implemented)
+- F12.1: Project types: FICTION, ARTICLE_COLLECTION, GENERAL
+- F12.2: Dynamic UI labels (Concept/Persona vs Chapter/Character)
+- F12.3: Medium-compatible Markdown export with front matter
+
+### M9: Article Templates (Completed)
+- Schema update for projectType
+- Refactored constants for dynamic labeling
+- UI updates for variable terminology
+- Medium export tool
+

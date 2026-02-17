@@ -22,10 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { OutlineNode, SceneStatus } from "@/lib/types";
+import type { OutlineNode, SceneStatus, ProjectType } from "@/lib/types";
+import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 
 interface OutlineTreeProps {
   nodes: OutlineNode[];
+  projectType: ProjectType;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE") => void;
@@ -46,6 +48,7 @@ function StatusDot({ status }: { status: SceneStatus }) {
 function TreeNode({
   node,
   depth,
+  projectType,
   selectedNodeId,
   onSelectNode,
   onAddNode,
@@ -54,6 +57,7 @@ function TreeNode({
 }: {
   node: OutlineNode;
   depth: number;
+  projectType: ProjectType;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE") => void;
@@ -116,12 +120,12 @@ function TreeNode({
               <>
                 <DropdownMenuItem onClick={() => onAddNode(node.id, "SCENE")}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Scene
+                  Add {PROJECT_TYPE_LABELS[projectType].SCENE}
                 </DropdownMenuItem>
                 {node.type === "PART" && (
                   <DropdownMenuItem onClick={() => onAddNode(node.id, "CHAPTER")}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Chapter
+                    Add {PROJECT_TYPE_LABELS[projectType].CHAPTER}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -154,6 +158,7 @@ function TreeNode({
               key={child.id}
               node={child}
               depth={depth + 1}
+              projectType={projectType}
               selectedNodeId={selectedNodeId}
               onSelectNode={onSelectNode}
               onAddNode={onAddNode}
@@ -169,17 +174,19 @@ function TreeNode({
 
 export function OutlineTree({
   nodes,
+  projectType,
   selectedNodeId,
   onSelectNode,
   onAddNode,
   onRenameNode,
   onDeleteNode,
 }: OutlineTreeProps) {
+  const labels = PROJECT_TYPE_LABELS[projectType];
   return (
     <div className="py-2">
       {nodes.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-text-muted">
-          <p>No chapters yet.</p>
+          <p>No {labels.CHAPTER.toLowerCase()}s yet.</p>
           <Button
             variant="ghost"
             size="sm"
@@ -187,7 +194,7 @@ export function OutlineTree({
             onClick={() => onAddNode(null, "CHAPTER")}
           >
             <Plus className="h-4 w-4 mr-1" />
-            Add Chapter
+            Add {labels.CHAPTER}
           </Button>
         </div>
       ) : (
@@ -197,6 +204,7 @@ export function OutlineTree({
               key={node.id}
               node={node}
               depth={0}
+              projectType={projectType}
               selectedNodeId={selectedNodeId}
               onSelectNode={onSelectNode}
               onAddNode={onAddNode}

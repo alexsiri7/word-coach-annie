@@ -30,6 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { ProjectType } from "@/lib/types";
 
 interface Project {
   id: string;
@@ -37,6 +45,7 @@ interface Project {
   author: string;
   synopsis: string;
   genre: string;
+  projectType: ProjectType;
   wordCount: number;
   nodeCount: number;
   createdAt: string;
@@ -53,6 +62,7 @@ export default function Dashboard() {
   const [newAuthor, setNewAuthor] = useState("");
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenre, setNewGenre] = useState("");
+  const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
 
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
@@ -75,6 +85,7 @@ export default function Dashboard() {
         author: newAuthor,
         synopsis: newSynopsis,
         genre: newGenre,
+        projectType: newProjectType,
       }),
     });
     if (res.ok) {
@@ -84,6 +95,7 @@ export default function Dashboard() {
       setNewAuthor("");
       setNewSynopsis("");
       setNewGenre("");
+      setNewProjectType("FICTION");
       router.push(`/project/${project.id}`);
     }
   };
@@ -246,6 +258,19 @@ export default function Dashboard() {
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Type</label>
+              <Select value={newProjectType} onValueChange={(v) => setNewProjectType(v as ProjectType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FICTION">Fiction</SelectItem>
+                  <SelectItem value="ARTICLE_COLLECTION">Article Collection</SelectItem>
+                  <SelectItem value="GENERAL">General</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-sm font-medium text-text-secondary">Author</label>

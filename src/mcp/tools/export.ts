@@ -199,6 +199,125 @@ export async function exportStoryBible(projectId: string): Promise<string> {
     return lines.join("\n");
 }
 
+export async function exportMedium(projectId: string, nodeId?: string): Promise<string> {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+
+    const where: any = { projectId };
+    if (nodeId) {
+        where.id = nodeId;
+    } else {
+        where.type = "SCENE"; // Default to exporting all scenes/articles if no specific node requested
+    }
+
+    // If nodeId is provided, we fetch that specific node. 
+    // If not, we fetch all SCENE nodes ordered by index.
+    const nodes = await prisma.structureNode.findMany({
+        where,
+        orderBy: { orderIndex: "asc" },
+    });
+
+    if (nodes.length === 0) return "";
+
+    const lines: string[] = [];
+
+    for (const node of nodes) {
+        // Only valid for SCENE/ARTICLE nodes usually, but if nodeId points to a CHAPTER, we might want to export its children? 
+        // For now let's assume we are exporting leaves (SCENES).
+        // If the user requested a CHAPTER node, we should get its children.
+        if (node.type !== "SCENE" && nodeId) {
+            // If a non-scene node is requested, fetch its children scenes
+            const children = await prisma.structureNode.findMany({
+                where: { parentId: node.id, type: "SCENE" },
+                orderBy: { orderIndex: "asc" },
+            });
+            // Recursively call or just loop here? Let's just loop for 1 level depth for now.
+            // Actually, the requirement says "formats a single node".
+            // Let's stick to modifying the query to include children if needed, or just fail if it's not a scene?
+            // "Support non-fiction... Article Collection... Chapter becomes Article".
+            // In Article Collection, "Chapter" (Article) contains "Scenes" (Sections)? 
+            // Or is "Chapter" the Article?
+            // In `types.ts`, `CHAPTER` maps to "Article" in `ARTICLE_COLLECTION`.
+            // So `SCENE` maps to "Section".
+            // If I export an "Article" (Chapter), I want all its "Sections" (Scenes).
+        }
+
+        // Re-fetching to handle the hierarchy correctly if we want to support exporting an "Article" (Chapter) with all its sections.
+        // Let's implement a helper to get content for a node.
+    }
+
+    // Simplified approach: Build the tree, then traverse.
+    const outline = await buildOutlineTree(projectId);
+
+    // Helper to collect markdown for a node and its children
+    const collectMarkdown = (n: OutlineNode): string[] => {
+        const result: string[] = [];
+        if (n.type === "SCENE" && n.content) {
+            // Medium format header for the section
+            // result.push(`## ${n.title}\n`); // Maybe? or just content?
+            // If it's an Article Collection, the SCENE is a Section. 
+            // The CHAPTER is the Article.
+
+            // Let's use the standard htmlToMarkdown but maybe adding a separator.
+            const md = htmlToMarkdown(n.content);
+            if (md) result.push(md);
+        } else if (n.children.length > 0) {
+            // It's a container (Part/Chapter/Article)
+            // We usually want the title of the Article to be the H1.
+            // But if we are exporting *multiple* articles, we might want them separated?
+
+            // If we are exporting a specific node `nodeId`:
+            // If it's a CHAPTER (Article), we output `# Title` then its scenes.
+
+            // Let's iterate.
+            if (n.type === "CHAPTER" || n.type === "PART") {
+                result.push(`# ${n.title}\n`);
+                for (const child of n.children) {
+                    result.push(...collectMarkdown(child));
+                }
+            }
+        }
+        return result;
+    }
+
+    // Filter outline if nodeId is present
+    let targetNodes = outline;
+    if (nodeId) {
+        const findNode = (nodes: OutlineNode[]): OutlineNode | null => {
+            for (const n of nodes) {
+                if (n.id === nodeId) return n;
+                const found = findNode(n.children);
+                if (found) return found;
+            }
+            return null;
+        };
+        const found = findNode(outline);
+        targetNodes = found ? [found] : [];
+    }
+
+    // Generate output
+    for (const node of targetNodes) {
+        // Prepare Medium Front Matter if it's a root-ish node (Chapter/Article)
+        if (node.type === "CHAPTER" || (nodeId && node.id === nodeId)) {
+            lines.push(`---`);
+            lines.push(`title: "${node.title}"`);
+            if (node.synopsis) lines.push(`description: "${node.synopsis}"`);
+            lines.push(`---`);
+            lines.push("");
+        }
+
+        // If it's just a raw list of scenes (e.g. exporting whole project), this might be messy with multiple front matters.
+        // But for "Article Collection", each Chapter is an Article.
+        // We probably want to export them strictly one by one usually. 
+        // But if requesting full project, let's just dump them separated.
+
+        lines.push(...collectMarkdown(node));
+        lines.push("\n\n");
+    }
+
+    return lines.join("\n").trim();
+}
+
 export async function getProjectSummary(projectId: string) {
     const project = await prisma.project.findUnique({
         where: { id: projectId },

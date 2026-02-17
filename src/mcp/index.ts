@@ -524,6 +524,20 @@ server.tool(
 );
 
 server.tool(
+    "export_medium",
+    "Export a specific node (Article/Chapter) or the entire project in Medium-ready Markdown format (with front matter)",
+    {
+        projectId: z.string().describe("The project ID"),
+        nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
+    },
+    async ({ projectId, nodeId }) => {
+        const { exportMedium } = await import("./tools/export");
+        const markdown = await exportMedium(projectId, nodeId);
+        return { content: [{ type: "text", text: markdown }] };
+    }
+);
+
+server.tool(
     "get_project_summary",
     "Get a structured overview of a project: metadata, node counts by type/status, story object counts by type, total word count",
     {

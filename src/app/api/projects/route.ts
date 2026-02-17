@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - Create a new project
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { title, author, synopsis, genre } = body;
+  const { title, author, synopsis, genre, projectType } = body;
 
   if (!title || typeof title !== "string" || title.trim() === "") {
     return NextResponse.json(
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       author: author?.trim() || "",
       synopsis: synopsis?.trim() || "",
       genre: genre?.trim() || "",
+      projectType: projectType || "FICTION",
     },
   });
 

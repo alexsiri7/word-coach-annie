@@ -7,9 +7,11 @@ import {
     StoryObject,
     Relationship,
     StoryObjectType,
+} from "@/lib/types";
+import {
     SCENE_STATUS_COLORS,
     STORY_OBJECT_ICONS,
-} from "@/lib/types";
+} from "@/lib/constants";
 import { TimelineData } from "@/lib/controllers/timeline";
 import { Users, MapPin, GitBranch, Globe, StickyNote, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";

@@ -40,6 +40,7 @@ import { SceneEditor } from "@/components/scene-editor";
 import { StoryObjectPanel } from "@/components/story-object-panel";
 import { SearchPanel } from "@/components/search-panel";
 import { cn } from "@/lib/utils";
+import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes";
@@ -343,6 +344,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </div>
                 <OutlineTree
                   nodes={outline}
+                  projectType={project.projectType}
                   selectedNodeId={selectedNodeId}
                   onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); }}
                   onAddNode={openAddNode}
@@ -456,10 +458,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Add {addNodeType === "CHAPTER" ? "Chapter" : "Scene"}
+              Add {PROJECT_TYPE_LABELS[project.projectType][addNodeType]}
             </DialogTitle>
             <DialogDescription>
-              Enter a title for the new {addNodeType.toLowerCase()}.
+              Enter a title for the new {
+                PROJECT_TYPE_LABELS[project.projectType][addNodeType] || addNodeType.toLowerCase()
+              }.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
