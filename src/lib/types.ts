@@ -1,4 +1,5 @@
 // Shared types used across the app
+export type ProjectType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL";
 
 export interface Project {
   id: string;
@@ -11,6 +12,11 @@ export interface Project {
   wordCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SceneBlock {
+  type: "CONTENT" | "BEAT";
+  content: string;
 }
 
 export interface Universe {

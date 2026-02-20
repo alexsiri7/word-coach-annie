@@ -1,13 +1,18 @@
 import { prisma } from "@/lib/db";
 
-function htmlToMarkdown(html: string): string {
+interface MarkdownOptions {
+    includeBeats?: boolean;
+}
+
+function htmlToMarkdown(html: string, options: MarkdownOptions = {}): string {
     if (!html || html === "<p></p>") return "";
 
     let md = html;
 
     // Valid HTML comments for beats (<!-- beat: ... -->)
-    // We strip these first to ensure they don't get mangled by the tag stripper
-    md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
+    if (!options.includeBeats) {
+        md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
+    }
 
     md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
     md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
@@ -88,7 +93,7 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
     return roots;
 }
 
-export async function exportManuscript(projectId: string): Promise<string> {
+export async function exportManuscript(projectId: string, options: MarkdownOptions = {}): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
@@ -113,7 +118,7 @@ export async function exportManuscript(projectId: string): Promise<string> {
             for (const child of node.children) renderNode(child);
         } else if (node.type === "SCENE") {
             if (node.content) {
-                const md = htmlToMarkdown(node.content);
+                const md = htmlToMarkdown(node.content, options);
                 if (md) {
                     lines.push(md);
                     lines.push("\n\n---\n");
@@ -401,4 +406,63 @@ export async function getProjectSummary(projectId: string) {
         totalWordCount,
         updatedAt: project.updatedAt.toISOString(),
     };
+}
+
+export async function exportUniverse(universeId: string): Promise<string> {
+    const universe = await prisma.universe.findUnique({
+        where: { id: universeId },
+        include: {
+            worldObjects: {
+                include: {
+                    timeline: {
+                        orderBy: { orderIndex: 'asc' }
+                    }
+                },
+                orderBy: [{ type: 'asc' }, { name: 'asc' }]
+            }
+        }
+    });
+
+    if (!universe) throw new Error(`Universe not found: ${universeId}`);
+
+    const lines: string[] = [];
+    lines.push(`# Universe: ${universe.title}\n`);
+    if (universe.description) lines.push(`> ${universe.description}\n`);
+    lines.push("---\n");
+
+    const grouped: Record<string, typeof universe.worldObjects> = {};
+    for (const obj of universe.worldObjects) {
+        if (!grouped[obj.type]) grouped[obj.type] = [];
+        grouped[obj.type].push(obj);
+    }
+
+    const typeLabels: Record<string, string> = {
+        CHARACTER: "Characters",
+        LOCATION: "Locations",
+        WORLD_ELEMENT: "World Elements",
+    };
+
+    for (const [type, label] of Object.entries(typeLabels)) {
+        const objects = grouped[type];
+        if (!objects || objects.length === 0) continue;
+
+        lines.push(`\n## ${label}\n`);
+        for (const obj of objects) {
+            lines.push(`### ${obj.name}\n`);
+            if (obj.description) lines.push(`${obj.description}\n`);
+            if (obj.tags) lines.push(`**Tags:** ${obj.tags}\n`);
+            if (obj.notes) lines.push(`*Notes:* ${obj.notes}\n`);
+
+            if (obj.timeline.length > 0) {
+                lines.push(`\n**Timeline:**\n`);
+                for (const entry of obj.timeline) {
+                    lines.push(`- **${entry.label}**: ${entry.description}`);
+                }
+                lines.push("");
+            }
+            lines.push("---\n");
+        }
+    }
+
+    return lines.join("\n");
 }

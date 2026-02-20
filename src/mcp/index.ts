@@ -63,6 +63,8 @@ import {
     linkProjectToUniverse,
     unlinkProjectFromUniverse,
 } from "./tools/universes";
+import { GoogleAuthController } from "../lib/controllers/google-auth";
+import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
 
 // Initialize snapshot repo on startup
 try {
@@ -763,6 +765,87 @@ server.tool(
     async ({ entryId }) => {
         const result = await deleteTimelineEntry(entryId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Google Docs Tools ───────────────────────────────────────────────────────
+
+server.tool(
+    "google_auth_status",
+    "Check if Google credentials are configured and valid",
+    {},
+    async () => {
+        const status = await GoogleAuthController.getStatus();
+        return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }] };
+    }
+);
+
+server.tool(
+    "google_auth_connect",
+    "Initiate OAuth flow; returns auth URL for the user to visit",
+    {},
+    async () => {
+        try {
+            const url = GoogleAuthController.getAuthUrl();
+            return { content: [{ type: "text", text: `Please visit this URL to authorize: ${url}` }] };
+        } catch (e) {
+            return { content: [{ type: "text", text: `Error generating auth URL. Check environment variables (GOOGLE_CLIENT_ID, etc). Error: ${e}` }], isError: true };
+        }
+    }
+);
+
+server.tool(
+    "google_auth_callback",
+    "Complete OAuth flow with the authorization code",
+    {
+        code: z.string().describe("The authorization code from the redirect URL"),
+    },
+    async ({ code }) => {
+        try {
+            await GoogleAuthController.handleCallback(code);
+            return { content: [{ type: "text", text: "Successfully connected to Google!" }] };
+        } catch (e) {
+            return { content: [{ type: "text", text: `Error connecting: ${e}` }], isError: true };
+        }
+    }
+);
+
+server.tool(
+    "google_auth_disconnect",
+    "Revoke and delete stored Google credentials",
+    {},
+    async () => {
+        await GoogleAuthController.disconnect();
+        return { content: [{ type: "text", text: "Disconnected from Google." }] };
+    }
+);
+
+server.tool(
+    "export_to_google_docs",
+    "Export/sync a project or universe to Google Docs. Creates a new doc or updates existing one.",
+    {
+        projectId: z.string().optional().describe("Project ID to export"),
+        universeId: z.string().optional().describe("Universe ID to export"),
+        exportMode: z.enum(['UNIVERSE', 'STORY_INTERNAL', 'STORY_READER']).describe("Export mode"),
+    },
+    async ({ projectId, universeId, exportMode }) => {
+        if (!projectId && !universeId) {
+            return { content: [{ type: "text", text: "Either projectId or universeId must be provided." }], isError: true };
+        }
+        if (exportMode === 'UNIVERSE' && !universeId) {
+            return { content: [{ type: "text", text: "universeId is required for UNIVERSE mode." }], isError: true };
+        }
+        if (exportMode !== 'UNIVERSE' && !projectId) {
+            return { content: [{ type: "text", text: "projectId is required for STORY modes." }], isError: true };
+        }
+
+        try {
+            const entityId = exportMode === 'UNIVERSE' ? universeId! : projectId!;
+            const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as any);
+            return { content: [{ type: "text", text: `Export successful! Document: ${result.googleDocUrl}` }] };
+        } catch (e) {
+            return { content: [{ type: "text", text: `Export failed: ${e}` }], isError: true };
+        }
     }
 );
 

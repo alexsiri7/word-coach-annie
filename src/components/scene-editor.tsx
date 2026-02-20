@@ -31,6 +31,8 @@ import {
   Trash2,
   Bookmark,
   Maximize,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -140,6 +142,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
   const [status, setStatus] = useState<SceneStatus>(node.status as SceneStatus);
+  const [isOnline, setIsOnline] = useState(true);
   const [initialContent, setInitialContent] = useState<string | null>(null);
   const [versionHistory, setVersionHistory] = useState<ContentVersion[]>([]);
   const [showVersions, setShowVersions] = useState(false);
@@ -179,6 +182,26 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         }
       });
   }, [node.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (mounted) setIsOnline(res.ok);
+      } catch (err) {
+        if (mounted) setIsOnline(false);
+      }
+    };
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 15000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Polling for external changes
   useEffect(() => {
@@ -617,6 +640,23 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
               <Maximize className="h-4 w-4" />
             </Button>
           )}
+
+          <div
+            className="flex items-center gap-1.5 ml-2 px-2 py-1 rounded-md text-xs cursor-help transition-colors"
+            title={isOnline ? "Backend connected" : "Backend disconnected - edits may not save"}
+          >
+            {isOnline ? (
+              <>
+                <Wifi className="h-3 w-3 text-success" />
+                <span className="text-text-muted hidden sm:inline-block">Connected</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3 w-3 text-danger animate-pulse" />
+                <span className="text-danger hidden sm:inline-block">Disconnected</span>
+              </>
+            )}
+          </div>
 
           <Select value={status} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-28 h-8 text-xs">
