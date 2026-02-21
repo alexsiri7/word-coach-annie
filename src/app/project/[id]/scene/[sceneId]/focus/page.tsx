@@ -6,7 +6,8 @@ import { FocusController } from "@/lib/controllers/focus";
 import { SceneEditor } from "@/components/scene-editor";
 import { SceneInfoSidebar } from "@/components/focus-mode/scene-info-sidebar";
 import { RelatedElementsPanel } from "@/components/focus-mode/related-elements-panel";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info, Layers } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function FocusModePage() {
     const params = useParams();
@@ -17,8 +18,16 @@ export default function FocusModePage() {
     const [loading, setLoading] = useState(true);
     const [sceneContext, setSceneContext] = useState<any>(null);
     const [relatedElements, setRelatedElements] = useState<any>(null);
-    const [leftCollapsed, setLeftCollapsed] = useState(false);
-    const [rightCollapsed, setRightCollapsed] = useState(false);
+    const [leftCollapsed, setLeftCollapsed] = useState(true);
+    const [rightCollapsed, setRightCollapsed] = useState(true);
+
+    // Auto-open on desktop
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.innerWidth >= 768) {
+            setLeftCollapsed(false);
+            setRightCollapsed(false);
+        }
+    }, []);
 
     // Fetch data
     useEffect(() => {
@@ -97,6 +106,19 @@ export default function FocusModePage() {
                 collapsed={rightCollapsed}
                 onToggle={() => setRightCollapsed(!rightCollapsed)}
             />
+
+            {/* Mobile bottom bar */}
+            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 p-1.5 rounded-full bg-surface-raised border border-border shadow-xl backdrop-blur-md">
+                <Button variant="ghost" size="sm" className="rounded-full px-4 h-10 gap-2" onClick={() => setLeftCollapsed(false)}>
+                    <Info className="h-4 w-4" />
+                    Info
+                </Button>
+                <div className="w-px h-6 bg-border mx-1" />
+                <Button variant="ghost" size="sm" className="rounded-full px-4 h-10 gap-2" onClick={() => setRightCollapsed(false)}>
+                    <Layers className="h-4 w-4" />
+                    Related
+                </Button>
+            </div>
         </div>
     );
 }

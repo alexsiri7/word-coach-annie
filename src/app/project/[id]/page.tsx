@@ -14,6 +14,8 @@ import {
   PenLine,
   Search,
   Activity,
+  Menu,
+  X as XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<SidebarTab>("outline");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Dialogs
   const [addNodeDialogOpen, setAddNodeDialogOpen] = useState(false);
@@ -212,6 +215,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setSelectedNodeId(sceneId);
     setSelectedObjectId(null);
     setActiveTab("outline");
+    setSidebarOpen(false);
   };
 
   const handleSearchSelectObject = (objectId: string, objectType: string) => {
@@ -219,6 +223,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setSelectedNodeId(null);
     const tab = OBJECT_TYPE_TO_TAB[objectType];
     if (tab) setActiveTab(tab);
+    setSidebarOpen(false);
   };
 
   if (!project) {
@@ -243,6 +248,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           onClick={() => router.push("/")}
         >
           <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 md:hidden text-text-muted hover:text-text-primary"
+          onClick={() => setSidebarOpen(true)}
+          title="Menu"
+        >
+          <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <PenLine className="h-4 w-4 text-accent flex-shrink-0" />
@@ -293,9 +307,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         />
       )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile sidebar overlay mask */}
+        {sidebarOpen && (
+          <div
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-80 border-r border-border bg-surface-raised flex flex-col flex-shrink-0">
+        <aside className={cn(
+          "absolute inset-y-0 left-0 z-50 w-80 border-r border-border bg-surface-raised flex flex-col flex-shrink-0 transition-transform duration-200 ease-in-out",
+          "md:relative md:translate-x-0",
+          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        )}>
+          {/* Mobile close button */}
+          <div className="md:hidden flex items-center justify-between p-2 border-b border-border bg-surface">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted ml-2">Menu</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-text-primary" onClick={() => setSidebarOpen(false)}>
+              <XIcon className="h-4 w-4" />
+            </Button>
+          </div>
+
           {/* Sidebar tabs */}
           <div className="flex items-center gap-0.5 px-2 py-2 border-b border-border overflow-x-auto">
             <button
@@ -346,7 +380,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   nodes={outline}
                   projectType={project.projectType}
                   selectedNodeId={selectedNodeId}
-                  onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); }}
+                  onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); setSidebarOpen(false); }}
                   onAddNode={openAddNode}
                   onRenameNode={openRename}
                   onDeleteNode={openDelete}
@@ -402,6 +436,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         onClick={() => {
                           setSelectedObjectId(obj.id);
                           setSelectedNodeId(null);
+                          setSidebarOpen(false);
                         }}
                       >
                         {obj.name}
