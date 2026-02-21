@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       # Mount source code for hot reload
       - .:/app
@@ -14,3 +14,10 @@ services:
       - NODE_ENV=development
       - DATABASE_URL=file:/app/data/word-coach-annie.db
     command: /app/scripts/start-docker.sh
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run

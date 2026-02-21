@@ -1,0 +1,14 @@
+# Allow safe, read-only git commands
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git log", "git diff", "git rev-parse", "git ls-files", "git remote", "git show", "git branch", "git tag"]
+decision = "allow"
+priority = 100
+
+# Block all other git commands with a custom message
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git "
+decision = "deny"
+priority = 50
+deny_message = "If you think this is a safe command, add it to the allowlist in .gemini/policies/git.toml"
