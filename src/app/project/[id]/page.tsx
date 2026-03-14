@@ -16,6 +16,7 @@ import {
   Activity,
   Menu,
   X as XIcon,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +42,12 @@ import { OutlineTree } from "@/components/outline-tree";
 import { SceneEditor } from "@/components/scene-editor";
 import { StoryObjectPanel } from "@/components/story-object-panel";
 import { SearchPanel } from "@/components/search-panel";
+import { AIChatPanel } from "@/components/ai-chat-panel";
 import { cn } from "@/lib/utils";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
-type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes";
+type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
 
 const STORY_TABS: { key: SidebarTab; type: StoryObjectType; label: string; icon: typeof Users }[] = [
   { key: "characters", type: "CHARACTER", label: "Characters", icon: Users },
@@ -359,11 +361,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <span className="text-xs font-medium hidden lg:inline">{label}</span>
               </button>
             ))}
+            <button
+              onClick={() => { setActiveTab("ai-chat"); setSelectedNodeId(null); setSelectedObjectId(null); }}
+              className={cn(
+                "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
+                activeTab === "ai-chat"
+                  ? "bg-accent/15 text-accent"
+                  : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50"
+              )}
+              title="AI Chat"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium hidden lg:inline">AI</span>
+            </button>
           </div>
 
           {/* Sidebar content */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === "outline" ? (
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            {activeTab === "ai-chat" ? (
+              <AIChatPanel
+                projectId={projectId}
+                sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
+              />
+            ) : activeTab === "outline" ? (
               <>
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Structure</span>
