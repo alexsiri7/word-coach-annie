@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   request: NextRequest,
@@ -48,7 +49,7 @@ export async function GET(
     if (message.includes("Invalid type")) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("GET /api/projects/[id]/story-objects error:", error);
+    logger.error("GET /api/projects/[id]/story-objects error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -92,7 +93,7 @@ export async function POST(
     if (message.includes("name is required") || message.includes("Invalid type") || message.includes("type is required")) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("POST /api/projects/[id]/story-objects error:", error);
+    logger.error("POST /api/projects/[id]/story-objects error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

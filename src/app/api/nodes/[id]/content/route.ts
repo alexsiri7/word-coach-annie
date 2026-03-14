@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   request: NextRequest,
@@ -43,7 +44,7 @@ export async function GET(
       }))
     });
   } catch (error) {
-    console.error("Failed to get content:", error);
+    logger.error("Failed to get content", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -71,7 +72,7 @@ export async function POST(
     const result = await StructureController.writeSceneContent(nodeId, content);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Failed to save content:", error);
+    logger.error("Failed to save content", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -99,7 +100,7 @@ export async function PATCH(
     const result = await StructureController.restoreSceneVersion(nodeId, versionId);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Failed to restore content version:", error);
+    logger.error("Failed to restore content version", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

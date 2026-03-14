@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
     request: NextRequest,
@@ -29,7 +30,7 @@ export async function PATCH(
 
         return NextResponse.json(annotation);
     } catch (error) {
-        console.error("Failed to update annotation:", error);
+        logger.error("Failed to update annotation", error);
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }
@@ -50,7 +51,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Failed to delete annotation:", error);
+        logger.error("Failed to delete annotation", error);
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

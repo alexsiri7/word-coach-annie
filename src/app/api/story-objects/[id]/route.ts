@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   _request: NextRequest,
@@ -35,7 +36,7 @@ export async function GET(
 
     return NextResponse.json(storyObject);
   } catch (error) {
-    console.error("GET /api/story-objects/[id] error:", error);
+    logger.error("GET /api/story-objects/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -110,7 +111,7 @@ export async function PATCH(
 
     return NextResponse.json(storyObject);
   } catch (error) {
-    console.error("PATCH /api/story-objects/[id] error:", error);
+    logger.error("PATCH /api/story-objects/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -141,7 +142,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("DELETE /api/story-objects/[id] error:", error);
+    logger.error("DELETE /api/story-objects/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

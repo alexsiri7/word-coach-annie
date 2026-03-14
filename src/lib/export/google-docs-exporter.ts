@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { GoogleDocsApi } from "../google-api";
 import { exportManuscript, exportStoryBible, exportUniverse } from "../../mcp/tools/export";
+import { logger } from "@/lib/logger";
 
 export type ExportMode = 'UNIVERSE' | 'STORY_INTERNAL' | 'STORY_READER';
 
@@ -76,7 +77,7 @@ export class GoogleDocsExporter {
                     break;
             }
         } catch (error) {
-            console.error("Error generating export content:", error);
+            logger.error("Error generating export content", error);
             throw new Error(`Failed to generate export content: ${error}`);
         }
 

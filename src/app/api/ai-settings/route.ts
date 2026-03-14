@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 // GET /api/ai-settings — return current AI settings (without exposing the full API key)
 export async function GET() {
@@ -54,7 +55,7 @@ export async function PUT(request: NextRequest) {
       hasApiKey: !!settings.apiKey,
     });
   } catch (error) {
-    console.error("PUT /api/ai-settings error:", error);
+    logger.error("PUT /api/ai-settings error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

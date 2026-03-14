@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ProjectsController } from "@/lib/controllers/projects";
+import { logger } from "@/lib/logger";
 
 // GET /api/projects/[id] - Get a project by ID
 export async function GET(
@@ -15,7 +16,7 @@ export async function GET(
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    console.error("GET /api/projects/[id] error:", error);
+    logger.error("GET /api/projects/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -54,7 +55,7 @@ export async function PATCH(
     if (message.includes("No fields to update")) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
-    console.error("PATCH /api/projects/[id] error:", error);
+    logger.error("PATCH /api/projects/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

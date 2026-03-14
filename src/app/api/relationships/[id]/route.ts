@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -38,7 +39,7 @@ export async function GET(
 
     return NextResponse.json(relationship);
   } catch (error) {
-    console.error("GET /api/relationships/[id] error:", error);
+    logger.error("GET /api/relationships/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -119,7 +120,7 @@ export async function PATCH(
 
     return NextResponse.json(relationship);
   } catch (error) {
-    console.error("PATCH /api/relationships/[id] error:", error);
+    logger.error("PATCH /api/relationships/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -150,7 +151,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("DELETE /api/relationships/[id] error:", error);
+    logger.error("DELETE /api/relationships/[id] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

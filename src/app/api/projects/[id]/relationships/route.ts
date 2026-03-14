@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -68,7 +69,7 @@ export async function GET(
 
     return NextResponse.json({ data: relationships });
   } catch (error) {
-    console.error("GET /api/projects/[id]/relationships error:", error);
+    logger.error("GET /api/projects/[id]/relationships error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -233,7 +234,7 @@ export async function POST(
 
     return NextResponse.json(relationship, { status: 201 });
   } catch (error) {
-    console.error("POST /api/projects/[id]/relationships error:", error);
+    logger.error("POST /api/projects/[id]/relationships error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

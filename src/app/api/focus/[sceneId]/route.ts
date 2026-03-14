@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FocusController } from "@/lib/controllers/focus";
+import { logger } from "@/lib/logger";
 
 export async function GET(
     request: Request,
@@ -15,7 +16,7 @@ export async function GET(
 
         return NextResponse.json({ context, related });
     } catch (error) {
-        console.error("Focus API Error:", error);
+        logger.error("Focus API error", error);
         return new NextResponse("Internal Server Error", { status: 500 });
     }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
+import { logger } from "@/lib/logger";
 
 // Deprecated: Use GET /api/projects/[id]/outline instead for the tree structure.
 // If a flat list is needed, we should add a specific method for it, but the UI seems to want a tree.
@@ -30,7 +31,7 @@ export async function GET(
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    console.error("Failed to list nodes:", error);
+    logger.error("Failed to list nodes", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -61,7 +62,7 @@ export async function POST(
 
     return NextResponse.json(node, { status: 201 });
   } catch (error: unknown) {
-    console.error("Failed to create node:", error);
+    logger.error("Failed to create node", error);
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });

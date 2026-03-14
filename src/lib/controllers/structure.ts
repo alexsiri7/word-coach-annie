@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
+import { logger } from "@/lib/logger";
 
 export interface OutlineNode {
     id: string;
@@ -274,7 +275,7 @@ export class StructureController {
             // Given the repo structure, mcp code is imported in standard code.
             autoSnapshot("delete_node", node.title);
         } catch (e) {
-            console.warn("Snapshot failed or not available:", e);
+            logger.warn("Snapshot failed or not available", e);
         }
 
         await prisma.structureNode.delete({ where: { id: nodeId } });

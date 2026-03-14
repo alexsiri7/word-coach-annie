@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   _request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    console.error("Failed to build outline:", error);
+    logger.error("Failed to build outline", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

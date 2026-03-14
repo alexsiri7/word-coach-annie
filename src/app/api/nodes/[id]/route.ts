@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   _request: NextRequest,
@@ -31,7 +32,7 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Failed to get node:", error);
+    logger.error("Failed to get node", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -104,7 +105,7 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Failed to update node:", error);
+    logger.error("Failed to update node", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -151,7 +152,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete node:", error);
+    logger.error("Failed to delete node", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

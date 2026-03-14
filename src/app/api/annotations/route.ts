@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
     try {
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(annotations);
     } catch (error) {
-        console.error("Failed to get open annotations:", error);
+        logger.error("Failed to get open annotations", error);
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

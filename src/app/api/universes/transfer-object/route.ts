@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
     try {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(result);
     } catch (error) {
-        console.error("Failed to transfer story object:", error);
+        logger.error("Failed to transfer story object", error);
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Internal server error" },
             { status: 500 }

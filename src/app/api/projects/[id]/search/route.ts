@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 function stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, "").replace(/&[a-zA-Z]+;/g, " ");
@@ -160,7 +161,7 @@ export async function GET(
             totalResults: sceneResults.length + objectResults.length,
         });
     } catch (error) {
-        console.error("GET /api/projects/[id]/search error:", error);
+        logger.error("GET /api/projects/[id]/search error", error);
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

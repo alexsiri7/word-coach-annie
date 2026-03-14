@@ -9,6 +9,7 @@ import {
 } from "@/lib/ai/tool-registry";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { getAiConfig } from "@/lib/ai/settings";
+import { logger } from "@/lib/logger";
 
 const MAX_TOOL_ITERATIONS = 10;
 
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ messages });
   } catch (error) {
-    console.error("GET /api/chat error:", error);
+    logger.error("GET /api/chat error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -312,7 +313,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (err) {
-          console.error("Stream error:", err);
+          logger.error("Stream error", err);
           send({ error: "Stream error" });
           controller.close();
         }
@@ -327,7 +328,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("POST /api/chat error:", error);
+    logger.error("POST /api/chat error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -343,7 +344,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.chatMessage.deleteMany({ where: { projectId } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/chat error:", error);
+    logger.error("DELETE /api/chat error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

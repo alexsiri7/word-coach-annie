@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
+import { logger } from "@/lib/logger";
 
 export async function GET(
     request: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
 
         return NextResponse.json(annotations);
     } catch (error) {
-        console.error("Failed to fetch annotations:", error);
+        logger.error("Failed to fetch annotations", error);
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }
@@ -43,7 +44,7 @@ export async function POST(
 
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {
-        console.error("Failed to create annotation:", error);
+        logger.error("Failed to create annotation", error);
         const message = error instanceof Error ? error.message : "Internal server error";
         return NextResponse.json(
             { error: message },
