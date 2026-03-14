@@ -62,12 +62,19 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
     const sceneIds = nodes.filter((n) => n.type === "SCENE").map((n) => n.id);
     const contentMap: Record<string, string> = {};
 
-    for (const sceneId of sceneIds) {
-        const version = await prisma.contentVersion.findFirst({
-            where: { nodeId: sceneId },
+    if (sceneIds.length > 0) {
+        const allVersions = await prisma.contentVersion.findMany({
+            where: { nodeId: { in: sceneIds } },
             orderBy: { createdAt: "desc" },
+            select: { nodeId: true, content: true },
         });
-        if (version) contentMap[sceneId] = version.content;
+
+        // First match per nodeId is latest due to orderBy desc
+        for (const v of allVersions) {
+            if (!(v.nodeId in contentMap)) {
+                contentMap[v.nodeId] = v.content;
+            }
+        }
     }
 
     const nodeMap = new Map<string, OutlineNode>();
@@ -359,16 +366,20 @@ export async function getProjectSummary(projectId: string) {
     let totalWordCount = 0;
 
     if (sceneIds.length > 0) {
-        const latestVersions = await Promise.all(
-            sceneIds.map((id) =>
-                prisma.contentVersion.findFirst({
-                    where: { nodeId: id },
-                    orderBy: { createdAt: "desc" },
-                    select: { wordCount: true },
-                })
-            )
-        );
-        totalWordCount = latestVersions.reduce((sum, v) => sum + (v?.wordCount || 0), 0);
+        const allVersions = await prisma.contentVersion.findMany({
+            where: { nodeId: { in: sceneIds } },
+            orderBy: { createdAt: "desc" },
+            select: { nodeId: true, wordCount: true },
+        });
+
+        // First match per nodeId is latest due to orderBy desc
+        const seen = new Set<string>();
+        for (const v of allVersions) {
+            if (!seen.has(v.nodeId)) {
+                seen.add(v.nodeId);
+                totalWordCount += v.wordCount ?? 0;
+            }
+        }
     }
 
     const objectIdsForCount = await prisma.storyObject.findMany({
