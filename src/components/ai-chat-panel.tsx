@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Trash2, Loader2 } from "lucide-react";
-import DOMPurify from "dompurify";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -21,22 +22,6 @@ interface AIChatPanelProps {
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto"><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code class="bg-surface-sunken px-1 rounded text-xs">$1</code>')
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^### (.+)$/gm, '<h4 class="font-semibold mt-2 mb-1">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 class="font-semibold text-sm mt-2 mb-1">$1</h3>')
-    .replace(/^- (.+)$/gm, '<li class="ml-3">• $1</li>')
-    .replace(/\n{2,}/g, '<br/><br/>')
-    .replace(/\n/g, "<br/>");
 }
 
 export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
@@ -221,10 +206,21 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
               )}
             >
               {msg.role === "assistant" ? (
-                <div
-                  className="prose-chat [&_pre]:my-1 [&_li]:list-none"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
-                />
+                <div className="prose-chat [&_pre]:my-1 [&_li]:list-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      pre: ({ children }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
+                      code: ({ children, className }) => className
+                        ? <code className={className}>{children}</code>
+                        : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
+                      h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
+                      h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -239,10 +235,21 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         {isStreaming && streamingContent && (
           <div className="flex flex-col items-start">
             <div className="max-w-[90%] rounded-lg px-3 py-2 text-sm bg-surface-overlay text-text-secondary">
-              <div
-                className="prose-chat [&_pre]:my-1 [&_li]:list-none"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(streamingContent)) }}
-              />
+              <div className="prose-chat [&_pre]:my-1 [&_li]:list-none">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    pre: ({ children }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
+                    code: ({ children, className }) => className
+                      ? <code className={className}>{children}</code>
+                      : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
+                    h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
+                    h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
+                  }}
+                >
+                  {streamingContent}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         )}
