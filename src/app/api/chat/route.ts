@@ -8,13 +8,7 @@ import {
   type OpenAIToolDefinition,
 } from "@/lib/ai/tool-registry";
 import { executeTool } from "@/lib/ai/tool-executor";
-
-const openai = new OpenAI({
-  baseURL: "https://router.requesty.ai/v1",
-  apiKey: process.env.REQUESTY_API_KEY || "",
-});
-
-const MODEL = process.env.REQUESTY_MODEL || "google/gemini-2.0-flash-001";
+import { getAiConfig } from "@/lib/ai/settings";
 
 const MAX_TOOL_ITERATIONS = 10;
 
@@ -178,6 +172,19 @@ export async function POST(request: NextRequest) {
     const loadedCategories = new Set<ToolCategory>(["core"]);
     const toolLog: { tool: string; args: Record<string, unknown>; result: string }[] = [];
 
+    // Load AI provider config (DB settings > env vars > defaults)
+    const aiConfig = await getAiConfig();
+    if (!aiConfig.apiKey) {
+      return NextResponse.json(
+        { error: "AI provider not configured. Set API key in AI Settings or AI_API_KEY env var." },
+        { status: 503 }
+      );
+    }
+    const openai = new OpenAI({
+      baseURL: aiConfig.baseUrl || undefined,
+      apiKey: aiConfig.apiKey,
+    });
+
     // Build messages array for the LLM
     const llmMessages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt + sceneNote },
@@ -190,7 +197,7 @@ export async function POST(request: NextRequest) {
       const tools = buildToolList(loadedCategories);
 
       const response = await openai.chat.completions.create({
-        model: MODEL,
+        model: aiConfig.model,
         messages: llmMessages,
         tools,
       });
@@ -211,6 +218,7 @@ export async function POST(request: NextRequest) {
 
       // Execute each tool call
       for (const toolCall of assistantMessage.tool_calls) {
+        if (toolCall.type !== "function") continue;
         const fnName = toolCall.function.name;
         const fnArgs = JSON.parse(toolCall.function.arguments);
 

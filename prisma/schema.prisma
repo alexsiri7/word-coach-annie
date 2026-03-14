@@ -181,6 +181,15 @@ model ChatMessage {
   @@index([projectId, createdAt])
 }
 
+model AiSettings {
+  id         String   @id @default("default")
+  baseUrl    String   @default("")
+  apiKey     String   @default("")
+  model      String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 model GoogleDocExport {
   id           String   @id @default(cuid())
   projectId    String?

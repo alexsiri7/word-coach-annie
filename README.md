@@ -65,8 +65,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `REQUESTY_API_KEY` | For AI chat | Requesty LLM gateway API key |
-| `REQUESTY_MODEL` | No | Model override (default: `google/gemini-2.0-flash-001`) |
+| `AI_API_BASE_URL` | For AI chat | OpenAI-compatible API base URL (e.g. `https://api.openai.com/v1`) |
+| `AI_API_KEY` | For AI chat | API key for your AI provider |
+| `AI_MODEL` | No | Model name (default: `gpt-4o`) |
 | `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |

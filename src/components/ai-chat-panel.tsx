@@ -5,6 +5,7 @@ import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench } from "lucide
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { AiSettingsDialog } from "@/components/ai-settings-dialog";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -222,17 +223,20 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
           AI Assistant
         </span>
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-text-muted hover:text-danger"
-            onClick={clearHistory}
-            title="Clear chat"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          <AiSettingsDialog />
+          {messages.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-text-muted hover:text-danger"
+              onClick={clearHistory}
+              title="Clear chat"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}

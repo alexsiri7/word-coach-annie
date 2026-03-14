@@ -132,7 +132,7 @@ No component tests or e2e tests yet (Playwright visual tests in progress).
 
 | Service | Purpose | Auth |
 |---------|---------|------|
-| Requesty | LLM gateway (routes to Gemini 2.0 Flash) | API key (`REQUESTY_API_KEY`) |
+| AI Provider | Any OpenAI-compatible LLM (configurable in UI or via `AI_API_KEY`) | API key |
 | Google Docs/Drive | Document export & sync | OAuth2 (`GOOGLE_CLIENT_ID/SECRET`) |
 | Cloudflare | Tunnel for public access | Tunnel token |
 | Tailscale | VPN for CI deploy | Auth key |
