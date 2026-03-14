@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
+import DOMPurify from "dompurify";
 import {
   Bold,
   Italic,
@@ -816,7 +817,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
                     ) : (
                       <div
                         className="text-sm text-text-secondary leading-relaxed prose-preview"
-                        dangerouslySetInnerHTML={{ __html: previewContent || "" }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent || "") }}
                       />
                     )}
                   </div>

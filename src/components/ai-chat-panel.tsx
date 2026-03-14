@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Trash2, Loader2 } from "lucide-react";
+import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -222,7 +223,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
               {msg.role === "assistant" ? (
                 <div
                   className="prose-chat [&_pre]:my-1 [&_li]:list-none"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
                 />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -240,7 +241,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
             <div className="max-w-[90%] rounded-lg px-3 py-2 text-sm bg-surface-overlay text-text-secondary">
               <div
                 className="prose-chat [&_pre]:my-1 [&_li]:list-none"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingContent) }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(streamingContent)) }}
               />
             </div>
           </div>
