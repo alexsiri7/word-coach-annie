@@ -368,7 +368,8 @@ export class StructureController {
 
         StructureController.validateSceneContent(content);
 
-        const wordCount = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
+        const proseContent = content.replace(/(<!-- beat:[\s\S]*?-->)/g, "");
+        const wordCount = proseContent.trim() === "" ? 0 : proseContent.trim().split(/\s+/).length;
 
         const version = await prisma.contentVersion.create({
             data: { nodeId, content, wordCount },

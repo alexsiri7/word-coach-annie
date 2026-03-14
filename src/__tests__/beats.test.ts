@@ -42,6 +42,26 @@ describe("Scene Beats", () => {
             await expect(StructureController.writeSceneContent("scene-1", content)).resolves.not.toThrow();
         });
 
+        it("should exclude beats from word count", async () => {
+            (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
+            (prisma.contentVersion.create as any).mockResolvedValue({
+                id: "v1", createdAt: new Date(), nodeId: "scene-1", wordCount: 2
+            });
+            (prisma.contentVersion.findMany as any).mockResolvedValue([]);
+
+            const content = "hello world<!-- beat: This beat has five words -->";
+
+            await StructureController.writeSceneContent("scene-1", content);
+
+            expect(prisma.contentVersion.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        wordCount: 2, // only "hello world", not the beat content
+                    }),
+                })
+            );
+        });
+
         it("should reject unclosed beat tags", async () => {
             (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
 
