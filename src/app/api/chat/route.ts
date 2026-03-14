@@ -252,18 +252,46 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Stream the final text response via SSE
+    // Stream via SSE — tool activity events first, then final content
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
+        const send = (data: Record<string, unknown>) => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+          );
+        };
+
         try {
-          // Send the final content in chunks for streaming feel
+          // Send tool activity events
+          for (const entry of toolLog) {
+            send({
+              type: "tool_call",
+              name: entry.tool,
+              args: entry.args,
+            });
+
+            // Summarize tool result for the client
+            let summary: string;
+            try {
+              const parsed = JSON.parse(entry.result);
+              summary = parsed.title || parsed.name || parsed.summary || entry.result.slice(0, 200);
+            } catch {
+              summary = entry.result.slice(0, 200);
+            }
+
+            send({
+              type: "tool_result",
+              name: entry.tool,
+              summary,
+            });
+          }
+
+          // Stream the final content in chunks
           const chunkSize = 20;
           for (let i = 0; i < finalContent.length; i += chunkSize) {
             const chunk = finalContent.slice(i, i + chunkSize);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`)
-            );
+            send({ type: "content", content: chunk });
           }
 
           // Save assistant response
@@ -277,11 +305,7 @@ export async function POST(request: NextRequest) {
           controller.close();
         } catch (err) {
           console.error("Stream error:", err);
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: "Stream error" })}\n\n`
-            )
-          );
+          send({ error: "Stream error" });
           controller.close();
         }
       },

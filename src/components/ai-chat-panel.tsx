@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Trash2, Loader2 } from "lucide-react";
+import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,14 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface ToolActivity {
+  id: string;
+  name: string;
+  args?: Record<string, unknown>;
+  status: "running" | "done";
+  summary?: string;
+}
+
 interface AIChatPanelProps {
   projectId: string;
   sceneContext?: string;
@@ -24,11 +32,54 @@ function formatTime(dateStr: string): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Formats a tool name for display: read_scene_content -> Read scene content */
+function formatToolName(name: string): string {
+  return name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function ToolActivityCard({ activity }: { activity: ToolActivity }) {
+  const [expanded, setExpanded] = useState(false);
+  const isRunning = activity.status === "running";
+
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-text-muted">
+      <button
+        onClick={() => !isRunning && setExpanded(!expanded)}
+        className={cn(
+          "flex items-center gap-1.5 px-2 py-1 rounded bg-surface-sunken/50 text-left",
+          !isRunning && "hover:bg-surface-sunken cursor-pointer",
+          isRunning && "cursor-default"
+        )}
+      >
+        {isRunning ? (
+          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-accent" />
+        ) : (
+          <>
+            <Wrench className="h-3 w-3 flex-shrink-0 text-text-muted/70" />
+            {activity.summary ? (
+              expanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />
+            ) : null}
+          </>
+        )}
+        <span className={cn(isRunning && "text-accent")}>
+          {formatToolName(activity.name)}
+        </span>
+      </button>
+      {expanded && activity.summary && (
+        <div className="ml-5 px-2 py-1 rounded bg-surface-sunken/30 text-text-muted/80 break-words">
+          {activity.summary}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,7 +102,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   // Scroll on new messages
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingContent, scrollToBottom]);
+  }, [messages, streamingContent, toolActivities, scrollToBottom]);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -60,6 +111,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
     setInput("");
     setIsStreaming(true);
     setStreamingContent("");
+    setToolActivities([]);
 
     // Optimistically add user message
     const userMsg: ChatMessage = {
@@ -100,7 +152,23 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
             if (data === "[DONE]") continue;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) {
+              if (parsed.type === "tool_call") {
+                const activity: ToolActivity = {
+                  id: `tool-${Date.now()}-${parsed.name}`,
+                  name: parsed.name,
+                  args: parsed.args,
+                  status: "running",
+                };
+                setToolActivities((prev) => [...prev, activity]);
+              } else if (parsed.type === "tool_result") {
+                setToolActivities((prev) =>
+                  prev.map((t) =>
+                    t.name === parsed.name && t.status === "running"
+                      ? { ...t, status: "done", summary: parsed.summary }
+                      : t
+                  )
+                );
+              } else if (parsed.type === "content" || parsed.content) {
                 accumulated += parsed.content;
                 setStreamingContent(accumulated);
               }
@@ -231,6 +299,17 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
           </div>
         ))}
 
+        {/* Tool activity indicators */}
+        {isStreaming && toolActivities.length > 0 && (
+          <div className="flex flex-col items-start">
+            <div className="max-w-[90%] space-y-1">
+              {toolActivities.map((activity) => (
+                <ToolActivityCard key={activity.id} activity={activity} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Streaming message */}
         {isStreaming && streamingContent && (
           <div className="flex flex-col items-start">
@@ -255,7 +334,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         )}
 
         {/* Loading indicator */}
-        {isStreaming && !streamingContent && (
+        {isStreaming && !streamingContent && toolActivities.length === 0 && (
           <div className="flex items-start">
             <div className="rounded-lg px-3 py-2 bg-surface-overlay">
               <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
