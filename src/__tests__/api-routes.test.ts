@@ -149,13 +149,11 @@ describe("API: Nodes", () => {
         });
 
         await testPrisma.contentVersion.create({
-            data: { nodeId: scene.id, content: "Version 1", wordCount: 2 },
+            data: { nodeId: scene.id, content: "Version 1", wordCount: 2, createdAt: new Date("2025-01-01T00:00:00Z") },
         });
 
-        await new Promise((r) => setTimeout(r, 50));
-
         await testPrisma.contentVersion.create({
-            data: { nodeId: scene.id, content: "Version 2 latest", wordCount: 3 },
+            data: { nodeId: scene.id, content: "Version 2 latest", wordCount: 3, createdAt: new Date("2025-01-01T00:00:01Z") },
         });
 
         const node = await testPrisma.structureNode.findUnique({
@@ -229,13 +227,11 @@ describe("API: Content Versioning", () => {
 
     it("saves content with word count and returns history", async () => {
         await testPrisma.contentVersion.create({
-            data: { nodeId: sceneId, content: "One two three", wordCount: 3 },
+            data: { nodeId: sceneId, content: "One two three", wordCount: 3, createdAt: new Date("2025-01-01T00:00:00Z") },
         });
 
-        await new Promise((r) => setTimeout(r, 50));
-
         await testPrisma.contentVersion.create({
-            data: { nodeId: sceneId, content: "Updated content here now", wordCount: 4 },
+            data: { nodeId: sceneId, content: "Updated content here now", wordCount: 4, createdAt: new Date("2025-01-01T00:00:01Z") },
         });
 
         const versions = await testPrisma.contentVersion.findMany({
@@ -268,13 +264,11 @@ describe("API: Content Versioning", () => {
 
     it("restores a previous version by creating a new one", async () => {
         const v1 = await testPrisma.contentVersion.create({
-            data: { nodeId: sceneId, content: "Original text here", wordCount: 3 },
+            data: { nodeId: sceneId, content: "Original text here", wordCount: 3, createdAt: new Date("2025-01-01T00:00:00Z") },
         });
 
-        await new Promise((r) => setTimeout(r, 50));
-
         await testPrisma.contentVersion.create({
-            data: { nodeId: sceneId, content: "Changed text", wordCount: 2 },
+            data: { nodeId: sceneId, content: "Changed text", wordCount: 2, createdAt: new Date("2025-01-01T00:00:01Z") },
         });
 
         // Restore v1: create a new version with v1's content
@@ -284,13 +278,12 @@ describe("API: Content Versioning", () => {
 
         expect(sourceVersion).not.toBeNull();
 
-        await new Promise((r) => setTimeout(r, 50));
-
         const restored = await testPrisma.contentVersion.create({
             data: {
                 nodeId: sceneId,
                 content: sourceVersion!.content,
                 wordCount: sourceVersion!.content.trim().split(/\s+/).length,
+                createdAt: new Date("2025-01-01T00:00:02Z"),
             },
         });
 
@@ -310,11 +303,11 @@ describe("API: Content Versioning", () => {
         const MAX = 5; // Use a small number for testing
 
         // Create MAX + 3 versions
+        const baseTime = new Date("2025-01-01T00:00:00Z");
         for (let i = 0; i < MAX + 3; i++) {
             await testPrisma.contentVersion.create({
-                data: { nodeId: sceneId, content: `Version ${i}`, wordCount: 2 },
+                data: { nodeId: sceneId, content: `Version ${i}`, wordCount: 2, createdAt: new Date(baseTime.getTime() + i * 1000) },
             });
-            await new Promise((r) => setTimeout(r, 10));
         }
 
         // Now prune

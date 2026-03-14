@@ -33,10 +33,8 @@ describe("Project CRUD", () => {
   });
 
   it("lists projects ordered by updatedAt desc", async () => {
-    await testPrisma.project.create({ data: { title: "Old Project" } });
-    // SQLite timestamp resolution needs a bit more time
-    await new Promise((r) => setTimeout(r, 100));
-    await testPrisma.project.create({ data: { title: "New Project" } });
+    await testPrisma.project.create({ data: { title: "Old Project", updatedAt: new Date("2025-01-01T00:00:00Z") } });
+    await testPrisma.project.create({ data: { title: "New Project", updatedAt: new Date("2025-01-01T00:00:01Z") } });
 
     const projects = await testPrisma.project.findMany({
       orderBy: { updatedAt: "desc" },

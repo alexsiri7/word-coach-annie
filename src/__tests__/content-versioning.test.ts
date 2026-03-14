@@ -42,20 +42,20 @@ describe("Content Versioning", () => {
   });
 
   it("maintains version history in chronological order", async () => {
+    const t0 = new Date("2025-01-01T00:00:00Z");
+    const t1 = new Date("2025-01-01T00:00:01Z");
+    const t2 = new Date("2025-01-01T00:00:02Z");
+
     await testPrisma.contentVersion.create({
-      data: { nodeId: sceneId, content: "Version 1", wordCount: 2 },
+      data: { nodeId: sceneId, content: "Version 1", wordCount: 2, createdAt: t0 },
     });
 
-    await new Promise((r) => setTimeout(r, 50));
-
     await testPrisma.contentVersion.create({
-      data: { nodeId: sceneId, content: "Version 2 with more words", wordCount: 5 },
+      data: { nodeId: sceneId, content: "Version 2 with more words", wordCount: 5, createdAt: t1 },
     });
 
-    await new Promise((r) => setTimeout(r, 50));
-
     await testPrisma.contentVersion.create({
-      data: { nodeId: sceneId, content: "Version 3", wordCount: 2 },
+      data: { nodeId: sceneId, content: "Version 3", wordCount: 2, createdAt: t2 },
     });
 
     const versions = await testPrisma.contentVersion.findMany({
@@ -70,13 +70,11 @@ describe("Content Versioning", () => {
 
   it("gets the latest version for a scene", async () => {
     await testPrisma.contentVersion.create({
-      data: { nodeId: sceneId, content: "Old content", wordCount: 2 },
+      data: { nodeId: sceneId, content: "Old content", wordCount: 2, createdAt: new Date("2025-01-01T00:00:00Z") },
     });
 
-    await new Promise((r) => setTimeout(r, 50));
-
     await testPrisma.contentVersion.create({
-      data: { nodeId: sceneId, content: "Latest content here", wordCount: 3 },
+      data: { nodeId: sceneId, content: "Latest content here", wordCount: 3, createdAt: new Date("2025-01-01T00:00:01Z") },
     });
 
     const latest = await testPrisma.contentVersion.findFirst({
