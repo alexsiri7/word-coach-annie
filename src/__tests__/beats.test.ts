@@ -124,10 +124,10 @@ describe("Scene Beats", () => {
                 { id: "scene-1", type: "SCENE", title: "Scene 1", orderIndex: 0, parentId: null }
             ]);
 
-            (prisma.contentVersion.findFirst as any).mockResolvedValue({
+            (prisma.contentVersion.findMany as any).mockResolvedValue([{
                 nodeId: sceneId,
                 content: "<p>Start.</p><!-- beat: ACTION: Chase --> <p>Middle.</p><!-- beat: EMOTION: Fear --> <p>End.</p>"
-            });
+            }]);
 
             const markdown = await exportManuscript(projectId);
 
@@ -145,10 +145,10 @@ describe("Scene Beats", () => {
             (prisma.structureNode.findMany as any).mockResolvedValue([
                 { id: "s1", type: "SCENE", title: "S1", orderIndex: 0 }
             ]);
-            (prisma.contentVersion.findFirst as any).mockResolvedValue({
+            (prisma.contentVersion.findMany as any).mockResolvedValue([{
                 nodeId: "s1",
                 content: "<p>Text.</p><!-- beat: \nMulti-line\nBeat\n --> <p>More.</p>"
-            });
+            }]);
 
             const markdown = await exportManuscript(projectId);
             expect(markdown).toContain("Text.");
