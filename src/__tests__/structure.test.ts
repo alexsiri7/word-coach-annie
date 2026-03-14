@@ -31,7 +31,7 @@ describe("Structure Nodes", () => {
       data: { projectId, type: "CHAPTER", title: "Ch 1", orderIndex: 0 },
     });
 
-    const scene1 = await testPrisma.structureNode.create({
+    const _scene1 = await testPrisma.structureNode.create({
       data: {
         projectId,
         parentId: chapter.id,
@@ -41,7 +41,7 @@ describe("Structure Nodes", () => {
       },
     });
 
-    const scene2 = await testPrisma.structureNode.create({
+    const _scene2 = await testPrisma.structureNode.create({
       data: {
         projectId,
         parentId: chapter.id,

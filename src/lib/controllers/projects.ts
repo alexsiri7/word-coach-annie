@@ -17,14 +17,14 @@ export class ProjectsController {
         ]);
 
         // Batch: get all scenes for all projects in one query
-        const projectIds = projects.map((p: any) => p.id);
+        const projectIds = projects.map((p) => p.id);
         const allScenes = await prisma.structureNode.findMany({
             where: { projectId: { in: projectIds }, type: "SCENE" },
             select: { id: true, projectId: true },
         });
 
         // Batch: get latest content version word counts for all scenes
-        const sceneIds = allScenes.map((s: any) => s.id);
+        const sceneIds = allScenes.map((s) => s.id);
         const allVersions = sceneIds.length > 0
             ? await prisma.contentVersion.findMany({
                 where: { nodeId: { in: sceneIds } },
@@ -48,7 +48,7 @@ export class ProjectsController {
             projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
         }
 
-        const result = projects.map((project: any) => ({
+        const result = projects.map((project) => ({
             id: project.id,
             title: project.title,
             author: project.author,
@@ -138,7 +138,7 @@ export class ProjectsController {
         if (data.synopsis !== undefined) updateData.synopsis = data.synopsis.trim();
         if (data.genre !== undefined) updateData.genre = data.genre.trim();
         if (data.projectType !== undefined) updateData.projectType = data.projectType;
-        if (data.universeId !== undefined) (updateData as any).universeId = data.universeId;
+        if (data.universeId !== undefined) (updateData as Record<string, unknown>).universeId = data.universeId;
 
         if (Object.keys(updateData).length === 0) {
             throw new Error("No fields to update");

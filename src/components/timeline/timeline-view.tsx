@@ -1,11 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-    StructureNode,
-    StoryObject,
-    Relationship,
     StoryObjectType,
 } from "@/lib/types";
 import {
@@ -15,7 +11,6 @@ import {
 import { TimelineData } from "@/lib/controllers/timeline";
 import { Users, MapPin, GitBranch, Globe, StickyNote, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
     Tooltip,
     TooltipContent,
@@ -30,7 +25,7 @@ interface TimelineViewProps {
     projectId: string; // Add projectId to props
 }
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, typeof Users> = {
     Users,
     MapPin,
     GitBranch,
@@ -38,7 +33,7 @@ const ICON_MAP: Record<string, any> = {
     StickyNote,
 };
 
-export function TimelineView({ data, filterTypes, zoomLevel, projectId }: TimelineViewProps) {
+export function TimelineView({ data, filterTypes, zoomLevel: _zoomLevel, projectId }: TimelineViewProps) {
     const router = useRouter();
     const { scenes, objects, events } = data;
 

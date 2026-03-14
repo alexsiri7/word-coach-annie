@@ -23,7 +23,7 @@ describe("UniversesController", () => {
         const p = await ProjectsController.createProject({ title: "P1" });
         await UniversesController.linkProjectToUniverse(p.id, u.id);
 
-        const wo = await UniversesController.createWorldObject({
+        const _wo = await UniversesController.createWorldObject({
             universeId: u.id,
             type: "CHARACTER",
             name: "Hero"
@@ -45,13 +45,13 @@ describe("UniversesController", () => {
             name: "Hero"
         });
 
-        const e1 = await UniversesController.addTimelineEntry({
+        const _e1 = await UniversesController.addTimelineEntry({
             worldObjectId: wo.id,
             label: "Birth",
             description: "Born in a village"
         });
 
-        const e2 = await UniversesController.addTimelineEntry({
+        const _e2 = await UniversesController.addTimelineEntry({
             worldObjectId: wo.id,
             label: "War",
             description: "Fought in the war",
@@ -88,7 +88,7 @@ describe("UniversesController", () => {
         const p = await ProjectsController.createProject({ title: "P1" });
 
         await UniversesController.linkProjectToUniverse(p.id, u.id);
-        let project = await ProjectsController.getProject(p.id);
+        const _project = await ProjectsController.getProject(p.id);
         // We need to check the raw prisma here or update ProjectsController to include universeId
         const dbProject = await testPrisma.project.findUnique({ where: { id: p.id } });
         expect(dbProject?.universeId).toBe(u.id);

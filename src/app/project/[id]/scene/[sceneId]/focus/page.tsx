@@ -2,12 +2,20 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { FocusController } from "@/lib/controllers/focus";
 import { SceneEditor } from "@/components/scene-editor";
 import { SceneInfoSidebar } from "@/components/focus-mode/scene-info-sidebar";
 import { RelatedElementsPanel } from "@/components/focus-mode/related-elements-panel";
 import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { StructureNode } from "@/lib/types";
+
+interface SceneContext extends StructureNode {
+    chapterTitle?: string | null;
+    prevScene: { id: string; title: string } | null;
+    nextScene: { id: string; title: string } | null;
+}
+
+type RelatedElements = Record<string, { id: string; name: string; role?: string; description?: string; notes?: string }[]>;
 
 export default function FocusModePage() {
     const params = useParams();
@@ -16,8 +24,8 @@ export default function FocusModePage() {
     const sceneId = params.sceneId as string;
 
     const [loading, setLoading] = useState(true);
-    const [sceneContext, setSceneContext] = useState<any>(null);
-    const [relatedElements, setRelatedElements] = useState<any>(null);
+    const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
+    const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
     const [rightCollapsed, setRightCollapsed] = useState(true);
 
@@ -80,7 +88,7 @@ export default function FocusModePage() {
     return (
         <div className="flex h-screen w-full bg-background overflow-hidden">
             <SceneInfoSidebar
-                scene={sceneContext}
+                scene={{ ...sceneContext, wordCount: sceneContext.wordCount ?? 0 }}
                 navigation={{
                     prevScene: sceneContext.prevScene,
                     nextScene: sceneContext.nextScene
@@ -102,7 +110,7 @@ export default function FocusModePage() {
             </div>
 
             <RelatedElementsPanel
-                elements={relatedElements}
+                elements={relatedElements || {}}
                 collapsed={rightCollapsed}
                 onToggle={() => setRightCollapsed(!rightCollapsed)}
             />

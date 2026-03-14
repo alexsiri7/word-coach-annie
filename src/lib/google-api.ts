@@ -1,4 +1,4 @@
-import { google, docs_v1, drive_v3 } from 'googleapis';
+import { google, docs_v1 } from 'googleapis';
 import { GoogleAuthController } from './controllers/google-auth';
 
 export class GoogleDocsApi {

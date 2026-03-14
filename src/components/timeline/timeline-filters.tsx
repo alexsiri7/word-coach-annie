@@ -9,7 +9,7 @@ interface TimelineFiltersProps {
     onZoomChange: (level: "CHAPTER" | "SCENE") => void;
 }
 
-const TYPE_CONFIG: { type: StoryObjectType; label: string; icon: any }[] = [
+const TYPE_CONFIG: { type: StoryObjectType; label: string; icon: typeof Users }[] = [
     { type: "CHARACTER", label: "Characters", icon: Users },
     { type: "LOCATION", label: "Locations", icon: MapPin },
     { type: "PLOTLINE", label: "Plotlines", icon: GitBranch },

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Hash, Clock, FileText, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hash, FileText, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SceneInfoSidebarProps {

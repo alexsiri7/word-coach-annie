@@ -158,7 +158,6 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const contentRef = useRef<string>("");
 
   // Load initial content

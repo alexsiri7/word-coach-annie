@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
-import { join } from "path";
+import { describe, it, expect } from "vitest";
 import { listSkills, loadSkill } from "../mcp/skills";
 
 // The skills module reads from process.cwd()/.skills/

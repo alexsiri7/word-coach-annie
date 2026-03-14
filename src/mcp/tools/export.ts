@@ -215,7 +215,7 @@ export async function exportMedium(projectId: string, nodeId?: string): Promise<
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
-    const where: any = { projectId };
+    const where: Record<string, unknown> = { projectId };
     if (nodeId) {
         where.id = nodeId;
     } else {
@@ -239,7 +239,7 @@ export async function exportMedium(projectId: string, nodeId?: string): Promise<
         // If the user requested a CHAPTER node, we should get its children.
         if (node.type !== "SCENE" && nodeId) {
             // If a non-scene node is requested, fetch its children scenes
-            const children = await prisma.structureNode.findMany({
+            const _children = await prisma.structureNode.findMany({
                 where: { parentId: node.id, type: "SCENE" },
                 orderBy: { orderIndex: "asc" },
             });

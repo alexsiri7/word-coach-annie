@@ -41,7 +41,7 @@ export async function writeSceneContent(nodeId: string, content: string) {
     return StructureController.writeSceneContent(nodeId, content);
 }
 
-export async function writeSceneContentFromBlocks(nodeId: string, blocks: any[]) {
+export async function writeSceneContentFromBlocks(nodeId: string, blocks: { type: "CONTENT" | "BEAT"; content: string }[]) {
     return StructureController.writeSceneContentFromBlocks(nodeId, blocks);
 }
 

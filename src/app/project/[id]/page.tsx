@@ -487,7 +487,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           ) : selectedNode && selectedNode.type === "SCENE" ? (
             <SceneEditor
               key={selectedNode.id}
-              node={selectedNode as any}
+              node={selectedNode}
               projectId={projectId}
               onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
             />

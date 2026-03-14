@@ -15,7 +15,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import type { WorldObject, WorldObjectTimelineEntry } from "@/lib/types";
 
 interface WorldObjectPanelProps {
@@ -30,7 +29,7 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [notes, setNotes] = useState("");
-    const [type, setType] = useState<any>("");
+    const [type, setType] = useState<string>("");
     const [tags, setTags] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);

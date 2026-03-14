@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
-import { testPrisma } from "./setup";
 
 // Note: The controllers use the global prisma instance. 
 // In the vitest setup, we set process.env.DATABASE_URL
@@ -22,14 +21,14 @@ describe("Controller Integrity Tests", () => {
     describe("ProjectsController", () => {
         it("should list projects with correct counts and names", async () => {
             // Create some data
-            const node = await StructureController.createNode({
+            const _node = await StructureController.createNode({
                 projectId,
                 type: "SCENE",
                 title: "Test Scene"
             });
 
             const result = await ProjectsController.listProjects();
-            const project = result.projects.find((p: any) => p.id === projectId);
+            const project = result.projects.find((p: Record<string, unknown>) => p.id === projectId);
 
             expect(project).toBeDefined();
             expect(project?.title).toBe("Test Project");

@@ -11,7 +11,7 @@ export class UniversesController {
             },
         });
 
-        return universes.map((u: any) => ({
+        return universes.map((u: { id: string; title: string; description: string; createdAt: Date; updatedAt: Date; _count: { projects: number; worldObjects: number } }) => ({
             id: u.id,
             title: u.title,
             description: u.description,
@@ -42,7 +42,7 @@ export class UniversesController {
             title: universe.title,
             description: universe.description,
             projects: universe.projects,
-            worldObjects: universe.worldObjects.map((wo: any) => ({
+            worldObjects: universe.worldObjects.map((wo: { id: string; type: string; name: string; description: string; notes: string; tags: string; createdAt: Date; updatedAt: Date }) => ({
                 ...wo,
                 createdAt: wo.createdAt.toISOString(),
                 updatedAt: wo.updatedAt.toISOString(),
@@ -72,7 +72,7 @@ export class UniversesController {
     }
 
     static async updateUniverse(id: string, data: { title?: string; description?: string }) {
-        const updateData: any = {};
+        const updateData: Record<string, string> = {};
         if (data.title !== undefined) updateData.title = data.title.trim();
         if (data.description !== undefined) updateData.description = data.description.trim();
 
@@ -104,7 +104,7 @@ export class UniversesController {
             orderBy: { name: "asc" },
         });
 
-        return worldObjects.map((wo: any) => ({
+        return worldObjects.map((wo: { id: string; type: string; name: string; description: string; notes: string; tags: string; createdAt: Date; updatedAt: Date }) => ({
             ...wo,
             createdAt: wo.createdAt.toISOString(),
             updatedAt: wo.updatedAt.toISOString(),
@@ -127,7 +127,7 @@ export class UniversesController {
             ...wo,
             createdAt: wo.createdAt.toISOString(),
             updatedAt: wo.updatedAt.toISOString(),
-            timeline: wo.timeline.map((te: any) => ({
+            timeline: wo.timeline.map((te: { id: string; label: string; orderIndex: number; description: string; attributes: string; projectId: string | null; createdAt: Date; updatedAt: Date }) => ({
                 ...te,
                 createdAt: te.createdAt.toISOString(),
                 updatedAt: te.updatedAt.toISOString(),
@@ -174,7 +174,7 @@ export class UniversesController {
             type?: string;
         }
     ) {
-        const updateData: any = {};
+        const updateData: Record<string, string> = {};
         if (data.name !== undefined) updateData.name = data.name.trim();
         if (data.description !== undefined) updateData.description = data.description.trim();
         if (data.notes !== undefined) updateData.notes = data.notes.trim();
@@ -244,7 +244,7 @@ export class UniversesController {
             orderIndex?: number;
         }
     ) {
-        const updateData: any = {};
+        const updateData: Record<string, string | number> = {};
         if (data.label !== undefined) updateData.label = data.label.trim();
         if (data.description !== undefined) updateData.description = data.description.trim();
         if (data.attributes !== undefined) updateData.attributes = data.attributes.trim();
@@ -294,7 +294,7 @@ export class UniversesController {
     }
 
     static async transferStoryObjectToUniverse(storyObjectId: string, universeId: string) {
-        return prisma.$transaction(async (tx: any) => {
+        return prisma.$transaction(async (tx) => {
             // 1. Fetch story object
             const obj = await tx.storyObject.findUnique({
                 where: { id: storyObjectId },

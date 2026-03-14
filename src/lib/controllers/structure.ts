@@ -61,14 +61,6 @@ export class StructureController {
         // Simple check: count of "<!-- beat:" must match count of "-->" (roughly)
         // Better: ensure every "<!-- beat:" is closed by "-->" and no nesting.
 
-        const openBeats = (content.match(/<!-- beat:/g) || []).length;
-        const closeComments = (content.match(/-->/g) || []).length;
-
-        // This is a loose check because "-->" checks for any comment closure.
-        // But since we only use comments for beats mostly, it's a good heuristic.
-        // If content has normal HTML comments, this might be strict. 
-        // But we want to discourage manual HTML comments in scenes anyway.
-
         if (content.includes("<!-- beat:")) {
             // Basic structure check
             const segments = content.split("<!-- beat:");
@@ -348,7 +340,7 @@ export class StructureController {
             wordCount: version?.wordCount ?? 0,
             versionId: version?.id ?? null,
             lastModified: version?.createdAt.toISOString() ?? null,
-            annotations: annotations.map((a: any) => ({
+            annotations: annotations.map((a: { id: string; content: string; resolved: boolean; range: string; createdAt: Date }) => ({
                 id: a.id,
                 content: a.content,
                 resolved: a.resolved,
@@ -420,7 +412,7 @@ export class StructureController {
         return {
             nodeId,
             title: node.title,
-            versions: versions.map((v: any) => ({
+            versions: versions.map((v: { id: string; wordCount: number; createdAt: Date }) => ({
                 id: v.id,
                 wordCount: v.wordCount,
                 createdAt: v.createdAt.toISOString(),
@@ -478,7 +470,7 @@ export class StructureController {
         });
     }
     static async getOpenAnnotations(projectId?: string) {
-        const where: any = { resolved: false };
+        const where: Record<string, unknown> = { resolved: false };
         if (projectId) {
             where.node = { projectId };
         }
@@ -497,7 +489,7 @@ export class StructureController {
             orderBy: { createdAt: "desc" }
         });
 
-        return annotations.map((a: any) => ({
+        return annotations.map((a: { id: string; content: string; nodeId: string; createdAt: Date; node: { title: string; project: { title: string } } }) => ({
             id: a.id,
             content: a.content,
             nodeId: a.nodeId,

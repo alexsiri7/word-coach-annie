@@ -30,8 +30,8 @@ export async function listRelationships(projectId: string) {
         }),
     ]);
 
-    const nodeIds = nodes.map((n: any) => n.id);
-    const objectIds = objects.map((o: any) => o.id);
+    const nodeIds = nodes.map((n: { id: string }) => n.id);
+    const objectIds = objects.map((o: { id: string }) => o.id);
 
     const relationships = await prisma.relationship.findMany({
         where: {
@@ -56,7 +56,7 @@ export async function listRelationships(projectId: string) {
     });
 
     return {
-        relationships: relationships.map((r: any) => ({
+        relationships: relationships.map((r: Record<string, unknown> & { id: string; type: string; label: string | null; fromNode?: { id: string; title: string; type: string } | null; fromObject?: { id: string; name: string; type: string } | null; fromWorldObject?: { id: string; name: string; type: string } | null; toNode?: { id: string; title: string; type: string } | null; toObject?: { id: string; name: string; type: string } | null; toWorldObject?: { id: string; name: string; type: string } | null }) => ({
             id: r.id,
             type: r.type,
             label: r.label,

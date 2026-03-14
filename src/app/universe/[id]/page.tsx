@@ -9,8 +9,6 @@ import {
     MapPin,
     Globe,
     Link as LinkIcon,
-    Search,
-    MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,19 +20,13 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { WorldObjectPanel } from "@/components/world-object-panel";
 import { cn } from "@/lib/utils";
-import type { Universe, WorldObject } from "@/lib/types";
+import type { Universe } from "@/lib/types";
 
 type WorldObjectType = "CHARACTER" | "LOCATION" | "WORLD_ELEMENT";
 
-const WORLD_TABS: { key: WorldObjectType; label: string; icon: any }[] = [
+const WORLD_TABS: { key: WorldObjectType; label: string; icon: typeof Users }[] = [
     { key: "CHARACTER", label: "Characters", icon: Users },
     { key: "LOCATION", label: "Locations", icon: MapPin },
     { key: "WORLD_ELEMENT", label: "World Elements", icon: Globe },
@@ -89,17 +81,6 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
             fetchUniverse();
         }
     };
-
-    const handleLinkProject = async (projectId: string) => {
-        await fetch(`/api/api/universes/link-project`, { // Wait, I need to check the link project route I implemented
-            // I'll check my API routes. Oh wait, I didn't implement a dedicated route for linking.
-            // I'll use PATCH /api/projects/[id]
-        });
-        // Actually, I'll implement a dedicated route or use the existing project PATCH.
-        // In FR2 guide: linkProjectToUniverse(projectId, universeId).
-    };
-
-    // I'll implement the link/unlink logic in a bit.
 
     const filteredObjects = universe?.worldObjects?.filter(o => o.type === activeTab) || [];
 

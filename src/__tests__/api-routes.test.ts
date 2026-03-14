@@ -106,11 +106,11 @@ describe("API: Nodes", () => {
             data: { projectId, type: "CHAPTER", title: "Ch 1", orderIndex: 0 },
         });
 
-        const s1 = await testPrisma.structureNode.create({
+        const _s1 = await testPrisma.structureNode.create({
             data: { projectId, parentId: ch.id, type: "SCENE", title: "Scene A", orderIndex: 0 },
         });
 
-        const s3 = await testPrisma.structureNode.create({
+        const _s3 = await testPrisma.structureNode.create({
             data: { projectId, parentId: ch.id, type: "SCENE", title: "Scene C", orderIndex: 1 },
         });
 
@@ -121,7 +121,7 @@ describe("API: Nodes", () => {
             data: { orderIndex: { increment: 1 } },
         });
 
-        const s2 = await testPrisma.structureNode.create({
+        const _s2 = await testPrisma.structureNode.create({
             data: { projectId, parentId: ch.id, type: "SCENE", title: "Scene B", orderIndex: 1 },
         });
 
@@ -546,7 +546,7 @@ describe("API: Export", () => {
             data: { nodeId: s1.id, content: "<p>Hello world</p>", wordCount: 2 },
         });
 
-        const ch2 = await testPrisma.structureNode.create({
+        const _ch2 = await testPrisma.structureNode.create({
             data: { projectId, type: "CHAPTER", title: "Ch 2", orderIndex: 1 },
         });
 

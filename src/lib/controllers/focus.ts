@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { StructureController } from "./structure";
 
 export class FocusController {
     static async getSceneContext(sceneId: string) {
@@ -75,7 +74,7 @@ export class FocusController {
             }
         });
 
-        const relatedObjects: any[] = [];
+        const relatedObjects: { id: string; type: string; name: string; description: string | null; role: string | null; notes: string | null; tags: string | null }[] = [];
         const seenIds = new Set<string>();
 
         for (const rel of relationships) {

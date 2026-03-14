@@ -61,7 +61,7 @@ export async function GET(
         });
 
         // Batch: get all content versions for all scenes in one query
-        const sceneIds = scenes.map((s: any) => s.id);
+        const sceneIds = scenes.map((s) => s.id);
         const allVersions = sceneIds.length > 0
             ? await prisma.contentVersion.findMany({
                 where: { nodeId: { in: sceneIds } },

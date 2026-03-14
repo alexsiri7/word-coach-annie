@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import React from "react";
 import { Search, FileText, Users, MapPin, GitBranch, Globe, StickyNote, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 interface SceneResult {
     type: "scene";

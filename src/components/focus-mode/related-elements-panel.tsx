@@ -12,12 +12,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 interface RelatedElementsPanelProps {
-    elements: Record<string, any[]>;
+    elements: Record<string, { id: string; name: string; role?: string; description?: string; notes?: string }[]>;
     collapsed: boolean;
     onToggle: () => void;
 }
 
-const TYPE_ICONS: Record<string, any> = {
+const TYPE_ICONS: Record<string, typeof User> = {
     CHARACTER: User,
     LOCATION: MapPin,
     PLOTLINE: BookOpen,

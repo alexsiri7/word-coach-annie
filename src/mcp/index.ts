@@ -275,7 +275,7 @@ server.tool(
     },
     async ({ nodeId, content, blocks }) => {
         if (blocks) {
-            const result = await writeSceneContentFromBlocks(nodeId, blocks as any[]);
+            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[]);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         if (content !== undefined) {
@@ -841,7 +841,7 @@ server.tool(
 
         try {
             const entityId = exportMode === 'UNIVERSE' ? universeId! : projectId!;
-            const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as any);
+            const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER");
             return { content: [{ type: "text", text: `Export successful! Document: ${result.googleDocUrl}` }] };
         } catch (e) {
             return { content: [{ type: "text", text: `Export failed: ${e}` }], isError: true };
