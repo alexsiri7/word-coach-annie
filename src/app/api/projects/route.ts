@@ -21,35 +21,43 @@ export async function GET(request: NextRequest) {
     prisma.project.count(),
   ]);
 
-  // Calculate word counts for each project
-  const projectsWithWordCount = await Promise.all(
-    projects.map(async (project: any) => {
-      const scenes = await prisma.structureNode.findMany({
-        where: { projectId: project.id, type: "SCENE" },
-        select: { id: true },
-      });
+  // Batch: get all scenes for all projects in one query
+  const projectIds = projects.map((p: any) => p.id);
+  const allScenes = await prisma.structureNode.findMany({
+    where: { projectId: { in: projectIds }, type: "SCENE" },
+    select: { id: true, projectId: true },
+  });
 
-      let wordCount = 0;
-      if (scenes.length > 0) {
-        const latestVersions = await Promise.all(
-          scenes.map((scene: any) =>
-            prisma.contentVersion.findFirst({
-              where: { nodeId: scene.id },
-              orderBy: { createdAt: "desc" },
-              select: { wordCount: true },
-            })
-          )
-        );
-        wordCount = latestVersions.reduce((sum: number, v: any) => sum + (v?.wordCount || 0), 0);
-      }
+  // Batch: get latest content version word counts for all scenes in one query
+  const sceneIds = allScenes.map((s: any) => s.id);
+  const allVersions = sceneIds.length > 0
+    ? await prisma.contentVersion.findMany({
+        where: { nodeId: { in: sceneIds } },
+        orderBy: { createdAt: "desc" },
+        select: { nodeId: true, wordCount: true },
+      })
+    : [];
 
-      return {
-        ...project,
-        wordCount,
-        nodeCount: project._count.structureNodes,
-      };
-    })
-  );
+  // Build map: nodeId -> latest version's wordCount (first match per nodeId is latest due to orderBy)
+  const latestWordCounts = new Map<string, number>();
+  for (const v of allVersions) {
+    if (!latestWordCounts.has(v.nodeId)) {
+      latestWordCounts.set(v.nodeId, v.wordCount ?? 0);
+    }
+  }
+
+  // Calculate word counts per project
+  const projectWordCounts = new Map<string, number>();
+  for (const scene of allScenes) {
+    const current = projectWordCounts.get(scene.projectId) || 0;
+    projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
+  }
+
+  const projectsWithWordCount = projects.map((project: any) => ({
+    ...project,
+    wordCount: projectWordCounts.get(project.id) || 0,
+    nodeCount: project._count.structureNodes,
+  }));
 
   return NextResponse.json({ projects: projectsWithWordCount, total });
 }

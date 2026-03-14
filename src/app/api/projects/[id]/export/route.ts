@@ -67,17 +67,22 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
     orderBy: { orderIndex: "asc" },
   });
 
-  // Get latest content for all scenes
+  // Batch: get latest content for all scenes in one query
   const sceneIds = nodes.filter((n: { type: string }) => n.type === "SCENE").map((n: { id: string }) => n.id);
   const contentMap: Record<string, string> = {};
 
-  for (const sceneId of sceneIds) {
-    const version = await prisma.contentVersion.findFirst({
-      where: { nodeId: sceneId },
+  if (sceneIds.length > 0) {
+    const allVersions = await prisma.contentVersion.findMany({
+      where: { nodeId: { in: sceneIds } },
       orderBy: { createdAt: "desc" },
+      select: { nodeId: true, content: true },
     });
-    if (version) {
-      contentMap[sceneId] = version.content;
+
+    // First match per nodeId is latest due to orderBy desc
+    for (const v of allVersions) {
+      if (!(v.nodeId in contentMap)) {
+        contentMap[v.nodeId] = v.content;
+      }
     }
   }
 

@@ -54,11 +54,29 @@ export async function GET(
             );
         }
 
-        // Search scene content — get all scenes, then get latest content version for each
+        // Search scene content — get all scenes, then batch-fetch latest content versions
         const scenes = await prisma.structureNode.findMany({
             where: { projectId, type: "SCENE" },
             select: { id: true, title: true, parentId: true },
         });
+
+        // Batch: get all content versions for all scenes in one query
+        const sceneIds = scenes.map((s: any) => s.id);
+        const allVersions = sceneIds.length > 0
+            ? await prisma.contentVersion.findMany({
+                where: { nodeId: { in: sceneIds } },
+                orderBy: { createdAt: "desc" },
+                select: { nodeId: true, content: true },
+            })
+            : [];
+
+        // Build map: nodeId -> latest content (first per nodeId due to orderBy desc)
+        const latestContentMap = new Map<string, string>();
+        for (const v of allVersions) {
+            if (!latestContentMap.has(v.nodeId)) {
+                latestContentMap.set(v.nodeId, v.content);
+            }
+        }
 
         const sceneResults: {
             type: "scene";
@@ -69,16 +87,13 @@ export async function GET(
         }[] = [];
 
         const lowerQuery = query.toLowerCase();
+        const matchedSceneIds = new Set<string>();
 
         for (const scene of scenes) {
-            const latestVersion = await prisma.contentVersion.findFirst({
-                where: { nodeId: scene.id },
-                orderBy: { createdAt: "desc" },
-                select: { content: true },
-            });
+            const content = latestContentMap.get(scene.id);
 
-            if (latestVersion) {
-                const plainText = stripHtml(latestVersion.content);
+            if (content) {
+                const plainText = stripHtml(content);
                 if (plainText.toLowerCase().includes(lowerQuery)) {
                     sceneResults.push({
                         type: "scene",
@@ -87,13 +102,14 @@ export async function GET(
                         parentId: scene.parentId,
                         snippet: getSnippet(plainText, query),
                     });
+                    matchedSceneIds.add(scene.id);
                 }
             }
 
-            // Also match on scene title
+            // Also match on scene title (use Set for O(1) lookup instead of O(n) .find())
             if (
                 scene.title.toLowerCase().includes(lowerQuery) &&
-                !sceneResults.find((r) => r.id === scene.id)
+                !matchedSceneIds.has(scene.id)
             ) {
                 sceneResults.push({
                     type: "scene",
@@ -102,6 +118,7 @@ export async function GET(
                     parentId: scene.parentId,
                     snippet: `Title match: ${scene.title}`,
                 });
+                matchedSceneIds.add(scene.id);
             }
         }
 
