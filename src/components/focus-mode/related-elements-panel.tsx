@@ -1,6 +1,5 @@
 "use client";
 
-import { Element } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, User, MapPin, BookOpen, Globe, StickyNote } from "lucide-react";
