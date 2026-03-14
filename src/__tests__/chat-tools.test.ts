@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mocks so they're available in vi.mock factories
-const { mockCreate, mockPrisma, mockExecuteTool } = vi.hoisted(() => ({
+const { mockCreate, mockPrisma, mockExecuteTool, mockGetAiConfig } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
   mockPrisma: {
     project: { findUnique: vi.fn() },
@@ -12,6 +12,7 @@ const { mockCreate, mockPrisma, mockExecuteTool } = vi.hoisted(() => ({
     },
   },
   mockExecuteTool: vi.fn(),
+  mockGetAiConfig: vi.fn(),
 }));
 
 vi.mock("openai", () => ({
@@ -26,6 +27,10 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/ai/tool-executor", () => ({
   executeTool: (...args: unknown[]) => mockExecuteTool(...args),
+}));
+
+vi.mock("@/lib/ai/settings", () => ({
+  getAiConfig: () => mockGetAiConfig(),
 }));
 
 // Import after mocks
@@ -67,6 +72,11 @@ const fakeProject = {
 beforeEach(() => {
   vi.clearAllMocks();
 
+  mockGetAiConfig.mockResolvedValue({
+    baseUrl: "https://test.example.com/v1",
+    apiKey: "test-key",
+    model: "test-model",
+  });
   mockPrisma.project.findUnique.mockResolvedValue(fakeProject);
   mockPrisma.chatMessage.findMany.mockResolvedValue([
     { role: "user", content: "Hello", createdAt: new Date() },
