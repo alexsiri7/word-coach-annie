@@ -4,3 +4,15 @@ data/*.db
 data/*.db-journal
 .git
 .env.local
+.env
+.beads
+.agent
+.artifacts
+.claude
+.gemini
+.skills
+.runtime
+docs
+*.md
+Dockerfile.dev
+docker-compose.dev.yml

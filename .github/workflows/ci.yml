@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: alexsiri7/word-coach-annie
+
 jobs:
   quality:
     name: Quality Gates (Node 20)
@@ -43,10 +47,50 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [quality]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
     name: Deploy to server
     runs-on: ubuntu-latest
-    needs: [quality]
+    needs: [build-and-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Connect to Tailscale
@@ -62,7 +106,30 @@ jobs:
           key: ${{ secrets.SSH_DEPLOY_KEY }}
           script: |
             cd /home/asiri/gt/annie/mayor/rig
+
+            # Pull latest compose file
             git pull --rebase
-            npm ci
-            npm run build
-            docker compose up -d --build
+
+            # Tag current running image as rollback before pulling new one
+            docker tag ghcr.io/alexsiri7/word-coach-annie:latest \
+              ghcr.io/alexsiri7/word-coach-annie:rollback 2>/dev/null || true
+
+            # Pull the new image
+            docker pull ghcr.io/alexsiri7/word-coach-annie:latest
+
+            # Restart with new image
+            docker compose up -d app
+
+            # Verify the new container is healthy (wait up to 30s)
+            echo "Waiting for container to start..."
+            for i in $(seq 1 6); do
+              if docker compose exec app curl -sf http://localhost:3000 > /dev/null 2>&1; then
+                echo "Deploy successful!"
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "WARNING: Health check did not pass within 30s"
+            echo "To rollback: docker compose down && docker tag ghcr.io/alexsiri7/word-coach-annie:rollback ghcr.io/alexsiri7/word-coach-annie:latest && docker compose up -d app"
+            exit 1

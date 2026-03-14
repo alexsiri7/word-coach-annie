@@ -1,17 +1,22 @@
 services:
   app:
-    image: ghcr.io/alexsiri7/word-coach-annie:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
+      # Mount source code for hot reload
+      - .:/app
+      # Prevent node_modules from being overwritten by mount
+      - /app/node_modules
       # Persist SQLite database outside the container
       - ./data:/app/data
-    env_file:
-      - .env.local
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - DATABASE_URL=file:/app/data/word-coach-annie.db
+    command: /app/scripts/start-docker.sh
 
   tunnel:
     image: cloudflare/cloudflared:latest

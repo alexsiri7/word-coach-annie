@@ -1,25 +1,41 @@
-FROM node:20-slim
+# --- Stage 1: Install dependencies ---
+FROM node:20-slim AS deps
 
-# Install system deps for Prisma (SQLite) and general tooling
-RUN apt-get update && apt-get install -y \
-    openssl \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# --- Stage 2: Build the application ---
+FROM node:20-slim AS builder
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npx prisma generate
+RUN npm run build
+
+# --- Stage 3: Production runtime ---
+FROM node:20-slim AS runner
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files first for layer caching
-COPY package.json package-lock.json* ./
-RUN npm install
+ENV NODE_ENV=production
 
-# Copy the rest of the app
-COPY . .
-
-# Generate Prisma client
-RUN npx prisma generate 2>/dev/null || true
+# Next.js standalone output includes only what's needed
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3000
 
-# Dev mode with hot reload
-CMD ["npm", "run", "dev"]
+CMD ["node", "server.js"]
