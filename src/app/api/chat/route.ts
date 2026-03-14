@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { prisma } from "@/lib/db";
+import {
+  getCoreTools,
+  getToolDefinitions,
+  type ToolCategory,
+  type OpenAIToolDefinition,
+} from "@/lib/ai/tool-registry";
+import { executeTool } from "@/lib/ai/tool-executor";
 
 const openai = new OpenAI({
   baseURL: "https://router.requesty.ai/v1",
@@ -8,6 +15,8 @@ const openai = new OpenAI({
 });
 
 const MODEL = process.env.REQUESTY_MODEL || "google/gemini-2.0-flash-001";
+
+const MAX_TOOL_ITERATIONS = 10;
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
@@ -69,7 +78,38 @@ Your role:
 - Be encouraging but honest — like a good writing partner
 - Stay grounded in the actual story content above
 - Keep responses concise unless asked to elaborate
-- Use the story's existing characters and locations — don't invent new ones unless asked`;
+- Use the story's existing characters and locations — don't invent new ones unless asked
+- You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
+}
+
+/** Build the current tool list from loaded categories */
+function buildToolList(loadedCategories: Set<ToolCategory>): OpenAIToolDefinition[] {
+  const extraCategories = Array.from(loadedCategories).filter((c) => c !== "core");
+  return [...getCoreTools(), ...getToolDefinitions(extraCategories)];
+}
+
+/** Handle the load_toolset meta-tool: add the requested category's tools */
+function handleLoadToolset(
+  args: Record<string, unknown>,
+  loadedCategories: Set<ToolCategory>,
+): string {
+  const category = args.category as ToolCategory;
+  const validCategories: ToolCategory[] = [
+    "structure", "characters", "world_building", "export", "admin", "skills",
+  ];
+  if (!validCategories.includes(category)) {
+    return JSON.stringify({
+      error: true,
+      message: `Invalid category: ${category}. Valid: ${validCategories.join(", ")}`,
+    });
+  }
+  loadedCategories.add(category);
+  const newTools = getToolDefinitions([category]);
+  return JSON.stringify({
+    loaded: category,
+    toolCount: newTools.length,
+    tools: newTools.map((t) => t.function.name),
+  });
 }
 
 // GET /api/chat?projectId=X — load chat history
@@ -93,7 +133,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/chat — send message, get streaming AI response
+// POST /api/chat — send message, get streaming AI response with tool use
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -134,37 +174,104 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }));
 
-    // Stream response
-    const stream = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: systemPrompt + sceneNote },
-        ...chatHistory,
-      ],
-      stream: true,
-    });
+    // Track loaded tool categories and tool interaction log
+    const loadedCategories = new Set<ToolCategory>(["core"]);
+    const toolLog: { tool: string; args: Record<string, unknown>; result: string }[] = [];
 
-    // Create a ReadableStream that sends SSE
+    // Build messages array for the LLM
+    const llmMessages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt + sceneNote },
+      ...chatHistory,
+    ];
+
+    // Tool use loop: call LLM non-streaming, execute tools, repeat
+    let finalContent = "";
+    for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+      const tools = buildToolList(loadedCategories);
+
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        messages: llmMessages,
+        tools,
+      });
+
+      const choice = response.choices[0];
+      if (!choice) break;
+
+      const assistantMessage = choice.message;
+
+      // If no tool calls, we have the final response
+      if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+        finalContent = assistantMessage.content || "";
+        break;
+      }
+
+      // Add assistant message with tool calls to conversation
+      llmMessages.push(assistantMessage);
+
+      // Execute each tool call
+      for (const toolCall of assistantMessage.tool_calls) {
+        const fnName = toolCall.function.name;
+        const fnArgs = JSON.parse(toolCall.function.arguments);
+
+        let result: string;
+        if (fnName === "load_toolset") {
+          result = handleLoadToolset(fnArgs, loadedCategories);
+        } else {
+          result = await executeTool(fnName, fnArgs);
+        }
+
+        toolLog.push({ tool: fnName, args: fnArgs, result });
+
+        // Add tool result to messages
+        llmMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: result,
+        });
+      }
+
+      // If finish_reason is "stop" despite having tool_calls, break
+      if (choice.finish_reason === "stop") {
+        finalContent = assistantMessage.content || "";
+        break;
+      }
+    }
+
+    // Save tool interactions as a system message if any tools were used
+    if (toolLog.length > 0) {
+      const toolSummary = toolLog
+        .map((t) => `Tool: ${t.tool}\nArgs: ${JSON.stringify(t.args)}\nResult: ${t.result.slice(0, 500)}`)
+        .join("\n---\n");
+      await prisma.chatMessage.create({
+        data: {
+          projectId,
+          role: "system",
+          content: `[Tool interactions]\n${toolSummary}`,
+        },
+      });
+    }
+
+    // Stream the final text response via SSE
     const encoder = new TextEncoder();
-    let fullResponse = "";
-
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content || "";
-            if (content) {
-              fullResponse += content;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
-              );
-            }
+          // Send the final content in chunks for streaming feel
+          const chunkSize = 20;
+          for (let i = 0; i < finalContent.length; i += chunkSize) {
+            const chunk = finalContent.slice(i, i + chunkSize);
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`)
+            );
           }
 
           // Save assistant response
-          await prisma.chatMessage.create({
-            data: { projectId, role: "assistant", content: fullResponse },
-          });
+          if (finalContent) {
+            await prisma.chatMessage.create({
+              data: { projectId, role: "assistant", content: finalContent },
+            });
+          }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
