@@ -80,6 +80,26 @@ describe("Scene Beats", () => {
                 .rejects.toThrow(/Nested comments in beats are not allowed/);
         });
 
+        it("should exclude beat annotations from word count", async () => {
+            (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
+            (prisma.contentVersion.create as any).mockResolvedValue({
+                id: "v1", createdAt: new Date(), nodeId: "scene-1", wordCount: 4
+            });
+            (prisma.contentVersion.findMany as any).mockResolvedValue([]);
+
+            const content = "<p>Some text.</p><!-- beat: This is a beat with many words --> <p>More text.</p>";
+
+            await StructureController.writeSceneContent("scene-1", content);
+
+            expect(prisma.contentVersion.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        wordCount: 4, // Only "Some text. More text." — not beat words
+                    }),
+                })
+            );
+        });
+
         it("should accept content without beats", async () => {
             (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
             (prisma.contentVersion.create as any).mockResolvedValue({ id: "v1", createdAt: new Date() });
