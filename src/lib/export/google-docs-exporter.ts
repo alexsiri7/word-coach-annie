@@ -83,10 +83,12 @@ export class GoogleDocsExporter {
         // 5. Update Doc Content
         try {
             await GoogleDocsApi.replaceContent(googleDocId, content);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Handle 404 (doc deleted externally) -> remove mapping and retry?
             // For now, just throw.
-            if (error.code === 404 || (error.message && error.message.includes('not found'))) {
+            const message = error instanceof Error ? error.message : String(error);
+            const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+            if (code === 404 || message.includes('not found')) {
                 await prisma.googleDocExport.delete({ where: { id: exportRecord!.id } });
                 throw new Error("Google Doc not found. Mapping removed. Please try again to create a new doc.");
             }

@@ -10,8 +10,8 @@ export async function PATCH(
         const body = await request.json();
         const entry = await UniversesController.updateTimelineEntry(entryId, body);
         return NextResponse.json(entry);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }
 
@@ -23,7 +23,7 @@ export async function DELETE(
         const { entryId } = await params;
         await UniversesController.deleteTimelineEntry(entryId);
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }

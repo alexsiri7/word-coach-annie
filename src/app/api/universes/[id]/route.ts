@@ -9,8 +9,8 @@ export async function GET(
         const { id } = await params;
         const universe = await UniversesController.getUniverse(id);
         return NextResponse.json(universe);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }
 
@@ -23,8 +23,8 @@ export async function PATCH(
         const body = await request.json();
         const universe = await UniversesController.updateUniverse(id, body);
         return NextResponse.json(universe);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }
 
@@ -36,7 +36,7 @@ export async function DELETE(
         const { id } = await params;
         await UniversesController.deleteUniverse(id);
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }

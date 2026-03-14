@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
   ]);
 
   // Batch: get all scenes for all projects in one query
-  const projectIds = projects.map((p: any) => p.id);
+  const projectIds = projects.map((p) => p.id);
   const allScenes = await prisma.structureNode.findMany({
     where: { projectId: { in: projectIds }, type: "SCENE" },
     select: { id: true, projectId: true },
   });
 
   // Batch: get latest content version word counts for all scenes in one query
-  const sceneIds = allScenes.map((s: any) => s.id);
+  const sceneIds = allScenes.map((s) => s.id);
   const allVersions = sceneIds.length > 0
     ? await prisma.contentVersion.findMany({
         where: { nodeId: { in: sceneIds } },
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
   }
 
-  const projectsWithWordCount = projects.map((project: any) => ({
+  const projectsWithWordCount = projects.map((project) => ({
     ...project,
     wordCount: projectWordCounts.get(project.id) || 0,
     nodeCount: project._count.structureNodes,

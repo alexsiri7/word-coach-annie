@@ -10,8 +10,9 @@ export async function GET(
     const { id } = await params;
     const project = await ProjectsController.getProject(id);
     return NextResponse.json(project);
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     console.error("GET /api/projects/[id] error:", error);
@@ -45,11 +46,12 @@ export async function PATCH(
 
     const project = await ProjectsController.updateProject(id, body);
     return NextResponse.json(project);
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (error.message.includes("No fields to update")) {
+    if (message.includes("No fields to update")) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
     console.error("PATCH /api/projects/[id] error:", error);

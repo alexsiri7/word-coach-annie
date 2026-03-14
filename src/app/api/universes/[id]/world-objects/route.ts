@@ -11,8 +11,8 @@ export async function GET(
         const type = searchParams.get("type") || undefined;
         const worldObjects = await UniversesController.listWorldObjects(id, type);
         return NextResponse.json(worldObjects);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }
 
@@ -28,7 +28,7 @@ export async function POST(
             universeId: id,
         });
         return NextResponse.json(worldObject);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }

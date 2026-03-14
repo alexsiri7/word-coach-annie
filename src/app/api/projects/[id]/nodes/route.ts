@@ -25,8 +25,9 @@ export async function GET(
 
     const roots = await StructureController.getOutline(projectId);
     return NextResponse.json({ tree: roots });
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     console.error("Failed to list nodes:", error);
@@ -59,13 +60,14 @@ export async function POST(
     });
 
     return NextResponse.json(node, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create node:", error);
-    if (error.message.includes("Project not found")) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (error.message.includes("type must be") || error.message.includes("status must be") || error.message.includes("Parent node not found")) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (message.includes("type must be") || message.includes("status must be") || message.includes("Parent node not found")) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     return NextResponse.json(
       { error: "Internal server error" },

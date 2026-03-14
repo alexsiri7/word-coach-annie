@@ -10,8 +10,9 @@ export async function GET(
   try {
     const roots = await StructureController.getOutline(projectId);
     return NextResponse.json(roots);
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     console.error("Failed to build outline:", error);

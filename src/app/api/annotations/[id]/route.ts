@@ -11,7 +11,7 @@ export async function PATCH(
         const body = await request.json();
         const { content, resolved } = body;
 
-        const updateData: any = {};
+        const updateData: Record<string, unknown> = {};
         if (content !== undefined) updateData.content = content;
         if (resolved !== undefined) updateData.resolved = resolved;
 

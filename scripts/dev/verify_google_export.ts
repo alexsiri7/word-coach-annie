@@ -16,8 +16,9 @@ async function main() {
     // 2. Try to export a non-existent project (should throw specific error)
     try {
         await GoogleDocsExporter.exportToGoogleDocs("non-existent-id", "STORY_READER");
-    } catch (error: any) {
-        if (error.message && error.message.includes("Project not found")) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("Project not found")) {
             console.log("Success: Correctly identified non-existent project.");
         } else {
             console.error("Unexpected error when exporting non-existent project:", error);

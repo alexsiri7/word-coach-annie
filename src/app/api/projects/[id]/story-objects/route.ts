@@ -40,12 +40,13 @@ export async function GET(
       offset,
     });
 
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (error.message.includes("Invalid type")) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (message.includes("Invalid type")) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("GET /api/projects/[id]/story-objects error:", error);
     return NextResponse.json(
@@ -72,21 +73,24 @@ export async function POST(
       );
     }
 
-    // We pass the body directly to the controller, casting it to the expected type
-    // The controller validates required fields like name and type.
-
     const storyObject = await StoryObjectController.createStoryObject({
       projectId,
-      ...(body as any)
+      type: body.type as string,
+      name: body.name as string,
+      description: body.description as string | undefined,
+      notes: body.notes as string | undefined,
+      role: body.role as string | undefined,
+      tags: body.tags as string | undefined,
     });
 
     return NextResponse.json(storyObject, { status: 201 });
-  } catch (error: any) {
-    if (error.message.includes("Project not found")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (error.message.includes("name is required") || error.message.includes("Invalid type") || error.message.includes("type is required")) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (message.includes("name is required") || message.includes("Invalid type") || message.includes("type is required")) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("POST /api/projects/[id]/story-objects error:", error);
     return NextResponse.json(
