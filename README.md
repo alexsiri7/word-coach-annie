@@ -1,77 +1,171 @@
 # Word Coach Annie
 
-Word Coach Annie is an AI-powered writing assistant designed to help authors plan, draft, and visualize their stories. It features a Next.js web interface for managing project data and a Model Context Protocol (MCP) server for integration with AI assistants like Claude.
+A local-first, AI-powered writing assistant for novelists and article writers. Manage complex narratives — structure, characters, world-building, timelines — and export clean Markdown or sync to Google Docs.
 
 ## Features
 
-- **Project Management**: Create and organize writing projects.
-- **Structure Editing**: Outline your story with parts, chapters, and scenes.
-- **Story Bible**: Track characters, locations, and other world elements.
-- **Rich Text Editor**: Write scene content with a WYSIWYG editor.
-- **AI Integration**: Seamlessly connect with AI assistants via MCP for context-aware help.
+### Writing
+- **Hierarchical structure**: Parts → Chapters → Scenes with status tracking (Outline/Draft/Revised/Final)
+- **Rich text editor**: Tiptap-based WYSIWYG with auto-save, word counts, and content versioning
+- **Scene beats**: Inline narrative waypoints (`<!-- beat: ... -->`) rendered as styled cards, stripped on export
+- **Focus mode**: Distraction-free three-panel layout (scene info | editor | related elements)
+- **Full-text search**: Search across all scenes and story objects with highlighted snippets
 
-## Prerequisites
+### Story Management
+- **Story objects**: Characters, Locations, Plotlines, World Elements, Notes — all with CRUD and tags
+- **Relationships**: Typed links between any entities (APPEARS_IN, LOCATED_AT, PART_OF_PLOTLINE, etc.)
+- **Universes**: Shared world-building containers spanning multiple projects
+- **World objects**: Universe-scoped characters, locations, elements with ordered timeline entries
+- **Timeline view**: Visual matrix of story objects × scenes showing where characters/locations appear
 
-- [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
-- Node.js (optional, for local development outside Docker)
+### Export
+- **Markdown**: Full manuscript, per-chapter, or story bible with configurable options
+- **Medium**: Medium-ready Markdown with front matter
+- **Google Docs**: OAuth-based export with idempotent sync (3 modes: Universe, Internal, Reader)
+
+### AI Integration
+- **AI chat panel**: Per-project streaming chat with full story context (characters, outline, current scene)
+- **MCP server**: 48 tools for agentic access to all project data (read/write scenes, manage characters, export, etc.)
+- **Writing skills**: 6 curated MCP Prompts — developmental edit, line edit, consistency check, plot structure analysis, character arc review, scene drafting assistant
+
+### Article / Non-Fiction
+- **Project types**: FICTION, ARTICLE_COLLECTION, GENERAL with dynamic UI labels (Chapter→Article, Scene→Section, etc.)
+- **Medium export**: Article-optimized Markdown with front matter
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript (strict mode) |
+| Frontend | React 19, Shadcn/ui, Tailwind CSS, Tiptap 3 |
+| Database | SQLite via Prisma 6 |
+| AI | OpenAI SDK → Requesty gateway → Gemini 2.0 Flash |
+| MCP | @modelcontextprotocol/sdk 1.12 (stdio transport) |
+| Testing | Vitest + @vitest/coverage-v8 |
+| Container | Docker + Docker Compose |
 
 ## Getting Started
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/word-coach-annie.git
-    cd word-coach-annie
-    ```
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
 
-2.  **Start the application:**
-    Run the following command to build and start the Docker container:
-    ```bash
-    docker compose up -d
-    ```
+### Quick Start
 
-3.  **Access the Web App:**
-    Open your browser and navigate to [http://localhost:3000](http://localhost:3000).
+```bash
+git clone https://github.com/alexsiri7/annie.git
+cd annie
+cp .env.example .env   # Configure API keys
+docker compose up -d
+```
 
-## MCP Server Configuration (for Claude Desktop)
+Open [http://localhost:3000](http://localhost:3000).
 
-To use Word Coach Annie with Claude Desktop, you need to configure the MCP server in your `claude_desktop_config.json`.
+### Environment Variables
 
-1.  Locate your config file:
-    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REQUESTY_API_KEY` | For AI chat | Requesty LLM gateway API key |
+| `REQUESTY_MODEL` | No | Model override (default: `google/gemini-2.0-flash-001`) |
+| `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |
+| `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for public access |
 
-2.  Add the following configuration:
+## MCP Server (for AI Agents)
 
-    ```json
-    {
-      "mcpServers": {
-        "word-coach-annie": {
-          "command": "docker",
-          "args": [
-            "compose",
-            "exec",
-            "-T",
-            "app",
-            "npx",
-            "tsx",
-            "src/mcp/index.ts"
-          ]
-        }
-      }
+Annie includes a Model Context Protocol server with 48 tools for full read/write access to project data.
+
+### Claude Desktop Configuration
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "word-coach-annie": {
+      "command": "docker",
+      "args": ["compose", "exec", "-T", "app", "npx", "tsx", "src/mcp/index.ts"]
     }
-    ```
+  }
+}
+```
 
-    > **Note:** The `-T` flag is crucial as it disables pseudo-tty allocation, ensuring clean stdio communication for the MCP protocol.
+The `-T` flag disables pseudo-tty allocation for clean stdio communication.
 
-3.  Restart Claude Desktop. The "word-coach-annie" tools should now be available.
+### Tool Categories
+
+| Category | Tools | Examples |
+|----------|-------|---------|
+| Projects | 4 | list, get, create, update |
+| Structure | 10 | outline, create/update/delete nodes, scene content, versions, annotations |
+| Story Objects | 5 | list, get, create, update, delete |
+| Relationships | 3 | list, create, delete |
+| Universes | 14 | CRUD for universes, world objects, timeline entries |
+| Export | 4 | manuscript, story bible, medium, Google Docs |
+| Database Safety | 3 | snapshot, list snapshots, restore |
+| Google Auth | 4 | status, connect, callback, disconnect |
+| Skills | 1 | list available writing skills |
+
+### Writing Skills (MCP Prompts)
+
+Six curated instruction sets registered as MCP Prompts:
+- **Developmental Edit** — structural/story-level feedback
+- **Line Edit** — sentence-level clarity, voice, word choice
+- **Consistency Check** — cross-reference world elements for contradictions
+- **Plot Structure Analysis** — analyze against frameworks (3-act, hero's journey, etc.)
+- **Character Arc Review** — map arcs, identify flat characters
+- **Scene Drafting Assistant** — draft scenes from outline context
 
 ## Development
 
-The project uses a Docker-based workflow.
+```bash
+docker compose up              # Start with logs
+docker compose exec app npm run test:run     # Run tests
+docker compose exec app npm run typecheck    # TypeScript check
+docker compose exec app npm run lint         # ESLint
+docker compose exec app npm run build        # Production build
+docker compose exec app npx prisma studio    # Database browser (port 5555)
+```
 
-- **Start Dev Server**: `docker compose up` (logs will stream to console)
-- **Run Tests**: `docker compose exec app npm run test`
-- **Database Studio**: `docker compose exec app npx prisma studio` (accessible at http://localhost:5555)
-- **Database Migrations**: `docker compose exec app npx prisma migrate dev`
+### Database Safety
 
-For more details on project rules and commands, see [docs/RULES.md](docs/RULES.md).
+**NEVER run `prisma db push` or `prisma migrate reset` on the production database.** These can drop and recreate tables, destroying all data.
+
+For schema changes:
+1. Write migration SQL by hand (`ALTER TABLE ... ADD COLUMN ...`)
+2. Apply: `sqlite3 data/word-coach-annie.db < migration.sql`
+3. Update `prisma/schema.prisma` to match
+4. Run `npx prisma generate` (client only, safe)
+
+### Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router (pages + API routes)
+│   ├── api/                # 27 REST endpoints
+│   ├── project/[id]/       # Editor, settings, timeline, focus mode
+│   └── universe/           # Universe management
+├── components/             # React UI components
+│   ├── editor/             # Tiptap extensions (beats, links)
+│   ├── focus-mode/         # Focus mode panels
+│   ├── timeline/           # Timeline view
+│   └── ui/                 # Shadcn/ui primitives
+├── lib/
+│   ├── controllers/        # Business logic (6 controllers)
+│   ├── export/             # Google Docs exporter
+│   └── db.ts               # Prisma client singleton
+├── mcp/
+│   ├── index.ts            # MCP server (48 tools)
+│   ├── tools/              # Tool implementations by category
+│   └── skills.ts           # Skill loader
+└── __tests__/              # 12 test files, 69+ tests
+```
+
+## Documentation
+
+- [Requirements](docs/REQUIREMENTS.md) — Functional requirements and data model
+- [Future Requirements](docs/FUTURE_REQUIREMENTS.md) — Planned features (cloud, collaboration)
+- [Tech Stack](docs/TECH_STACK.md) — Architecture and technology details
+- [Decision Log](docs/memory-bank/decisionLog.md) — Why we made the choices we did
+- [Progress](docs/memory-bank/progress.md) — Completed milestones and open work

@@ -463,6 +463,68 @@ Clean manuscript only (same as `exportManuscript` today):
 
 ---
 
+## FR9: MCP-Powered AI Chat with Dynamic Tool Loading
+
+### Problem
+The in-app AI chat panel is a vanilla LLM API call. It gets project context injected
+as a system prompt but cannot use any of the 48 MCP tools. The AI can discuss the story
+but cannot take action — can't edit scenes, create characters, check consistency, or run
+writing skills. Meanwhile, the MCP server has comprehensive tooling that only external
+agents can use.
+
+### Vision
+Upgrade the in-app chat to a tool-using AI assistant that can read, write, and analyze
+project data directly. Use **dynamic tool loading** to avoid the token cost of sending
+all 48 tool definitions on every request.
+
+### Architecture: Two-Tier Dynamic Tool Loading
+
+**Tier 1 — Core Toolset (always loaded, ~1500 tokens)**
+These handle 80% of writing conversations:
+- `get_project_summary` — overview of project state
+- `get_outline` — full structure tree
+- `read_scene_content` — read any scene
+- `write_scene_content` — edit any scene
+- `list_story_objects` — characters, locations, plotlines
+- `create_story_object` — add new characters/etc
+- `list_relationships` — see what's connected
+- `create_relationship` — link entities
+
+**Tier 2 — On-demand toolsets via `load_toolset` meta-tool**
+| Toolset | Tools | Use Case |
+|---------|-------|----------|
+| `structure` | 10 | Create/update/delete nodes, versions, annotations |
+| `characters` | 6 | CRUD story objects + relationships |
+| `world_building` | 14 | Universes, world objects, timeline entries |
+| `export` | 6 | Manuscript, bible, medium, Google Docs |
+| `admin` | 7 | Database snapshots, Google auth |
+| `skills` | 1 | Writing skills as MCP Prompts |
+
+**How it works:**
+1. Chat request sends core tools + `load_toolset` to LLM (~1500 tokens)
+2. LLM processes user message with core tools (handles most cases)
+3. If LLM needs specialized tools, it calls `load_toolset('world_building')`
+4. Server adds those tool definitions to the next LLM turn
+5. LLM can now use the specialized tools
+
+**Token savings:** ~6500 tokens per message (81% reduction) for most conversations.
+
+### Implementation (does NOT use MCP protocol)
+The in-app chat calls controllers directly (same code the MCP tools wrap). No stdio,
+no MCP client needed. Tool definitions are OpenAI function-calling schemas generated
+from the same Zod schemas the MCP server uses.
+
+| File | Purpose |
+|------|---------|
+| `src/lib/ai/tool-registry.ts` | Tool category definitions, Zod→OpenAI schema conversion |
+| `src/lib/ai/tool-executor.ts` | Execute tool calls by routing to controllers |
+| `src/app/api/chat/route.ts` | Add tool use loop with streaming |
+| `src/components/ai-chat-panel.tsx` | Show tool use indicators in UI |
+
+**Tracked as:** an-xo8 (P1)
+
+---
+
 ## Priority & Dependencies
 
 ```mermaid
@@ -473,31 +535,37 @@ graph TD
     FR3 --> FR4_ARTICLE["FR4: Article Skills"]
     FR5["FR5: Scene Beats<br/>(Done)"] --> FR6["FR6: Scene Focus Mode<br/>(Done)"]
     FR7["FR7: Timeline View<br/>(Done)"] --> FR2
-    FR8["FR8: Google Docs Export"] --> FR2
+    FR8["FR8: Google Docs Export<br/>(Done)"] --> FR2
+    FR9["FR9: MCP-Powered Chat"] --> FR4
+    FR9 --> FR8
 
     style FR2 fill:#a5d6a7,color:#000
+    style FR3 fill:#a5d6a7,color:#000
     style FR4 fill:#a5d6a7,color:#000
     style FR5 fill:#a5d6a7,color:#000
-    style FR3 fill:#4a6fa5,color:#fff
+    style FR6 fill:#a5d6a7,color:#000
+    style FR7 fill:#a5d6a7,color:#000
+    style FR8 fill:#a5d6a7,color:#000
     style FR1 fill:#6b8cae,color:#fff
     style FR1_MCP fill:#6b8cae,color:#fff
     style FR4_PUB fill:#6b8cae,color:#fff
     style FR4_ARTICLE fill:#6b8cae,color:#fff
-    style FR6 fill:#a5d6a7,color:#000
-    style FR7 fill:#a5d6a7,color:#000
-    style FR8 fill:#4a6fa5,color:#fff
+    style FR9 fill:#e57373,color:#fff
 ```
 
 | Priority | Requirement | Effort | Blocked By |
 |---|---|---|---|
-| ✅ **Done** | FR5: Scene Beats | Small | Nothing — markdown annotations + editor UI |
-| ✅ **Done** | FR3: Article templates | Small | FR2 (Completed) |
-| ✅ **Done** | FR6: Scene Focus Mode | Medium | FR5 (beats integrate into the writing surface) |
-| ✅ **Done** | FR7: Timeline View | Medium | Benefits from FR2 (Completed) |
-| 🟡 **Do second** | FR1: Cloud (auth + Supabase) | Large | Nothing, but high effort |
-| 🔴 **Do last** | FR1.5: MCP auth (cloud) | Medium | FR1 (needs cloud infra first) |
-| 🟡 **Do second** | FR8: Google Docs Export | Medium | Benefits from FR2 (Completed); needs Google Cloud project setup |
-| 🔴 **Do last** | FR4.5: Skill publishing | Small | FR4 (Completed) + ecosystem maturity |
+| ✅ **Done** | FR2: Universes | Medium | — |
+| ✅ **Done** | FR3: Article templates | Small | FR2 |
+| ✅ **Done** | FR4: MCP Skills | Small | — |
+| ✅ **Done** | FR5: Scene Beats | Small | — |
+| ✅ **Done** | FR6: Scene Focus Mode | Medium | FR5 |
+| ✅ **Done** | FR7: Timeline View | Medium | FR2 |
+| ✅ **Done** | FR8: Google Docs Export | Medium | FR2 |
+| 🔴 **Do next** | FR9: MCP-Powered AI Chat | Medium | FR4 (done) |
+| 🟡 **Do later** | FR1: Cloud (auth + Supabase) | Large | Nothing, but high effort |
+| 🔴 **Do last** | FR1.5: MCP auth (cloud) | Medium | FR1 |
+| 🔴 **Do last** | FR4.5: Skill publishing | Small | FR4 + ecosystem maturity |
 
 ---
 

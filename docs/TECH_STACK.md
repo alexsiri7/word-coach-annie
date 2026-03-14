@@ -33,7 +33,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | ORM | Prisma 6.4.1 | Type-safe database access |
 | Database | SQLite | At `./data/word-coach-annie.db` (volume-mounted) |
 | Validation | Zod 3.24.2 | Schema validation |
-| AI | OpenAI SDK 6.29 | Chat completions for AI panel |
+| AI | OpenAI SDK 6.29 | Chat completions via Requesty gateway → Gemini 2.0 Flash |
 | Google APIs | googleapis 171.4 | Google Docs export, Drive |
 | OAuth | google-auth-library 10.5 | Google authentication |
 | MCP | @modelcontextprotocol/sdk 1.12 | AI tool integration server |
@@ -132,8 +132,8 @@ No component tests or e2e tests yet (Playwright visual tests in progress).
 
 | Service | Purpose | Auth |
 |---------|---------|------|
-| OpenAI | AI chat completions | API key |
-| Google Docs/Drive | Document export & sync | OAuth2 |
+| Requesty | LLM gateway (routes to Gemini 2.0 Flash) | API key (`REQUESTY_API_KEY`) |
+| Google Docs/Drive | Document export & sync | OAuth2 (`GOOGLE_CLIENT_ID/SECRET`) |
 | Cloudflare | Tunnel for public access | Tunnel token |
 | Tailscale | VPN for CI deploy | Auth key |
 
