@@ -5,10 +5,12 @@ import { testPrisma } from "./setup";
 class MockNextRequest {
     private _body: unknown;
     nextUrl: { searchParams: URLSearchParams };
+    headers: Map<string, string>;
 
     constructor(url: string, init?: { method?: string; body?: string }) {
         this._body = init?.body ? JSON.parse(init.body) : null;
         this.nextUrl = { searchParams: new URL(url, "http://localhost").searchParams };
+        this.headers = new Map();
     }
 
     async json() {

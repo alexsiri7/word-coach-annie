@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
 
   try {
     const roots = await StructureController.getOutline(projectId);

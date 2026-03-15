@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
   try {
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccessByNode(id, userId);
+    if (!access.authorized) return access.response;
     const node = await prisma.structureNode.findUnique({
       where: { id },
       include: {
@@ -47,6 +51,10 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    const userId = getCurrentUserId(request);
+    const nodeAccess = await verifyProjectAccessByNode(id, userId);
+    if (!nodeAccess.authorized) return nodeAccess.response;
+
     const existing = await prisma.structureNode.findUnique({
       where: { id },
     });
@@ -114,12 +122,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
   try {
+    const userId = getCurrentUserId(request);
+    const nodeAccess = await verifyProjectAccessByNode(id, userId);
+    if (!nodeAccess.authorized) return nodeAccess.response;
+
     const node = await prisma.structureNode.findUnique({
       where: { id },
     });

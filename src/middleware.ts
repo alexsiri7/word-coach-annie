@@ -60,11 +60,13 @@ export async function middleware(request: NextRequest) {
         // Try JWT verification first (Google OAuth sessions)
         const session = await verifySessionToken(sessionCookie);
         if (session) {
-            // Attach userId to request headers for downstream routes
-            const response = NextResponse.next();
-            response.headers.set("x-user-id", session.userId);
-            response.headers.set("x-user-email", session.email);
-            return response;
+            // Forward userId to route handlers via request headers
+            const requestHeaders = new Headers(request.headers);
+            requestHeaders.set("x-user-id", session.userId);
+            requestHeaders.set("x-user-email", session.email);
+            return NextResponse.next({
+                request: { headers: requestHeaders },
+            });
         }
 
         // Fall back to legacy API_TOKEN session cookie

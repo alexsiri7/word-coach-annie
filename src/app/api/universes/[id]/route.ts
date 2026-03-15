@@ -1,12 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
+import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 
 export async function GET(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const userId = getCurrentUserId(request);
+        const access = await verifyUniverseAccess(id, userId);
+        if (!access.authorized) return access.response;
+
         const universe = await UniversesController.getUniverse(id);
         return NextResponse.json(universe);
     } catch (error: unknown) {
@@ -15,11 +20,15 @@ export async function GET(
 }
 
 export async function PATCH(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const userId = getCurrentUserId(request);
+        const access = await verifyUniverseAccess(id, userId);
+        if (!access.authorized) return access.response;
+
         const body = await request.json();
         const universe = await UniversesController.updateUniverse(id, body);
         return NextResponse.json(universe);
@@ -29,11 +38,15 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const userId = getCurrentUserId(request);
+        const access = await verifyUniverseAccess(id, userId);
+        if (!access.authorized) return access.response;
+
         await UniversesController.deleteUniverse(id);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
