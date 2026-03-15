@@ -42,7 +42,7 @@ export function AnnotationsSidebar({
             <MessageSquare className="h-3.5 w-3.5 text-accent" />
             <span>Annotations ({annotations.length})</span>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose} aria-label="Close annotations">
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>

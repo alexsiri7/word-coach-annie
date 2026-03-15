@@ -248,7 +248,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     <div className="flex flex-col h-full bg-surface relative">
       {/* External Change Banner */}
       {externalChangeDetected && (
-        <div className="bg-warning/20 border-b border-warning/30 px-4 py-2 flex items-center justify-between z-50 animate-slide-down">
+        <div role="alert" className="bg-warning/20 border-b border-warning/30 px-4 py-2 flex items-center justify-between z-50 animate-slide-down">
           <span className="text-sm text-warning flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             External changes detected
@@ -342,11 +342,11 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
           </div>
 
           {/* Bottom bar */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0" role="status" aria-live="polite">
             <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
             {lastSaved && (
               <span className="flex items-center gap-1">
-                <Check className="h-3 w-3 text-success" />
+                <Check className="h-3 w-3 text-success" aria-hidden="true" />
                 Last saved {lastSaved}
               </span>
             )}

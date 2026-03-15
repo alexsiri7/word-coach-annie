@@ -264,6 +264,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           size="icon"
           className="h-8 w-8"
           onClick={() => router.push("/")}
+          aria-label="Back to projects"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -272,7 +273,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           size="icon"
           className="h-8 w-8 md:hidden text-text-muted hover:text-text-primary"
           onClick={() => setSidebarOpen(true)}
-          title="Menu"
+          aria-label="Open sidebar menu"
         >
           <Menu className="h-4 w-4" />
         </Button>
@@ -291,7 +292,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           size="icon"
           className="h-8 w-8"
           onClick={() => setShowSearch(!showSearch)}
-          title="Search project"
+          aria-label="Search project"
+          aria-expanded={showSearch}
         >
           <Search className="h-4 w-4" />
         </Button>
@@ -300,7 +302,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           size="icon"
           className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/timeline`)}
-          title="Timeline View"
+          aria-label="Timeline view"
         >
           <Activity className="h-4 w-4" />
         </Button>
@@ -309,7 +311,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           size="icon"
           className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
-          title="Project Settings"
+          aria-label="Project settings"
         >
           <Settings className="h-4 w-4" />
         </Button>
@@ -344,14 +346,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           {/* Mobile close button */}
           <div className="md:hidden flex items-center justify-between p-2 border-b border-border bg-surface">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-muted ml-2">Menu</span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-text-primary" onClick={() => setSidebarOpen(false)}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-text-primary" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar menu">
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Sidebar tabs */}
-          <div className="flex items-center gap-0.5 px-2 py-2 border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-0.5 px-2 py-2 border-b border-border overflow-x-auto" role="tablist" aria-label="Sidebar navigation">
             <button
+              role="tab"
+              aria-selected={activeTab === "outline"}
               onClick={() => { setActiveTab("outline"); setSelectedObjectId(null); }}
               className={cn(
                 "px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap",
@@ -365,6 +369,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             {STORY_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
+                role="tab"
+                aria-selected={activeTab === key}
                 onClick={() => { setActiveTab(key); setSelectedNodeId(null); setSelectedObjectId(null); }}
                 className={cn(
                   "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
@@ -372,13 +378,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     ? "bg-accent/15 text-accent"
                     : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50"
                 )}
-                title={label}
+                aria-label={label}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="text-xs font-medium hidden lg:inline">{label}</span>
               </button>
             ))}
             <button
+              role="tab"
+              aria-selected={activeTab === "ai-chat"}
               onClick={() => { setActiveTab("ai-chat"); setSelectedNodeId(null); setSelectedObjectId(null); }}
               className={cn(
                 "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
@@ -386,9 +394,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   ? "bg-accent/15 text-accent"
                   : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50"
               )}
-              title="AI Chat"
+              aria-label="AI Chat"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
+              <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="text-xs font-medium hidden lg:inline">AI</span>
             </button>
           </div>
@@ -409,6 +417,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     size="icon"
                     className="h-6 w-6"
                     onClick={() => openAddNode(null, "CHAPTER")}
+                    aria-label="Add chapter"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
@@ -439,6 +448,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       setAddObjectName("");
                       setAddObjectDialogOpen(true);
                     }}
+                    aria-label={`Add ${activeStoryTab?.label.slice(0, -1).toLowerCase()}`}
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
@@ -499,7 +509,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-hidden">
+        <main id="main-content" className="flex-1 overflow-hidden">
           {selectedObjectId ? (
             <StoryObjectPanel
               objectId={selectedObjectId}

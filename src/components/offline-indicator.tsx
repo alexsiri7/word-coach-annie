@@ -28,8 +28,8 @@ export function OfflineIndicator() {
           : "translate-y-2 opacity-0"
       }`}
     >
-      <div className="flex items-center gap-2 rounded-full bg-yellow-900/90 px-4 py-2 text-sm text-yellow-100 shadow-lg backdrop-blur-sm">
-        <WifiOff className="h-4 w-4" />
+      <div className="flex items-center gap-2 rounded-full bg-yellow-900/90 px-4 py-2 text-sm text-yellow-100 shadow-lg backdrop-blur-sm" role="status" aria-live="polite">
+        <WifiOff className="h-4 w-4" aria-hidden="true" />
         <span>Offline — changes saved locally</span>
       </div>
     </div>

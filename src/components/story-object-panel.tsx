@@ -151,7 +151,7 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                     )}
                     <h2 className="font-semibold text-text-primary truncate">{obj.name}</h2>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose} aria-label="Close panel">
                     <X className="h-4 w-4" />
                 </Button>
             </div>
@@ -159,15 +159,15 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
                 <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1.5">Name</label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} />
+                    <label htmlFor="obj-name" className="block text-xs font-medium text-text-muted mb-1.5">Name</label>
+                    <Input id="obj-name" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
 
                 {obj.type === "CHARACTER" && (
                     <div>
-                        <label className="block text-xs font-medium text-text-muted mb-1.5">Role</label>
+                        <label htmlFor="obj-role" className="block text-xs font-medium text-text-muted mb-1.5">Role</label>
                         <Select value={role} onValueChange={setRole}>
-                            <SelectTrigger>
+                            <SelectTrigger id="obj-role">
                                 <SelectValue placeholder="Select role..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -181,8 +181,9 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                 )}
 
                 <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1.5">Description</label>
+                    <label htmlFor="obj-description" className="block text-xs font-medium text-text-muted mb-1.5">Description</label>
                     <Textarea
+                        id="obj-description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={4}
@@ -191,8 +192,9 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                 </div>
 
                 <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1.5">Notes</label>
+                    <label htmlFor="obj-notes" className="block text-xs font-medium text-text-muted mb-1.5">Notes</label>
                     <Textarea
+                        id="obj-notes"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={4}
@@ -201,8 +203,9 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                 </div>
 
                 <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1.5">Tags</label>
+                    <label htmlFor="obj-tags" className="block text-xs font-medium text-text-muted mb-1.5">Tags</label>
                     <Input
+                        id="obj-tags"
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="Comma-separated tags"
@@ -233,7 +236,7 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                             Move to Universe
                         </Button>
                     )}
-                    {saved && <span className="text-xs text-success">Saved!</span>}
+                    {saved && <span className="text-xs text-success" role="status">Saved!</span>}
                     <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
                         <Save className="h-4 w-4 mr-1.5" />
                         {saving ? "Saving..." : "Save"}

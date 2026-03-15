@@ -9,7 +9,7 @@ export function UpdateBanner() {
     if (!showBanner) return null;
 
     return (
-        <div className="fixed top-0 inset-x-0 z-[100] bg-accent text-accent-foreground px-4 py-2 text-sm flex items-center justify-center gap-3 animate-slide-down shadow-md">
+        <div role="alert" className="fixed top-0 inset-x-0 z-[100] bg-accent text-accent-foreground px-4 py-2 text-sm flex items-center justify-center gap-3 animate-slide-down shadow-md">
             <span>A new version is available.</span>
             <button
                 onClick={refresh}

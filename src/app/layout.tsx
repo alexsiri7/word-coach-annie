@@ -22,6 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-accent focus:text-accent-foreground focus:px-4 focus:py-2 focus:rounded-md focus:text-sm focus:font-medium"
+        >
+          Skip to content
+        </a>
         <UpdateBanner />
         {children}
         <SyncToast />
