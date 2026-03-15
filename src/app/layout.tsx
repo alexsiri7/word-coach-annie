@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { UpdateBanner } from "@/components/update-banner";
 
 export const metadata: Metadata = {
   title: "Word Coach Annie",
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <UpdateBanner />
         {children}
         <OfflineIndicator />
       </body>
