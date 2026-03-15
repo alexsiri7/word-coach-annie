@@ -36,6 +36,11 @@ run_build() {
     docker build -t word-coach-annie:gate-check .
 }
 
+run_screenshots() {
+    echo "=== Screenshots (Visual Regression) ==="
+    npx playwright test e2e/visual.spec.ts
+}
+
 # If no args, run all stages
 if [ $# -eq 0 ]; then
     STAGES=(setup lint typecheck test build)

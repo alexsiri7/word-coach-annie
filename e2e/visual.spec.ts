@@ -265,6 +265,75 @@ async function mockUniverseApi(page: Page, options: { empty?: boolean } = {}) {
   })
 }
 
+const MOCK_FOCUS_CONTEXT = {
+  context: {
+    id: 'sc-1',
+    projectId: 'proj-1',
+    parentId: 'ch-1',
+    type: 'SCENE',
+    title: 'Throne Room',
+    synopsis: 'The messenger arrives.',
+    status: 'FINAL',
+    orderIndex: 0,
+    wordCount: 1800,
+    createdAt: '2026-01-15T10:00:00Z',
+    updatedAt: '2026-03-01T10:00:00Z',
+    chapterTitle: 'The Summons',
+    prevScene: null,
+    nextScene: { id: 'sc-2', title: 'War Council' },
+  },
+  related: {
+    CHARACTER: [
+      { id: 'so-1', name: 'Queen Mira', role: 'Protagonist', description: 'Young ruler of the Southern Kingdom.', notes: 'Reluctant leader, skilled diplomat.' },
+    ],
+    LOCATION: [
+      { id: 'so-3', name: 'Sunstone Keep', description: 'The royal palace of the Southern Kingdom.', notes: 'Built on a hill of amber-veined stone.' },
+    ],
+  },
+}
+
+const MOCK_STORY_OBJECT_DETAIL = {
+  id: 'so-1',
+  projectId: 'proj-1',
+  type: 'CHARACTER',
+  name: 'Queen Mira',
+  description: 'Young ruler of the Southern Kingdom.',
+  notes: 'Reluctant leader, skilled diplomat.',
+  role: 'Protagonist',
+  tags: 'royalty,diplomat',
+  createdAt: '2026-01-15T10:00:00Z',
+  updatedAt: '2026-03-01T10:00:00Z',
+}
+
+/** Intercept API calls for the focus mode page */
+async function mockFocusModeApi(page: Page) {
+  await page.route('**/api/focus/sc-1', route =>
+    route.fulfill({ json: MOCK_FOCUS_CONTEXT, status: 200 })
+  )
+  await page.route('**/api/nodes/sc-1/content', route =>
+    route.fulfill({ json: MOCK_SCENE_CONTENT, status: 200 })
+  )
+  await page.route('**/api/nodes/*/content', route =>
+    route.fulfill({ json: { id: 'cv-0', nodeId: 'sc-0', content: '', wordCount: 0, createdAt: '2026-01-01T00:00:00Z' }, status: 200 })
+  )
+  await page.route('**/api/nodes/*/annotations', route =>
+    route.fulfill({ json: [], status: 200 })
+  )
+  await page.route('**/api/ai-settings', route =>
+    route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
+  )
+}
+
+/** Intercept API calls for the story object panel */
+async function mockStoryObjectDetailApi(page: Page) {
+  await page.route('**/api/story-objects/so-1', route =>
+    route.fulfill({ json: MOCK_STORY_OBJECT_DETAIL, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1', route =>
+    route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
+  )
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Visual regression – Annie', () => {
@@ -320,6 +389,45 @@ test.describe('Visual regression – Annie', () => {
     }
 
     await expect(page).toHaveScreenshot('project-editor-scene-open.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('project editor – story objects panel', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockStoryObjectDetailApi(page)
+    await page.goto('/project/proj-1')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.waitForTimeout(500)
+
+    // Switch to Characters tab in sidebar
+    const charsTab = page.locator('button[title="Characters"]').first()
+    if (await charsTab.isVisible()) {
+      await charsTab.click()
+      await page.waitForTimeout(300)
+    }
+
+    // Click "Queen Mira" to open the story object panel
+    const queenMira = page.locator('text=Queen Mira').first()
+    if (await queenMira.isVisible()) {
+      await queenMira.click()
+      await page.waitForTimeout(500)
+    }
+
+    await expect(page).toHaveScreenshot('project-editor-story-object.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('focus mode – writing view', async ({ page }) => {
+    await mockFocusModeApi(page)
+    await page.goto('/project/proj-1/scene/sc-1/focus')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.waitForTimeout(500)
+
+    await expect(page).toHaveScreenshot('focus-mode-writing.png', {
       animations: 'disabled',
     })
   })
