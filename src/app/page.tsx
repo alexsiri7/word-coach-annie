@@ -125,7 +125,7 @@ export default function Dashboard() {
   const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
 
   return (
-    <main className="min-h-screen">
+    <main id="main-content" className="min-h-screen">
       {/* Accent gradient line at top */}
       <div className="h-1 accent-gradient" />
 

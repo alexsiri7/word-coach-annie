@@ -104,10 +104,11 @@ export function AiSettingsDialog() {
             </p>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="ai-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Base URL
               </label>
               <Input
+                id="ai-base-url"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="https://api.openai.com/v1"
@@ -118,11 +119,12 @@ export function AiSettingsDialog() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="ai-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
                 API Key
               </label>
               <div className="relative">
                 <Input
+                  id="ai-api-key"
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
@@ -133,6 +135,7 @@ export function AiSettingsDialog() {
                   type="button"
                   onClick={() => setShowKey(!showKey)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  aria-label={showKey ? "Hide API key" : "Show API key"}
                 >
                   {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -145,10 +148,11 @@ export function AiSettingsDialog() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="ai-model" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Model
               </label>
               <Input
+                id="ai-model"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."

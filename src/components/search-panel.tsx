@@ -117,7 +117,7 @@ export function SearchPanel({ projectId, onSelectScene, onSelectObject, onClose 
     };
 
     return (
-        <div className="search-panel border-b border-border bg-surface-raised animate-slide-up">
+        <div className="search-panel border-b border-border bg-surface-raised animate-slide-up" role="search" aria-label="Search project">
             {/* Search input */}
             <div className="flex items-center gap-2 px-4 py-3">
                 <Search className="h-4 w-4 text-text-muted flex-shrink-0" />
@@ -134,6 +134,7 @@ export function SearchPanel({ projectId, onSelectScene, onSelectObject, onClose 
                 <button
                     onClick={onClose}
                     className="h-6 w-6 flex items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-surface-overlay transition-colors flex-shrink-0"
+                    aria-label="Close search"
                 >
                     <X className="h-3.5 w-3.5" />
                 </button>
@@ -141,7 +142,7 @@ export function SearchPanel({ projectId, onSelectScene, onSelectObject, onClose 
 
             {/* Results */}
             {results && (
-                <div className="border-t border-border-subtle max-h-80 overflow-y-auto">
+                <div className="border-t border-border-subtle max-h-80 overflow-y-auto" aria-live="polite">
                     {results.totalResults === 0 ? (
                         <div className="px-4 py-6 text-center text-sm text-text-muted">
                             No results found for &ldquo;{results.query}&rdquo;

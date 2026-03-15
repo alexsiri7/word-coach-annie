@@ -71,83 +71,89 @@ export function EditorToolbar({
   onInsertBeat,
 }: EditorToolbarProps) {
   return (
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto">
+    <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
       <div className="flex items-center gap-0.5 mr-3 shrink-0">
         {[
-          { icon: Bold, action: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive("bold") },
-          { icon: Italic, action: () => editor?.chain().focus().toggleItalic().run(), active: editor?.isActive("italic") },
-          { icon: UnderlineIcon, action: () => editor?.chain().focus().toggleUnderline().run(), active: editor?.isActive("underline") },
-        ].map(({ icon: Icon, action, active }, i) => (
+          { icon: Bold, label: "Bold", action: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive("bold") },
+          { icon: Italic, label: "Italic", action: () => editor?.chain().focus().toggleItalic().run(), active: editor?.isActive("italic") },
+          { icon: UnderlineIcon, label: "Underline", action: () => editor?.chain().focus().toggleUnderline().run(), active: editor?.isActive("underline") },
+        ].map(({ icon: Icon, label, action, active }, i) => (
           <Button
             key={i}
             variant="ghost"
             size="icon"
             className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
             onClick={action}
+            aria-label={label}
+            aria-pressed={!!active}
           >
             <Icon className="h-4 w-4" />
           </Button>
         ))}
       </div>
 
-      <div className="w-px h-5 bg-border mx-1" />
+      <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
       <div className="flex items-center gap-0.5 mr-3 shrink-0">
         {[
-          { icon: Heading1, action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), active: editor?.isActive("heading", { level: 1 }) },
-          { icon: Heading2, action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(), active: editor?.isActive("heading", { level: 2 }) },
-          { icon: Heading3, action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(), active: editor?.isActive("heading", { level: 3 }) },
-        ].map(({ icon: Icon, action, active }, i) => (
+          { icon: Heading1, label: "Heading 1", action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), active: editor?.isActive("heading", { level: 1 }) },
+          { icon: Heading2, label: "Heading 2", action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(), active: editor?.isActive("heading", { level: 2 }) },
+          { icon: Heading3, label: "Heading 3", action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(), active: editor?.isActive("heading", { level: 3 }) },
+        ].map(({ icon: Icon, label, action, active }, i) => (
           <Button
             key={i}
             variant="ghost"
             size="icon"
             className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
             onClick={action}
+            aria-label={label}
+            aria-pressed={!!active}
           >
             <Icon className="h-4 w-4" />
           </Button>
         ))}
       </div>
 
-      <div className="w-px h-5 bg-border mx-1" />
+      <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
       <div className="flex items-center gap-0.5 shrink-0">
         {[
-          { icon: List, action: () => editor?.chain().focus().toggleBulletList().run(), active: editor?.isActive("bulletList") },
-          { icon: ListOrdered, action: () => editor?.chain().focus().toggleOrderedList().run(), active: editor?.isActive("orderedList") },
-          { icon: Quote, action: () => editor?.chain().focus().toggleBlockquote().run(), active: editor?.isActive("blockquote") },
-        ].map(({ icon: Icon, action, active }, i) => (
+          { icon: List, label: "Bullet list", action: () => editor?.chain().focus().toggleBulletList().run(), active: editor?.isActive("bulletList") },
+          { icon: ListOrdered, label: "Numbered list", action: () => editor?.chain().focus().toggleOrderedList().run(), active: editor?.isActive("orderedList") },
+          { icon: Quote, label: "Block quote", action: () => editor?.chain().focus().toggleBlockquote().run(), active: editor?.isActive("blockquote") },
+        ].map(({ icon: Icon, label, action, active }, i) => (
           <Button
             key={i}
             variant="ghost"
             size="icon"
             className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
             onClick={action}
+            aria-label={label}
+            aria-pressed={!!active}
           >
             <Icon className="h-4 w-4" />
           </Button>
         ))}
       </div>
 
-      <div className="w-px h-5 bg-border mx-1" />
+      <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
       <Button
         variant="ghost"
         size="icon"
         className="h-8 w-8"
         onClick={onInsertBeat}
-        title="Insert Beat"
+        aria-label="Insert beat"
       >
         <Bookmark className="h-4 w-4" />
       </Button>
 
-      <div className="w-px h-5 bg-border mx-1" />
+      <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().undo().run()}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().undo().run()} aria-label="Undo">
         <Undo className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().redo().run()}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().redo().run()} aria-label="Redo">
         <Redo className="h-4 w-4" />
       </Button>
 
@@ -159,12 +165,13 @@ export function EditorToolbar({
           size="icon"
           className={cn("h-8 w-8", showAnnotations && "bg-accent/15 text-accent")}
           onClick={onToggleAnnotations}
-          title={showAnnotations ? "Hide annotations" : "Show annotations"}
+          aria-label={`${showAnnotations ? "Hide" : "Show"} annotations${annotationCount > 0 ? ` (${annotationCount})` : ""}`}
+          aria-pressed={showAnnotations}
         >
           <div className="relative">
             <MessageSquare className="h-4 w-4" />
             {annotationCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent animate-pulse" />
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent animate-pulse" aria-hidden="true" />
             )}
           </div>
         </Button>
@@ -175,7 +182,7 @@ export function EditorToolbar({
             size="icon"
             className="h-8 w-8"
             onClick={() => window.location.href = `/project/${projectId}/scene/${nodeId}/focus`}
-            title="Focus Mode"
+            aria-label="Focus mode"
           >
             <Maximize className="h-4 w-4" />
           </Button>
@@ -183,16 +190,17 @@ export function EditorToolbar({
 
         <div
           className="flex items-center gap-1.5 ml-2 px-2 py-1 rounded-md text-xs cursor-help transition-colors"
-          title={isOnline ? "Backend connected" : "Backend disconnected - edits may not save"}
+          role="status"
+          aria-label={isOnline ? "Backend connected" : "Backend disconnected — edits may not save"}
         >
           {isOnline ? (
             <>
-              <Wifi className="h-3 w-3 text-success" />
+              <Wifi className="h-3 w-3 text-success" aria-hidden="true" />
               <span className="text-text-muted hidden sm:inline-block">Connected</span>
             </>
           ) : (
             <>
-              <WifiOff className="h-3 w-3 text-danger animate-pulse" />
+              <WifiOff className="h-3 w-3 text-danger animate-pulse" aria-hidden="true" />
               <span className="text-danger hidden sm:inline-block">Disconnected</span>
             </>
           )}
@@ -232,7 +240,8 @@ export function EditorToolbar({
           size="icon"
           className={cn("h-8 w-8 ml-1", showVersions && "bg-accent/15 text-accent")}
           onClick={onToggleVersions}
-          title="Version history"
+          aria-label="Version history"
+          aria-pressed={showVersions}
         >
           <Clock className="h-4 w-4" />
         </Button>

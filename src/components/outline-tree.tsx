@@ -54,6 +54,13 @@ interface OutlineTreeProps {
   onMoveNode?: (nodeId: string, newParentId: string | null, newIndex: number) => void;
 }
 
+const STATUS_LABELS: Record<SceneStatus, string> = {
+  OUTLINE: "Outline",
+  DRAFT: "Draft",
+  REVISED: "Revised",
+  FINAL: "Final",
+};
+
 function StatusDot({ status }: { status: SceneStatus }) {
   const colors: Record<SceneStatus, string> = {
     OUTLINE: "bg-text-muted/50",
@@ -61,7 +68,13 @@ function StatusDot({ status }: { status: SceneStatus }) {
     REVISED: "bg-accent",
     FINAL: "bg-success",
   };
-  return <span className={cn("inline-block w-2 h-2 rounded-full flex-shrink-0", colors[status])} />;
+  return (
+    <span
+      className={cn("inline-block w-2 h-2 rounded-full flex-shrink-0", colors[status])}
+      role="img"
+      aria-label={`Status: ${STATUS_LABELS[status]}`}
+    />
+  );
 }
 
 function NodeContent({
@@ -95,6 +108,11 @@ function NodeContent({
 
   return (
     <div
+      role="treeitem"
+      aria-selected={isSelected}
+      aria-expanded={isScene ? undefined : node.children.length > 0 ? true : false}
+      aria-label={node.title}
+      tabIndex={isSelected ? 0 : -1}
       className={cn(
         "group flex items-center gap-1 py-1.5 px-2 rounded-lg cursor-pointer text-sm transition-all duration-150",
         "hover:bg-surface-overlay/60",
@@ -111,6 +129,16 @@ function NodeContent({
           onToggleExpand();
         }
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (isScene) {
+            onSelectNode(node.id);
+          } else if (onToggleExpand) {
+            onToggleExpand();
+          }
+        }
+      }}
     >
       {/* Drag handle */}
       <span
@@ -120,12 +148,13 @@ function NodeContent({
         )}
         {...dragHandleProps}
         onClick={(e) => e.stopPropagation()}
+        aria-label="Drag to reorder"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </span>
 
       {!isScene && (
-        <span className="text-text-muted w-4 flex-shrink-0">
+        <span className="text-text-muted w-4 flex-shrink-0" aria-hidden="true">
           {node.children.length > 0 ? (
             <ChevronDown className="h-4 w-4" />
           ) : (
@@ -134,11 +163,11 @@ function NodeContent({
         </span>
       )}
       {isScene ? (
-        <FileText className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-accent" : "text-text-muted")} />
+        <FileText className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-accent" : "text-text-muted")} aria-hidden="true" />
       ) : node.type === "CHAPTER" ? (
-        <FolderOpen className="h-4 w-4 text-text-muted flex-shrink-0" />
+        <FolderOpen className="h-4 w-4 text-text-muted flex-shrink-0" aria-hidden="true" />
       ) : (
-        <BookOpen className="h-4 w-4 text-text-muted flex-shrink-0" />
+        <BookOpen className="h-4 w-4 text-text-muted flex-shrink-0" aria-hidden="true" />
       )}
       <span className="truncate flex-1">{node.title}</span>
       {isScene && <StatusDot status={node.status as SceneStatus} />}
@@ -151,8 +180,9 @@ function NodeContent({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100 flex-shrink-0 transition-opacity"
               onClick={(e) => e.stopPropagation()}
+              aria-label={`Actions for ${node.title}`}
             >
               <MoreVertical className="h-3 w-3" />
             </Button>
@@ -478,7 +508,7 @@ export function OutlineTree({
   }, []);
 
   return (
-    <div className="py-2">
+    <div className="py-2" role="tree" aria-label="Document outline">
       {nodes.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-text-muted">
           <p>No {labels.CHAPTER.toLowerCase()}s yet.</p>
