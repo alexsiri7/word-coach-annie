@@ -4,6 +4,7 @@ import { OfflineIndicator } from "@/components/offline-indicator";
 import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
   title: {
@@ -57,8 +58,10 @@ export default function RootLayout({
             Skip to content
           </a>
           <UpdateBanner />
-          {children}
-          <SyncToast />
+          <ToastProvider>
+            {children}
+            <SyncToast />
+          </ToastProvider>
           <OfflineIndicator />
         </ThemeProvider>
       </body>

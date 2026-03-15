@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Save, Trash2, Globe } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +43,7 @@ const TYPE_LABELS: Record<StoryObjectType, string> = {
 };
 
 export function StoryObjectPanel({ objectId, source = "project", onClose, onDeleted, onUpdated }: StoryObjectPanelProps) {
+    const { error: toastError } = useToast();
     const [obj, setObj] = useState<StoryObject | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -119,11 +121,11 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
             } else {
                 const errorData = await res.json();
                 console.error("Transfer failed:", errorData.error);
-                alert(`Transfer failed: ${errorData.error}`);
+                toastError(`Transfer failed: ${errorData.error}`);
             }
         } catch (error) {
             console.error("Transfer error:", error);
-            alert("An unexpected error occurred during transfer.");
+            toastError("An unexpected error occurred during transfer.");
         } finally {
             setTransferring(false);
         }
