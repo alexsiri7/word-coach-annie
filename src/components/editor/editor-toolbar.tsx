@@ -1,0 +1,242 @@
+"use client";
+
+import type { Editor } from "@tiptap/react";
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+  Undo,
+  Redo,
+  Save,
+  Clock,
+  Check,
+  MessageSquare,
+  Bookmark,
+  Maximize,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import type { SceneStatus } from "@/lib/types";
+
+interface EditorToolbarProps {
+  editor: Editor | null;
+  status: SceneStatus;
+  onStatusChange: (status: string) => void;
+  saving: boolean;
+  lastSaved: string | null;
+  onManualSave: () => void;
+  onToggleVersions: () => void;
+  showVersions: boolean;
+  onToggleAnnotations: () => void;
+  showAnnotations: boolean;
+  annotationCount: number;
+  isOnline: boolean;
+  showFocusButton: boolean;
+  projectId: string;
+  nodeId: string;
+  onInsertBeat: () => void;
+}
+
+export function EditorToolbar({
+  editor,
+  status,
+  onStatusChange,
+  saving,
+  lastSaved,
+  onManualSave,
+  onToggleVersions,
+  showVersions,
+  onToggleAnnotations,
+  showAnnotations,
+  annotationCount,
+  isOnline,
+  showFocusButton,
+  projectId,
+  nodeId,
+  onInsertBeat,
+}: EditorToolbarProps) {
+  return (
+    <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-0.5 mr-3 shrink-0">
+        {[
+          { icon: Bold, action: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive("bold") },
+          { icon: Italic, action: () => editor?.chain().focus().toggleItalic().run(), active: editor?.isActive("italic") },
+          { icon: UnderlineIcon, action: () => editor?.chain().focus().toggleUnderline().run(), active: editor?.isActive("underline") },
+        ].map(({ icon: Icon, action, active }, i) => (
+          <Button
+            key={i}
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
+            onClick={action}
+          >
+            <Icon className="h-4 w-4" />
+          </Button>
+        ))}
+      </div>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      <div className="flex items-center gap-0.5 mr-3 shrink-0">
+        {[
+          { icon: Heading1, action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), active: editor?.isActive("heading", { level: 1 }) },
+          { icon: Heading2, action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(), active: editor?.isActive("heading", { level: 2 }) },
+          { icon: Heading3, action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(), active: editor?.isActive("heading", { level: 3 }) },
+        ].map(({ icon: Icon, action, active }, i) => (
+          <Button
+            key={i}
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
+            onClick={action}
+          >
+            <Icon className="h-4 w-4" />
+          </Button>
+        ))}
+      </div>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      <div className="flex items-center gap-0.5 shrink-0">
+        {[
+          { icon: List, action: () => editor?.chain().focus().toggleBulletList().run(), active: editor?.isActive("bulletList") },
+          { icon: ListOrdered, action: () => editor?.chain().focus().toggleOrderedList().run(), active: editor?.isActive("orderedList") },
+          { icon: Quote, action: () => editor?.chain().focus().toggleBlockquote().run(), active: editor?.isActive("blockquote") },
+        ].map(({ icon: Icon, action, active }, i) => (
+          <Button
+            key={i}
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", active && "bg-accent/15 text-accent")}
+            onClick={action}
+          >
+            <Icon className="h-4 w-4" />
+          </Button>
+        ))}
+      </div>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={onInsertBeat}
+        title="Insert Beat"
+      >
+        <Bookmark className="h-4 w-4" />
+      </Button>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().undo().run()}>
+        <Undo className="h-4 w-4" />
+      </Button>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().redo().run()}>
+        <Redo className="h-4 w-4" />
+      </Button>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-2 shrink-0 pr-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("h-8 w-8", showAnnotations && "bg-accent/15 text-accent")}
+          onClick={onToggleAnnotations}
+          title={showAnnotations ? "Hide annotations" : "Show annotations"}
+        >
+          <div className="relative">
+            <MessageSquare className="h-4 w-4" />
+            {annotationCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent animate-pulse" />
+            )}
+          </div>
+        </Button>
+
+        {showFocusButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => window.location.href = `/project/${projectId}/scene/${nodeId}/focus`}
+            title="Focus Mode"
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+        )}
+
+        <div
+          className="flex items-center gap-1.5 ml-2 px-2 py-1 rounded-md text-xs cursor-help transition-colors"
+          title={isOnline ? "Backend connected" : "Backend disconnected - edits may not save"}
+        >
+          {isOnline ? (
+            <>
+              <Wifi className="h-3 w-3 text-success" />
+              <span className="text-text-muted hidden sm:inline-block">Connected</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-3 w-3 text-danger animate-pulse" />
+              <span className="text-danger hidden sm:inline-block">Disconnected</span>
+            </>
+          )}
+        </div>
+
+        <Select value={status} onValueChange={onStatusChange}>
+          <SelectTrigger className="w-28 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="OUTLINE">Outline</SelectItem>
+            <SelectItem value="DRAFT">Draft</SelectItem>
+            <SelectItem value="REVISED">Revised</SelectItem>
+            <SelectItem value="FINAL">Final</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs gap-1.5 ml-2"
+          onClick={onManualSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <div className="h-3 w-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          ) : lastSaved ? (
+            <Check className="h-3 w-3 text-success" />
+          ) : (
+            <Save className="h-3 w-3" />
+          )}
+          {saving ? "Saving..." : lastSaved ? `Saved` : "Save"}
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("h-8 w-8 ml-1", showVersions && "bg-accent/15 text-accent")}
+          onClick={onToggleVersions}
+          title="Version history"
+        >
+          <Clock className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
