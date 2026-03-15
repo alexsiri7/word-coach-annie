@@ -43,6 +43,7 @@ import { SceneEditor } from "@/components/scene-editor";
 import { StoryObjectPanel } from "@/components/story-object-panel";
 import { SearchPanel } from "@/components/search-panel";
 import { AIChatPanel } from "@/components/ai-chat-panel";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -418,10 +419,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           {/* Sidebar content */}
           <div className="flex-1 overflow-y-auto flex flex-col">
             {activeTab === "ai-chat" ? (
-              <AIChatPanel
-                projectId={projectId}
-                sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
-              />
+              <ErrorBoundary fallbackTitle="Chat panel crashed">
+                <AIChatPanel
+                  projectId={projectId}
+                  sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
+                />
+              </ErrorBoundary>
             ) : activeTab === "outline" ? (
               <>
                 <div className="flex items-center justify-between px-3 py-2">
@@ -436,16 +439,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <OutlineTree
-                  nodes={outline}
-                  projectType={project.projectType}
-                  selectedNodeId={selectedNodeId}
-                  onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); setSidebarOpen(false); }}
-                  onAddNode={openAddNode}
-                  onRenameNode={openRename}
-                  onDeleteNode={openDelete}
-                  onMoveNode={handleMoveNode}
-                />
+                <ErrorBoundary fallbackTitle="Outline crashed">
+                  <OutlineTree
+                    nodes={outline}
+                    projectType={project.projectType}
+                    selectedNodeId={selectedNodeId}
+                    onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); setSidebarOpen(false); }}
+                    onAddNode={openAddNode}
+                    onRenameNode={openRename}
+                    onDeleteNode={openDelete}
+                    onMoveNode={handleMoveNode}
+                  />
+                </ErrorBoundary>
               </>
             ) : (
               <>
@@ -525,23 +530,27 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         {/* Main content */}
         <main id="main-content" className="flex-1 overflow-hidden">
           {selectedObjectId ? (
-            <StoryObjectPanel
-              objectId={selectedObjectId}
-              source={selectedObjectSource}
-              onClose={() => setSelectedObjectId(null)}
-              onDeleted={() => {
-                setSelectedObjectId(null);
-                fetchStoryObjects();
-              }}
-              onUpdated={fetchStoryObjects}
-            />
+            <ErrorBoundary fallbackTitle="Story object panel crashed">
+              <StoryObjectPanel
+                objectId={selectedObjectId}
+                source={selectedObjectSource}
+                onClose={() => setSelectedObjectId(null)}
+                onDeleted={() => {
+                  setSelectedObjectId(null);
+                  fetchStoryObjects();
+                }}
+                onUpdated={fetchStoryObjects}
+              />
+            </ErrorBoundary>
           ) : selectedNode && selectedNode.type === "SCENE" ? (
-            <SceneEditor
-              key={selectedNode.id}
-              node={selectedNode}
-              projectId={projectId}
-              onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
-            />
+            <ErrorBoundary fallbackTitle="Scene editor crashed">
+              <SceneEditor
+                key={selectedNode.id}
+                node={selectedNode}
+                projectId={projectId}
+                onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
+              />
+            </ErrorBoundary>
           ) : (
             <div className="flex items-center justify-center h-full text-text-muted animate-fade-in">
               <div className="text-center">

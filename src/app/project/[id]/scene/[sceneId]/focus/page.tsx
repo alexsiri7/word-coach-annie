@@ -9,6 +9,7 @@ import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { StructureNode } from "@/lib/types";
 
 interface SceneContext extends StructureNode {
@@ -131,11 +132,13 @@ export default function FocusModePage() {
                     />
                 </div>
                 <main className="flex-1 overflow-y-auto w-full max-w-3xl mx-auto px-8 py-12">
-                    <SceneEditor
-                        node={{ ...sceneContext, type: "SCENE" }}
-                        projectId={projectId}
-                        showFocusButton={false}
-                    />
+                    <ErrorBoundary fallbackTitle="Scene editor crashed">
+                        <SceneEditor
+                            node={{ ...sceneContext, type: "SCENE" }}
+                            projectId={projectId}
+                            showFocusButton={false}
+                        />
+                    </ErrorBoundary>
                 </main>
             </div>
 
