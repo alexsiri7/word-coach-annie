@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -14,11 +15,15 @@ const VALID_RELATIONSHIP_TYPES = [
 ] as const;
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
+
   try {
-    const { id: projectId } = await params;
 
     // Verify project exists
     const project = await prisma.project.findUnique({
@@ -81,9 +86,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id: projectId } = await params;
+  const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
 
+  try {
     // Verify project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },

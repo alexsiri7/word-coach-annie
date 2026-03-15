@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUserId } from "@/lib/api-auth";
 
-// GET /api/projects - List all projects
+// GET /api/projects - List projects (scoped by userId when authenticated via Google)
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const limit = parseInt(searchParams.get("limit") || "20");
   const offset = parseInt(searchParams.get("offset") || "0");
+  const userId = getCurrentUserId(request);
+
+  // Scope by userId when available; include unowned (legacy) projects
+  const where = userId ? { OR: [{ userId }, { userId: null }] } : {};
 
   const [projects, total] = await Promise.all([
     prisma.project.findMany({
+      where,
       orderBy: { updatedAt: "desc" },
       skip: offset,
       take: limit,
@@ -18,7 +24,7 @@ export async function GET(request: NextRequest) {
         },
       },
     }),
-    prisma.project.count(),
+    prisma.project.count({ where }),
   ]);
 
   // Batch: get all scenes for all projects in one query
@@ -62,10 +68,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ projects: projectsWithWordCount, total });
 }
 
-// POST /api/projects - Create a new project
+// POST /api/projects - Create a new project (owned by current user)
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { title, author, synopsis, genre, projectType } = body;
+  const userId = getCurrentUserId(request);
 
   if (!title || typeof title !== "string" || title.trim() === "") {
     return NextResponse.json(
@@ -81,6 +88,7 @@ export async function POST(request: NextRequest) {
       synopsis: synopsis?.trim() || "",
       genre: genre?.trim() || "",
       projectType: projectType || "FICTION",
+      ...(userId && { userId }),
     },
   });
 

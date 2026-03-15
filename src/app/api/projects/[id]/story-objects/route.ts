@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
+
   try {
-    const { id: projectId } = await params;
     const { searchParams } = request.nextUrl;
 
     // Extract query params
@@ -61,9 +66,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id: projectId } = await params;
+  const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
 
+  try {
     let body: Record<string, unknown>;
     try {
       body = await request.json();

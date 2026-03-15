@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
 // Deprecated: Use GET /api/projects/[id]/outline instead for the tree structure.
 // If a flat list is needed, we should add a specific method for it, but the UI seems to want a tree.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
 
   try {
     // For now, return the tree structure as 'tree' property to match what might be expected if we change the frontend
@@ -44,6 +48,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(projectId, userId);
+  if (!access.authorized) return access.response;
 
   try {
     const body = await request.json();
