@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { logger } from "@/lib/logger";
+import { logger, generateRequestId, logRequest } from "@/lib/logger";
 
 describe("logger", () => {
     beforeEach(() => {
@@ -51,5 +51,66 @@ describe("logger", () => {
         logger.info("clean");
         const output = JSON.parse((console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]);
         expect(output.error).toBeUndefined();
+    });
+});
+
+describe("generateRequestId", () => {
+    it("returns a UUID string", () => {
+        const id = generateRequestId();
+        expect(id).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+        );
+    });
+
+    it("returns unique IDs on each call", () => {
+        const a = generateRequestId();
+        const b = generateRequestId();
+        expect(a).not.toBe(b);
+    });
+});
+
+describe("logRequest", () => {
+    beforeEach(() => {
+        vi.spyOn(console, "log").mockImplementation(() => {});
+    });
+
+    it("logs structured request info with all fields", () => {
+        logRequest({
+            request_id: "req-123",
+            method: "GET",
+            path: "/api/projects",
+            status: 200,
+            duration_ms: 42,
+            user_id: "user-1",
+        });
+
+        expect(console.log).toHaveBeenCalledOnce();
+        const output = JSON.parse(
+            (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]
+        );
+        expect(output.level).toBe("info");
+        expect(output.request_id).toBe("req-123");
+        expect(output.method).toBe("GET");
+        expect(output.path).toBe("/api/projects");
+        expect(output.status).toBe(200);
+        expect(output.duration_ms).toBe(42);
+        expect(output.user_id).toBe("user-1");
+        expect(output.timestamp).toBeDefined();
+    });
+
+    it("omits user_id when not provided", () => {
+        logRequest({
+            request_id: "req-456",
+            method: "POST",
+            path: "/api/chat",
+            status: 201,
+            duration_ms: 100,
+        });
+
+        const output = JSON.parse(
+            (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]
+        );
+        expect(output.user_id).toBeUndefined();
+        expect(output.request_id).toBe("req-456");
     });
 });

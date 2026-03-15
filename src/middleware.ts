@@ -5,6 +5,7 @@ import {
     verifySessionToken,
     isAuthEnabled,
 } from "@/lib/auth";
+import { generateRequestId, logRequest } from "@/lib/logger";
 
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
@@ -23,16 +24,50 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-    // No auth configured → pass through (local dev mode)
-    if (!isAuthEnabled()) {
-        return NextResponse.next();
+    const startTime = Date.now();
+    const requestId =
+        request.headers.get("x-request-id") || generateRequestId();
+    const { pathname } = request.nextUrl;
+
+    function finalizeResponse(
+        response: NextResponse,
+        userId?: string
+    ): NextResponse {
+        response.headers.set("x-request-id", requestId);
+
+        // Only log API requests to avoid noise from static assets
+        if (pathname.startsWith("/api/")) {
+            logRequest({
+                request_id: requestId,
+                method: request.method,
+                path: pathname,
+                status: response.status,
+                duration_ms: Date.now() - startTime,
+                user_id: userId,
+            });
+        }
+
+        return response;
     }
 
-    const { pathname } = request.nextUrl;
+    // No auth configured → pass through (local dev mode)
+    if (!isAuthEnabled()) {
+        const response = NextResponse.next({
+            request: {
+                headers: addRequestIdHeader(request.headers, requestId),
+            },
+        });
+        return finalizeResponse(response);
+    }
 
     // Allow public paths through
     if (isPublicPath(pathname)) {
-        return NextResponse.next();
+        const response = NextResponse.next({
+            request: {
+                headers: addRequestIdHeader(request.headers, requestId),
+            },
+        });
+        return finalizeResponse(response);
     }
 
     // Check Authorization header (programmatic / MCP access via API_TOKEN)
@@ -43,13 +78,23 @@ export async function middleware(request: NextRequest) {
             ? authHeader.slice(7)
             : null;
         if (token && token === apiToken) {
-            return NextResponse.next();
+            const response = NextResponse.next({
+                request: {
+                    headers: addRequestIdHeader(
+                        request.headers,
+                        requestId
+                    ),
+                },
+            });
+            return finalizeResponse(response);
         }
         // Invalid bearer token on API route → 401 immediately
         if (pathname.startsWith("/api/")) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
+            return finalizeResponse(
+                NextResponse.json(
+                    { error: "Unauthorized" },
+                    { status: 401 }
+                )
             );
         }
     }
@@ -60,32 +105,54 @@ export async function middleware(request: NextRequest) {
         // Try JWT verification first (Google OAuth sessions)
         const session = await verifySessionToken(sessionCookie);
         if (session) {
-            // Forward userId to route handlers via request headers
+            // Forward userId and requestId to route handlers via request headers
             const requestHeaders = new Headers(request.headers);
             requestHeaders.set("x-user-id", session.userId);
             requestHeaders.set("x-user-email", session.email);
-            return NextResponse.next({
+            requestHeaders.set("x-request-id", requestId);
+            const response = NextResponse.next({
                 request: { headers: requestHeaders },
             });
+            return finalizeResponse(response, session.userId);
         }
 
         // Fall back to legacy API_TOKEN session cookie
         if (apiToken) {
             const expected = await deriveSessionToken(apiToken);
             if (sessionCookie === expected) {
-                return NextResponse.next();
+                const response = NextResponse.next({
+                    request: {
+                        headers: addRequestIdHeader(
+                            request.headers,
+                            requestId
+                        ),
+                    },
+                });
+                return finalizeResponse(response);
             }
         }
     }
 
     // Not authenticated — return 401 for API, redirect for pages
     if (pathname.startsWith("/api/")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return finalizeResponse(
+            NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        );
     }
 
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    return finalizeResponse(NextResponse.redirect(loginUrl));
+}
+
+/** Create a copy of the request headers with x-request-id added. */
+function addRequestIdHeader(
+    headers: Headers,
+    requestId: string
+): Headers {
+    const copy = new Headers(headers);
+    copy.set("x-request-id", requestId);
+    return copy;
 }
 
 export const config = {
