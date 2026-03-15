@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { OfflineIndicator } from "@/components/offline-indicator";
 
 export const metadata: Metadata = {
   title: "Word Coach Annie",
@@ -18,7 +19,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <OfflineIndicator />
+      </body>
     </html>
   );
 }
