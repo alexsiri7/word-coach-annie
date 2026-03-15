@@ -39,11 +39,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import dynamic from "next/dynamic";
 import { OutlineTree } from "@/components/outline-tree";
-import { SceneEditor } from "@/components/scene-editor";
-import { StoryObjectPanel } from "@/components/story-object-panel";
-import { SearchPanel } from "@/components/search-panel";
-import { AIChatPanel } from "@/components/ai-chat-panel";
+
+const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
+  loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
+});
+const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
+const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
+const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
