@@ -18,6 +18,7 @@ COPY . .
 
 RUN npx prisma generate
 RUN npm run build
+RUN npm run mcp:build
 
 # --- Stage 3: Production runtime ---
 FROM node:20-slim AS runner
@@ -35,6 +36,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/dist/mcp ./dist/mcp
+COPY --from=builder /app/.skills ./.skills
 
 EXPOSE 3000
 
