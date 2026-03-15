@@ -1,0 +1,120 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { FocusController } from "@/lib/controllers/focus";
+import { ProjectsController } from "@/lib/controllers/projects";
+import { StructureController } from "@/lib/controllers/structure";
+import { testPrisma } from "./setup";
+
+describe("FocusController", () => {
+    let projectId: string;
+
+    beforeEach(async () => {
+        const project = await ProjectsController.createProject({ title: "Test Novel" });
+        projectId = project.id;
+    });
+
+    describe("getSceneContext", () => {
+        it("returns scene context with navigation", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
+            const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+            const s2 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 2", parentId: ch.id });
+            const _s3 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 3", parentId: ch.id });
+
+            // Write content to scene 2
+            await StructureController.writeSceneContent(s2.id, "Hello world foo bar");
+
+            const ctx = await FocusController.getSceneContext(s2.id);
+            expect(ctx.title).toBe("Scene 2");
+            expect(ctx.projectTitle).toBe("Test Novel");
+            expect(ctx.chapterTitle).toBe("Chapter 1");
+            expect(ctx.wordCount).toBe(4);
+            expect(ctx.prevScene).toEqual({ id: s1.id, title: "Scene 1" });
+            expect(ctx.nextScene).toEqual({ id: _s3.id, title: "Scene 3" });
+        });
+
+        it("returns null for prevScene on first scene", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
+            const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+
+            const ctx = await FocusController.getSceneContext(s1.id);
+            expect(ctx.prevScene).toBeNull();
+            expect(ctx.nextScene).toBeNull();
+        });
+
+        it("returns null chapterTitle for root-level scene", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Standalone" });
+
+            const ctx = await FocusController.getSceneContext(scene.id);
+            expect(ctx.chapterTitle).toBeNull();
+        });
+
+        it("returns 0 wordCount when no content", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Empty", parentId: ch.id });
+
+            const ctx = await FocusController.getSceneContext(scene.id);
+            expect(ctx.wordCount).toBe(0);
+        });
+
+        it("throws for non-existent scene", async () => {
+            await expect(
+                FocusController.getSceneContext("nonexistent")
+            ).rejects.toThrow("Scene not found");
+        });
+    });
+
+    describe("getRelatedElements", () => {
+        it("returns related story objects grouped by type", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+
+            const char = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Alice", description: "Hero", role: "protagonist" }
+            });
+            const loc = await testPrisma.storyObject.create({
+                data: { projectId, type: "LOCATION", name: "Castle" }
+            });
+
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: char.id, toNodeId: scene.id }
+            });
+            await testPrisma.relationship.create({
+                data: { type: "LOCATED_AT", fromObjectId: loc.id, toNodeId: scene.id }
+            });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(1);
+            expect(grouped.CHARACTER[0].name).toBe("Alice");
+            expect(grouped.LOCATION).toHaveLength(1);
+            expect(grouped.LOCATION[0].name).toBe("Castle");
+            expect(grouped.PLOTLINE).toHaveLength(0);
+        });
+
+        it("returns empty groups for no relationships", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1" });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(0);
+            expect(grouped.LOCATION).toHaveLength(0);
+        });
+
+        it("deduplicates objects with multiple relationships to same scene", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+
+            const char = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Alice" }
+            });
+
+            // Two relationships from same object to same scene
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: char.id, toNodeId: scene.id }
+            });
+            await testPrisma.relationship.create({
+                data: { type: "RELATED_TO", toObjectId: char.id, fromNodeId: scene.id }
+            });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(1);
+        });
+    });
+});

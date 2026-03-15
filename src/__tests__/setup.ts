@@ -12,6 +12,8 @@ export const testPrisma = new PrismaClient({
 
 // Clean all tables before each test
 beforeEach(async () => {
+  await testPrisma.googleDocExport.deleteMany();
+  await testPrisma.googleCredential.deleteMany();
   await testPrisma.relationship.deleteMany();
   await testPrisma.annotation.deleteMany();
   await testPrisma.contentVersion.deleteMany();
