@@ -74,7 +74,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Redirect to home with session cookie
-    const response = NextResponse.redirect(new URL("/", request.url));
+    // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
+    const baseUrl = new URL(redirectUri).origin;
+    const response = NextResponse.redirect(new URL("/", baseUrl));
     response.cookies.set(SESSION_COOKIE_NAME, jwt, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
