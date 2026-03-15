@@ -23,4 +23,5 @@ beforeEach(async () => {
   await testPrisma.worldObject.deleteMany();
   await testPrisma.project.deleteMany();
   await testPrisma.universe.deleteMany();
+  await testPrisma.user.deleteMany();
 });
