@@ -7,6 +7,7 @@ import { SceneInfoSidebar } from "@/components/focus-mode/scene-info-sidebar";
 import { RelatedElementsPanel } from "@/components/focus-mode/related-elements-panel";
 import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { StructureNode } from "@/lib/types";
 
@@ -25,6 +26,7 @@ export default function FocusModePage() {
     const sceneId = params.sceneId as string;
 
     const [loading, setLoading] = useState(true);
+    const [projectTitle, setProjectTitle] = useState<string>("");
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
@@ -52,12 +54,20 @@ export default function FocusModePage() {
                 // To stick to the plan, we should have created an API route. 
                 // Let's create `src/app/api/focus/[sceneId]/route.ts` next.
 
-                const res = await fetch(`/api/focus/${sceneId}`);
-                if (!res.ok) throw new Error("Failed to load scene data");
+                const [focusRes, projectRes] = await Promise.all([
+                    fetch(`/api/focus/${sceneId}`),
+                    fetch(`/api/projects/${projectId}`),
+                ]);
+                if (!focusRes.ok) throw new Error("Failed to load scene data");
 
-                const data = await res.json();
+                const data = await focusRes.json();
                 setSceneContext(data.context);
                 setRelatedElements(data.related);
+
+                if (projectRes.ok) {
+                    const projectData = await projectRes.json();
+                    setProjectTitle(projectData.title || "");
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -111,6 +121,15 @@ export default function FocusModePage() {
             />
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                <div className="px-4 py-2 border-b border-border bg-surface-raised flex-shrink-0">
+                    <Breadcrumbs
+                        items={[
+                            { label: projectTitle || "Project", href: `/project/${projectId}` },
+                            { label: sceneContext.title, href: `/project/${projectId}` },
+                            { label: "Focus" },
+                        ]}
+                    />
+                </div>
                 <main className="flex-1 overflow-y-auto w-full max-w-3xl mx-auto px-8 py-12">
                     <SceneEditor
                         node={{ ...sceneContext, type: "SCENE" }}
