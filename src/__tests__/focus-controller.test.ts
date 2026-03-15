@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { FocusController } from "@/lib/controllers/focus";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
+import { UniversesController } from "@/lib/controllers/universes";
 import { testPrisma } from "./setup";
 
 describe("FocusController", () => {
@@ -95,6 +96,43 @@ describe("FocusController", () => {
             const grouped = await FocusController.getRelatedElements(scene.id);
             expect(grouped.CHARACTER).toHaveLength(0);
             expect(grouped.LOCATION).toHaveLength(0);
+        });
+
+        it("includes world objects from linked universe", async () => {
+            const universe = await UniversesController.createUniverse({ title: "Test Universe" });
+            await UniversesController.linkProjectToUniverse(projectId, universe.id);
+
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+
+            const worldChar = await UniversesController.createWorldObject({
+                universeId: universe.id,
+                type: "CHARACTER",
+                name: "Universe Hero",
+            });
+
+            const storyChar = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Project Hero" }
+            });
+
+            // Relationship from world object to scene
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromWorldObjectId: worldChar.id, toNodeId: scene.id }
+            });
+            // Relationship from story object to scene
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: storyChar.id, toNodeId: scene.id }
+            });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(2);
+            const names = grouped.CHARACTER.map(c => c.name).sort();
+            expect(names).toEqual(["Project Hero", "Universe Hero"]);
+
+            const universeChar = grouped.CHARACTER.find(c => c.name === "Universe Hero");
+            expect(universeChar?.source).toBe("universe");
+            const projectChar = grouped.CHARACTER.find(c => c.name === "Project Hero");
+            expect(projectChar?.source).toBe("project");
         });
 
         it("deduplicates objects with multiple relationships to same scene", async () => {

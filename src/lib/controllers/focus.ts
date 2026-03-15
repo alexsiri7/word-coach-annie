@@ -74,26 +74,45 @@ export class FocusController {
             include: {
                 fromObject: true,
                 toObject: true,
+                fromWorldObject: true,
+                toWorldObject: true,
             }
         });
 
-        const relatedObjects: { id: string; type: string; name: string; description: string | null; role: string | null; notes: string | null; tags: string | null }[] = [];
+        const relatedObjects: { id: string; type: string; name: string; description: string | null; role: string | null; notes: string | null; tags: string | null; source: "project" | "universe" }[] = [];
         const seenIds = new Set<string>();
 
         for (const rel of relationships) {
-            // Determine which side is the story object
-            const obj = rel.fromObject || rel.toObject;
-            if (obj && !seenIds.has(obj.id)) {
+            // Check StoryObject side
+            const storyObj = rel.fromObject || rel.toObject;
+            if (storyObj && !seenIds.has(storyObj.id)) {
                 relatedObjects.push({
-                    id: obj.id,
-                    type: obj.type,
-                    name: obj.name,
-                    description: obj.description,
-                    role: obj.role,
-                    notes: obj.notes,
-                    tags: obj.tags
+                    id: storyObj.id,
+                    type: storyObj.type,
+                    name: storyObj.name,
+                    description: storyObj.description,
+                    role: storyObj.role,
+                    notes: storyObj.notes,
+                    tags: storyObj.tags,
+                    source: "project",
                 });
-                seenIds.add(obj.id);
+                seenIds.add(storyObj.id);
+            }
+
+            // Check WorldObject side
+            const worldObj = rel.fromWorldObject || rel.toWorldObject;
+            if (worldObj && !seenIds.has(worldObj.id)) {
+                relatedObjects.push({
+                    id: worldObj.id,
+                    type: worldObj.type,
+                    name: worldObj.name,
+                    description: worldObj.description,
+                    role: null,
+                    notes: worldObj.notes,
+                    tags: worldObj.tags,
+                    source: "universe",
+                });
+                seenIds.add(worldObj.id);
             }
         }
 
