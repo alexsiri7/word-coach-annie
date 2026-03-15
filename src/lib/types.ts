@@ -86,6 +86,7 @@ export interface StoryObject {
   notes: string;
   role: string | null;
   tags: string;
+  source?: "project" | "universe";
   createdAt: string;
   updatedAt: string;
 }

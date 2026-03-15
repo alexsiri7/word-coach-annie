@@ -66,6 +66,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [storyObjects, setStoryObjects] = useState<StoryObject[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [selectedObjectSource, setSelectedObjectSource] = useState<"project" | "universe">("project");
   const [activeTab, setActiveTab] = useState<SidebarTab>("outline");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -234,6 +235,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const handleSearchSelectObject = (objectId: string, objectType: string) => {
     setSelectedObjectId(objectId);
+    setSelectedObjectSource("project");
     setSelectedNodeId(null);
     const tab = OBJECT_TYPE_TO_TAB[objectType];
     if (tab) setActiveTab(tab);
@@ -468,14 +470,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         )}
                         onClick={() => {
                           setSelectedObjectId(obj.id);
+                          setSelectedObjectSource(obj.source || "project");
                           setSelectedNodeId(null);
                           setSidebarOpen(false);
                         }}
                       >
-                        {obj.name}
-                        {obj.role && (
-                          <span className="ml-2 text-xs text-text-muted">{obj.role}</span>
-                        )}
+                        <span className="flex items-center gap-1.5">
+                          {obj.name}
+                          {obj.source === "universe" && (
+                            <span title="Universe entity">
+                              <Globe className="h-3 w-3 text-accent/60 flex-shrink-0" />
+                            </span>
+                          )}
+                          {obj.role && (
+                            <span className="text-xs text-text-muted">{obj.role}</span>
+                          )}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -490,6 +500,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           {selectedObjectId ? (
             <StoryObjectPanel
               objectId={selectedObjectId}
+              source={selectedObjectSource}
               onClose={() => setSelectedObjectId(null)}
               onDeleted={() => {
                 setSelectedObjectId(null);

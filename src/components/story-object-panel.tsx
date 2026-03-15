@@ -26,6 +26,7 @@ import type { StoryObject, StoryObjectType, Project } from "@/lib/types";
 
 interface StoryObjectPanelProps {
     objectId: string;
+    source?: "project" | "universe";
     onClose: () => void;
     onDeleted: () => void;
     onUpdated: () => void;
@@ -39,7 +40,7 @@ const TYPE_LABELS: Record<StoryObjectType, string> = {
     NOTE: "Note",
 };
 
-export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: StoryObjectPanelProps) {
+export function StoryObjectPanel({ objectId, source = "project", onClose, onDeleted, onUpdated }: StoryObjectPanelProps) {
     const [obj, setObj] = useState<StoryObject | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -53,8 +54,11 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
     const [transferOpen, setTransferOpen] = useState(false);
     const [transferring, setTransferring] = useState(false);
 
+    const isUniverse = source === "universe";
+    const apiBase = isUniverse ? "/api/world-objects" : "/api/story-objects";
+
     useEffect(() => {
-        fetch(`/api/story-objects/${objectId}`)
+        fetch(`${apiBase}/${objectId}`)
             .then((res) => res.json())
             .then((data) => {
                 setObj(data);
@@ -64,20 +68,25 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
                 setRole(data.role || "");
                 setTags(data.tags || "");
 
-                // Fetch project to see if it's linked to a universe
-                fetch(`/api/projects/${data.projectId}`)
-                    .then(res => res.json())
-                    .then(p => setProject(p));
+                if (!isUniverse && data.projectId) {
+                    // Fetch project to see if it's linked to a universe
+                    fetch(`/api/projects/${data.projectId}`)
+                        .then(res => res.json())
+                        .then(p => setProject(p));
+                }
             });
-    }, [objectId]);
+    }, [objectId, apiBase, isUniverse]);
 
     const handleSave = async () => {
         setSaving(true);
         setSaved(false);
-        await fetch(`/api/story-objects/${objectId}`, {
+        const body = isUniverse
+            ? { name, description, notes, tags }
+            : { name, description, notes, role: role || null, tags };
+        await fetch(`${apiBase}/${objectId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, description, notes, role: role || null, tags }),
+            body: JSON.stringify(body),
         });
         setSaving(false);
         setSaved(true);
@@ -86,7 +95,7 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
     };
 
     const handleDelete = async () => {
-        await fetch(`/api/story-objects/${objectId}`, { method: "DELETE" });
+        await fetch(`${apiBase}/${objectId}`, { method: "DELETE" });
         setDeleteOpen(false);
         onDeleted();
     };
@@ -133,6 +142,12 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
             <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-raised">
                 <div className="flex items-center gap-2">
                     <span className="tag-pill text-accent">{TYPE_LABELS[obj.type as StoryObjectType] || obj.type}</span>
+                    {isUniverse && (
+                        <span className="tag-pill text-xs bg-accent/10 text-accent/80 flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            Universe
+                        </span>
+                    )}
                     <h2 className="font-semibold text-text-primary truncate">{obj.name}</h2>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose}>
@@ -206,7 +221,7 @@ export function StoryObjectPanel({ objectId, onClose, onDeleted, onUpdated }: St
                     Delete
                 </Button>
                 <div className="flex items-center gap-2">
-                    {project?.universeId && (
+                    {!isUniverse && project?.universeId && (
                         <Button
                             variant="outline"
                             size="sm"

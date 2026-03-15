@@ -16,7 +16,7 @@ export class StoryObjectController {
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { id: true },
+            select: { id: true, universeId: true },
         });
         if (!project) throw new Error(`Project not found: ${projectId}`);
 
@@ -28,7 +28,20 @@ export class StoryObjectController {
         if (type) where.type = type;
         if (search) where.name = { contains: search };
 
-        const [storyObjects, total] = await Promise.all([
+        // WorldObject types that overlap with StoryObject types
+        const WORLD_OBJECT_TYPES = ["CHARACTER", "LOCATION", "WORLD_ELEMENT"];
+
+        // Fetch project story objects and universe world objects in parallel
+        const shouldFetchWorldObjects = project.universeId &&
+            (!type || WORLD_OBJECT_TYPES.includes(type));
+
+        const worldObjectWhere: Record<string, unknown> = project.universeId
+            ? { universeId: project.universeId }
+            : {};
+        if (type) worldObjectWhere.type = type;
+        if (search) worldObjectWhere.name = { contains: search };
+
+        const [storyObjects, storyTotal, worldObjects] = await Promise.all([
             prisma.storyObject.findMany({
                 where,
                 orderBy: { createdAt: "desc" },
@@ -36,21 +49,43 @@ export class StoryObjectController {
                 skip: offset,
             }),
             prisma.storyObject.count({ where }),
+            shouldFetchWorldObjects
+                ? prisma.worldObject.findMany({
+                    where: worldObjectWhere,
+                    orderBy: { createdAt: "desc" },
+                })
+                : Promise.resolve([]),
         ]);
 
+        const projectObjects = storyObjects.map((obj) => ({
+            id: obj.id,
+            type: obj.type,
+            name: obj.name,
+            description: obj.description,
+            notes: obj.notes,
+            role: obj.role,
+            tags: obj.tags,
+            source: "project" as const,
+            createdAt: obj.createdAt.toISOString(),
+            updatedAt: obj.updatedAt.toISOString(),
+        }));
+
+        const universeObjects = worldObjects.map((obj) => ({
+            id: obj.id,
+            type: obj.type,
+            name: obj.name,
+            description: obj.description,
+            notes: obj.notes,
+            role: null,
+            tags: obj.tags,
+            source: "universe" as const,
+            createdAt: obj.createdAt.toISOString(),
+            updatedAt: obj.updatedAt.toISOString(),
+        }));
+
         return {
-            objects: storyObjects.map((obj) => ({
-                id: obj.id,
-                type: obj.type,
-                name: obj.name,
-                description: obj.description,
-                notes: obj.notes,
-                role: obj.role,
-                tags: obj.tags,
-                createdAt: obj.createdAt.toISOString(),
-                updatedAt: obj.updatedAt.toISOString(),
-            })),
-            total,
+            objects: [...projectObjects, ...universeObjects],
+            total: storyTotal + worldObjects.length,
         };
     }
 
