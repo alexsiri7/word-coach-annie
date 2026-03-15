@@ -322,6 +322,48 @@
   animation: fade-in 0.2s ease-out;
 }
 
+@keyframes page-transition {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-transition {
+  animation: page-transition 0.15s ease-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-transition,
+  .animate-slide-in-right,
+  .animate-slide-up,
+  .animate-fade-in {
+    animation: none;
+  }
+}
+
 /* Search panel */
 .search-panel {
   box-shadow: 0 4px 24px hsl(0 0% 0% / 0.3);
