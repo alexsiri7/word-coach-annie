@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body>
         <UpdateBanner />
         {children}
+        <SyncToast />
         <OfflineIndicator />
       </body>
     </html>

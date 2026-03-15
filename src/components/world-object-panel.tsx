@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,7 +63,7 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const handleSave = async () => {
         setSaving(true);
         setSaved(false);
-        const res = await fetch(`/api/world-objects/${objectId}`, {
+        const res = await offlineFetch(`/api/world-objects/${objectId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, description, notes, type, tags }),
@@ -76,14 +77,14 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     };
 
     const handleDelete = async () => {
-        await fetch(`/api/world-objects/${objectId}`, { method: "DELETE" });
+        await offlineFetch(`/api/world-objects/${objectId}`, { method: "DELETE" });
         setDeleteOpen(false);
         onDeleted();
     };
 
     const handleAddTimelineEntry = async () => {
         if (!newEntryLabel.trim()) return;
-        const res = await fetch(`/api/world-objects/${objectId}/timeline`, {
+        const res = await offlineFetch(`/api/world-objects/${objectId}/timeline`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ label: newEntryLabel, description: newEntryDesc }),
@@ -97,7 +98,7 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     };
 
     const handleDeleteTimelineEntry = async (entryId: string) => {
-        const res = await fetch(`/api/world-objects/${objectId}/timeline/${entryId}`, {
+        const res = await offlineFetch(`/api/world-objects/${objectId}/timeline/${entryId}`, {
             method: "DELETE",
         });
         if (res.ok) fetchWo();
@@ -113,7 +114,7 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
 
         setTimeline(newTimeline); // Optimistic update
 
-        await fetch(`/api/world-objects/${objectId}/timeline/reorder`, {
+        await offlineFetch(`/api/world-objects/${objectId}/timeline/reorder`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ orderedIds: newTimeline.map(t => t.id) }),

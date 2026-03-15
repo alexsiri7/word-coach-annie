@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X, Save, Trash2, Globe } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,7 +84,7 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
         const body = isUniverse
             ? { name, description, notes, tags }
             : { name, description, notes, role: role || null, tags };
-        await fetch(`${apiBase}/${objectId}`, {
+        await offlineFetch(`${apiBase}/${objectId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -95,7 +96,7 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
     };
 
     const handleDelete = async () => {
-        await fetch(`${apiBase}/${objectId}`, { method: "DELETE" });
+        await offlineFetch(`${apiBase}/${objectId}`, { method: "DELETE" });
         setDeleteOpen(false);
         onDeleted();
     };
@@ -104,7 +105,7 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
         if (!project?.universeId) return;
         setTransferring(true);
         try {
-            const res = await fetch("/api/universes/transfer-object", {
+            const res = await offlineFetch("/api/universes/transfer-object", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

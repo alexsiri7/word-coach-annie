@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { MessageSquare, AlertTriangle, RefreshCw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -143,7 +144,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     const selectedText = editor.state.doc.textBetween(from, to);
 
     try {
-      const res = await fetch(`/api/nodes/${node.id}/annotations`, {
+      const res = await offlineFetch(`/api/nodes/${node.id}/annotations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text, range: JSON.stringify({ from, to }), selectedText }),
@@ -162,7 +163,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
 
   const deleteAnnotation = useCallback(async (id: string) => {
     try {
-      await fetch(`/api/annotations/${id}`, { method: "DELETE" });
+      await offlineFetch(`/api/annotations/${id}`, { method: "DELETE" });
       setAnnotations((prev) => prev.filter((a) => a.id !== id));
       if (editor) {
         const tr = editor.state.tr;
@@ -184,7 +185,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
 
   const resolveAnnotation = useCallback(async (id: string, resolved: boolean) => {
     try {
-      const res = await fetch(`/api/annotations/${id}`, {
+      const res = await offlineFetch(`/api/annotations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resolved }),
@@ -215,7 +216,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
 
   const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus as SceneStatus);
-    await fetch(`/api/nodes/${node.id}`, {
+    await offlineFetch(`/api/nodes/${node.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
