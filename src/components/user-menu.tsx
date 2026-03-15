@@ -1,17 +1,20 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { LogOut, Moon, Sun, Monitor, User } from "lucide-react";
 
 export function UserMenu() {
     const { authenticated, user, loading, logout } = useAuth();
+    const { setTheme, theme } = useTheme();
 
     if (loading || !authenticated) return null;
 
@@ -38,6 +41,24 @@ export function UserMenu() {
                         <div className="text-muted-foreground text-xs truncate">{user.email}</div>
                     </div>
                 )}
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Theme</div>
+                <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer">
+                    <Sun className="h-4 w-4 mr-2" />
+                    Light
+                    {theme === "light" && <span className="ml-auto text-accent">&#10003;</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer">
+                    <Moon className="h-4 w-4 mr-2" />
+                    Dark
+                    {theme === "dark" && <span className="ml-auto text-accent">&#10003;</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    System
+                    {theme === "system" && <span className="ml-auto text-accent">&#10003;</span>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-destructive cursor-pointer">
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign out

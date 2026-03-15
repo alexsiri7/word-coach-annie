@@ -44,6 +44,7 @@ import { StoryObjectPanel } from "@/components/story-object-panel";
 import { SearchPanel } from "@/components/search-panel";
 import { AIChatPanel } from "@/components/ai-chat-panel";
 import { UserMenu } from "@/components/user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
@@ -327,6 +328,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Settings className="h-4 w-4" />
         </Button>
+        <ThemeToggle />
         <UserMenu />
       </header>
 

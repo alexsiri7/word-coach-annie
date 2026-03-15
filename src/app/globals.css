@@ -6,8 +6,78 @@
 
 @layer base {
   :root {
-    /* Unified Dark Theme Palette (Default) */
-    
+    /* Light Theme Palette (Default) */
+
+    /* Custom Surface Colors */
+    --surface: 220 20% 97%;
+    --surface-raised: 0 0% 100%;
+    --surface-overlay: 220 15% 95%;
+    --surface-sunken: 220 20% 94%;
+
+    /* Custom Borders */
+    --border: 220 13% 87%;
+    --border-subtle: 220 13% 91%;
+
+    /* Custom Text Colors */
+    --text-primary: 225 15% 12%;
+    --text-secondary: 225 10% 40%;
+    --text-muted: 225 8% 58%;
+
+    /* Custom Status Colors */
+    --status-outline: 225 8% 58%;
+    --status-draft: 38 92% 50%;
+    --status-revised: 230 80% 55%;
+    --status-final: 145 65% 40%;
+
+    /* Functional Colors */
+    --danger: 0 72% 51%;
+    --danger-hover: 0 72% 45%;
+    --success: 145 65% 40%;
+    --warning: 38 92% 50%;
+
+    /* Shadcn/Base Variables (Mapped to Light Theme) */
+    --background: 0 0% 100%;
+    --foreground: 225 15% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 15% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 15% 12%;
+
+    --primary: 225 15% 12%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 225 15% 12%;
+
+    --muted: 220 15% 95%;
+    --muted-foreground: 225 10% 40%;
+
+    /* Accent - Blue/Purple */
+    --accent: 230 80% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 230 80% 48%;
+    --accent-muted: 230 40% 92%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --input: 220 13% 87%;
+    --ring: 230 80% 55%;
+
+    --radius: 0.5rem;
+
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+
+  .dark {
+    /* Dark Theme Palette */
+
     /* Custom Surface Colors */
     --surface: 225 15% 10%;
     --surface-raised: 225 15% 13%;
@@ -36,21 +106,21 @@
     --warning: 38 90% 60%;
 
     /* Shadcn/Base Variables (Mapped to Dark Theme) */
-    --background: 225 15% 7%;     /* matches surface-sunken */
-    --foreground: 225 10% 93%;    /* matches text-primary */
-    
-    --card: 225 15% 10%;          /* matches surface */
+    --background: 225 15% 7%;
+    --foreground: 225 10% 93%;
+
+    --card: 225 15% 10%;
     --card-foreground: 225 10% 93%;
-    
-    --popover: 225 15% 13%;       /* matches surface-raised */
+
+    --popover: 225 15% 13%;
     --popover-foreground: 225 10% 93%;
-    
+
     --primary: 225 10% 93%;
     --primary-foreground: 225 15% 7%;
-    
+
     --secondary: 225 15% 13%;
     --secondary-foreground: 225 10% 93%;
-    
+
     --muted: 225 15% 16%;
     --muted-foreground: 225 10% 65%;
 
@@ -59,15 +129,13 @@
     --accent-foreground: 225 10% 93%;
     --accent-hover: 230 80% 72%;
     --accent-muted: 230 40% 20%;
-    
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --input: 225 12% 16%;
     --ring: 230 80% 65%;
-    
-    --radius: 0.5rem;
-    
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -125,6 +193,10 @@
 
   .glass-card:hover {
     border-color: hsl(var(--border) / 0.8);
+    box-shadow: 0 8px 32px hsl(0 0% 0% / 0.08);
+  }
+
+  .dark .glass-card:hover {
     box-shadow: 0 8px 32px hsl(0 0% 0% / 0.2);
   }
 
