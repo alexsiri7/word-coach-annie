@@ -155,7 +155,7 @@ describe("StructureController", () => {
 
         describe("deleteNode", () => {
             it("deletes node and reindexes siblings", async () => {
-                const ch1 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+                const _ch1 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
                 const ch2 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 2" });
                 const _ch3 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 3" });
 

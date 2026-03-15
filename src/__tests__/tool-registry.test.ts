@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
     getCoreTools,
     getToolDefinitions,
@@ -6,7 +6,6 @@ import {
     getAllTools,
     LOAD_TOOLSET_DEFINITION,
     type ToolCategory,
-    type OpenAIToolDefinition,
 } from "@/lib/ai/tool-registry";
 
 describe("Tool Registry", () => {

@@ -282,8 +282,8 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      pre: ({ children }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
-                      code: ({ children, className }) => className
+                      pre: ({ children }: { children?: React.ReactNode }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
+                      code: ({ children, className }: { children?: React.ReactNode; className?: string }) => className
                         ? <code className={className}>{children}</code>
                         : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
                       h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
@@ -326,8 +326,8 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
                     code: ({ children, className }) => className
                       ? <code className={className}>{children}</code>
                       : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
-                    h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
-                    h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
+                    h2: ({ children }: { children?: React.ReactNode }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
+                    h3: ({ children }: { children?: React.ReactNode }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
                   }}
                 >
                   {streamingContent}
