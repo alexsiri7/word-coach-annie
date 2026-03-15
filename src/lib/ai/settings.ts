@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { decrypt } from "@/lib/crypto";
 
 export interface AiProviderConfig {
   baseUrl: string;
@@ -17,15 +18,17 @@ function getEnvDefaults(): AiProviderConfig {
 /**
  * Get AI provider configuration.
  * Priority: DB settings (non-empty fields) > env vars > hardcoded defaults.
+ * API keys stored in DB are decrypted transparently.
  */
 export async function getAiConfig(): Promise<AiProviderConfig> {
   const envDefaults = getEnvDefaults();
   try {
     const settings = await prisma.aiSettings.findUnique({ where: { id: "default" } });
     if (settings) {
+      const decryptedKey = decrypt(settings.apiKey);
       return {
         baseUrl: settings.baseUrl || envDefaults.baseUrl,
-        apiKey: settings.apiKey || envDefaults.apiKey,
+        apiKey: decryptedKey || envDefaults.apiKey,
         model: settings.model || envDefaults.model,
       };
     }
