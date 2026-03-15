@@ -2,9 +2,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { SceneEditor } from "@/components/scene-editor";
-import { SceneInfoSidebar } from "@/components/focus-mode/scene-info-sidebar";
-import { RelatedElementsPanel } from "@/components/focus-mode/related-elements-panel";
+import dynamic from "next/dynamic";
+
+const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
+  loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
+});
+const SceneInfoSidebar = dynamic(() => import("@/components/focus-mode/scene-info-sidebar").then(m => m.SceneInfoSidebar));
+const RelatedElementsPanel = dynamic(() => import("@/components/focus-mode/related-elements-panel").then(m => m.RelatedElementsPanel));
 import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
