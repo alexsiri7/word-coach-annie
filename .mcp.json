@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "word-coach-annie": {
+      "command": "docker",
+      "args": [
+        "compose", "exec", "-T", "app",
+        "node", "dist/mcp/index.mjs"
+      ]
+    }
+  }
+}
