@@ -10,6 +10,7 @@ import {
 import { executeTool } from "@/lib/ai/tool-executor";
 import { getAiConfig } from "@/lib/ai/settings";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 const MAX_TOOL_ITERATIONS = 10;
 
@@ -145,9 +146,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize user input to prevent stored XSS
+    const sanitizedMessage = sanitizeInput(message);
+
     // Save user message
     await prisma.chatMessage.create({
-      data: { projectId, role: "user", content: message },
+      data: { projectId, role: "user", content: sanitizedMessage },
     });
 
     // Build context
