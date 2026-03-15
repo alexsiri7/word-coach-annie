@@ -32,9 +32,22 @@ model ContentVersion {
   @@index([nodeId, createdAt(sort: Desc)])
 }
 
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  googleId  String    @unique
+  name      String    @default("")
+  picture   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+  universes Universe[]
+}
+
 model Project {
   id             String          @id @default(cuid())
   universeId     String?
+  userId         String?
   title          String
   author         String          @default("")
   synopsis       String          @default("")
@@ -44,9 +57,12 @@ model Project {
   storyObjects   StoryObject[]
   structureNodes StructureNode[]
   universe       Universe?       @relation(fields: [universeId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
+
+  @@index([userId])
 }
 
 model Relationship {
@@ -118,6 +134,7 @@ model StructureNode {
 
 model Universe {
   id           String        @id @default(cuid())
+  userId       String?
   title        String
   description  String        @default("")
   createdAt    DateTime      @default(now())
@@ -125,6 +142,9 @@ model Universe {
   projects     Project[]
   worldObjects WorldObject[]
   googleDocExports GoogleDocExport[]
+  user         User?         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model WorldObject {
