@@ -6,6 +6,7 @@ import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lu
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -156,6 +157,7 @@ export default function Dashboard() {
               <Plus className="h-4 w-4" />
               New Project
             </Button>
+            <ThemeToggle />
             <UserMenu />
           </div>
         </div>
