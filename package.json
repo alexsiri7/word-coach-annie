@@ -51,6 +51,7 @@
     "dompurify": "^3.3.3",
     "google-auth-library": "^10.5.0",
     "googleapis": "^171.4.0",
+    "idb": "^8.0.3",
     "jose": "^6.2.1",
     "lucide-react": "^0.564.0",
     "next": "^15.2.1",
