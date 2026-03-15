@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Settings,
-  ArrowLeft,
   Users,
   MapPin,
   GitBranch,
@@ -48,6 +47,7 @@ import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
@@ -279,15 +279,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
-          onClick={() => router.push("/")}
-          aria-label="Back to projects"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
           className="h-8 w-8 md:hidden text-text-muted hover:text-text-primary"
           onClick={() => setSidebarOpen(true)}
           aria-label="Open sidebar menu"
@@ -295,8 +286,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <PenLine className="h-4 w-4 text-accent flex-shrink-0" />
-          <h1 className="font-semibold text-text-primary truncate">{project.title}</h1>
+          <Breadcrumbs
+            items={[
+              { label: project.title, href: selectedNode ? `/project/${projectId}` : undefined },
+              ...(selectedNode ? [{ label: selectedNode.title }] : []),
+            ]}
+          />
           {project.genre && (
             <span className="tag-pill hidden sm:inline">{project.genre}</span>
           )}
