@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { AiSettingsDialog } from "@/components/ai-settings-dialog";
 import { cn } from "@/lib/utils";
+import { sanitizeMessageContent } from "@/lib/sanitize";
 
 interface ChatMessage {
   id: string;
@@ -291,11 +292,11 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
                       h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
                     }}
                   >
-                    {msg.content}
+                    {sanitizeMessageContent(msg.content)}
                   </ReactMarkdown>
                 </div>
               ) : (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <p className="whitespace-pre-wrap">{sanitizeMessageContent(msg.content)}</p>
               )}
             </div>
             <span className="text-[10px] text-text-muted mt-0.5 px-1">
@@ -331,7 +332,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
                     h3: ({ children }: { children?: React.ReactNode }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
                   }}
                 >
-                  {streamingContent}
+                  {sanitizeMessageContent(streamingContent)}
                 </ReactMarkdown>
               </div>
             </div>
