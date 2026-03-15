@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// Stub navigator for Node.js test environment
+const navigatorStub = { onLine: true };
+vi.stubGlobal("navigator", navigatorStub);
+
 // Mock idb module before importing sync-queue
 vi.mock("@/lib/offline/idb", () => {
   const ops: Array<{ id: number; url: string; method: string; body: string | null; timestamp: number; status: string; retries: number }> = [];
@@ -35,21 +39,19 @@ import { queuePendingOp } from "@/lib/offline/idb";
 const idbMock = await vi.importMock<{ _ops: Array<Record<string, unknown>>; _reset: () => void }>("@/lib/offline/idb");
 
 describe("sync-queue", () => {
-  let originalOnLine: boolean;
-
   beforeEach(() => {
-    originalOnLine = navigator.onLine;
+    navigatorStub.onLine = true;
     idbMock._reset();
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
-    Object.defineProperty(navigator, "onLine", { value: originalOnLine, writable: true });
+    navigatorStub.onLine = true;
   });
 
   describe("offlineFetch", () => {
     it("passes through to fetch when online", async () => {
-      Object.defineProperty(navigator, "onLine", { value: true, writable: true });
+      navigatorStub.onLine = true;
 
       const mockResponse = new Response(JSON.stringify({ ok: true }), { status: 200 });
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse));
@@ -64,7 +66,7 @@ describe("sync-queue", () => {
     });
 
     it("queues mutations when offline and returns 202", async () => {
-      Object.defineProperty(navigator, "onLine", { value: false, writable: true });
+      navigatorStub.onLine = false;
 
       const res = await offlineFetch("/api/projects", {
         method: "POST",
@@ -84,7 +86,7 @@ describe("sync-queue", () => {
     });
 
     it("does not queue GET requests when offline", async () => {
-      Object.defineProperty(navigator, "onLine", { value: false, writable: true });
+      navigatorStub.onLine = false;
 
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
 
@@ -93,7 +95,7 @@ describe("sync-queue", () => {
     });
 
     it("does not queue non-API requests when offline", async () => {
-      Object.defineProperty(navigator, "onLine", { value: false, writable: true });
+      navigatorStub.onLine = false;
 
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
 
@@ -106,9 +108,8 @@ describe("sync-queue", () => {
 
   describe("replayPendingOps", () => {
     it("replays queued ops in order on reconnect", async () => {
-      Object.defineProperty(navigator, "onLine", { value: true, writable: true });
+      navigatorStub.onLine = true;
 
-      // Pre-populate ops
       idbMock._ops.push(
         { id: 1, url: "/api/projects", method: "POST", body: '{"title":"A"}', timestamp: 100, status: "pending", retries: 0 },
         { id: 2, url: "/api/nodes/x", method: "PATCH", body: '{"title":"B"}', timestamp: 200, status: "pending", retries: 0 }
@@ -138,7 +139,7 @@ describe("sync-queue", () => {
     });
 
     it("handles 409 conflicts by discarding the op", async () => {
-      Object.defineProperty(navigator, "onLine", { value: true, writable: true });
+      navigatorStub.onLine = true;
 
       idbMock._ops.push(
         { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "pending", retries: 0 }
@@ -163,7 +164,7 @@ describe("sync-queue", () => {
     });
 
     it("handles server errors with retry tracking", async () => {
-      Object.defineProperty(navigator, "onLine", { value: true, writable: true });
+      navigatorStub.onLine = true;
 
       idbMock._ops.push(
         { id: 1, url: "/api/nodes/x", method: "POST", body: '{}', timestamp: 100, status: "pending", retries: 0 }
@@ -180,14 +181,13 @@ describe("sync-queue", () => {
       const errorEvent = events.find((e) => e.type === "replay-error");
       expect(errorEvent).toBeDefined();
 
-      // Op should still be in the queue with incremented retries
       const op = idbMock._ops.find((o) => o.id === 1);
       expect(op?.retries).toBe(1);
       expect(op?.status).toBe("failed");
     });
 
     it("skips ops that have exceeded max retries", async () => {
-      Object.defineProperty(navigator, "onLine", { value: true, writable: true });
+      navigatorStub.onLine = true;
 
       idbMock._ops.push(
         { id: 1, url: "/api/nodes/x", method: "POST", body: '{}', timestamp: 100, status: "failed", retries: 3 }
@@ -197,7 +197,6 @@ describe("sync-queue", () => {
 
       await replayPendingOps();
 
-      // fetch should NOT have been called
       expect(fetch).not.toHaveBeenCalled();
     });
   });
