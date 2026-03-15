@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from "next/server";
+import { google } from "googleapis";
+import { prisma } from "@/lib/db";
+import {
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE,
+    createSessionToken,
+} from "@/lib/auth";
+
+/**
+ * GET /api/auth/google/callback — Handle Google OAuth callback.
+ * Exchanges auth code for tokens, fetches user info, upserts User,
+ * and sets a JWT session cookie.
+ */
+export async function GET(request: NextRequest) {
+    const code = request.nextUrl.searchParams.get("code");
+    if (!code) {
+        return NextResponse.json(
+            { error: "Missing authorization code" },
+            { status: 400 }
+        );
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+        return NextResponse.json(
+            { error: "Google OAuth not configured" },
+            { status: 501 }
+        );
+    }
+
+    const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+
+    // Exchange code for tokens
+    const { tokens } = await client.getToken(code);
+    client.setCredentials(tokens);
+
+    // Fetch user info from Google
+    const oauth2 = google.oauth2({ version: "v2", auth: client });
+    const { data: userInfo } = await oauth2.userinfo.get();
+
+    if (!userInfo.email || !userInfo.id) {
+        return NextResponse.json(
+            { error: "Could not retrieve user info from Google" },
+            { status: 400 }
+        );
+    }
+
+    // Upsert user in database
+    const user = await prisma.user.upsert({
+        where: { googleId: userInfo.id },
+        update: {
+            email: userInfo.email,
+            name: userInfo.name || "",
+            picture: userInfo.picture || null,
+        },
+        create: {
+            email: userInfo.email,
+            googleId: userInfo.id,
+            name: userInfo.name || "",
+            picture: userInfo.picture || null,
+        },
+    });
+
+    // Create JWT session
+    const jwt = await createSessionToken({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture || undefined,
+    });
+
+    // Redirect to home with session cookie
+    const response = NextResponse.redirect(new URL("/", request.url));
+    response.cookies.set(SESSION_COOKIE_NAME, jwt, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax", // lax required for OAuth redirect
+        maxAge: SESSION_MAX_AGE,
+        path: "/",
+    });
+
+    return response;
+}

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { deriveSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+    deriveSessionToken,
+    SESSION_COOKIE_NAME,
+    createSessionToken,
+    verifySessionToken,
+    isAuthEnabled,
+} from "@/lib/auth";
 
 describe("auth utilities", () => {
     it("deriveSessionToken produces consistent hex output", async () => {
@@ -17,6 +23,116 @@ describe("auth utilities", () => {
 
     it("SESSION_COOKIE_NAME is defined", () => {
         expect(SESSION_COOKIE_NAME).toBe("annie_session");
+    });
+});
+
+describe("JWT session tokens", () => {
+    let origJwt: string | undefined;
+    let origApiToken: string | undefined;
+
+    beforeEach(() => {
+        origJwt = process.env.JWT_SECRET;
+        origApiToken = process.env.API_TOKEN;
+        process.env.JWT_SECRET = "test-jwt-secret";
+    });
+
+    afterEach(() => {
+        if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
+        else delete process.env.JWT_SECRET;
+        if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
+        else delete process.env.API_TOKEN;
+    });
+
+    it("creates and verifies JWT round-trip", async () => {
+        const payload = {
+            userId: "user-123",
+            email: "test@example.com",
+            name: "Test User",
+            picture: "https://example.com/pic.jpg",
+        };
+        const token = await createSessionToken(payload);
+        expect(token).toBeTruthy();
+        expect(token.split(".")).toHaveLength(3); // JWT format
+
+        const verified = await verifySessionToken(token);
+        expect(verified).not.toBeNull();
+        expect(verified!.userId).toBe("user-123");
+        expect(verified!.email).toBe("test@example.com");
+        expect(verified!.name).toBe("Test User");
+        expect(verified!.picture).toBe("https://example.com/pic.jpg");
+    });
+
+    it("returns null for invalid JWT", async () => {
+        const result = await verifySessionToken("invalid.token.here");
+        expect(result).toBeNull();
+    });
+
+    it("returns null for tampered JWT", async () => {
+        const token = await createSessionToken({
+            userId: "user-1",
+            email: "a@b.com",
+            name: "A",
+        });
+        // Tamper with payload
+        const parts = token.split(".");
+        parts[1] = "eyJ0ZXN0IjoidGFtcGVyZWQifQ";
+        const tampered = parts.join(".");
+        const result = await verifySessionToken(tampered);
+        expect(result).toBeNull();
+    });
+
+    it("returns null for JWT missing required fields", async () => {
+        // Create a JWT with jose directly without userId
+        const { SignJWT } = await import("jose");
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+            "raw",
+            encoder.encode("test-jwt-secret"),
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["sign"]
+        );
+        const token = await new SignJWT({ foo: "bar" })
+            .setProtectedHeader({ alg: "HS256" })
+            .setExpirationTime("1h")
+            .sign(key);
+        const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+});
+
+describe("isAuthEnabled", () => {
+    let origApiToken: string | undefined;
+    let origGoogleClientId: string | undefined;
+
+    beforeEach(() => {
+        origApiToken = process.env.API_TOKEN;
+        origGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+    });
+
+    afterEach(() => {
+        if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
+        else delete process.env.API_TOKEN;
+        if (origGoogleClientId !== undefined) process.env.GOOGLE_CLIENT_ID = origGoogleClientId;
+        else delete process.env.GOOGLE_CLIENT_ID;
+    });
+
+    it("returns false when no auth configured", () => {
+        delete process.env.API_TOKEN;
+        delete process.env.GOOGLE_CLIENT_ID;
+        expect(isAuthEnabled()).toBe(false);
+    });
+
+    it("returns true when API_TOKEN set", () => {
+        process.env.API_TOKEN = "test";
+        delete process.env.GOOGLE_CLIENT_ID;
+        expect(isAuthEnabled()).toBe(true);
+    });
+
+    it("returns true when GOOGLE_CLIENT_ID set", () => {
+        delete process.env.API_TOKEN;
+        process.env.GOOGLE_CLIENT_ID = "test-client-id";
+        expect(isAuthEnabled()).toBe(true);
     });
 });
 
@@ -40,7 +156,6 @@ describe("middleware auth logic", () => {
     describe("login endpoint logic", () => {
         it("rejects when API_TOKEN not configured", async () => {
             delete process.env.API_TOKEN;
-            // Import fresh to test behavior
             const { POST } = await import("@/app/api/auth/login/route");
             const req = new Request("http://localhost/api/auth/login", {
                 method: "POST",
