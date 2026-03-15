@@ -172,6 +172,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setAddNodeDialogOpen(true);
   };
 
+  const handleMoveNode = async (nodeId: string, newParentId: string | null, newIndex: number) => {
+    // Optimistic: re-fetch after server confirms
+    const res = await fetch("/api/nodes/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeId, newParentId, newIndex }),
+    });
+    if (res.ok) {
+      fetchOutline();
+    }
+  };
+
   const openRename = (nodeId: string, currentTitle: string) => {
     setRenameNodeId(nodeId);
     setRenameTitle(currentTitle);
@@ -404,6 +416,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   onAddNode={openAddNode}
                   onRenameNode={openRename}
                   onDeleteNode={openDelete}
+                  onMoveNode={handleMoveNode}
                 />
               </>
             ) : (
