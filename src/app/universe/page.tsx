@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Globe, MoreVertical, Trash2, Sparkles, Link, ArrowLeft } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,7 +64,7 @@ export default function UniversesPage() {
 
     const handleCreate = async () => {
         if (!newTitle.trim()) return;
-        const res = await fetch("/api/universes", {
+        const res = await offlineFetch("/api/universes", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -82,7 +83,7 @@ export default function UniversesPage() {
 
     const handleDelete = async () => {
         if (!deleteTarget) return;
-        await fetch(`/api/universes/${deleteTarget.id}`, { method: "DELETE" });
+        await offlineFetch(`/api/universes/${deleteTarget.id}`, { method: "DELETE" });
         setDeleteTarget(null);
         fetchUniverses();
     };

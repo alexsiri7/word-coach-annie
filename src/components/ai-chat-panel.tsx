@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -124,7 +125,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await offlineFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, message: text, sceneContext }),
@@ -205,7 +206,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   };
 
   const clearHistory = async () => {
-    await fetch(`/api/chat?projectId=${projectId}`, { method: "DELETE" });
+    await offlineFetch(`/api/chat?projectId=${projectId}`, { method: "DELETE" });
     setMessages([]);
   };
 

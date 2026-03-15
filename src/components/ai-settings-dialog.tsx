@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Settings, Save, Check, Eye, EyeOff } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,7 +59,7 @@ export function AiSettingsDialog() {
     }
 
     try {
-      const res = await fetch("/api/ai-settings", {
+      const res = await offlineFetch("/api/ai-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

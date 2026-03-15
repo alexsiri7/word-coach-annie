@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DOMPurify from "dompurify";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import {
   Clock,
   X,
@@ -69,7 +70,7 @@ export function VersionHistoryPanel({
     setRestoring(true);
 
     try {
-      const res = await fetch(`/api/nodes/${nodeId}/content`, {
+      const res = await offlineFetch(`/api/nodes/${nodeId}/content`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ versionId: versionToRestore.id }),

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { WorldObjectPanel } from "@/components/world-object-panel";
 import { cn } from "@/lib/utils";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import type { Universe } from "@/lib/types";
 
 type WorldObjectType = "CHARACTER" | "LOCATION" | "WORLD_ELEMENT";
@@ -70,7 +71,7 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
 
     const handleAddObject = async () => {
         if (!newObjectName.trim()) return;
-        const res = await fetch(`/api/universes/${universeId}/world-objects`, {
+        const res = await offlineFetch(`/api/universes/${universeId}/world-objects`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: newObjectName, type: activeTab }),
@@ -239,7 +240,7 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                                 key={p.id}
                                 className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between"
                                 onClick={async () => {
-                                    await fetch(`/api/projects/${p.id}`, {
+                                    await offlineFetch(`/api/projects/${p.id}`, {
                                         method: "PATCH",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({ universeId })

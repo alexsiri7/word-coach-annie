@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { Input } from "@/components/ui/input";
@@ -78,7 +79,7 @@ export default function Dashboard() {
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
-    const res = await fetch("/api/projects", {
+    const res = await offlineFetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -103,7 +104,7 @@ export default function Dashboard() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await fetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" });
+    await offlineFetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" });
     setDeleteTarget(null);
     fetchProjects();
   };

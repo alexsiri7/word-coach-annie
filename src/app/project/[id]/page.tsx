@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import {
   Dialog,
   DialogContent,
@@ -121,7 +122,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Handlers
   const handleAddNode = async () => {
     if (!addNodeTitle.trim()) return;
-    await fetch(`/api/projects/${projectId}/nodes`, {
+    await offlineFetch(`/api/projects/${projectId}/nodes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -137,7 +138,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const handleRenameNode = async () => {
     if (!renameNodeId || !renameTitle.trim()) return;
-    await fetch(`/api/nodes/${renameNodeId}`, {
+    await offlineFetch(`/api/nodes/${renameNodeId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: renameTitle }),
@@ -149,7 +150,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const handleDeleteNode = async () => {
     if (!deleteNodeId) return;
-    await fetch(`/api/nodes/${deleteNodeId}`, { method: "DELETE" });
+    await offlineFetch(`/api/nodes/${deleteNodeId}`, { method: "DELETE" });
     setDeleteDialogOpen(false);
     if (selectedNodeId === deleteNodeId) setSelectedNodeId(null);
     fetchOutline();
@@ -157,7 +158,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const handleAddStoryObject = async () => {
     if (!addObjectName.trim()) return;
-    await fetch(`/api/projects/${projectId}/story-objects`, {
+    await offlineFetch(`/api/projects/${projectId}/story-objects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: addObjectType, name: addObjectName }),
@@ -176,7 +177,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const handleMoveNode = async (nodeId: string, newParentId: string | null, newIndex: number) => {
     // Optimistic: re-fetch after server confirms
-    const res = await fetch("/api/nodes/move", {
+    const res = await offlineFetch("/api/nodes/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nodeId, newParentId, newIndex }),

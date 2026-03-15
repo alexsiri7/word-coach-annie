@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { beatsToComments } from "./editor-config";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 
 interface UseAutoSaveOptions {
   nodeId: string;
@@ -23,7 +24,7 @@ export function useAutoSave({
     async (content: string) => {
       onSaveStart();
       try {
-        const res = await fetch(`/api/nodes/${nodeId}/content`, {
+        const res = await offlineFetch(`/api/nodes/${nodeId}/content`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: beatsToComments(content) }),

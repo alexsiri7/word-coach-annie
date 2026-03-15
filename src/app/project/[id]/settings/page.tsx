@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen } from "lucide-react";
+import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,7 +49,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    await fetch(`/api/projects/${projectId}`, {
+    await offlineFetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, author, synopsis, genre }),
