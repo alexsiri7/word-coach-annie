@@ -124,6 +124,14 @@ export class StructureController {
             }
         }
 
+        // Sort children within each parent by orderIndex
+        for (const node of nodeMap.values()) {
+            if (node.children.length > 1) {
+                node.children.sort((a, b) => a.orderIndex - b.orderIndex);
+            }
+        }
+        roots.sort((a, b) => a.orderIndex - b.orderIndex);
+
         return roots;
     }
 
