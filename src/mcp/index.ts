@@ -72,12 +72,30 @@ try {
     console.error("Warning: Could not initialize snapshot repo:", e);
 }
 
-function createServer(): McpServer {
+interface McpServerOptions {
+    /** Allow destructive tools (delete, restore). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
+    allowDestructive?: boolean;
+}
+
+function createServer(options?: McpServerOptions): McpServer {
+
+const allowDestructive = options?.allowDestructive ?? (process.env.MCP_ALLOW_DESTRUCTIVE === "true");
 
 const server = new McpServer({
     name: "word-coach-annie",
     version: "1.0.0",
 });
+
+/** Guard for destructive tools — returns error if not allowed. */
+function destructiveGuard(): { content: [{ type: "text"; text: string }]; isError: true } | null {
+    if (!allowDestructive) {
+        return {
+            content: [{ type: "text", text: "This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable." }],
+            isError: true,
+        };
+    }
+    return null;
+}
 
 // ─── Project Tools ───────────────────────────────────────────────────────────
 
@@ -244,6 +262,7 @@ server.tool(
         nodeId: z.string().describe("The node ID to delete"),
     },
     async ({ nodeId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteNode(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -349,6 +368,7 @@ server.tool(
         annotationId: z.string(),
     },
     async ({ annotationId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteAnnotation(annotationId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -451,6 +471,7 @@ server.tool(
         objectId: z.string().describe("The story object ID to delete"),
     },
     async ({ objectId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -495,6 +516,7 @@ server.tool(
         relationshipId: z.string().describe("The relationship ID to delete"),
     },
     async ({ relationshipId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteRelationship(relationshipId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -585,6 +607,7 @@ server.tool(
         commitHash: z.string().describe("The snapshot commit hash to restore (from list_snapshots)"),
     },
     async ({ commitHash }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await restoreDatabaseSnapshot(commitHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -648,6 +671,7 @@ server.tool(
         universeId: z.string().describe("The universe ID"),
     },
     async ({ universeId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteUniverse(universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -719,6 +743,7 @@ server.tool(
         objectId: z.string().describe("The world object ID"),
     },
     async ({ objectId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteWorldObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -764,6 +789,7 @@ server.tool(
         entryId: z.string().describe("The entry ID"),
     },
     async ({ entryId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteTimelineEntry(entryId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -816,6 +842,7 @@ server.tool(
     "Revoke and delete stored Google credentials",
     {},
     async () => {
+        const guard = destructiveGuard(); if (guard) return guard;
         await GoogleAuthController.disconnect();
         return { content: [{ type: "text", text: "Disconnected from Google." }] };
     }
