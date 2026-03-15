@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/user-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -154,6 +155,7 @@ export default function Dashboard() {
               <Plus className="h-4 w-4" />
               New Project
             </Button>
+            <UserMenu />
           </div>
         </div>
 

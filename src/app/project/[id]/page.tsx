@@ -43,6 +43,7 @@ import { SceneEditor } from "@/components/scene-editor";
 import { StoryObjectPanel } from "@/components/story-object-panel";
 import { SearchPanel } from "@/components/search-panel";
 import { AIChatPanel } from "@/components/ai-chat-panel";
+import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
@@ -311,6 +312,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Settings className="h-4 w-4" />
         </Button>
+        <UserMenu />
       </header>
 
       {/* Search panel */}
