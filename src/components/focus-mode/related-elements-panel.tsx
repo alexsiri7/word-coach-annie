@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, User, MapPin, BookOpen, Globe, StickyNote } from "lucide-react";
+import { ChevronRight, ChevronLeft, User, MapPin, BookOpen, Globe, StickyNote, MessageSquare, Check } from "lucide-react";
 import {
     Accordion,
     AccordionContent,
@@ -10,9 +10,11 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import type { Annotation } from "@/lib/types";
 
 interface RelatedElementsPanelProps {
     elements: Record<string, { id: string; name: string; role?: string; description?: string; notes?: string }[]>;
+    annotations?: Annotation[];
     collapsed: boolean;
     onToggle: () => void;
 }
@@ -33,7 +35,18 @@ const TYPE_LABELS: Record<string, string> = {
     NOTE: "Notes",
 };
 
-export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedElementsPanelProps) {
+function timeAgo(dateStr: string): string {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+export function RelatedElementsPanel({ elements, annotations = [], collapsed, onToggle }: RelatedElementsPanelProps) {
     if (collapsed) {
         return (
             <div className="hidden md:flex w-12 border-l bg-background flex-col items-center py-4 gap-4 h-full shrink-0">
@@ -44,7 +57,8 @@ export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedE
         );
     }
 
-    const hasElements = Object.values(elements || {}).some(arr => arr && arr.length > 0);
+    const hasElements = Object.values(elements || {}).some(arr => arr && arr.length > 0) || annotations.length > 0;
+    const unresolvedCount = annotations.filter(a => !a.resolved).length;
 
     return (
         <>
@@ -67,7 +81,7 @@ export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedE
                             No related elements linked to this scene yet.
                         </div>
                     ) : (
-                        <Accordion type="multiple" defaultValue={["CHARACTER", "LOCATION", "PLOTLINE"]} className="w-full space-y-4">
+                        <Accordion type="multiple" defaultValue={["CHARACTER", "LOCATION", "PLOTLINE", ...(annotations.length > 0 ? ["ANNOTATIONS"] : [])]} className="w-full space-y-4">
                             {Object.entries(elements).map(([type, items]) => {
                                 if (!items || items.length === 0) return null;
                                 const Icon = TYPE_ICONS[type] || StickyNote;
@@ -99,6 +113,49 @@ export function RelatedElementsPanel({ elements, collapsed, onToggle }: RelatedE
                                     </AccordionItem>
                                 );
                             })}
+
+                            {annotations.length > 0 && (
+                                <AccordionItem value="ANNOTATIONS" className="border-none">
+                                    <AccordionTrigger className="hover:no-underline py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                                        <span className="flex items-center gap-2">
+                                            <MessageSquare className="h-4 w-4" /> Annotations
+                                            {unresolvedCount > 0 ? (
+                                                <Badge variant="default" className="ml-2 text-[10px] h-4 px-1">{unresolvedCount}</Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="ml-2 text-[10px] h-4 px-1">{annotations.length}</Badge>
+                                            )}
+                                        </span>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pt-2 pb-4 space-y-3">
+                                        {annotations.map((annotation) => (
+                                            <div
+                                                key={annotation.id}
+                                                className={cn(
+                                                    "p-3 rounded-md bg-card border shadow-sm",
+                                                    annotation.resolved && "opacity-60"
+                                                )}
+                                            >
+                                                <div className="flex items-start gap-2 mb-1">
+                                                    {annotation.resolved && (
+                                                        <Check className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                                                    )}
+                                                    <div className={cn("text-sm", annotation.resolved && "line-through text-muted-foreground")}>
+                                                        {annotation.content}
+                                                    </div>
+                                                </div>
+                                                {annotation.selectedText && (
+                                                    <div className="text-xs text-muted-foreground italic mt-1 truncate">
+                                                        &ldquo;{annotation.selectedText}&rdquo;
+                                                    </div>
+                                                )}
+                                                <div className="text-[10px] text-muted-foreground mt-2">
+                                                    {timeAgo(annotation.createdAt)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )}
                         </Accordion>
                     )}
                 </div>
