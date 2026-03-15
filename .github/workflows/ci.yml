@@ -95,20 +95,21 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         env:
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         with:
           host: 100.120.193.82
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          envs: GHCR_PAT
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
             cd /home/asiri/gt/annie/mayor/rig
 
             # Pull latest compose file
             git pull --rebase
 
-            # Authenticate with GHCR
-            echo "$GHCR_PAT" | docker login ghcr.io -u alexsiri7 --password-stdin
+            # Authenticate with GHCR using workflow token
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
             # Tag current running image as rollback before pulling new one
             docker tag ghcr.io/alexsiri7/word-coach-annie:latest \
