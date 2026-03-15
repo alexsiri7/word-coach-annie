@@ -72,6 +72,8 @@ try {
     console.error("Warning: Could not initialize snapshot repo:", e);
 }
 
+function createServer(): McpServer {
+
 const server = new McpServer({
     name: "word-coach-annie",
     version: "1.0.0",
@@ -901,6 +903,8 @@ for (const skillMeta of availableSkills) {
     );
 }
 
-console.error(`Registered ${availableSkills.length} skill(s) as MCP prompts`);
+return server;
 
-export { server };
+} // end createServer
+
+export { createServer };
