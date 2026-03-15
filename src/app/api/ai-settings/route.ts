@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 // GET /api/ai-settings — return current AI settings (without exposing the full API key)
 export async function GET() {
@@ -9,11 +10,12 @@ export async function GET() {
     if (!settings) {
       return NextResponse.json({ baseUrl: "", apiKey: "", model: "" });
     }
+    const decryptedKey = decrypt(settings.apiKey);
     return NextResponse.json({
       baseUrl: settings.baseUrl,
-      apiKey: settings.apiKey ? maskKey(settings.apiKey) : "",
+      apiKey: decryptedKey ? maskKey(decryptedKey) : "",
       model: settings.model,
-      hasApiKey: !!settings.apiKey,
+      hasApiKey: !!decryptedKey,
     });
   } catch {
     // Table may not exist yet
@@ -34,7 +36,7 @@ export async function PUT(request: NextRequest) {
     // Build update data — only include fields that were actually sent
     const data: Record<string, string> = {};
     if (baseUrl !== undefined) data.baseUrl = baseUrl.trim();
-    if (apiKey !== undefined) data.apiKey = apiKey.trim();
+    if (apiKey !== undefined) data.apiKey = encrypt(apiKey.trim());
     if (model !== undefined) data.model = model.trim();
 
     const settings = await prisma.aiSettings.upsert({
@@ -48,11 +50,12 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    const decryptedKey = decrypt(settings.apiKey);
     return NextResponse.json({
       baseUrl: settings.baseUrl,
-      apiKey: settings.apiKey ? maskKey(settings.apiKey) : "",
+      apiKey: decryptedKey ? maskKey(decryptedKey) : "",
       model: settings.model,
-      hasApiKey: !!settings.apiKey,
+      hasApiKey: !!decryptedKey,
     });
   } catch (error) {
     logger.error("PUT /api/ai-settings error", error);
