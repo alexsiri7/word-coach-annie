@@ -13,8 +13,9 @@ export async function GET(
 
         const context = await FocusController.getSceneContext(sceneId);
         const related = await FocusController.getRelatedElements(sceneId);
+        const annotations = await FocusController.getAnnotations(sceneId);
 
-        return NextResponse.json({ context, related });
+        return NextResponse.json({ context, related, annotations });
     } catch (error) {
         logger.error("Focus API error", error);
         return new NextResponse("Internal Server Error", { status: 500 });

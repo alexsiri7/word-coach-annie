@@ -9,7 +9,7 @@ import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import type { StructureNode } from "@/lib/types";
+import type { StructureNode, Annotation } from "@/lib/types";
 
 interface SceneContext extends StructureNode {
     chapterTitle?: string | null;
@@ -29,6 +29,7 @@ export default function FocusModePage() {
     const [projectTitle, setProjectTitle] = useState<string>("");
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
+    const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
     const [rightCollapsed, setRightCollapsed] = useState(true);
 
@@ -63,6 +64,7 @@ export default function FocusModePage() {
                 const data = await focusRes.json();
                 setSceneContext(data.context);
                 setRelatedElements(data.related);
+                setAnnotations(data.annotations || []);
 
                 if (projectRes.ok) {
                     const projectData = await projectRes.json();
@@ -141,6 +143,7 @@ export default function FocusModePage() {
 
             <RelatedElementsPanel
                 elements={relatedElements || {}}
+                annotations={annotations}
                 collapsed={rightCollapsed}
                 onToggle={() => setRightCollapsed(!rightCollapsed)}
             />
