@@ -54,14 +54,6 @@ interface OutlineTreeProps {
   onMoveNode?: (nodeId: string, newParentId: string | null, newIndex: number) => void;
 }
 
-interface FlatNode {
-  id: string;
-  node: OutlineNode;
-  depth: number;
-  parentId: string | null;
-  index: number; // index among siblings
-}
-
 function StatusDot({ status }: { status: SceneStatus }) {
   const colors: Record<SceneStatus, string> = {
     OUTLINE: "bg-text-muted/50",
@@ -246,7 +238,6 @@ function SortableTreeNode({
     transition,
   };
 
-  const isScene = node.type === "SCENE";
   const expanded = expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedNodeId === node.id;

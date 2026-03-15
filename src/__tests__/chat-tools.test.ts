@@ -35,7 +35,7 @@ vi.mock("@/lib/ai/settings", () => ({
 
 // Import after mocks
 import { POST } from "@/app/api/chat/route";
-import { getCoreTools, getToolDefinitions } from "@/lib/ai/tool-registry";
+
 
 function makeRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost/api/chat", {
