@@ -5,13 +5,34 @@ import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
 
 export const metadata: Metadata = {
-  title: "Word Coach Annie",
+  title: {
+    default: "Word Coach Annie",
+    template: "%s | Word Coach Annie",
+  },
   description: "Local fiction writing & book management tool",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: "/icon-192.png",
   },
   manifest: "/manifest.json",
   themeColor: "#0f172a",
+  openGraph: {
+    title: "Word Coach Annie",
+    description: "Local fiction writing & book management tool",
+    siteName: "Word Coach Annie",
+    type: "website",
+    images: [
+      {
+        url: "/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "Word Coach Annie",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
