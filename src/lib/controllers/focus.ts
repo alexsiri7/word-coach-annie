@@ -11,13 +11,16 @@ export class FocusController {
 
         if (!scene) throw new Error(`Scene not found: ${sceneId}`);
 
-        // Get adjacent scenes
+        // Get adjacent scenes ordered by chapter then scene position
         const siblings = await prisma.structureNode.findMany({
             where: {
                 projectId: scene.projectId,
                 type: "SCENE"
             },
-            orderBy: { orderIndex: "asc" },
+            orderBy: [
+                { parent: { orderIndex: "asc" } },
+                { orderIndex: "asc" }
+            ],
             select: { id: true, title: true, orderIndex: true }
         });
 
