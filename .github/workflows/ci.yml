@@ -124,7 +124,7 @@ jobs:
             # Verify the new container is healthy (wait up to 30s)
             echo "Waiting for container to start..."
             for i in $(seq 1 6); do
-              if docker compose exec app curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              if curl -sf http://localhost:3000 > /dev/null 2>&1; then
                 echo "Deploy successful!"
                 exit 0
               fi
