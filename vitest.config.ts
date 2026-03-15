@@ -14,12 +14,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],
       reportsDirectory: "./coverage",
-      // Coverage threshold — keep above 25% floor, raise as tests improve
+      // Coverage threshold — keep above 35% floor, raise as tests improve
       thresholds: {
-        statements: 25,
-        branches: 25,
-        functions: 25,
-        lines: 25,
+        statements: 35,
+        branches: 35,
+        functions: 35,
+        lines: 35,
       },
     },
   },
