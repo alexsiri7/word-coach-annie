@@ -100,6 +100,26 @@ describe("Scene Beats", () => {
             );
         });
 
+        it("should exclude beat div annotations from word count (MCP path)", async () => {
+            (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
+            (prisma.contentVersion.create as any).mockResolvedValue({
+                id: "v1", createdAt: new Date(), nodeId: "scene-1", wordCount: 2
+            });
+            (prisma.contentVersion.findMany as any).mockResolvedValue([]);
+
+            const content = '<p>Hello world</p><div data-type="beat-annotation">This beat has five words</div>';
+
+            await StructureController.writeSceneContent("scene-1", content);
+
+            expect(prisma.contentVersion.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        wordCount: 2, // only "Hello world", not the beat div content
+                    }),
+                })
+            );
+        });
+
         it("should accept content without beats", async () => {
             (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);
             (prisma.contentVersion.create as any).mockResolvedValue({ id: "v1", createdAt: new Date() });
