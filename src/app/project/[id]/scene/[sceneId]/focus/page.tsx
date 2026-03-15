@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { SceneEditor } from "@/components/scene-editor";
 import { SceneInfoSidebar } from "@/components/focus-mode/scene-info-sidebar";
 import { RelatedElementsPanel } from "@/components/focus-mode/related-elements-panel";
 import { Loader2, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { StructureNode } from "@/lib/types";
 
 interface SceneContext extends StructureNode {
@@ -72,6 +73,16 @@ export default function FocusModePage() {
     const handleNavigate = useCallback((targetSceneId: string) => {
         router.push(`/project/${projectId}/scene/${targetSceneId}/focus`);
     }, [projectId, router]);
+
+    // Keyboard shortcuts: Escape collapses sidebars, Cmd+/ toggles left sidebar
+    const keyboardActions = useMemo(() => ({
+        onClosePanel: () => {
+            if (!leftCollapsed) { setLeftCollapsed(true); return; }
+            if (!rightCollapsed) { setRightCollapsed(true); return; }
+        },
+        onToggleSidebar: () => setLeftCollapsed((v) => !v),
+    }), [leftCollapsed, rightCollapsed]);
+    useKeyboardShortcuts(keyboardActions);
 
     if (loading) {
         return (

@@ -212,7 +212,8 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Enter (without Shift) or Cmd/Ctrl+Enter sends the message
+    if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       sendMessage();
     }

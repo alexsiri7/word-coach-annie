@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -46,6 +46,7 @@ import { SearchPanel } from "@/components/search-panel";
 import { AIChatPanel } from "@/components/ai-chat-panel";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
@@ -89,6 +90,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [addObjectDialogOpen, setAddObjectDialogOpen] = useState(false);
   const [addObjectType, setAddObjectType] = useState<StoryObjectType>("CHARACTER");
   const [showSearch, setShowSearch] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
 
   // Data fetching
@@ -244,6 +246,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setSidebarOpen(false);
   };
 
+  // Keyboard shortcuts: Cmd+K search, Escape close, Cmd+/ sidebar
+  const keyboardActions = useMemo(() => ({
+    onToggleSearch: () => setShowSearch((v) => !v),
+    onClosePanel: () => {
+      if (showSearch) { setShowSearch(false); return; }
+      if (selectedObjectId) { setSelectedObjectId(null); return; }
+      if (sidebarOpen) { setSidebarOpen(false); return; }
+    },
+    onToggleSidebar: () => {
+      setSidebarHidden((v) => !v);
+      if (sidebarHidden) setSidebarOpen(true);
+    },
+  }), [showSearch, selectedObjectId, sidebarOpen, sidebarHidden]);
+  useKeyboardShortcuts(keyboardActions);
+
   if (!project) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -340,8 +357,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         {/* Sidebar */}
         <aside className={cn(
           "absolute inset-y-0 left-0 z-50 w-80 border-r border-border bg-surface-raised flex flex-col flex-shrink-0 transition-transform duration-200 ease-in-out",
-          "md:relative md:translate-x-0",
-          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+          sidebarHidden ? "hidden" : "md:relative md:translate-x-0",
+          !sidebarHidden && (sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full")
         )}>
           {/* Mobile close button */}
           <div className="md:hidden flex items-center justify-between p-2 border-b border-border bg-surface">
