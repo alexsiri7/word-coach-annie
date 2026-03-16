@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench, WifiOff } from "lucide-react";
+import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench, WifiOff, Key } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -86,8 +86,21 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Check if AI is configured
+  const refreshAiStatus = useCallback(() => {
+    fetch("/api/ai-settings")
+      .then((res) => res.json())
+      .then((data) => setHasApiKey(!!data.hasApiKey))
+      .catch(() => setHasApiKey(false));
+  }, []);
+
+  useEffect(() => {
+    refreshAiStatus();
+  }, [refreshAiStatus]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -231,7 +244,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
           AI Assistant
         </span>
         <div className="flex items-center gap-1">
-          <AiSettingsDialog />
+          <AiSettingsDialog onSaved={refreshAiStatus} />
           {messages.length > 0 && (
             <Button
               variant="ghost"
@@ -254,8 +267,24 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         </div>
       )}
 
+      {/* No API key configured */}
+      {hasApiKey === false && (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+          <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
+            <Key className="h-6 w-6 text-accent" />
+          </div>
+          <p className="text-sm font-medium text-text-primary mb-1">
+            AI not configured
+          </p>
+          <p className="text-xs text-text-muted mb-4 max-w-[240px]">
+            Add your API key in settings to enable AI chat, feedback, and brainstorming.
+          </p>
+          <AiSettingsDialog onSaved={refreshAiStatus} />
+        </div>
+      )}
+
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 space-y-3" aria-live="polite" aria-label="Chat messages">
+      {hasApiKey !== false && <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 space-y-3" aria-live="polite" aria-label="Chat messages">
         {loadingHistory && (
           <div className="space-y-3 animate-pulse">
             <div className="flex flex-col items-end">
@@ -377,34 +406,36 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Input area */}
-      <div className="border-t border-border p-2">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isOnline ? "Ask about your story..." : "AI chat unavailable offline"}
-            aria-label="Chat message"
-            rows={1}
-            className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted border border-border focus:outline-none focus:ring-1 focus:ring-accent max-h-24 overflow-y-auto"
-            style={{ minHeight: "36px" }}
-            disabled={isStreaming || !isOnline}
-          />
-          <Button
-            size="icon"
-            className="h-9 w-9 flex-shrink-0"
-            onClick={sendMessage}
-            disabled={!input.trim() || isStreaming || !isOnline}
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+      {hasApiKey !== false && (
+        <div className="border-t border-border p-2">
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isOnline ? "Ask about your story..." : "AI chat unavailable offline"}
+              aria-label="Chat message"
+              rows={1}
+              className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted border border-border focus:outline-none focus:ring-1 focus:ring-accent max-h-24 overflow-y-auto"
+              style={{ minHeight: "36px" }}
+              disabled={isStreaming || !isOnline}
+            />
+            <Button
+              size="icon"
+              className="h-9 w-9 flex-shrink-0"
+              onClick={sendMessage}
+              disabled={!input.trim() || isStreaming || !isOnline}
+              aria-label="Send message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

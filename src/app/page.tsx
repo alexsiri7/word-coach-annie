@@ -7,6 +7,8 @@ import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SetupWizard, useSetupWizard } from "@/components/setup-wizard";
+import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -57,6 +59,8 @@ interface Project {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { showWizard, dismissWizard } = useSetupWizard(user?.userId);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -353,6 +357,11 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* First-run setup wizard */}
+      {showWizard && (
+        <SetupWizard userId={user?.userId} onComplete={dismissWizard} />
+      )}
     </main>
   );
 }

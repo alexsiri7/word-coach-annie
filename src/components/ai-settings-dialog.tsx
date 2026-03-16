@@ -21,7 +21,11 @@ interface AiSettingsData {
   scope?: "user" | "global";
 }
 
-export function AiSettingsDialog() {
+interface AiSettingsDialogProps {
+  onSaved?: () => void;
+}
+
+export function AiSettingsDialog({ onSaved }: AiSettingsDialogProps = {}) {
   const [open, setOpen] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -71,6 +75,7 @@ export function AiSettingsDialog() {
         setApiKey("");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+        onSaved?.();
       }
     } finally {
       setSaving(false);
