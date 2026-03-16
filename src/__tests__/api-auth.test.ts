@@ -35,11 +35,14 @@ describe("api-auth", () => {
             expect(result.authorized).toBe(true);
         });
 
-        it("allows access when project has no owner (legacy)", async () => {
+        it("denies access when project has no owner and user is authenticated", async () => {
             const project = await ProjectsController.createProject({ title: "Legacy" });
-            // Project created without userId is legacy
+            // Unowned projects are not accessible to authenticated users
             const result = await verifyProjectAccess(project.id, "some-user");
-            expect(result.authorized).toBe(true);
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(403);
+            }
         });
 
         it("allows access when userId matches project owner", async () => {
@@ -81,12 +84,15 @@ describe("api-auth", () => {
             expect(result.authorized).toBe(true);
         });
 
-        it("allows access when universe has no owner (legacy)", async () => {
+        it("denies access when universe has no owner and user is authenticated", async () => {
             const universe = await prisma.universe.create({
                 data: { title: "Legacy Universe" },
             });
             const result = await verifyUniverseAccess(universe.id, "some-user");
-            expect(result.authorized).toBe(true);
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(403);
+            }
         });
 
         it("allows access when userId matches universe owner", async () => {
