@@ -145,15 +145,26 @@ const pwaConfig = withPWA({
 })(nextConfig);
 
 export default withSentryConfig(withAnalyzer(pwaConfig), {
-  // Suppresses source map upload logs during build
+  // Suppress source map upload logs during build
   silent: true,
 
-  // Upload source maps only when SENTRY_AUTH_TOKEN is set
+  // Sentry project identification
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
 
-  // Automatically tree-shake Sentry logger statements for smaller bundles
-  disableLogger: true,
+  // Tag each release with the git commit hash for accurate stack traces
+  release: { name: buildVersion },
+
+  // Upload source maps then delete them so they're never served to clients
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Tree-shake Sentry debug logging for smaller bundles
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
 
   // Hides source maps from generated client bundles
   hideSourceMaps: true,
