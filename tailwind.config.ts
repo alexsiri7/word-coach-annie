@@ -93,7 +93,8 @@ const config: Config = {
   			'slide-in-right': 'slideInRight 0.2s ease-out',
   			shimmer: 'shimmer 2s infinite linear',
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'toast-in': 'toastSlideIn 0.3s ease-out'
   		},
   		keyframes: {
   			fadeIn: {
@@ -166,6 +167,16 @@ const config: Config = {
   				},
   				to: {
   					height: '0'
+  				}
+  			},
+  			toastSlideIn: {
+  				from: {
+  					opacity: '0',
+  					transform: 'translateX(16px)'
+  				},
+  				to: {
+  					opacity: '1',
+  					transform: 'translateX(0)'
   				}
   			}
   		}
