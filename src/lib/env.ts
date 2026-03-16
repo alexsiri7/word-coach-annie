@@ -32,6 +32,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().optional(),
   ENCRYPTION_KEY: z.string().optional(),
 
+  // Feedback (GitHub issue creation)
+  GITHUB_FEEDBACK_TOKEN: z.string().optional(),
+  GITHUB_FEEDBACK_REPO: z.string().optional(), // format: "owner/repo"
+
   // MCP
   MCP_ALLOW_DESTRUCTIVE: z
     .enum(["true", "false"])
