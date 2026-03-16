@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { TimelineController } from "@/lib/controllers/timeline";
 import { ProjectsController } from "@/lib/controllers/projects";
-import { StructureController } from "@/lib/controllers/structure";
 import { testPrisma } from "./setup";
 
 describe("TimelineController", () => {
@@ -21,12 +20,21 @@ describe("TimelineController", () => {
         });
 
         it("returns scenes in tree traversal order", async () => {
-            const ch1 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
-            await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1.1", parentId: ch1.id });
-            await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1.2", parentId: ch1.id });
-
-            const ch2 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 2" });
-            await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 2.1", parentId: ch2.id });
+            // Create nodes directly via prisma to avoid 20+ sequential DB calls
+            // through the controller's validation layer (which causes timeouts under load)
+            const ch1 = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Ch 1", orderIndex: 0, synopsis: "", status: "OUTLINE" },
+            });
+            const ch2 = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Ch 2", orderIndex: 1, synopsis: "", status: "OUTLINE" },
+            });
+            await testPrisma.structureNode.createMany({
+                data: [
+                    { projectId, type: "SCENE", title: "Scene 1.1", parentId: ch1.id, orderIndex: 0, synopsis: "", status: "OUTLINE" },
+                    { projectId, type: "SCENE", title: "Scene 1.2", parentId: ch1.id, orderIndex: 1, synopsis: "", status: "OUTLINE" },
+                    { projectId, type: "SCENE", title: "Scene 2.1", parentId: ch2.id, orderIndex: 0, synopsis: "", status: "OUTLINE" },
+                ],
+            });
 
             const data = await TimelineController.getTimelineData(projectId);
             expect(data.scenes).toHaveLength(3);
@@ -48,8 +56,12 @@ describe("TimelineController", () => {
         });
 
         it("returns events linking objects to scenes", async () => {
-            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
-            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+            const ch = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Ch 1", orderIndex: 0, synopsis: "", status: "OUTLINE" },
+            });
+            const scene = await testPrisma.structureNode.create({
+                data: { projectId, type: "SCENE", title: "Scene 1", parentId: ch.id, orderIndex: 0, synopsis: "", status: "OUTLINE" },
+            });
 
             const char = await testPrisma.storyObject.create({
                 data: { projectId, type: "CHARACTER", name: "Alice" }
@@ -65,7 +77,9 @@ describe("TimelineController", () => {
         });
 
         it("handles scenes without parent (root-level scenes)", async () => {
-            await StructureController.createNode({ projectId, type: "SCENE", title: "Standalone Scene" });
+            await testPrisma.structureNode.create({
+                data: { projectId, type: "SCENE", title: "Standalone Scene", orderIndex: 0, synopsis: "", status: "OUTLINE" },
+            });
 
             const data = await TimelineController.getTimelineData(projectId);
             expect(data.scenes).toHaveLength(1);
