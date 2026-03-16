@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheProjects, getCachedProjects } from "@/lib/offline/idb-cache";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -68,10 +69,19 @@ export default function Dashboard() {
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
 
   const fetchProjects = async () => {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    setProjects(data.projects);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      setProjects(data.projects);
+      // Cache to IDB for offline access
+      cacheProjects(data.projects).catch(() => {});
+    } catch {
+      // Offline — serve from IDB cache
+      const cached = await getCachedProjects();
+      if (cached.length) setProjects(cached as Project[]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

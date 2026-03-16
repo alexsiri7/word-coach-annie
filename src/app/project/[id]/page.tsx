@@ -22,6 +22,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import {
+  cacheProjects,
+  cacheStoryObjects,
+  cacheStructureNodes,
+  flattenOutlineTree,
+  buildOutlineTree,
+  getCachedProject,
+  getCachedNodesByProject,
+  getCachedStoryObjectsByProject,
+} from "@/lib/offline/idb-cache";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -98,23 +108,46 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Data fetching
   const fetchProject = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}`);
-    if (res.ok) setProject(await res.json());
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProject(data);
+        cacheProjects([data]).catch(() => {});
+      }
+    } catch {
+      const cached = await getCachedProject(projectId);
+      if (cached) setProject(cached as Project);
+    }
   }, [projectId]);
 
   const fetchOutline = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/nodes`);
-    if (res.ok) {
-      const data = await res.json();
-      setOutline(data.tree || []);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/nodes`);
+      if (res.ok) {
+        const data = await res.json();
+        const tree = data.tree || [];
+        setOutline(tree);
+        cacheStructureNodes(flattenOutlineTree(tree, projectId)).catch(() => {});
+      }
+    } catch {
+      const cached = await getCachedNodesByProject(projectId);
+      if (cached.length) setOutline(buildOutlineTree(cached) as OutlineNode[]);
     }
   }, [projectId]);
 
   const fetchStoryObjects = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/story-objects`);
-    if (res.ok) {
-      const data = await res.json();
-      setStoryObjects(data.data || []);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story-objects`);
+      if (res.ok) {
+        const data = await res.json();
+        const objects = data.data || [];
+        setStoryObjects(objects);
+        cacheStoryObjects(objects).catch(() => {});
+      }
+    } catch {
+      const cached = await getCachedStoryObjectsByProject(projectId);
+      if (cached.length) setStoryObjects(cached as StoryObject[]);
     }
   }, [projectId]);
 

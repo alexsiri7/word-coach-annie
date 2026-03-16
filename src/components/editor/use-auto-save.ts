@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { beatsToComments } from "./editor-config";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheContentVersion } from "@/lib/offline/idb-cache";
 
 interface UseAutoSaveOptions {
   nodeId: string;
@@ -24,14 +25,34 @@ export function useAutoSave({
     async (content: string) => {
       onSaveStart();
       try {
+        const serverContent = beatsToComments(content);
+
+        // Always write-through to IDB first (content never lost)
+        const idbVersion = {
+          id: `local-${Date.now()}`,
+          nodeId,
+          content: serverContent,
+          wordCount: content.trim() === "" ? 0 : content.trim().split(/\s+/).length,
+          createdAt: new Date().toISOString(),
+        };
+        cacheContentVersion(idbVersion).catch(() => {});
+
         const res = await offlineFetch(`/api/nodes/${nodeId}/content`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: beatsToComments(content) }),
+          body: JSON.stringify({ content: serverContent }),
         });
 
         if (res.ok) {
           const newVersion = await res.json();
+          // Update IDB with server-assigned ID
+          cacheContentVersion({
+            id: newVersion.id,
+            nodeId,
+            content: serverContent,
+            wordCount: newVersion.wordCount ?? idbVersion.wordCount,
+            createdAt: newVersion.createdAt ?? idbVersion.createdAt,
+          }).catch(() => {});
           onVersionCreated(newVersion);
           onNodeUpdated?.();
         }

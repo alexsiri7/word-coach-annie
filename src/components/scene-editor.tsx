@@ -4,6 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import {
+  cacheContentVersion,
+  cacheAnnotations,
+  getCachedContentByNode,
+  getCachedAnnotationsByNode,
+} from "@/lib/offline/idb-cache";
 import { MessageSquare, AlertTriangle, RefreshCw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,7 +58,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     onNodeUpdated,
   });
 
-  // Load initial content
+  // Load initial content (with IDB fallback for offline)
   useEffect(() => {
     fetch(`/api/nodes/${node.id}/content`)
       .then((res) => res.json())
@@ -62,13 +68,45 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         if (data.latest) {
           setWordCount(data.latest.wordCount);
           setLatestVersionId(data.latest.id);
+          // Cache latest content to IDB
+          cacheContentVersion({
+            id: data.latest.id,
+            nodeId: node.id,
+            content: data.latest.content,
+            wordCount: data.latest.wordCount,
+            createdAt: data.latest.createdAt,
+          }).catch(() => {});
+        }
+      })
+      .catch(async () => {
+        // Offline — load from IDB
+        const cached = await getCachedContentByNode(node.id);
+        if (cached.length) {
+          // Get most recent by createdAt
+          const latest = cached.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          setInitialContent(commentsToBeats(latest.content || ""));
+          setWordCount(latest.wordCount);
+          setLatestVersionId(latest.id);
+        } else {
+          setInitialContent("");
         }
       });
 
     fetch(`/api/nodes/${node.id}/annotations`)
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) setAnnotations(data);
+        if (Array.isArray(data)) {
+          setAnnotations(data);
+          // Cache annotations to IDB
+          cacheAnnotations(data).catch(() => {});
+        }
+      })
+      .catch(async () => {
+        // Offline — load from IDB
+        const cached = await getCachedAnnotationsByNode(node.id);
+        if (cached.length) setAnnotations(cached as Annotation[]);
       });
   }, [node.id]);
 
