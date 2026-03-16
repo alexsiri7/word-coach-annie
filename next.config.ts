@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import withPWA, { runtimeCaching } from "@ducanh2912/next-pwa";
 import { execSync } from "child_process";
 import { writeFileSync } from "fs";
@@ -37,7 +38,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self'",
+              "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
@@ -62,7 +63,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA({
+const pwaConfig = withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: true,
@@ -92,3 +93,14 @@ export default withPWA({
     ],
   },
 })(nextConfig);
+
+export default withSentryConfig(pwaConfig, {
+  // Suppress source map upload warnings when SENTRY_AUTH_TOKEN is not set
+  silent: !process.env.SENTRY_AUTH_TOKEN,
+  // Disable source map upload unless explicitly configured
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  // Disable telemetry for build speed
+  telemetry: false,
+});
