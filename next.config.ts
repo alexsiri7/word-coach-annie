@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import withPWA, { runtimeCaching } from "@ducanh2912/next-pwa";
+import withBundleAnalyzer from "@next/bundle-analyzer";
 import { execSync } from "child_process";
 import { writeFileSync } from "fs";
 import { join } from "path";
@@ -21,6 +22,19 @@ const buildVersion = generateVersionFile();
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-accordion",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-select",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-tooltip",
+    ],
+  },
   env: {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion,
   },
@@ -62,7 +76,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA({
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+export default withAnalyzer(withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: true,
@@ -91,4 +109,4 @@ export default withPWA({
       ...runtimeCaching,
     ],
   },
-})(nextConfig);
+})(nextConfig));
