@@ -1,5 +1,16 @@
 import { PrismaClient } from "@prisma/client";
-import { beforeEach } from "vitest";
+import { beforeEach, vi } from "vitest";
+
+// Global mock for Sentry — prevents real Sentry calls in all tests
+vi.mock("@sentry/nextjs", () => ({
+  init: vi.fn(),
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  setUser: vi.fn(),
+  replayIntegration: vi.fn(),
+  browserTracingIntegration: vi.fn(),
+  captureRequestError: vi.fn(),
+}));
 
 // Use a separate test database
 const TEST_DATABASE_URL = "file:./test.db";

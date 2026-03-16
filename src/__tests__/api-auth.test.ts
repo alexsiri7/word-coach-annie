@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { prisma } from "@/lib/db";
+
+vi.mock("@sentry/nextjs", () => ({
+    setUser: vi.fn(),
+}));
+
 import {
     verifyProjectAccess,
     verifyUniverseAccess,

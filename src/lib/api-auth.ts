@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db";
 
 /**
  * Get the authenticated user's ID from the request.
  * Returns the userId from the x-user-id header (set by middleware for JWT sessions),
  * or null for API_TOKEN / unauthenticated (local dev) sessions.
+ * Also sets Sentry user context for error attribution on server-side routes.
  */
 export function getCurrentUserId(request: NextRequest): string | null {
-    return request.headers.get("x-user-id");
+    const userId = request.headers.get("x-user-id");
+    const email = request.headers.get("x-user-email");
+    if (userId) {
+        Sentry.setUser({ id: userId, email: email ?? undefined });
+    }
+    return userId;
 }
 
 /**

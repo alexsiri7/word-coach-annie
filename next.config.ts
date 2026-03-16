@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import withPWA, { runtimeCaching } from "@ducanh2912/next-pwa";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { execSync } from "child_process";
@@ -51,7 +52,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self'",
+              "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
@@ -80,7 +81,7 @@ const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
-export default withAnalyzer(withPWA({
+const pwaConfig = withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: true,
@@ -109,4 +110,19 @@ export default withAnalyzer(withPWA({
       ...runtimeCaching,
     ],
   },
-})(nextConfig));
+})(nextConfig);
+
+export default withSentryConfig(withAnalyzer(pwaConfig), {
+  // Suppresses source map upload logs during build
+  silent: true,
+
+  // Upload source maps only when SENTRY_AUTH_TOKEN is set
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Automatically tree-shake Sentry logger statements for smaller bundles
+  disableLogger: true,
+
+  // Hides source maps from generated client bundles
+  hideSourceMaps: true,
+});

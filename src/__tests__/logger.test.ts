@@ -1,4 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@sentry/nextjs", () => ({
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+}));
+
+import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
 describe("logger", () => {
@@ -6,6 +13,8 @@ describe("logger", () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         vi.spyOn(console, "warn").mockImplementation(() => {});
         vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.mocked(Sentry.captureException).mockClear();
+        vi.mocked(Sentry.captureMessage).mockClear();
     });
 
     it("logs error messages as JSON to console.error", () => {
@@ -51,5 +60,36 @@ describe("logger", () => {
         logger.info("clean");
         const output = JSON.parse((console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]);
         expect(output.error).toBeUndefined();
+    });
+
+    it("reports Error instances to Sentry via captureException", () => {
+        const err = new Error("sentry test");
+        logger.error("crashed", err);
+        expect(Sentry.captureException).toHaveBeenCalledWith(err, {
+            extra: { message: "crashed" },
+        });
+    });
+
+    it("reports non-Error errors to Sentry via captureMessage", () => {
+        logger.error("something failed", { code: 500 });
+        expect(Sentry.captureMessage).toHaveBeenCalledWith("something failed", {
+            level: "error",
+            extra: { meta: { code: 500 } },
+        });
+    });
+
+    it("reports errors without meta to Sentry via captureMessage", () => {
+        logger.error("plain error");
+        expect(Sentry.captureMessage).toHaveBeenCalledWith("plain error", {
+            level: "error",
+            extra: undefined,
+        });
+    });
+
+    it("does not report warn or info to Sentry", () => {
+        logger.warn("just a warning");
+        logger.info("just info");
+        expect(Sentry.captureException).not.toHaveBeenCalled();
+        expect(Sentry.captureMessage).not.toHaveBeenCalled();
     });
 });
