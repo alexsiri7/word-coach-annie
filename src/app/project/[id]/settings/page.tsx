@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,42 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         const a = document.createElement("a");
         a.href = url;
         a.download = `${title || "export"}-${type}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleJsonExport = async () => {
+    setExporting("json");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export?type=json`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${title || "export"}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleExportAll = async () => {
+    setExporting("export-all");
+    try {
+      const res = await fetch("/api/projects/export-all");
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `annie-export-${new Date().toISOString().slice(0, 10)}.zip`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -238,7 +274,8 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           </div>
 
           {/* Export buttons */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Markdown</p>
+          <div className="grid gap-3 sm:grid-cols-3 mb-4">
             <Button
               variant="outline"
               onClick={() => handleExport("manuscript")}
@@ -279,6 +316,37 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
                 <Download className="h-4 w-4" />
               )}
               <span className="text-xs">Story Bible</span>
+            </Button>
+          </div>
+
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Data</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              onClick={handleJsonExport}
+              disabled={!!exporting}
+              className="gap-1.5 h-auto py-3 flex-col"
+            >
+              {exporting === "json" ? (
+                <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Braces className="h-4 w-4" />
+              )}
+              <span className="text-xs">JSON Export</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleExportAll}
+              disabled={!!exporting}
+              className="gap-1.5 h-auto py-3 flex-col"
+            >
+              {exporting === "export-all" ? (
+                <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Archive className="h-4 w-4" />
+              )}
+              <span className="text-xs">Export All Projects (ZIP)</span>
             </Button>
           </div>
         </div>
