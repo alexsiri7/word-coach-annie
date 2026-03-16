@@ -13,6 +13,7 @@ import {
   PenLine,
   Search,
   Activity,
+  Network,
   Menu,
   X as XIcon,
   MessageSquare,
@@ -319,6 +320,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-label="Timeline view"
         >
           <Activity className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/graph`)}
+          aria-label="Story graph"
+        >
+          <Network className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
