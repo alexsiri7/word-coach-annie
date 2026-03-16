@@ -10,10 +10,12 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 - **Scene beats**: Inline narrative waypoints (`<!-- beat: ... -->`) rendered as styled cards, stripped on export
 - **Focus mode**: Distraction-free three-panel layout (scene info | editor | related elements)
 - **Full-text search**: Search across all scenes and story objects with highlighted snippets
+- **Keyboard shortcuts**: Cmd/Ctrl+K search, Escape close, Cmd+/ sidebar toggle
 
 ### Story Management
 - **Story objects**: Characters, Locations, Plotlines, World Elements, Notes — all with CRUD and tags
 - **Relationships**: Typed links between any entities (APPEARS_IN, LOCATED_AT, PART_OF_PLOTLINE, etc.)
+- **Story graph**: Interactive visual graph of entity relationships within a project
 - **Universes**: Shared world-building containers spanning multiple projects
 - **World objects**: Universe-scoped characters, locations, elements with ordered timeline entries
 - **Timeline view**: Visual matrix of story objects × scenes showing where characters/locations appear
@@ -25,12 +27,69 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 
 ### AI Integration
 - **AI chat panel**: Per-project streaming chat with full story context (characters, outline, current scene)
+- **BYO API key**: Per-user AI settings — bring your own OpenAI-compatible API key and model
 - **MCP server**: 48 tools for agentic access to all project data (read/write scenes, manage characters, export, etc.)
 - **Writing skills**: 6 curated MCP Prompts — developmental edit, line edit, consistency check, plot structure analysis, character arc review, scene drafting assistant
+- **First-run setup wizard**: Guided API key configuration and feature tour for new users
 
 ### Article / Non-Fiction
 - **Project types**: FICTION, ARTICLE_COLLECTION, GENERAL with dynamic UI labels (Chapter→Article, Scene→Section, etc.)
 - **Medium export**: Article-optimized Markdown with front matter
+
+### Platform
+- **Google OAuth login**: Authentication with JWT session management
+- **Per-user rate limiting**: API endpoint protection against abuse
+- **Offline support**: Service worker caching, IndexedDB storage, and mutation queue with auto-replay on reconnect
+- **Dark mode**: Toggle with system preference detection
+- **Accessibility**: ARIA labels and keyboard navigation throughout
+- **Error handling**: Error boundaries, graceful 404/500 pages, toast notifications
+- **Loading states**: Skeleton screens for lists, chat panel, and scene editor
+- **Feedback channel**: In-app feedback dialog with GitHub issue creation
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                     Browser                         │
+│                                                     │
+│  Next.js App Router (React 19 + Shadcn/ui)          │
+│  ┌──────────┐ ┌──────────┐ ┌────────────────────┐   │
+│  │ Dashboard │ │ Editor   │ │ Focus / Timeline   │   │
+│  │          │ │ (Tiptap) │ │ / Graph views      │   │
+│  └──────────┘ └──────────┘ └────────────────────┘   │
+│  Service Worker (offline caching + sync queue)       │
+└─────────────────┬───────────────────────────────────┘
+                  │ REST API
+┌─────────────────▼───────────────────────────────────┐
+│              Next.js API Routes                      │
+│                                                     │
+│  Auth middleware (Google OAuth + JWT)                 │
+│  Rate limiting middleware (per-user)                  │
+│  ┌─────────────┐ ┌─────────────┐ ┌──────────────┐   │
+│  │ Controllers  │ │ AI Chat     │ │ Google Docs  │   │
+│  │ (6 modules)  │ │ (streaming) │ │ Export/Sync  │   │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬───────┘   │
+│         │               │               │           │
+│  ┌──────▼───────────────▼───────────────▼───────┐   │
+│  │          Prisma ORM (11 models)               │   │
+│  │          SQLite database                      │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│              MCP Server (stdio)                      │
+│  48 tools + 6 writing skills as MCP Prompts          │
+│  Connects via: docker compose exec -T app npx tsx    │
+└─────────────────────────────────────────────────────┘
+```
+
+**Data flow**: The browser communicates with Next.js API routes over REST. All routes are gated by authentication and rate limiting middleware. Controllers handle business logic and interact with SQLite through Prisma. The AI chat streams responses from any OpenAI-compatible provider. The MCP server exposes the same data layer to AI agents via stdio transport.
+
+**Key design decisions**:
+- **Local-first**: SQLite database stored on disk, no cloud dependency required
+- **Docker-contained**: Entire app runs in a single container for simple deployment
+- **Offline-capable**: Service worker caches API responses; IndexedDB queues mutations for replay on reconnect
+- **Multi-tenant**: Google OAuth with per-user data scoping across all API routes
 
 ## Tech Stack
 
@@ -39,11 +98,13 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript (strict mode) |
 | Frontend | React 19, Shadcn/ui, Tailwind CSS, Tiptap 3 |
-| Database | SQLite via Prisma 6 |
-| AI | OpenAI SDK → Requesty gateway → Gemini 2.0 Flash |
+| Database | SQLite via Prisma 6 (11 models) |
+| Auth | Google OAuth + JWT sessions |
+| AI | OpenAI SDK → configurable provider (default: Gemini 2.0 Flash) |
 | MCP | @modelcontextprotocol/sdk 1.12 (stdio transport) |
-| Testing | Vitest + @vitest/coverage-v8 |
+| Testing | Vitest + @vitest/coverage-v8, Playwright (E2E) |
 | Container | Docker + Docker Compose |
+| Security | Encrypted API keys at rest, XSS protection (DOMPurify), input sanitization |
 
 ## Getting Started
 
@@ -59,7 +120,7 @@ cp .env.example .env   # Configure API keys
 docker compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). A setup wizard will guide you through API key configuration on first launch.
 
 ### Environment Variables
 
@@ -68,8 +129,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `AI_API_BASE_URL` | For AI chat | OpenAI-compatible API base URL (e.g. `https://api.openai.com/v1`) |
 | `AI_API_KEY` | For AI chat | API key for your AI provider |
 | `AI_MODEL` | No | Model name (default: `gpt-4o`) |
-| `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
+| `GOOGLE_CLIENT_ID` | For login & Google Docs | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For login & Google Docs | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |
 | `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for public access |
 
@@ -144,23 +205,28 @@ For schema changes:
 ```
 src/
 ├── app/                    # Next.js App Router (pages + API routes)
-│   ├── api/                # 27 REST endpoints
-│   ├── project/[id]/       # Editor, settings, timeline, focus mode
+│   ├── api/                # REST endpoints (16 route groups)
+│   ├── login/              # Authentication page
+│   ├── project/[id]/       # Editor, settings, timeline, focus mode, graph
 │   └── universe/           # Universe management
 ├── components/             # React UI components
 │   ├── editor/             # Tiptap extensions (beats, links)
 │   ├── focus-mode/         # Focus mode panels
 │   ├── timeline/           # Timeline view
-│   └── ui/                 # Shadcn/ui primitives
+│   ├── ui/                 # Shadcn/ui primitives
+│   ├── ai-chat-panel.tsx   # Streaming AI chat
+│   ├── story-graph.tsx     # Interactive relationship graph
+│   └── setup-wizard.tsx    # First-run configuration
 ├── lib/
 │   ├── controllers/        # Business logic (6 controllers)
 │   ├── export/             # Google Docs exporter
+│   ├── env.ts              # Zod-validated environment config
 │   └── db.ts               # Prisma client singleton
 ├── mcp/
 │   ├── index.ts            # MCP server (48 tools)
 │   ├── tools/              # Tool implementations by category
 │   └── skills.ts           # Skill loader
-└── __tests__/              # 12 test files, 69+ tests
+└── __tests__/              # Test files (Vitest)
 ```
 
 ## Documentation
