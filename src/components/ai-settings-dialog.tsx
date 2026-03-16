@@ -18,6 +18,7 @@ interface AiSettingsData {
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
+  scope?: "user" | "global";
 }
 
 export function AiSettingsDialog() {
