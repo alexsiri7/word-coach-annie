@@ -49,10 +49,10 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+              "font-src 'self' https://fonts.gstatic.com",
+              "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://fonts.googleapis.com https://fonts.gstatic.com",
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
@@ -89,6 +89,8 @@ const pwaConfig = withPWA({
     document: "/_offline",
   },
   workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
     runtimeCaching: [
       // Stale-while-revalidate for API GET requests
       {
@@ -106,7 +108,37 @@ const pwaConfig = withPWA({
           },
         },
       },
-      // Include the default caches (static assets, fonts, images, etc.)
+      // Cache Google Fonts stylesheets
+      {
+        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "google-fonts-stylesheets",
+          expiration: {
+            maxEntries: 4,
+            maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      // Cache Google Fonts webfont files
+      {
+        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "google-fonts-webfonts",
+          expiration: {
+            maxEntries: 16,
+            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      // Include the default caches (static assets, images, etc.)
       ...runtimeCaching,
     ],
   },
