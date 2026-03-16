@@ -39,8 +39,16 @@ function LoginForm() {
         }
     };
 
+    const authError = searchParams.get("error");
+
     return (
         <div className="space-y-4">
+            {authError === "invite_only" && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive">
+                    Sorry, this app is invite-only. Your email is not on the
+                    access list. Please contact the admin for an invitation.
+                </div>
+            )}
             <Button
                 variant="outline"
                 className="w-full"
