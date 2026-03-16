@@ -6,6 +6,7 @@ import {
     isAuthEnabled,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
@@ -21,6 +22,44 @@ function isPublicPath(pathname: string): boolean {
     return PUBLIC_PATHS.some(
         (p) => pathname === p || pathname.startsWith(p + "/")
     );
+}
+
+/**
+ * Apply per-user rate limiting on API routes.
+ * Chat endpoint: 30 req/min. Other API routes: 100 req/min.
+ * Returns a 429 response if the limit is exceeded, or null if allowed.
+ */
+function applyRateLimit(
+    pathname: string,
+    userKey: string
+): NextResponse | null {
+    if (!pathname.startsWith("/api/")) return null;
+
+    const isChatRoute =
+        pathname === "/api/chat" || pathname.startsWith("/api/chat/");
+    const config = isChatRoute ? RATE_LIMITS.chat : RATE_LIMITS.api;
+    const prefix = isChatRoute ? "chat" : "api";
+    const result = checkRateLimit(`${prefix}:${userKey}`, config);
+
+    if (!result.allowed) {
+        const retryAfterSec = Math.ceil((result.retryAfterMs ?? 1000) / 1000);
+        return NextResponse.json(
+            { error: "Too many requests. Please try again later." },
+            {
+                status: 429,
+                headers: {
+                    "Retry-After": String(retryAfterSec),
+                    "X-RateLimit-Limit": String(config.limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": String(
+                        Math.ceil(result.resetMs / 1000)
+                    ),
+                },
+            }
+        );
+    }
+
+    return null;
 }
 
 export async function middleware(request: NextRequest) {
@@ -44,6 +83,9 @@ export async function middleware(request: NextRequest) {
             ? authHeader.slice(7)
             : null;
         if (token && token === apiToken) {
+            // Rate limit API_TOKEN users by token (single shared identity)
+            const rateLimited = applyRateLimit(pathname, "apitoken");
+            if (rateLimited) return rateLimited;
             return NextResponse.next();
         }
         // Invalid bearer token on API route → 401 immediately
@@ -61,6 +103,10 @@ export async function middleware(request: NextRequest) {
         // Try JWT verification first (Google OAuth sessions)
         const session = await verifySessionToken(sessionCookie);
         if (session) {
+            // Rate limit by authenticated user ID
+            const rateLimited = applyRateLimit(pathname, session.userId);
+            if (rateLimited) return rateLimited;
+
             // Forward userId to route handlers via request headers
             const requestHeaders = new Headers(request.headers);
             requestHeaders.set("x-user-id", session.userId);
@@ -74,6 +120,9 @@ export async function middleware(request: NextRequest) {
         if (apiToken) {
             const expected = await deriveSessionToken(apiToken);
             if (sessionCookie === expected) {
+                // Rate limit legacy sessions by token
+                const rateLimited = applyRateLimit(pathname, "apitoken");
+                if (rateLimited) return rateLimited;
                 return NextResponse.next();
             }
         }
