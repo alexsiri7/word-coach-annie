@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import type { ForceGraphMethods } from "react-force-graph-2d";
 import { Loader2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -19,18 +20,21 @@ interface GraphNode {
   y?: number;
 }
 
-interface GraphEdge {
+interface GraphLink {
   id: string;
-  source: string | GraphNode;
-  target: string | GraphNode;
+  source: string;
+  target: string;
   type: string;
   label: string;
 }
 
-interface GraphData {
+interface ApiGraphData {
   nodes: GraphNode[];
-  edges: GraphEdge[];
+  edges: GraphLink[];
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FGMethods = ForceGraphMethods<any, any>;
 
 const ENTITY_COLORS: Record<string, string> = {
   SCENE: "#3b82f6",
@@ -60,9 +64,9 @@ interface StoryGraphProps {
 
 export function StoryGraph({ projectId }: StoryGraphProps) {
   const router = useRouter();
-  const graphRef = useRef<{ zoomToFit: (ms?: number) => void; zoom: (k: number, ms?: number) => void }>(null);
+  const graphRef = useRef<FGMethods>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [apiData, setApiData] = useState<ApiGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
@@ -91,8 +95,8 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
       try {
         const res = await fetch(`/api/projects/${projectId}/graph`);
         if (!res.ok) throw new Error("Failed to load graph data");
-        const data: GraphData = await res.json();
-        setGraphData(data);
+        const data: ApiGraphData = await res.json();
+        setApiData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -103,19 +107,22 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
   }, [projectId]);
 
   const forceGraphData = useMemo(() => {
-    if (!graphData) return { nodes: [], links: [] };
+    if (!apiData) return { nodes: [], links: [] };
     return {
-      nodes: graphData.nodes,
-      links: graphData.edges.map((e) => ({
-        ...e,
-        source: typeof e.source === "string" ? e.source : e.source.id,
-        target: typeof e.target === "string" ? e.target : e.target.id,
+      nodes: apiData.nodes,
+      links: apiData.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        id: e.id,
+        type: e.type,
+        label: e.label,
       })),
     };
-  }, [graphData]);
+  }, [apiData]);
 
   const handleNodeClick = useCallback(
-    (node: GraphNode) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (node: any) => {
       if (node.type === "structureNode" && node.entityType === "SCENE") {
         router.push(`/project/${projectId}/scene/${node.id}`);
       }
@@ -124,14 +131,15 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
   );
 
   const nodeCanvasObject = useCallback(
-    (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const x = node.x ?? 0;
       const y = node.y ?? 0;
-      const radius = ENTITY_RADIUS[node.entityType] ?? 5;
-      const color = ENTITY_COLORS[node.entityType] ?? "#a3a3a3";
+      const entityType = node.entityType ?? "";
+      const radius = ENTITY_RADIUS[entityType] ?? 5;
+      const color = ENTITY_COLORS[entityType] ?? "#a3a3a3";
       const isHovered = hoveredNode?.id === node.id;
 
-      // Draw node circle
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, 2 * Math.PI);
       ctx.fillStyle = color;
@@ -143,27 +151,26 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
         ctx.stroke();
       }
 
-      // Draw label when zoomed in enough or hovered
       if (globalScale > 1.5 || isHovered) {
         const fontSize = Math.max(12 / globalScale, 3);
         ctx.font = `${fontSize}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillStyle = isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.85)";
-        ctx.fillText(node.label, x, y + radius + 2);
+        ctx.fillText(node.label ?? "", x, y + radius + 2);
       }
     },
     [hoveredNode]
   );
 
   const linkCanvasObject = useCallback(
-    (link: { source: GraphNode; target: GraphNode; label: string }, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const sx = link.source.x ?? 0;
-      const sy = link.source.y ?? 0;
-      const tx = link.target.x ?? 0;
-      const ty = link.target.y ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const sx = link.source?.x ?? 0;
+      const sy = link.source?.y ?? 0;
+      const tx = link.target?.x ?? 0;
+      const ty = link.target?.y ?? 0;
 
-      // Draw edge line
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(tx, ty);
@@ -171,7 +178,6 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Draw label at midpoint when zoomed in
       if (globalScale > 2.5 && link.label) {
         const mx = (sx + tx) / 2;
         const my = (sy + ty) / 2;
@@ -202,7 +208,7 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
     );
   }
 
-  if (!graphData || graphData.nodes.length === 0) {
+  if (!apiData || apiData.nodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-text-muted">
         No graph data yet. Add scenes, characters, and relationships to see your story graph.
@@ -220,7 +226,7 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
         nodeCanvasObject={nodeCanvasObject}
         linkCanvasObject={linkCanvasObject}
         onNodeClick={handleNodeClick}
-        onNodeHover={(node: GraphNode | null) => setHoveredNode(node)}
+        onNodeHover={(node) => setHoveredNode(node as GraphNode | null)}
         nodeLabel=""
         enablePanInteraction={true}
         enableZoomInteraction={true}
@@ -278,7 +284,7 @@ export function StoryGraph({ projectId }: StoryGraphProps) {
         <div className="absolute left-3 top-3 rounded-lg bg-surface/90 px-3 py-2 backdrop-blur-sm">
           <div className="text-sm font-medium text-text-primary">{hoveredNode.label}</div>
           <div className="text-xs text-text-muted capitalize">
-            {hoveredNode.entityType.toLowerCase().replace("_", " ")}
+            {(hoveredNode.entityType ?? "").toLowerCase().replace("_", " ")}
             {hoveredNode.type === "structureNode" && hoveredNode.entityType === "SCENE" && (
               <span className="ml-1 text-accent">(click to open)</span>
             )}
