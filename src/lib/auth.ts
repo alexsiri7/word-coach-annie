@@ -8,6 +8,7 @@
  * When neither API_TOKEN nor GOOGLE_CLIENT_ID is set, auth is disabled (local dev).
  */
 import { SignJWT, jwtVerify } from "jose";
+import { env } from "@/lib/env";
 
 const SESSION_COOKIE_NAME = "annie_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -27,7 +28,7 @@ export interface SessionPayload {
  * Returns a CryptoKey suitable for jose sign/verify.
  */
 async function getJwtKey(): Promise<CryptoKey> {
-    const secret = process.env.JWT_SECRET || process.env.API_TOKEN || process.env.ENCRYPTION_KEY || "annie-dev-secret";
+    const secret = env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY || "annie-dev-secret";
     const encoder = new TextEncoder();
     return crypto.subtle.importKey(
         "raw",
@@ -88,5 +89,5 @@ export async function deriveSessionToken(apiToken: string): Promise<string> {
 
 /** Check if auth is configured at all (any auth mode). */
 export function isAuthEnabled(): boolean {
-    return !!(process.env.API_TOKEN || process.env.GOOGLE_CLIENT_ID);
+    return !!(env.API_TOKEN || env.GOOGLE_CLIENT_ID);
 }

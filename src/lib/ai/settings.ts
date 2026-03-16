@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
+import { env } from "@/lib/env";
 
 export interface AiProviderConfig {
   baseUrl: string;
@@ -9,9 +10,9 @@ export interface AiProviderConfig {
 
 function getEnvDefaults(): AiProviderConfig {
   // Support new generic env vars, fall back to legacy REQUESTY_ vars
-  const apiKey = process.env.AI_API_KEY || process.env.REQUESTY_API_KEY || "";
-  const model = process.env.AI_MODEL || process.env.REQUESTY_MODEL || "google/gemini-2.0-flash-001";
-  const baseUrl = process.env.AI_API_BASE_URL || (process.env.REQUESTY_API_KEY ? "https://router.requesty.ai/v1" : "");
+  const apiKey = env.AI_API_KEY || env.REQUESTY_API_KEY || "";
+  const model = env.AI_MODEL || env.REQUESTY_MODEL || "google/gemini-2.0-flash-001";
+  const baseUrl = env.AI_API_BASE_URL || (env.REQUESTY_API_KEY ? "https://router.requesty.ai/v1" : "");
   return { baseUrl, apiKey, model };
 }
 

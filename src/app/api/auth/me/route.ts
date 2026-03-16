@@ -4,6 +4,7 @@ import {
     verifySessionToken,
     deriveSessionToken,
 } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 /**
  * GET /api/auth/me — Return current user info.
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check legacy API_TOKEN session
-    const apiToken = process.env.API_TOKEN;
+    const apiToken = env.API_TOKEN;
     if (apiToken) {
         const expected = await deriveSessionToken(apiToken);
         if (cookie === expected) {

@@ -7,13 +7,14 @@
  * Encrypted format: "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
  */
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto";
+import { env } from "@/lib/env";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 96 bits for GCM
 const PREFIX = "enc:v1:";
 
 function getEncryptionKey(): Buffer | null {
-    const keySource = process.env.ENCRYPTION_KEY || process.env.API_TOKEN;
+    const keySource = env.ENCRYPTION_KEY || env.API_TOKEN;
     if (!keySource) return null;
     // Derive a 256-bit key from the source using SHA-256
     return createHash("sha256").update(keySource).digest();

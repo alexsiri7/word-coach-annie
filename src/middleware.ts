@@ -5,6 +5,7 @@ import {
     verifySessionToken,
     isAuthEnabled,
 } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
@@ -36,7 +37,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check Authorization header (programmatic / MCP access via API_TOKEN)
-    const apiToken = process.env.API_TOKEN;
+    const apiToken = env.API_TOKEN;
     const authHeader = request.headers.get("authorization");
     if (authHeader && apiToken) {
         const token = authHeader.startsWith("Bearer ")

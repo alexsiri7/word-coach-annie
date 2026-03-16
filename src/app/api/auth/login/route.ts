@@ -4,9 +4,10 @@ import {
     SESSION_MAX_AGE,
     deriveSessionToken,
 } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
-    const apiToken = process.env.API_TOKEN;
+    const apiToken = env.API_TOKEN;
 
     if (!apiToken) {
         return NextResponse.json(

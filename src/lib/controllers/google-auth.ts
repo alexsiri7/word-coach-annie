@@ -2,13 +2,14 @@ import { google } from 'googleapis';
 import { prisma } from '@/lib/db';
 import { OAuth2Client } from 'google-auth-library';
 import { encrypt, decrypt } from '@/lib/crypto';
+import { env } from '@/lib/env';
 
 export class GoogleAuthController {
     private static getClient(): OAuth2Client {
         return new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
+            env.GOOGLE_CLIENT_ID,
+            env.GOOGLE_CLIENT_SECRET,
+            env.GOOGLE_REDIRECT_URI
         );
     }
 
