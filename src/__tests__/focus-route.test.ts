@@ -1,14 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "./setup";
 
-vi.mock("next/server", () => ({
-    NextResponse: {
-        ...MockNextResponse,
-        json: MockNextResponse.json,
-    },
-}));
-
-// Re-assign NextResponse constructor for `new NextResponse(...)` calls
 vi.mock("next/server", () => {
     const nr = class {
         body: string;
