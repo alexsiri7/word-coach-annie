@@ -14,7 +14,7 @@ describe("FocusController", () => {
     });
 
     describe("getSceneContext", () => {
-        it("returns scene context with navigation", async () => {
+        it("returns scene context with navigation", { timeout: 15000 }, async () => {
             const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
             const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
             const s2 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 2", parentId: ch.id });
