@@ -6,6 +6,7 @@ import {
     SESSION_MAX_AGE,
     createSessionToken,
 } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 /**
  * GET /api/auth/google/callback — Handle Google OAuth callback.
@@ -21,9 +22,9 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const clientId = env.GOOGLE_CLIENT_ID;
+    const clientSecret = env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = env.GOOGLE_REDIRECT_URI;
 
     if (!clientId || !clientSecret || !redirectUri) {
         return NextResponse.json(

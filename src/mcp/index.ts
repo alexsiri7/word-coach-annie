@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
+import { env } from "@/lib/env";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -79,7 +80,7 @@ interface McpServerOptions {
 
 function createServer(options?: McpServerOptions): McpServer {
 
-const allowDestructive = options?.allowDestructive ?? (process.env.MCP_ALLOW_DESTRUCTIVE === "true");
+const allowDestructive = options?.allowDestructive ?? env.MCP_ALLOW_DESTRUCTIVE;
 
 const server = new McpServer({
     name: "word-coach-annie",
