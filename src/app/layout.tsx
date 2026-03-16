@@ -15,9 +15,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
     ],
-    apple: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
   },
   manifest: "/manifest.json",
   themeColor: "#0f172a",
@@ -28,10 +30,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/icon-512.png",
-        width: 512,
-        height: 512,
-        alt: "Word Coach Annie",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Word Coach Annie — Fiction writing & book management",
       },
     ],
   },
