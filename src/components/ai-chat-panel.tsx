@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench, WifiOff } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AiSettingsDialog } from "@/components/ai-settings-dialog";
 import { cn } from "@/lib/utils";
 import { sanitizeMessageContent } from "@/lib/sanitize";
+import { useNetworkStatus } from "@/lib/offline/use-network-status";
 
 interface ChatMessage {
   id: string;
@@ -78,6 +79,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
 }
 
 export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
+  const { isOnline } = useNetworkStatus();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
@@ -111,7 +113,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || !isOnline) return;
 
     setInput("");
     setIsStreaming(true);
@@ -243,6 +245,14 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
           )}
         </div>
       </div>
+
+      {/* Offline notice */}
+      {!isOnline && (
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-lg bg-yellow-900/30 border border-yellow-800/40 px-3 py-2 text-xs text-yellow-200">
+          <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>AI features require an internet connection</span>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 space-y-3" aria-live="polite" aria-label="Chat messages">
@@ -377,18 +387,18 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your story..."
+            placeholder={isOnline ? "Ask about your story..." : "AI chat unavailable offline"}
             aria-label="Chat message"
             rows={1}
             className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted border border-border focus:outline-none focus:ring-1 focus:ring-accent max-h-24 overflow-y-auto"
             style={{ minHeight: "36px" }}
-            disabled={isStreaming}
+            disabled={isStreaming || !isOnline}
           />
           <Button
             size="icon"
             className="h-9 w-9 flex-shrink-0"
             onClick={sendMessage}
-            disabled={!input.trim() || isStreaming}
+            disabled={!input.trim() || isStreaming || !isOnline}
             aria-label="Send message"
           >
             <Send className="h-4 w-4" />
