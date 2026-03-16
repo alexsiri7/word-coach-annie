@@ -1,22 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { testPrisma } from "./setup";
-
-const MockNextResponse = {
-    json: (data: unknown, init?: { status?: number }) => ({
-        data,
-        status: init?.status || 200,
-        async json() { return data; },
-    }),
-};
-
-class MockNextResponseClass {
-    body: string;
-    status: number;
-    constructor(body: string, init?: { status: number }) {
-        this.body = body;
-        this.status = init?.status || 200;
-    }
-}
+import "./setup";
 
 vi.mock("next/server", () => ({
     NextResponse: {
