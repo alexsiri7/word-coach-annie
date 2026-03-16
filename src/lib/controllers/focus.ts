@@ -133,4 +133,11 @@ export class FocusController {
 
         return grouped;
     }
+
+    static async getAnnotations(sceneId: string) {
+        return prisma.annotation.findMany({
+            where: { nodeId: sceneId },
+            orderBy: { createdAt: "desc" },
+        });
+    }
 }

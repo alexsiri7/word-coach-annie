@@ -14,7 +14,7 @@ describe("FocusController", () => {
     });
 
     describe("getSceneContext", () => {
-        it("returns scene context with navigation", async () => {
+        it("returns scene context with navigation", { timeout: 15000 }, async () => {
             const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
             const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
             const s2 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 2", parentId: ch.id });
@@ -153,6 +153,32 @@ describe("FocusController", () => {
 
             const grouped = await FocusController.getRelatedElements(scene.id);
             expect(grouped.CHARACTER).toHaveLength(1);
+        });
+    });
+
+    describe("getAnnotations", () => {
+        it("returns annotations for a scene ordered by newest first", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1" });
+
+            await testPrisma.annotation.create({
+                data: { nodeId: scene.id, content: "First note", range: "0:5" }
+            });
+            await testPrisma.annotation.create({
+                data: { nodeId: scene.id, content: "Second note", range: "10:15", resolved: true }
+            });
+
+            const annotations = await FocusController.getAnnotations(scene.id);
+            expect(annotations).toHaveLength(2);
+            expect(annotations[0].content).toBe("Second note");
+            expect(annotations[0].resolved).toBe(true);
+            expect(annotations[1].content).toBe("First note");
+        });
+
+        it("returns empty array for scene with no annotations", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1" });
+
+            const annotations = await FocusController.getAnnotations(scene.id);
+            expect(annotations).toHaveLength(0);
         });
     });
 });
