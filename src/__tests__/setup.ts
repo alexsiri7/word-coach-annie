@@ -10,18 +10,22 @@ export const testPrisma = new PrismaClient({
   datasources: { db: { url: TEST_DATABASE_URL } },
 });
 
-// Clean all tables before each test
+// Clean all tables before each test using raw SQL in a transaction for speed.
+// A single transaction with raw DELETEs is much faster than 12 sequential
+// Prisma deleteMany calls, especially in constrained environments (Docker, CI).
 beforeEach(async () => {
-  await testPrisma.googleDocExport.deleteMany();
-  await testPrisma.googleCredential.deleteMany();
-  await testPrisma.relationship.deleteMany();
-  await testPrisma.annotation.deleteMany();
-  await testPrisma.contentVersion.deleteMany();
-  await testPrisma.storyObject.deleteMany();
-  await testPrisma.structureNode.deleteMany();
-  await testPrisma.worldObjectTimelineEntry.deleteMany();
-  await testPrisma.worldObject.deleteMany();
-  await testPrisma.project.deleteMany();
-  await testPrisma.universe.deleteMany();
-  await testPrisma.user.deleteMany();
+  await testPrisma.$transaction([
+    testPrisma.$executeRawUnsafe('DELETE FROM "GoogleDocExport"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "GoogleCredential"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "Relationship"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "Annotation"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "ContentVersion"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "StoryObject"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "StructureNode"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "WorldObjectTimelineEntry"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "WorldObject"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "Project"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "Universe"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "User"'),
+  ]);
 });
