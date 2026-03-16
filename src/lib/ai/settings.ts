@@ -18,11 +18,33 @@ function getEnvDefaults(): AiProviderConfig {
 
 /**
  * Get AI provider configuration.
- * Priority: DB settings (non-empty fields) > env vars > hardcoded defaults.
+ * Priority: User DB settings > Global DB settings > env vars > hardcoded defaults.
  * API keys stored in DB are decrypted transparently.
  */
-export async function getAiConfig(): Promise<AiProviderConfig> {
+export async function getAiConfig(userId?: string | null): Promise<AiProviderConfig> {
   const envDefaults = getEnvDefaults();
+
+  // Try per-user settings first
+  if (userId) {
+    try {
+      const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
+      if (userSettings) {
+        const decryptedKey = decrypt(userSettings.apiKey);
+        // If user has a key set, use their full config (with fallbacks for empty fields)
+        if (decryptedKey) {
+          return {
+            baseUrl: userSettings.baseUrl || envDefaults.baseUrl,
+            apiKey: decryptedKey,
+            model: userSettings.model || envDefaults.model,
+          };
+        }
+      }
+    } catch {
+      // Table may not exist yet — fall through
+    }
+  }
+
+  // Fall back to global ("default") settings
   try {
     const settings = await prisma.aiSettings.findUnique({ where: { id: "default" } });
     if (settings) {

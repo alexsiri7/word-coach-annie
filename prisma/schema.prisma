@@ -33,15 +33,16 @@ model ContentVersion {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  googleId  String    @unique
-  name      String    @default("")
-  picture   String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  projects  Project[]
-  universes Universe[]
+  id            String          @id @default(cuid())
+  email         String          @unique
+  googleId      String          @unique
+  name          String          @default("")
+  picture       String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  projects      Project[]
+  universes     Universe[]
+  aiSettings    UserAiSettings?
 }
 
 model Project {
@@ -208,6 +209,17 @@ model AiSettings {
   model      String   @default("")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model UserAiSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  baseUrl   String   @default("")
+  apiKey    String   @default("")
+  model     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GoogleDocExport {

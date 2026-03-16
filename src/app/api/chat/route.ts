@@ -9,6 +9,7 @@ import {
 } from "@/lib/ai/tool-registry";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { getAiConfig } from "@/lib/ai/settings";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
@@ -177,8 +178,9 @@ export async function POST(request: NextRequest) {
     const loadedCategories = new Set<ToolCategory>(["core"]);
     const toolLog: { tool: string; args: Record<string, unknown>; result: string }[] = [];
 
-    // Load AI provider config (DB settings > env vars > defaults)
-    const aiConfig = await getAiConfig();
+    // Load AI provider config (user DB > global DB > env vars > defaults)
+    const userId = getCurrentUserId(request);
+    const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       return NextResponse.json(
         { error: "AI provider not configured. Set API key in AI Settings or AI_API_KEY env var." },
