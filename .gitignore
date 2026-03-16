@@ -68,3 +68,4 @@ data/*.db-journal
 __pycache__/
 state.json
 .beads/
+public/swe-worker-5c72df51bb1f6ee0.js
