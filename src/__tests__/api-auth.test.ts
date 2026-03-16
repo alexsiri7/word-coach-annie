@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 
 vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
+    setTag: vi.fn(),
 }));
 
 import {

@@ -7,6 +7,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   setUser: vi.fn(),
+  setTag: vi.fn(),
   replayIntegration: vi.fn(),
   browserTracingIntegration: vi.fn(),
   captureRequestError: vi.fn(),

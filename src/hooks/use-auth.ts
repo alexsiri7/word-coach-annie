@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 export interface AuthUser {
     userId: string;
@@ -32,15 +33,22 @@ export function useAuth(): AuthState {
                 setAuthenticated(data.authenticated);
                 setAuthMethod(data.authMethod || null);
                 setUser(data.user || null);
+                if (data.user) {
+                    Sentry.setUser({ id: data.user.userId, email: data.user.email });
+                } else {
+                    Sentry.setUser(null);
+                }
             } else {
                 setAuthenticated(false);
                 setAuthMethod(null);
                 setUser(null);
+                Sentry.setUser(null);
             }
         } catch {
             setAuthenticated(false);
             setAuthMethod(null);
             setUser(null);
+            Sentry.setUser(null);
         } finally {
             setLoading(false);
         }
@@ -51,6 +59,7 @@ export function useAuth(): AuthState {
         setAuthenticated(false);
         setAuthMethod(null);
         setUser(null);
+        Sentry.setUser(null);
         window.location.href = "/login";
     }, []);
 

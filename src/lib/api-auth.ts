@@ -42,6 +42,7 @@ export async function verifyProjectAccess(
 
     // No user scoping in API_TOKEN / dev mode
     if (!userId) {
+        Sentry.setTag("projectId", projectId);
         return { authorized: true, project };
     }
 
@@ -52,6 +53,7 @@ export async function verifyProjectAccess(
         };
     }
 
+    Sentry.setTag("projectId", projectId);
     return { authorized: true, project };
 }
 
