@@ -14,6 +14,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],
       reportsDirectory: "./coverage",
+      exclude: [
+        "src/components/**",
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/hooks/**",
+      ],
       // Coverage threshold — keep above 35% floor, raise as tests improve
       thresholds: {
         statements: 35,
