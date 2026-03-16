@@ -14,3 +14,16 @@ For schema changes:
 
 The database at `data/word-coach-annie.db` contains real creative work. It is
 backed up every 6 hours and version-controlled in `data/.git`.
+
+## GitHub Issue Linking
+
+PRs MUST reference the GitHub issue they contribute to. This is how we track feature progress.
+
+When creating a PR (or when `gt done` creates one), include in the PR body:
+- `Fixes #N` — if the PR fully completes the feature/issue
+- `Part of #N` — if the PR is partial progress toward the feature
+
+Current feature issues: https://github.com/alexsiri7/word-coach-annie/issues
+
+If your bead description mentions a GitHub issue number, use it. If not, check the
+issues list to see if your work maps to an existing feature issue.
