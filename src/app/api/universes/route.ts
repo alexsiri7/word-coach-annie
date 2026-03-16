@@ -8,9 +8,9 @@ export async function GET(request: NextRequest) {
         const userId = getCurrentUserId(request);
 
         if (userId) {
-            // Scoped query: user's universes + unowned (legacy) universes
+            // Scoped query: only this user's universes
             const universes = await prisma.universe.findMany({
-                where: { OR: [{ userId }, { userId: null }] },
+                where: { userId },
                 orderBy: { updatedAt: "desc" },
                 include: {
                     _count: {

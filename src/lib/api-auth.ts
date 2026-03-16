@@ -15,6 +15,7 @@ export function getCurrentUserId(request: NextRequest): string | null {
  * Verify that a project belongs to the current user.
  * Returns the project if accessible, or a 403/404 response.
  * When userId is null (API_TOKEN/dev mode), all projects are accessible.
+ * Unowned projects (NULL userId) are denied to authenticated users.
  */
 export async function verifyProjectAccess(
     projectId: string,
@@ -37,11 +38,6 @@ export async function verifyProjectAccess(
         return { authorized: true, project };
     }
 
-    // Project has no owner (legacy data) — allow access
-    if (!project.userId) {
-        return { authorized: true, project };
-    }
-
     if (project.userId !== userId) {
         return {
             authorized: false,
@@ -56,6 +52,7 @@ export async function verifyProjectAccess(
  * Verify that a universe belongs to the current user.
  * Returns the universe if accessible, or a 403/404 response.
  * When userId is null (API_TOKEN/dev mode), all universes are accessible.
+ * Unowned universes (NULL userId) are denied to authenticated users.
  */
 export async function verifyUniverseAccess(
     universeId: string,
@@ -74,10 +71,6 @@ export async function verifyUniverseAccess(
     }
 
     if (!userId) {
-        return { authorized: true, universe };
-    }
-
-    if (!universe.userId) {
         return { authorized: true, universe };
     }
 

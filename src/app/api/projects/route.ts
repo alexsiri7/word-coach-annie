@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
   const offset = parseInt(searchParams.get("offset") || "0");
   const userId = getCurrentUserId(request);
 
-  // Scope by userId when available; include unowned (legacy) projects
-  const where = userId ? { OR: [{ userId }, { userId: null }] } : {};
+  // Scope by userId when authenticated; show all in API_TOKEN/dev mode
+  const where = userId ? { userId } : {};
 
   const [projects, total] = await Promise.all([
     prisma.project.findMany({
