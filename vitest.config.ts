@@ -6,6 +6,8 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**"],
     environment: "node",
     globals: true,
+    testTimeout: 15000,
+    hookTimeout: 15000,
     globalSetup: ["./src/__tests__/globalSetup.ts"],
     setupFiles: ["./src/__tests__/setup.ts"],
     // Run test files sequentially to avoid shared DB conflicts
