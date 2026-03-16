@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SetupWizard } from "@/components/setup-wizard";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -127,6 +128,7 @@ export default function Dashboard() {
 
   return (
     <main id="main-content" className="min-h-screen">
+      <SetupWizard />
       {/* Accent gradient line at top */}
       <div className="h-1 accent-gradient" />
 
