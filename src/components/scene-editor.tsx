@@ -238,8 +238,26 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
 
   if (initialContent === null) {
     return (
-      <div className="flex items-center justify-center h-full text-text-muted">
-        <div className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col h-full bg-surface animate-pulse">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-surface-raised">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-7 w-7 bg-surface-overlay rounded" />
+          ))}
+          <div className="h-5 w-px bg-surface-overlay mx-1" />
+          <div className="h-7 w-20 bg-surface-overlay rounded" />
+        </div>
+        <div className="flex-1 px-8 py-6 space-y-4">
+          <div className="h-4 w-3/4 bg-surface-overlay rounded" />
+          <div className="h-4 w-full bg-surface-overlay rounded" />
+          <div className="h-4 w-5/6 bg-surface-overlay rounded" />
+          <div className="h-4 w-2/3 bg-surface-overlay rounded" />
+          <div className="h-4 w-full bg-surface-overlay rounded" />
+          <div className="h-4 w-1/2 bg-surface-overlay rounded" />
+        </div>
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised">
+          <div className="h-3.5 w-20 bg-surface-overlay rounded" />
+          <div className="h-3.5 w-28 bg-surface-overlay rounded" />
+        </div>
       </div>
     );
   }

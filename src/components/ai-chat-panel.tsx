@@ -79,6 +79,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
 
 export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -99,7 +100,8 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
       .then((data) => {
         if (data.messages) setMessages(data.messages);
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoadingHistory(false));
   }, [projectId]);
 
   // Scroll on new messages
@@ -244,7 +246,24 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 space-y-3" aria-live="polite" aria-label="Chat messages">
-        {messages.length === 0 && !isStreaming && (
+        {loadingHistory && (
+          <div className="space-y-3 animate-pulse">
+            <div className="flex flex-col items-end">
+              <div className="max-w-[90%] rounded-lg px-3 py-2 bg-accent/20 h-8 w-48" />
+              <div className="h-2.5 w-10 bg-surface-overlay rounded mt-1 mr-1" />
+            </div>
+            <div className="flex flex-col items-start">
+              <div className="max-w-[90%] rounded-lg px-3 py-2 bg-surface-overlay h-16 w-56" />
+              <div className="h-2.5 w-10 bg-surface-overlay rounded mt-1 ml-1" />
+            </div>
+            <div className="flex flex-col items-end">
+              <div className="max-w-[90%] rounded-lg px-3 py-2 bg-accent/20 h-8 w-36" />
+              <div className="h-2.5 w-10 bg-surface-overlay rounded mt-1 mr-1" />
+            </div>
+          </div>
+        )}
+
+        {!loadingHistory && messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-sm text-text-muted mb-2">
               Ask about your story — plot, characters, pacing, ideas...

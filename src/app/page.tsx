@@ -163,8 +163,26 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-32">
-            <div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="glass-card p-5 animate-pulse">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="h-5 w-32 bg-surface-overlay rounded" />
+                    <div className="h-3.5 w-20 bg-surface-overlay rounded mt-1.5" />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-1">
+                  <div className="h-3.5 w-full bg-surface-overlay rounded" />
+                  <div className="h-3.5 w-3/4 bg-surface-overlay rounded" />
+                </div>
+                <div className="flex items-center gap-3 mt-4">
+                  <div className="h-5 w-16 bg-surface-overlay rounded-full" />
+                  <div className="h-3.5 w-20 bg-surface-overlay rounded" />
+                  <div className="h-3.5 w-16 bg-surface-overlay rounded ml-auto" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : projects.length === 0 ? (
           <div className="text-center py-32 animate-fade-in">
