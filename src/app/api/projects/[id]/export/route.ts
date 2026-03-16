@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { exportProjectJson } from "@/lib/export-json";
 
 interface OutlineNode {
   id: string;
@@ -302,6 +304,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectAccess(id, userId);
+  if (!access.authorized) return access.response;
+
   const searchParams = request.nextUrl.searchParams;
 
   // Accept both "format" and "type" params for compatibility
@@ -323,6 +329,18 @@ export async function GET(
   let resolvedFormat = format;
   if (format === "manuscript") resolvedFormat = "full";
   if (format === "story-bible") resolvedFormat = "bible";
+
+  // JSON export
+  if (resolvedFormat === "json") {
+    const data = await exportProjectJson(id);
+    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.json`;
+    return new NextResponse(JSON.stringify(data, null, 2), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
 
   if (resolvedFormat === "bible") {
     const markdown = await exportStoryBible(id, project.title);
