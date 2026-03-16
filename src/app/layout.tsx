@@ -14,9 +14,10 @@ export const metadata: Metadata = {
   description: "Local fiction writing & book management tool",
   icons: {
     icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon.ico",
@@ -36,6 +37,12 @@ export const metadata: Metadata = {
         alt: "Word Coach Annie — Fiction writing & book management",
       },
     ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Word Coach Annie",
+    description: "Local fiction writing & book management tool",
+    images: ["/og-image.png"],
   },
 };
 
