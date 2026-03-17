@@ -1,7 +1,23 @@
 import { StructureController } from "@/lib/controllers/structure";
+import { mcpCache } from "@/lib/cache";
+
+/** Invalidate caches affected by structure/content changes. */
+function invalidateStructureCaches(projectId?: string) {
+    if (projectId) {
+        mcpCache.delete(`outline:${projectId}`);
+        mcpCache.delete(`projectSummary:${projectId}`);
+    } else {
+        mcpCache.invalidatePrefix("outline:");
+        mcpCache.invalidatePrefix("projectSummary:");
+    }
+    mcpCache.invalidatePrefix("projects:");
+}
 
 export async function getOutline(projectId: string) {
-    return StructureController.getOutline(projectId);
+    return mcpCache.getOrSet(
+        `outline:${projectId}`,
+        () => StructureController.getOutline(projectId),
+    );
 }
 
 export async function createNode(params: {
@@ -13,7 +29,9 @@ export async function createNode(params: {
     status?: string;
     insertAfterIndex?: number;
 }) {
-    return StructureController.createNode(params);
+    const result = await StructureController.createNode(params);
+    invalidateStructureCaches(params.projectId);
+    return result;
 }
 
 export async function updateNode(
@@ -26,23 +44,36 @@ export async function updateNode(
         parentId?: string | null;
     }
 ) {
-    return StructureController.updateNode(nodeId, data);
+    const result = await StructureController.updateNode(nodeId, data);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function deleteNode(nodeId: string) {
-    return StructureController.deleteNode(nodeId);
+    const result = await StructureController.deleteNode(nodeId);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function readSceneContent(nodeId: string) {
-    return StructureController.readSceneContent(nodeId);
+    return mcpCache.getOrSet(
+        `sceneContent:${nodeId}`,
+        () => StructureController.readSceneContent(nodeId),
+    );
 }
 
 export async function writeSceneContent(nodeId: string, content: string) {
-    return StructureController.writeSceneContent(nodeId, content);
+    const result = await StructureController.writeSceneContent(nodeId, content);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function writeSceneContentFromBlocks(nodeId: string, blocks: { type: "CONTENT" | "BEAT"; content: string }[]) {
-    return StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function getSceneVersions(nodeId: string, limit: number = 20) {
@@ -50,11 +81,16 @@ export async function getSceneVersions(nodeId: string, limit: number = 20) {
 }
 
 export async function restoreSceneVersion(nodeId: string, versionId: string) {
-    return StructureController.restoreSceneVersion(nodeId, versionId);
+    const result = await StructureController.restoreSceneVersion(nodeId, versionId);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
-    return StructureController.addAnnotation(nodeId, content, range, selectedText);
+    const result = await StructureController.addAnnotation(nodeId, content, range, selectedText);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    return result;
 }
 
 export async function updateAnnotation(annotationId: string, data: { content?: string; resolved?: boolean }) {
