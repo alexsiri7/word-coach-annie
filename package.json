@@ -19,7 +19,8 @@
     "e2e:ui": "playwright test --ui",
     "e2e:update-snapshots": "playwright test --update-snapshots",
     "test:screenshots": "playwright test e2e/visual.spec.ts",
-    "test:screenshots:update": "playwright test e2e/visual.spec.ts --update-snapshots"
+    "test:screenshots:update": "playwright test e2e/visual.spec.ts --update-snapshots",
+    "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
