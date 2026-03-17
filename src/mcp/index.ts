@@ -21,6 +21,9 @@ import {
     deleteAnnotation,
     resolveAnnotation,
     getOpenAnnotations,
+    batchCreateNodes,
+    batchUpdateNodes,
+    batchDeleteNodes,
 } from "./tools/structure";
 import {
     listStoryObjects,
@@ -28,6 +31,9 @@ import {
     createStoryObject,
     updateStoryObject,
     deleteStoryObject,
+    batchCreateStoryObjects,
+    batchUpdateStoryObjects,
+    batchDeleteStoryObjects,
 } from "./tools/story-objects";
 import {
     listRelationships,
@@ -474,6 +480,111 @@ server.tool(
     async ({ objectId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteStoryObject(objectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Batch Tools ────────────────────────────────────────────────────────────
+
+server.tool(
+    "batch_create_story_objects",
+    "Create multiple story objects in a single operation. Returns per-item results with successes and errors. Max 50 per batch.",
+    {
+        projectId: z.string().describe("The project ID"),
+        objects: z.array(z.object({
+            type: z.enum(["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"]).describe("Object type"),
+            name: z.string().describe("Object name"),
+            description: z.string().optional().describe("Description"),
+            notes: z.string().optional().describe("Additional notes"),
+            role: z.string().optional().describe("Role (for characters)"),
+            tags: z.string().optional().describe("Comma-separated tags"),
+        })).describe("Array of story objects to create"),
+    },
+    async ({ projectId, objects }) => {
+        const result = await batchCreateStoryObjects(projectId, objects);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "batch_update_story_objects",
+    "Update multiple story objects in a single operation. Returns per-item results with successes and errors. Max 50 per batch.",
+    {
+        updates: z.array(z.object({
+            objectId: z.string().describe("The story object ID"),
+            name: z.string().optional().describe("New name"),
+            description: z.string().optional().describe("New description"),
+            notes: z.string().optional().describe("New notes"),
+            role: z.string().nullable().optional().describe("New role (null to clear)"),
+            tags: z.string().optional().describe("New comma-separated tags"),
+        })).describe("Array of updates to apply"),
+    },
+    async ({ updates }) => {
+        const result = await batchUpdateStoryObjects(updates);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "batch_delete_story_objects",
+    "Delete multiple story objects and their relationships in a single operation. A snapshot is created before deletion. Max 50 per batch.",
+    {
+        objectIds: z.array(z.string()).describe("Array of story object IDs to delete"),
+    },
+    async ({ objectIds }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await batchDeleteStoryObjects(objectIds);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "batch_create_nodes",
+    "Create multiple structure nodes (PART, CHAPTER, SCENE) in a single operation. Nodes are created sequentially, so earlier entries can serve as parents for later ones. Max 50 per batch.",
+    {
+        projectId: z.string().describe("The project ID"),
+        nodes: z.array(z.object({
+            type: z.enum(["PART", "CHAPTER", "SCENE"]).describe("Node type"),
+            title: z.string().describe("Node title"),
+            parentId: z.string().optional().describe("Parent node ID"),
+            synopsis: z.string().optional().describe("Brief synopsis"),
+            status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("Scene status (default OUTLINE)"),
+        })).describe("Array of nodes to create"),
+    },
+    async ({ projectId, nodes }) => {
+        const result = await batchCreateNodes(projectId, nodes);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "batch_update_nodes",
+    "Update multiple structure nodes in a single operation. Returns per-item results with successes and errors. Max 50 per batch.",
+    {
+        updates: z.array(z.object({
+            nodeId: z.string().describe("The node ID to update"),
+            title: z.string().optional().describe("New title"),
+            synopsis: z.string().optional().describe("New synopsis"),
+            status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
+            orderIndex: z.number().optional().describe("New order index"),
+            parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
+        })).describe("Array of updates to apply"),
+    },
+    async ({ updates }) => {
+        const result = await batchUpdateNodes(updates);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "batch_delete_nodes",
+    "Delete multiple structure nodes and their children in a single operation. A snapshot is created before deletion. Max 50 per batch.",
+    {
+        nodeIds: z.array(z.string()).describe("Array of node IDs to delete"),
+    },
+    async ({ nodeIds }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await batchDeleteNodes(nodeIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

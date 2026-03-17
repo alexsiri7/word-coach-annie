@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 type LogLevel = "error" | "warn" | "info";
 
 function formatLog(level: LogLevel, message: string, meta?: unknown): void {
@@ -17,6 +19,15 @@ function formatLog(level: LogLevel, message: string, meta?: unknown): void {
   const json = JSON.stringify(entry);
   if (level === "error") {
     console.error(json);
+    // Report errors to Sentry with full context
+    if (meta instanceof Error) {
+      Sentry.captureException(meta, { extra: { message } });
+    } else {
+      Sentry.captureMessage(message, {
+        level: "error",
+        extra: meta != null ? { meta } : undefined,
+      });
+    }
   } else if (level === "warn") {
     console.warn(json);
   } else {

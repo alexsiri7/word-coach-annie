@@ -3,6 +3,11 @@ import { NextRequest } from "next/server";
 import { middleware } from "@/middleware";
 import { resetRateLimitStore } from "@/lib/rate-limit";
 
+// Mock Sentry
+vi.mock("@sentry/nextjs", () => ({
+    setUser: vi.fn(),
+}));
+
 // Mock auth module
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",

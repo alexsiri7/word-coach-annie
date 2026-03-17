@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import {
     SESSION_COOKIE_NAME,
     deriveSessionToken,
@@ -106,6 +107,12 @@ export async function middleware(request: NextRequest) {
             // Rate limit by authenticated user ID
             const rateLimited = applyRateLimit(pathname, session.userId);
             if (rateLimited) return rateLimited;
+
+            // Set Sentry user context for error attribution
+            Sentry.setUser({
+                id: session.userId,
+                email: session.email,
+            });
 
             // Forward userId to route handlers via request headers
             const requestHeaders = new Headers(request.headers);

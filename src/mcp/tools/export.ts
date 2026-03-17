@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { mcpCache } from "@/lib/cache";
 
 interface MarkdownOptions {
     includeBeats?: boolean;
@@ -331,6 +332,13 @@ export async function exportMedium(projectId: string, nodeId?: string): Promise<
 }
 
 export async function getProjectSummary(projectId: string) {
+    return mcpCache.getOrSet(
+        `projectSummary:${projectId}`,
+        () => _getProjectSummary(projectId),
+    );
+}
+
+async function _getProjectSummary(projectId: string) {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
     });
