@@ -5,6 +5,21 @@ import { StructureController } from "@/lib/controllers/structure";
 import { UniversesController } from "@/lib/controllers/universes";
 import { testPrisma } from "./setup";
 
+/** Helper: create a structure node directly via prisma (avoids 3-5 DB queries per createNode call) */
+function createNodeDirect(data: { projectId: string; type: string; title: string; parentId?: string; orderIndex?: number }) {
+    return testPrisma.structureNode.create({
+        data: {
+            projectId: data.projectId,
+            type: data.type,
+            title: data.title,
+            parentId: data.parentId ?? null,
+            orderIndex: data.orderIndex ?? 0,
+            synopsis: "",
+            status: "OUTLINE",
+        },
+    });
+}
+
 describe("FocusController", () => {
     let projectId: string;
 
@@ -14,14 +29,18 @@ describe("FocusController", () => {
     });
 
     describe("getSceneContext", () => {
-        it("returns scene context with navigation", { timeout: 15000 }, async () => {
-            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
-            const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
-            const s2 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 2", parentId: ch.id });
-            const _s3 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 3", parentId: ch.id });
+        it("returns scene context with navigation", async () => {
+            // Create nodes directly via prisma to avoid ~20 sequential DB calls
+            // through the controller's validation layer (causes timeouts under load)
+            const ch = await createNodeDirect({ projectId, type: "CHAPTER", title: "Chapter 1" });
+            const s1 = await createNodeDirect({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id, orderIndex: 0 });
+            const s2 = await createNodeDirect({ projectId, type: "SCENE", title: "Scene 2", parentId: ch.id, orderIndex: 1 });
+            const _s3 = await createNodeDirect({ projectId, type: "SCENE", title: "Scene 3", parentId: ch.id, orderIndex: 2 });
 
-            // Write content to scene 2
-            await StructureController.writeSceneContent(s2.id, "Hello world foo bar");
+            // Write content directly via prisma instead of StructureController.writeSceneContent
+            await testPrisma.contentVersion.create({
+                data: { nodeId: s2.id, content: "Hello world foo bar", wordCount: 4 },
+            });
 
             const ctx = await FocusController.getSceneContext(s2.id);
             expect(ctx.title).toBe("Scene 2");
@@ -33,8 +52,8 @@ describe("FocusController", () => {
         });
 
         it("returns null for prevScene on first scene", async () => {
-            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Chapter 1" });
-            const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+            const ch = await createNodeDirect({ projectId, type: "CHAPTER", title: "Chapter 1" });
+            const s1 = await createNodeDirect({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
 
             const ctx = await FocusController.getSceneContext(s1.id);
             expect(ctx.prevScene).toBeNull();
