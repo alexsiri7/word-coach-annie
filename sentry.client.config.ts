@@ -11,8 +11,9 @@ Sentry.init({
   replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 1.0,
 
+  // Browser tracing loaded eagerly (required for initial page load spans)
+  // Replay loaded lazily after hydration to reduce initial bundle impact
   integrations: [
-    Sentry.replayIntegration(),
     Sentry.browserTracingIntegration(),
   ],
 
@@ -26,3 +27,12 @@ Sentry.init({
     "Load failed",
   ],
 });
+
+// Defer session replay integration until after page is interactive
+if (typeof window !== "undefined") {
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      Sentry.addIntegration(Sentry.replayIntegration());
+    }, 3000);
+  });
+}

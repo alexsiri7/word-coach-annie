@@ -40,7 +40,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import dynamic from "next/dynamic";
-import { OutlineTree } from "@/components/outline-tree";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
@@ -49,6 +48,7 @@ const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => 
 const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
+const OutlineTree = dynamic(() => import("@/components/outline-tree").then(m => m.OutlineTree));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";

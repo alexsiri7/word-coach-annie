@@ -158,4 +158,11 @@ export default withSentryConfig(withAnalyzer(pwaConfig), {
 
   // Hides source maps from generated client bundles
   hideSourceMaps: true,
+
+  // Tree-shake optional Sentry features not used in this project
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+  },
 });
