@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../snapshot";
+import { mcpCache } from "@/lib/cache";
 
 const VALID_RELATIONSHIP_TYPES = [
     "APPEARS_IN",
@@ -13,70 +14,75 @@ const VALID_RELATIONSHIP_TYPES = [
 ] as const;
 
 export async function listRelationships(projectId: string) {
-    const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { id: true },
-    });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    return mcpCache.getOrSet(
+        `relationships:${projectId}`,
+        async () => {
+            const project = await prisma.project.findUnique({
+                where: { id: projectId },
+                select: { id: true },
+            });
+            if (!project) throw new Error(`Project not found: ${projectId}`);
 
-    const [nodes, objects] = await Promise.all([
-        prisma.structureNode.findMany({
-            where: { projectId },
-            select: { id: true },
-        }),
-        prisma.storyObject.findMany({
-            where: { projectId },
-            select: { id: true },
-        }),
-    ]);
+            const [nodes, objects] = await Promise.all([
+                prisma.structureNode.findMany({
+                    where: { projectId },
+                    select: { id: true },
+                }),
+                prisma.storyObject.findMany({
+                    where: { projectId },
+                    select: { id: true },
+                }),
+            ]);
 
-    const nodeIds = nodes.map((n: { id: string }) => n.id);
-    const objectIds = objects.map((o: { id: string }) => o.id);
+            const nodeIds = nodes.map((n: { id: string }) => n.id);
+            const objectIds = objects.map((o: { id: string }) => o.id);
 
-    const relationships = await prisma.relationship.findMany({
-        where: {
-            OR: [
-                { fromNodeId: { in: nodeIds } },
-                { fromObjectId: { in: objectIds } },
-                { toNodeId: { in: nodeIds } },
-                { toObjectId: { in: objectIds } },
-                { fromWorldObjectId: { not: null } },
-                { toWorldObjectId: { not: null } },
-            ],
+            const relationships = await prisma.relationship.findMany({
+                where: {
+                    OR: [
+                        { fromNodeId: { in: nodeIds } },
+                        { fromObjectId: { in: objectIds } },
+                        { toNodeId: { in: nodeIds } },
+                        { toObjectId: { in: objectIds } },
+                        { fromWorldObjectId: { not: null } },
+                        { toWorldObjectId: { not: null } },
+                    ],
+                },
+                include: {
+                    fromNode: { select: { id: true, title: true, type: true } },
+                    fromObject: { select: { id: true, name: true, type: true } },
+                    fromWorldObject: { select: { id: true, name: true, type: true } },
+                    toNode: { select: { id: true, title: true, type: true } },
+                    toObject: { select: { id: true, name: true, type: true } },
+                    toWorldObject: { select: { id: true, name: true, type: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            return {
+                relationships: relationships.map((r: Record<string, unknown> & { id: string; type: string; label: string | null; fromNode?: { id: string; title: string; type: string } | null; fromObject?: { id: string; name: string; type: string } | null; fromWorldObject?: { id: string; name: string; type: string } | null; toNode?: { id: string; title: string; type: string } | null; toObject?: { id: string; name: string; type: string } | null; toWorldObject?: { id: string; name: string; type: string } | null }) => ({
+                    id: r.id,
+                    type: r.type,
+                    label: r.label,
+                    from: r.fromNode
+                        ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
+                        : r.fromObject
+                            ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
+                            : r.fromWorldObject
+                                ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
+                                : null,
+                    to: r.toNode
+                        ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
+                        : r.toObject
+                            ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
+                            : r.toWorldObject
+                                ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
+                                : null,
+                })),
+                total: relationships.length,
+            };
         },
-        include: {
-            fromNode: { select: { id: true, title: true, type: true } },
-            fromObject: { select: { id: true, name: true, type: true } },
-            fromWorldObject: { select: { id: true, name: true, type: true } },
-            toNode: { select: { id: true, title: true, type: true } },
-            toObject: { select: { id: true, name: true, type: true } },
-            toWorldObject: { select: { id: true, name: true, type: true } },
-        },
-        orderBy: { createdAt: "desc" },
-    });
-
-    return {
-        relationships: relationships.map((r: Record<string, unknown> & { id: string; type: string; label: string | null; fromNode?: { id: string; title: string; type: string } | null; fromObject?: { id: string; name: string; type: string } | null; fromWorldObject?: { id: string; name: string; type: string } | null; toNode?: { id: string; title: string; type: string } | null; toObject?: { id: string; name: string; type: string } | null; toWorldObject?: { id: string; name: string; type: string } | null }) => ({
-            id: r.id,
-            type: r.type,
-            label: r.label,
-            from: r.fromNode
-                ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
-                : r.fromObject
-                    ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                    : r.fromWorldObject
-                        ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
-                        : null,
-            to: r.toNode
-                ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
-                : r.toObject
-                    ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                    : r.toWorldObject
-                        ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
-                        : null,
-        })),
-        total: relationships.length,
-    };
+    );
 }
 
 export async function createRelationship(params: {
@@ -152,6 +158,9 @@ export async function createRelationship(params: {
         },
     });
 
+    mcpCache.delete(`relationships:${projectId}`);
+    mcpCache.delete(`projectSummary:${projectId}`);
+
     return {
         id: relationship.id,
         type: relationship.type,
@@ -193,6 +202,9 @@ export async function deleteRelationship(relationshipId: string) {
     autoSnapshot("delete_relationship", `${fromName} → ${toName}`);
 
     await prisma.relationship.delete({ where: { id: relationshipId } });
+
+    mcpCache.invalidatePrefix("relationships:");
+    mcpCache.invalidatePrefix("projectSummary:");
 
     return {
         deleted: true,

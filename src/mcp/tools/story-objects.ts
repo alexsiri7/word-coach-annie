@@ -1,4 +1,9 @@
 import { StoryObjectController } from "@/lib/controllers/story-objects";
+import { mcpCache } from "@/lib/cache";
+
+function storyObjectsKey(params: { projectId: string; type?: string; search?: string; limit?: number; offset?: number }): string {
+    return `storyObjects:${params.projectId}:${params.type ?? ""}:${params.search ?? ""}:${params.limit ?? 50}:${params.offset ?? 0}`;
+}
 
 export async function listStoryObjects(params: {
     projectId: string;
@@ -7,11 +12,17 @@ export async function listStoryObjects(params: {
     limit?: number;
     offset?: number;
 }) {
-    return StoryObjectController.listStoryObjects(params);
+    return mcpCache.getOrSet(
+        storyObjectsKey(params),
+        () => StoryObjectController.listStoryObjects(params),
+    );
 }
 
 export async function getStoryObject(objectId: string) {
-    return StoryObjectController.getStoryObject(objectId);
+    return mcpCache.getOrSet(
+        `storyObject:${objectId}`,
+        () => StoryObjectController.getStoryObject(objectId),
+    );
 }
 
 export async function createStoryObject(params: {
@@ -23,7 +34,11 @@ export async function createStoryObject(params: {
     role?: string;
     tags?: string;
 }) {
-    return StoryObjectController.createStoryObject(params);
+    const result = await StoryObjectController.createStoryObject(params);
+    mcpCache.invalidatePrefix(`storyObjects:${params.projectId}:`);
+    mcpCache.invalidatePrefix("projects:");
+    mcpCache.delete(`projectSummary:${params.projectId}`);
+    return result;
 }
 
 export async function updateStoryObject(
@@ -36,9 +51,18 @@ export async function updateStoryObject(
         tags?: string;
     }
 ) {
-    return StoryObjectController.updateStoryObject(objectId, data);
+    const result = await StoryObjectController.updateStoryObject(objectId, data);
+    mcpCache.delete(`storyObject:${objectId}`);
+    mcpCache.invalidatePrefix("storyObjects:");
+    return result;
 }
 
 export async function deleteStoryObject(objectId: string) {
-    return StoryObjectController.deleteStoryObject(objectId);
+    const result = await StoryObjectController.deleteStoryObject(objectId);
+    mcpCache.delete(`storyObject:${objectId}`);
+    mcpCache.invalidatePrefix("storyObjects:");
+    mcpCache.invalidatePrefix("projects:");
+    mcpCache.invalidatePrefix("projectSummary:");
+    mcpCache.invalidatePrefix("relationships:");
+    return result;
 }
