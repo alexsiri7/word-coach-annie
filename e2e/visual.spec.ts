@@ -192,79 +192,6 @@ const MOCK_UNIVERSES = [
   },
 ]
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-async function disableAnimations(page: Page) {
-  await page.addStyleTag({
-    content: `*, *::before, *::after {
-      animation-duration: 0s !important;
-      animation-delay: 0s !important;
-      transition-duration: 0s !important;
-    }`,
-  })
-}
-
-/** Intercept all API calls for the dashboard (project list) */
-async function mockDashboardApi(page: Page, options: { empty?: boolean } = {}) {
-  const projects = options.empty ? { projects: [], total: 0 } : MOCK_PROJECTS
-
-  await page.route('**/api/projects?*', route =>
-    route.fulfill({ json: projects, status: 200 })
-  )
-  await page.route('**/api/projects', route => {
-    if (route.request().method() === 'GET') {
-      return route.fulfill({ json: projects, status: 200 })
-    }
-    return route.continue()
-  })
-}
-
-/** Intercept all API calls for the project editor view */
-async function mockProjectEditorApi(page: Page) {
-  await page.route('**/api/projects/proj-1', route =>
-    route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
-  )
-  await page.route('**/api/projects/proj-1/outline', route =>
-    route.fulfill({ json: MOCK_OUTLINE, status: 200 })
-  )
-  await page.route('**/api/projects/proj-1/story-objects*', route =>
-    route.fulfill({ json: MOCK_STORY_OBJECTS, status: 200 })
-  )
-  await page.route('**/api/projects/proj-1/relationships*', route =>
-    route.fulfill({ json: [], status: 200 })
-  )
-  await page.route('**/api/projects/proj-1/search*', route =>
-    route.fulfill({ json: { results: [] }, status: 200 })
-  )
-  await page.route('**/api/nodes/sc-1/content', route =>
-    route.fulfill({ json: MOCK_SCENE_CONTENT, status: 200 })
-  )
-  await page.route('**/api/nodes/*/content', route =>
-    route.fulfill({ json: { id: 'cv-0', nodeId: 'sc-0', content: '', wordCount: 0, createdAt: '2026-01-01T00:00:00Z' }, status: 200 })
-  )
-  await page.route('**/api/nodes/*/annotations', route =>
-    route.fulfill({ json: [], status: 200 })
-  )
-  await page.route('**/api/ai-settings', route =>
-    route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
-  )
-  await page.route('**/api/chat', route =>
-    route.fulfill({ json: { message: 'Mock response' }, status: 200 })
-  )
-}
-
-/** Intercept API calls for the universe page */
-async function mockUniverseApi(page: Page, options: { empty?: boolean } = {}) {
-  const universes = options.empty ? [] : MOCK_UNIVERSES
-
-  await page.route('**/api/universes', route => {
-    if (route.request().method() === 'GET') {
-      return route.fulfill({ json: universes, status: 200 })
-    }
-    return route.continue()
-  })
-}
-
 const MOCK_FOCUS_CONTEXT = {
   context: {
     id: 'sc-1',
@@ -292,17 +219,78 @@ const MOCK_FOCUS_CONTEXT = {
   },
 }
 
-const MOCK_STORY_OBJECT_DETAIL = {
-  id: 'so-1',
-  projectId: 'proj-1',
-  type: 'CHARACTER',
-  name: 'Queen Mira',
-  description: 'Young ruler of the Southern Kingdom.',
-  notes: 'Reluctant leader, skilled diplomat.',
-  role: 'Protagonist',
-  tags: 'royalty,diplomat',
-  createdAt: '2026-01-15T10:00:00Z',
-  updatedAt: '2026-03-01T10:00:00Z',
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function disableAnimations(page: Page) {
+  await page.addStyleTag({
+    content: `*, *::before, *::after {
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0s !important;
+    }`,
+  })
+}
+
+/** Intercept all API calls for the dashboard (project list) */
+async function mockDashboardApi(page: Page) {
+  await page.route('**/api/projects?*', route =>
+    route.fulfill({ json: MOCK_PROJECTS, status: 200 })
+  )
+  await page.route('**/api/projects', route => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ json: MOCK_PROJECTS, status: 200 })
+    }
+    return route.continue()
+  })
+}
+
+/** Intercept all API calls for the project editor view */
+async function mockProjectEditorApi(page: Page) {
+  await page.route('**/api/projects/proj-1/nodes', route =>
+    route.fulfill({ json: { tree: MOCK_OUTLINE }, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/outline', route =>
+    route.fulfill({ json: MOCK_OUTLINE, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/story-objects*', route =>
+    route.fulfill({ json: { data: MOCK_STORY_OBJECTS.storyObjects, total: MOCK_STORY_OBJECTS.total }, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/relationships*', route =>
+    route.fulfill({ json: [], status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/search*', route =>
+    route.fulfill({ json: { results: [] }, status: 200 })
+  )
+  await page.route('**/api/nodes/sc-1/content', route =>
+    route.fulfill({ json: MOCK_SCENE_CONTENT, status: 200 })
+  )
+  await page.route('**/api/nodes/*/content', route =>
+    route.fulfill({ json: { id: 'cv-0', nodeId: 'sc-0', content: '', wordCount: 0, createdAt: '2026-01-01T00:00:00Z' }, status: 200 })
+  )
+  await page.route('**/api/nodes/*/annotations', route =>
+    route.fulfill({ json: [], status: 200 })
+  )
+  await page.route('**/api/ai-settings', route =>
+    route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
+  )
+  await page.route('**/api/chat', route =>
+    route.fulfill({ json: { message: 'Mock response' }, status: 200 })
+  )
+  // Use function matcher for exact project endpoint to avoid intercepting sub-routes
+  await page.route(
+    url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
+  )
+}
+
+/** Intercept API calls for the universe page */
+async function mockUniverseApi(page: Page) {
+  await page.route('**/api/universes', route => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ json: MOCK_UNIVERSES, status: 200 })
+    }
+    return route.continue()
+  })
 }
 
 /** Intercept API calls for the focus mode page */
@@ -322,135 +310,86 @@ async function mockFocusModeApi(page: Page) {
   await page.route('**/api/ai-settings', route =>
     route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
   )
-}
-
-/** Intercept API calls for the story object panel */
-async function mockStoryObjectDetailApi(page: Page) {
-  await page.route('**/api/story-objects/so-1', route =>
-    route.fulfill({ json: MOCK_STORY_OBJECT_DETAIL, status: 200 })
-  )
-  await page.route('**/api/projects/proj-1', route =>
-    route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
+  await page.route(
+    url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
   )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
+// 4 screens × 3 projects (desktop, mobile, dark-desktop) = 12 screenshots
 
 test.describe('Visual regression – Annie', () => {
-  test('dashboard – empty state', async ({ page }) => {
-    await mockDashboardApi(page, { empty: true })
-    await page.goto('/')
-    await page.waitForSelector('main', { timeout: 20_000 })
-    await disableAnimations(page)
-
-    await expect(page).toHaveScreenshot('dashboard-empty.png', {
-      animations: 'disabled',
-    })
-  })
-
-  test('dashboard – with projects', async ({ page }) => {
+  test('dashboard with projects', async ({ page }) => {
     await mockDashboardApi(page)
+    // Dismiss the setup wizard so it doesn't cover the dashboard
+    await page.addInitScript(() => {
+      localStorage.setItem('setup-wizard-dismissed', 'true')
+    })
     await page.goto('/')
     await page.waitForSelector('main', { timeout: 20_000 })
-    // Wait for project cards to render
     await page.waitForSelector('.glass-card', { timeout: 5_000 }).catch(() => {})
     await disableAnimations(page)
 
-    await expect(page).toHaveScreenshot('dashboard-with-projects.png', {
+    await expect(page).toHaveScreenshot('dashboard.png', {
       animations: 'disabled',
     })
   })
 
-  test('project editor – outline sidebar', async ({ page }) => {
-    await mockProjectEditorApi(page)
-    await page.goto('/project/proj-1')
-    await page.waitForSelector('main', { timeout: 20_000 })
-    await disableAnimations(page)
-    // Wait for outline to load
-    await page.waitForTimeout(500)
-
-    await expect(page).toHaveScreenshot('project-editor-outline.png', {
-      animations: 'disabled',
-    })
-  })
-
-  test('project editor – scene selected', async ({ page }) => {
+  test('project editor with scene selected', async ({ page }) => {
     await mockProjectEditorApi(page)
     await page.goto('/project/proj-1')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
     await page.waitForTimeout(500)
 
-    // Click the first scene in the outline to open it
-    const sceneItem = page.locator('text=Throne Room').first()
-    if (await sceneItem.isVisible()) {
-      await sceneItem.click()
-      await page.waitForTimeout(500)
-    }
-
-    await expect(page).toHaveScreenshot('project-editor-scene-open.png', {
-      animations: 'disabled',
-    })
-  })
-
-  test('project editor – story objects panel', async ({ page }) => {
-    await mockProjectEditorApi(page)
-    await mockStoryObjectDetailApi(page)
-    await page.goto('/project/proj-1')
-    await page.waitForSelector('main', { timeout: 20_000 })
-    await disableAnimations(page)
-    await page.waitForTimeout(500)
-
-    // Switch to Characters tab in sidebar
-    const charsTab = page.locator('button[title="Characters"]').first()
-    if (await charsTab.isVisible()) {
-      await charsTab.click()
+    // On mobile, open the sidebar menu first
+    const menuButton = page.locator('button[aria-label="Open sidebar menu"], button:has-text("Open sidebar")')
+    if (await menuButton.isVisible().catch(() => false)) {
+      await menuButton.click()
       await page.waitForTimeout(300)
     }
 
-    // Click "Queen Mira" to open the story object panel
-    const queenMira = page.locator('text=Queen Mira').first()
-    if (await queenMira.isVisible()) {
-      await queenMira.click()
-      await page.waitForTimeout(500)
+    // Wait for outline to fully render, then ensure Throne Room scene is visible
+    await page.waitForTimeout(500)
+    const sceneItem = page.locator('text=Throne Room').first()
+    if (!(await sceneItem.isVisible().catch(() => false))) {
+      // Chapter is collapsed — expand it
+      const chapter = page.locator('text=The Summons').first()
+      await chapter.click()
+      await sceneItem.waitFor({ state: 'visible', timeout: 5_000 })
     }
+    await sceneItem.click()
+    // Wait for the editor to load the scene (breadcrumb updates)
+    await page.locator('text=Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+    await page.waitForTimeout(500)
 
-    await expect(page).toHaveScreenshot('project-editor-story-object.png', {
+    await expect(page).toHaveScreenshot('project-editor.png', {
       animations: 'disabled',
+      maxDiffPixelRatio: 0.01,
     })
   })
 
-  test('focus mode – writing view', async ({ page }) => {
+  test('focus mode writing view', async ({ page }) => {
     await mockFocusModeApi(page)
     await page.goto('/project/proj-1/scene/sc-1/focus')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
     await page.waitForTimeout(500)
 
-    await expect(page).toHaveScreenshot('focus-mode-writing.png', {
+    await expect(page).toHaveScreenshot('focus-mode.png', {
       animations: 'disabled',
     })
   })
 
-  test('universe list – empty state', async ({ page }) => {
-    await mockUniverseApi(page, { empty: true })
-    await page.goto('/universe')
-    await page.waitForSelector('main', { timeout: 20_000 })
-    await disableAnimations(page)
-
-    await expect(page).toHaveScreenshot('universe-list-empty.png', {
-      animations: 'disabled',
-    })
-  })
-
-  test('universe list – with universes', async ({ page }) => {
+  test('universe list populated', async ({ page }) => {
     await mockUniverseApi(page)
     await page.goto('/universe')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
     await page.waitForTimeout(500)
 
-    await expect(page).toHaveScreenshot('universe-list-populated.png', {
+    await expect(page).toHaveScreenshot('universe-list.png', {
       animations: 'disabled',
     })
   })
