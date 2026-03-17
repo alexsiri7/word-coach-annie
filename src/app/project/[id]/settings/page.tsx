@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
@@ -8,12 +8,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 interface ProjectSettings {
   id: string;
   title: string;
   author: string;
   synopsis: string;
   genre: string;
+}
+
+interface ExportProgress {
+  stage: "preparing" | "downloading" | "complete" | "error";
+  bytesReceived: number;
+  totalBytes: number | null;
+  message: string;
 }
 
 export default function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +55,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [includeSceneBreaks, setIncludeSceneBreaks] = useState(true);
   const [chapterNumbering, setChapterNumbering] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -68,59 +91,86 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   };
 
   const handleExport = async (type: "manuscript" | "story-bible") => {
-    setExporting(type);
-    try {
-      const exportParams = buildExportParams();
-      const sep = exportParams ? "&" : "";
-      const res = await fetch(`/api/projects/${projectId}/export?type=${type}${sep}${exportParams}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${title || "export"}-${type}.md`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } finally {
-      setExporting(null);
-    }
+    const exportParams = buildExportParams();
+    const sep = exportParams ? "&" : "";
+    await downloadWithProgress(
+      `/api/projects/${projectId}/export?type=${type}${sep}${exportParams}`,
+      `${title || "export"}-${type}.md`,
+      type,
+    );
   };
 
-  const handleJsonExport = async () => {
-    setExporting("json");
+  const downloadWithProgress = useCallback(async (
+    url: string,
+    filename: string,
+    exportType: string,
+  ) => {
+    setExporting(exportType);
+    setExportProgress({ stage: "preparing", bytesReceived: 0, totalBytes: null, message: "Preparing export..." });
     try {
-      const res = await fetch(`/api/projects/${projectId}/export?type=json`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${title || "export"}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+      const res = await fetch(url);
+      if (!res.ok) {
+        setExportProgress({ stage: "error", bytesReceived: 0, totalBytes: null, message: "Export failed" });
+        return;
       }
+
+      const contentLength = res.headers.get("Content-Length");
+      const totalBytes = contentLength ? parseInt(contentLength, 10) : null;
+
+      if (!res.body) {
+        // Fallback for browsers without ReadableStream support
+        const blob = await res.blob();
+        triggerDownload(blob, filename);
+        setExportProgress({ stage: "complete", bytesReceived: blob.size, totalBytes: blob.size, message: formatBytes(blob.size) });
+        return;
+      }
+
+      setExportProgress({ stage: "downloading", bytesReceived: 0, totalBytes, message: "Downloading..." });
+
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let bytesReceived = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        bytesReceived += value.length;
+        setExportProgress({
+          stage: "downloading",
+          bytesReceived,
+          totalBytes,
+          message: totalBytes
+            ? `${formatBytes(bytesReceived)} / ${formatBytes(totalBytes)}`
+            : formatBytes(bytesReceived),
+        });
+      }
+
+      const blob = new Blob(chunks as BlobPart[]);
+      triggerDownload(blob, filename);
+      setExportProgress({ stage: "complete", bytesReceived, totalBytes: bytesReceived, message: formatBytes(bytesReceived) });
+    } catch {
+      setExportProgress({ stage: "error", bytesReceived: 0, totalBytes: null, message: "Export failed" });
     } finally {
       setExporting(null);
+      setTimeout(() => setExportProgress(null), 3000);
     }
+  }, []);
+
+  const handleJsonExport = async () => {
+    await downloadWithProgress(
+      `/api/projects/${projectId}/export?type=json`,
+      `${title || "export"}.json`,
+      "json",
+    );
   };
 
   const handleExportAll = async () => {
-    setExporting("export-all");
-    try {
-      const res = await fetch("/api/projects/export-all");
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `annie-export-${new Date().toISOString().slice(0, 10)}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } finally {
-      setExporting(null);
-    }
+    await downloadWithProgress(
+      "/api/projects/export-all",
+      `annie-export-${new Date().toISOString().slice(0, 10)}.zip`,
+      "export-all",
+    );
   };
 
   const handleChapterExport = async () => {
@@ -218,7 +268,21 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
 
         {/* Export */}
         <div className="glass-card p-6 mt-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Export</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-text-primary">Export</h2>
+            <Button
+              onClick={handleJsonExport}
+              disabled={!!exporting}
+              className="gap-2"
+            >
+              {exporting === "json" ? (
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Export Project
+            </Button>
+          </div>
 
           {/* Export options */}
           <div className="mb-5 p-4 rounded-lg bg-surface-overlay/30 border border-border-subtle space-y-3">
@@ -349,6 +413,52 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <span className="text-xs">Export All Projects (ZIP)</span>
             </Button>
           </div>
+
+          {/* Export progress indicator */}
+          {exportProgress && (
+            <div className="mt-4 p-3 rounded-lg bg-surface-overlay/30 border border-border-subtle">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-text-secondary">
+                  {exportProgress.stage === "complete" ? (
+                    <span className="flex items-center gap-1.5 text-green-400">
+                      <Check className="h-3.5 w-3.5" />
+                      Download complete
+                    </span>
+                  ) : exportProgress.stage === "error" ? (
+                    <span className="text-red-400">Export failed</span>
+                  ) : (
+                    exportProgress.message
+                  )}
+                </span>
+                <span className="text-xs text-text-muted">{exportProgress.message}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    exportProgress.stage === "complete"
+                      ? "bg-green-400"
+                      : exportProgress.stage === "error"
+                        ? "bg-red-400"
+                        : exportProgress.stage === "downloading" && !exportProgress.totalBytes
+                          ? "bg-accent animate-pulse w-2/3"
+                          : "bg-accent"
+                  }`}
+                  style={
+                    exportProgress.stage === "downloading" && !exportProgress.totalBytes
+                      ? undefined
+                      : {
+                          width:
+                            exportProgress.stage === "complete" || exportProgress.stage === "error"
+                              ? "100%"
+                              : exportProgress.totalBytes
+                                ? `${Math.round((exportProgress.bytesReceived / exportProgress.totalBytes) * 100)}%`
+                                : "5%",
+                        }
+                  }
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>
