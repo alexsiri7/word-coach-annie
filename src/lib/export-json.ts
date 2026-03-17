@@ -27,11 +27,37 @@ export async function exportProjectJson(projectId: string) {
         include: {
           fromNode: { select: { id: true, projectId: true } },
           fromObject: { select: { id: true, projectId: true } },
+          fromWorldObject: { select: { id: true, universeId: true } },
           toNode: { select: { id: true, projectId: true } },
           toObject: { select: { id: true, projectId: true } },
+          toWorldObject: { select: { id: true, universeId: true } },
         },
       }),
     ]);
+
+  // Fetch universe world objects if project belongs to a universe
+  let worldObjects: Awaited<ReturnType<typeof prisma.worldObject.findMany>> = [];
+  let timelineEntries: Awaited<ReturnType<typeof prisma.worldObjectTimelineEntry.findMany>> = [];
+  if (project.universeId) {
+    [worldObjects, timelineEntries] = await Promise.all([
+      prisma.worldObject.findMany({
+        where: { universeId: project.universeId },
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      }),
+      prisma.worldObjectTimelineEntry.findMany({
+        where: { worldObject: { universeId: project.universeId } },
+        orderBy: [{ worldObjectId: "asc" }, { orderIndex: "asc" }],
+      }),
+    ]);
+  }
+
+  // Build timeline entries lookup by worldObjectId
+  const timelineByObjectId = new Map<string, typeof timelineEntries>();
+  for (const entry of timelineEntries) {
+    const existing = timelineByObjectId.get(entry.worldObjectId) || [];
+    existing.push(entry);
+    timelineByObjectId.set(entry.worldObjectId, existing);
+  }
 
   // Get latest content versions for all scenes
   const sceneIds = structureNodes
@@ -45,17 +71,54 @@ export async function exportProjectJson(projectId: string) {
         })
       : [];
 
-  // Filter relationships to this project
+  // Collect world object IDs for relationship filtering
+  const worldObjectIds = new Set(worldObjects.map((o) => o.id));
+
+  // Filter relationships to this project (including world object relationships)
   const projectRelationships = relationships
     .filter((r) => {
       const fromProjectId = r.fromNode?.projectId || r.fromObject?.projectId;
       const toProjectId = r.toNode?.projectId || r.toObject?.projectId;
-      return fromProjectId === projectId || toProjectId === projectId;
+      if (fromProjectId === projectId || toProjectId === projectId) return true;
+      // Include relationships involving the project's universe world objects
+      if (r.fromWorldObjectId && worldObjectIds.has(r.fromWorldObjectId)) return true;
+      if (r.toWorldObjectId && worldObjectIds.has(r.toWorldObjectId)) return true;
+      return false;
     })
-    .map(({ fromNode: _fn, fromObject: _fo, toNode: _tn, toObject: _to, ...rel }) => rel);
+    .map(({ fromNode: _fn, fromObject: _fo, fromWorldObject: _fwo, toNode: _tn, toObject: _to, toWorldObject: _two, ...rel }) => rel);
+
+  // Build relationship lookup by entity ID (for inline relationships on objects)
+  const relationshipsByEntity = new Map<string, typeof projectRelationships>();
+  for (const rel of projectRelationships) {
+    const entityIds = [
+      rel.fromNodeId, rel.toNodeId,
+      rel.fromObjectId, rel.toObjectId,
+      rel.fromWorldObjectId, rel.toWorldObjectId,
+    ].filter(Boolean) as string[];
+    for (const eid of entityIds) {
+      const existing = relationshipsByEntity.get(eid) || [];
+      existing.push(rel);
+      relationshipsByEntity.set(eid, existing);
+    }
+  }
+
+  function formatRelationship(r: (typeof projectRelationships)[number]) {
+    return {
+      id: r.id,
+      type: r.type,
+      label: r.label,
+      fromNodeId: r.fromNodeId,
+      fromObjectId: r.fromObjectId,
+      fromWorldObjectId: r.fromWorldObjectId,
+      toNodeId: r.toNodeId,
+      toObjectId: r.toObjectId,
+      toWorldObjectId: r.toWorldObjectId,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
 
   return {
-    exportVersion: 1,
+    exportVersion: 2,
     exportedAt: new Date().toISOString(),
     project: {
       id: project.id,
@@ -64,6 +127,7 @@ export async function exportProjectJson(projectId: string) {
       synopsis: project.synopsis,
       genre: project.genre,
       projectType: project.projectType,
+      universeId: project.universeId,
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
     },
@@ -95,6 +159,28 @@ export async function exportProjectJson(projectId: string) {
       tags: o.tags,
       createdAt: o.createdAt.toISOString(),
       updatedAt: o.updatedAt.toISOString(),
+      relationships: (relationshipsByEntity.get(o.id) || []).map(formatRelationship),
+    })),
+    worldObjects: worldObjects.map((o) => ({
+      id: o.id,
+      type: o.type,
+      name: o.name,
+      description: o.description,
+      notes: o.notes,
+      tags: o.tags,
+      createdAt: o.createdAt.toISOString(),
+      updatedAt: o.updatedAt.toISOString(),
+      timeline: (timelineByObjectId.get(o.id) || []).map((t) => ({
+        id: t.id,
+        label: t.label,
+        orderIndex: t.orderIndex,
+        description: t.description,
+        attributes: t.attributes,
+        projectId: t.projectId,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+      })),
+      relationships: (relationshipsByEntity.get(o.id) || []).map(formatRelationship),
     })),
     annotations: annotations.map((a) => ({
       id: a.id,
@@ -106,16 +192,7 @@ export async function exportProjectJson(projectId: string) {
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     })),
-    relationships: projectRelationships.map((r) => ({
-      id: r.id,
-      type: r.type,
-      label: r.label,
-      fromNodeId: r.fromNodeId,
-      fromObjectId: r.fromObjectId,
-      toNodeId: r.toNodeId,
-      toObjectId: r.toObjectId,
-      createdAt: r.createdAt.toISOString(),
-    })),
+    relationships: projectRelationships.map(formatRelationship),
     chatHistory: chatMessages.map((m) => ({
       id: m.id,
       role: m.role,
