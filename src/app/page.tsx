@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cachedFetch } from "@/lib/offline/cache";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -69,10 +70,15 @@ export default function Dashboard() {
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
 
   const fetchProjects = async () => {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    setProjects(data.projects);
-    setLoading(false);
+    try {
+      const res = await cachedFetch("/api/projects");
+      const data = await res.json();
+      setProjects(data.projects);
+    } catch {
+      // No network and no cache — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

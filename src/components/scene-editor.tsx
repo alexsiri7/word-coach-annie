@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cachedFetch } from "@/lib/offline/cache";
 import { MessageSquare, AlertTriangle, RefreshCw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,9 +53,9 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     onNodeUpdated,
   });
 
-  // Load initial content
+  // Load initial content (with offline cache fallback)
   useEffect(() => {
-    fetch(`/api/nodes/${node.id}/content`)
+    cachedFetch(`/api/nodes/${node.id}/content`)
       .then((res) => res.json())
       .then((data) => {
         setInitialContent(commentsToBeats(data.latest?.content || ""));
@@ -63,13 +64,19 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
           setWordCount(data.latest.wordCount);
           setLatestVersionId(data.latest.id);
         }
-      });
+        if (Array.isArray(data.annotations)) {
+          setAnnotations(data.annotations);
+        }
+      })
+      .catch(() => { /* offline, no cache */ });
 
+    // Also fetch annotations separately (not cached route, but best-effort)
     fetch(`/api/nodes/${node.id}/annotations`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setAnnotations(data);
-      });
+      })
+      .catch(() => { /* offline */ });
   }, [node.id]);
 
   // Health check polling

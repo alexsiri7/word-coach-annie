@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cachedFetch } from "@/lib/offline/cache";
 import {
   Dialog,
   DialogContent,
@@ -102,24 +103,30 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Data fetching
   const fetchProject = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}`);
-    if (res.ok) setProject(await res.json());
+    try {
+      const res = await cachedFetch(`/api/projects/${projectId}`);
+      if (res.ok) setProject(await res.json());
+    } catch { /* offline, no cache */ }
   }, [projectId]);
 
   const fetchOutline = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/nodes`);
-    if (res.ok) {
-      const data = await res.json();
-      setOutline(data.tree || []);
-    }
+    try {
+      const res = await cachedFetch(`/api/projects/${projectId}/nodes`);
+      if (res.ok) {
+        const data = await res.json();
+        setOutline(data.tree || []);
+      }
+    } catch { /* offline, no cache */ }
   }, [projectId]);
 
   const fetchStoryObjects = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/story-objects`);
-    if (res.ok) {
-      const data = await res.json();
-      setStoryObjects(data.data || []);
-    }
+    try {
+      const res = await cachedFetch(`/api/projects/${projectId}/story-objects`);
+      if (res.ok) {
+        const data = await res.json();
+        setStoryObjects(data.data || []);
+      }
+    } catch { /* offline, no cache */ }
   }, [projectId]);
 
   useEffect(() => {
