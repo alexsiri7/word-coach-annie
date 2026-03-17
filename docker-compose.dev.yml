@@ -16,7 +16,19 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=file:/app/data/word-coach-annie.db
+      - OTEL_ENABLED=true
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
     command: /app/scripts/start-docker.sh
+    depends_on:
+      - phoenix
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6006:6006"
+    volumes:
+      - phoenix-data:/data
 
   tunnel:
     image: cloudflare/cloudflared:latest
@@ -24,3 +36,6 @@ services:
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     command: tunnel --no-autoupdate run
+
+volumes:
+  phoenix-data:
