@@ -38,7 +38,8 @@ function makeRequest(body: Record<string, unknown>): Request {
   }) as unknown as Request;
 }
 
-async function readSSE(response: Response): Promise<string[]> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readSSE(response: Response): Promise<any[]> {
   const text = await response.text();
   return text
     .split("\n\n")
@@ -114,7 +115,7 @@ describe("Chat route with tool use", () => {
     // Tool call event
     const toolCall = chunks.find((c: any) => c.type === "tool_call");
     expect(toolCall).toBeDefined();
-    expect(toolCall.name).toBe("get_outline");
+    expect(toolCall!.name).toBe("get_outline");
 
     // Tool result event
     const toolResult = chunks.find((c: any) => c.type === "tool_result");
