@@ -485,6 +485,113 @@ export class StructureController {
             where: { id: annotationId },
         });
     }
+    static async batchCreateNodes(
+        projectId: string,
+        nodes: Array<{
+            type: string;
+            title: string;
+            parentId?: string;
+            synopsis?: string;
+            status?: string;
+        }>
+    ) {
+        if (nodes.length === 0) throw new Error("nodes array must not be empty");
+        if (nodes.length > 50) throw new Error("Maximum 50 nodes per batch");
+
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { id: true },
+        });
+        if (!project) throw new Error(`Project not found: ${projectId}`);
+
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < nodes.length; i++) {
+            try {
+                const result = await StructureController.createNode({
+                    projectId,
+                    ...nodes[i],
+                });
+                results.push({ index: i, success: true, ...result });
+            } catch (e) {
+                errors.push({
+                    index: i,
+                    success: false,
+                    title: nodes[i].title,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+
+        return { created: results, errors, totalCreated: results.length, totalErrors: errors.length };
+    }
+
+    static async batchUpdateNodes(
+        updates: Array<{
+            nodeId: string;
+            title?: string;
+            synopsis?: string;
+            status?: string;
+            orderIndex?: number;
+            parentId?: string | null;
+        }>
+    ) {
+        if (updates.length === 0) throw new Error("updates array must not be empty");
+        if (updates.length > 50) throw new Error("Maximum 50 updates per batch");
+
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < updates.length; i++) {
+            const { nodeId, ...data } = updates[i];
+            try {
+                const result = await StructureController.updateNode(nodeId, data);
+                results.push({ index: i, success: true, ...result });
+            } catch (e) {
+                errors.push({
+                    index: i,
+                    success: false,
+                    nodeId,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+
+        return { updated: results, errors, totalUpdated: results.length, totalErrors: errors.length };
+    }
+
+    static async batchDeleteNodes(nodeIds: string[]) {
+        if (nodeIds.length === 0) throw new Error("nodeIds array must not be empty");
+        if (nodeIds.length > 50) throw new Error("Maximum 50 deletions per batch");
+
+        try {
+            autoSnapshot("batch_delete_nodes", `${nodeIds.length} nodes`);
+        } catch (e) {
+            logger.warn("Snapshot failed or not available", e);
+        }
+
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < nodeIds.length; i++) {
+            const nodeId = nodeIds[i];
+            try {
+                const result = await StructureController.deleteNode(nodeId);
+                results.push({ index: i, success: true, ...result });
+            } catch (e) {
+                errors.push({
+                    index: i,
+                    success: false,
+                    nodeId,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+
+        return { deleted: results, errors, totalDeleted: results.length, totalErrors: errors.length };
+    }
+
     static async getOpenAnnotations(projectId?: string) {
         const where: Record<string, unknown> = { resolved: false };
         if (projectId) {
