@@ -8,7 +8,7 @@ import {
   loadToolsetTool,
   DynamicToolset,
 } from "@/lib/ai/adk-tools";
-import { getAllTools, getToolDefinitions, getCoreTools } from "@/lib/ai/tool-registry";
+import { getAllTools, getCoreTools } from "@/lib/ai/tool-registry";
 
 describe("ADK tools", () => {
   describe("tool coverage", () => {
