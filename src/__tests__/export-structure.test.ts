@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { exportProjectStructure } from "@/lib/export-structure";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
-import { testPrisma } from "./setup";
+import "./setup";
 
 describe("exportProjectStructure", () => {
   let projectId: string;
@@ -28,12 +28,12 @@ describe("exportProjectStructure", () => {
   });
 
   it("exports flat chapters without parts", async () => {
-    const ch1 = await StructureController.createNode({
+    await StructureController.createNode({
       projectId,
       type: "CHAPTER",
       title: "Chapter One",
     });
-    const ch2 = await StructureController.createNode({
+    await StructureController.createNode({
       projectId,
       type: "CHAPTER",
       title: "Chapter Two",
