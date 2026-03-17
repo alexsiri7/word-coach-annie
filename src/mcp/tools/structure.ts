@@ -105,6 +105,42 @@ export async function resolveAnnotation(annotationId: string, resolved: boolean)
     return StructureController.resolveAnnotation(annotationId, resolved);
 }
 
+export async function batchCreateNodes(
+    projectId: string,
+    nodes: Array<{
+        type: string;
+        title: string;
+        parentId?: string;
+        synopsis?: string;
+        status?: string;
+    }>
+) {
+    const result = await StructureController.batchCreateNodes(projectId, nodes);
+    invalidateStructureCaches(projectId);
+    return result;
+}
+
+export async function batchUpdateNodes(
+    updates: Array<{
+        nodeId: string;
+        title?: string;
+        synopsis?: string;
+        status?: string;
+        orderIndex?: number;
+        parentId?: string | null;
+    }>
+) {
+    const result = await StructureController.batchUpdateNodes(updates);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function batchDeleteNodes(nodeIds: string[]) {
+    const result = await StructureController.batchDeleteNodes(nodeIds);
+    invalidateStructureCaches();
+    return result;
+}
+
 export async function getOpenAnnotations(projectId?: string) {
     return StructureController.getOpenAnnotations(projectId);
 }

@@ -66,3 +66,51 @@ export async function deleteStoryObject(objectId: string) {
     mcpCache.invalidatePrefix("relationships:");
     return result;
 }
+
+export async function batchCreateStoryObjects(
+    projectId: string,
+    objects: Array<{
+        type: string;
+        name: string;
+        description?: string;
+        notes?: string;
+        role?: string;
+        tags?: string;
+    }>
+) {
+    const result = await StoryObjectController.batchCreateStoryObjects(projectId, objects);
+    mcpCache.invalidatePrefix(`storyObjects:${projectId}:`);
+    mcpCache.invalidatePrefix("projects:");
+    mcpCache.delete(`projectSummary:${projectId}`);
+    return result;
+}
+
+export async function batchUpdateStoryObjects(
+    updates: Array<{
+        objectId: string;
+        name?: string;
+        description?: string;
+        notes?: string;
+        role?: string | null;
+        tags?: string;
+    }>
+) {
+    const result = await StoryObjectController.batchUpdateStoryObjects(updates);
+    mcpCache.invalidatePrefix("storyObjects:");
+    for (const u of updates) {
+        mcpCache.delete(`storyObject:${u.objectId}`);
+    }
+    return result;
+}
+
+export async function batchDeleteStoryObjects(objectIds: string[]) {
+    const result = await StoryObjectController.batchDeleteStoryObjects(objectIds);
+    mcpCache.invalidatePrefix("storyObjects:");
+    mcpCache.invalidatePrefix("projects:");
+    mcpCache.invalidatePrefix("projectSummary:");
+    mcpCache.invalidatePrefix("relationships:");
+    for (const id of objectIds) {
+        mcpCache.delete(`storyObject:${id}`);
+    }
+    return result;
+}
