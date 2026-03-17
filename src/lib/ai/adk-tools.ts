@@ -10,6 +10,8 @@ import { FunctionTool, BaseToolset } from "@google/adk";
 import type { BaseTool, ToolPredicate, ToolInputParameters } from "@google/adk";
 import type { ReadonlyContext } from "@google/adk";
 import { z, ZodObject, ZodRawShape } from "zod";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { getTracer } from "@/lib/telemetry";
 
 // ADK bundles its own zod v3 copy. The project's zod is structurally identical
 // but TypeScript treats them as separate types due to private fields. We cast
@@ -775,7 +777,31 @@ function toAdkTool(def: ToolDefinition): FunctionTool {
     // Cast: project zod v3 ↔ ADK's bundled zod v3 are structurally identical
     parameters: def.parameters as unknown as AdkParams,
     execute: async (input) => {
-      return executor(input as Record<string, unknown>);
+      const tracer = getTracer();
+      return tracer.startActiveSpan(`tool.${def.name}`, async (span) => {
+        try {
+          span.setAttribute("tool.name", def.name);
+          span.setAttribute("tool.category", def.category);
+          const inputStr = JSON.stringify(input);
+          // Cap at 4KB to avoid bloating traces
+          span.setAttribute("tool.input", inputStr.slice(0, 4096));
+
+          const result = await executor(input as Record<string, unknown>);
+
+          const resultStr = JSON.stringify(result);
+          span.setAttribute("tool.output", resultStr.slice(0, 4096));
+          span.setStatus({ code: SpanStatusCode.OK });
+          return result;
+        } catch (err) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
     },
   });
 }
