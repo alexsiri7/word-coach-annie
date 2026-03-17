@@ -1,13 +1,11 @@
 import {
   getDB,
-  idbPut,
   idbGet,
   idbGetAll,
   idbGetNodesByProject,
   idbGetStoryObjectsByProject,
   idbGetContentByNode,
   idbGetAnnotationsByNode,
-  idbDelete,
   type AnnieDBSchema,
 } from "./idb";
 
@@ -32,10 +30,11 @@ interface RouteMatch {
 
 // ─── Route definitions ──────────────────────────────────────────────────────
 
-const ROUTES: { pattern: RegExp; route: CacheRoute }[] = [
+const ROUTES: { pattern: RegExp; parseParams: (m: RegExpMatchArray) => Record<string, string>; route: CacheRoute }[] = [
   {
     // GET /api/projects — project list
     pattern: /^\/api\/projects\/?$/,
+    parseParams: () => ({}),
     route: {
       store: "projects",
       extract: (json) => {
@@ -61,7 +60,8 @@ const ROUTES: { pattern: RegExp; route: CacheRoute }[] = [
   },
   {
     // GET /api/projects/:id — single project
-    pattern: /^\/api\/projects\/(?<id>[^/]+)\/?$/,
+    pattern: /^\/api\/projects\/([^/]+)\/?$/,
+    parseParams: (m) => ({ id: m[1] }),
     route: {
       store: "projects",
       extract: (json) => {
@@ -88,7 +88,8 @@ const ROUTES: { pattern: RegExp; route: CacheRoute }[] = [
   },
   {
     // GET /api/projects/:id/nodes — outline tree
-    pattern: /^\/api\/projects\/(?<id>[^/]+)\/nodes\/?$/,
+    pattern: /^\/api\/projects\/([^/]+)\/nodes\/?$/,
+    parseParams: (m) => ({ id: m[1] }),
     route: {
       store: "structureNodes",
       extract: (json) => {
@@ -143,7 +144,8 @@ const ROUTES: { pattern: RegExp; route: CacheRoute }[] = [
   },
   {
     // GET /api/projects/:id/story-objects — story objects list
-    pattern: /^\/api\/projects\/(?<id>[^/]+)\/story-objects\/?$/,
+    pattern: /^\/api\/projects\/([^/]+)\/story-objects\/?$/,
+    parseParams: (m) => ({ id: m[1] }),
     route: {
       store: "storyObjects",
       extract: (json) => {
@@ -169,7 +171,8 @@ const ROUTES: { pattern: RegExp; route: CacheRoute }[] = [
   },
   {
     // GET /api/nodes/:id/content — scene content + annotations
-    pattern: /^\/api\/nodes\/(?<id>[^/]+)\/content\/?$/,
+    pattern: /^\/api\/nodes\/([^/]+)\/content\/?$/,
+    parseParams: (m) => ({ id: m[1] }),
     route: {
       store: "contentVersions",
       extract: (json) => {
@@ -238,10 +241,10 @@ async function cacheAnnotations(annotations: Record<string, unknown>[]) {
 function matchRoute(url: string): RouteMatch | null {
   // Strip query string
   const path = url.split("?")[0];
-  for (const { pattern, route } of ROUTES) {
+  for (const { pattern, parseParams, route } of ROUTES) {
     const match = path.match(pattern);
     if (match) {
-      return { route, params: match.groups || {} };
+      return { route, params: parseParams(match) };
     }
   }
   return null;
