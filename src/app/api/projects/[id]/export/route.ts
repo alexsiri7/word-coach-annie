@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { exportProjectJson } from "@/lib/export-json";
+import { exportProjectStructure } from "@/lib/export-structure";
 
 interface OutlineNode {
   id: string;
@@ -329,6 +330,18 @@ export async function GET(
   let resolvedFormat = format;
   if (format === "manuscript") resolvedFormat = "full";
   if (format === "story-bible") resolvedFormat = "bible";
+
+  // Structure export (hierarchical parts → chapters → scenes with metadata)
+  if (resolvedFormat === "structure") {
+    const data = await exportProjectStructure(id);
+    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}_structure.json`;
+    return new NextResponse(JSON.stringify(data, null, 2), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
 
   // JSON export
   if (resolvedFormat === "json") {
