@@ -19,6 +19,8 @@ import type {
   Tool,
 } from "@google/genai";
 import OpenAI from "openai";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { getTracer } from "@/lib/telemetry";
 
 // ─── OpenAI ↔ ADK type translations ─────────────────────────────────────────
 
@@ -214,40 +216,90 @@ export class OpenAICompatibleLlm extends BaseLlm {
     llmRequest: LlmRequest,
     _stream?: boolean,
   ): AsyncGenerator<LlmResponse, void> {
-    // Build OpenAI messages from ADK request
-    const messages: OpenAI.ChatCompletionMessageParam[] = [];
+    const tracer = getTracer();
+    const modelName = llmRequest.model ?? this.model;
+    const toolDefs = llmRequest.config?.tools as Tool[] | undefined;
+    const toolCount = toolDefs
+      ? toolDefs.reduce((n, t) => n + (t.functionDeclarations?.length ?? 0), 0)
+      : 0;
 
-    // System instruction
-    const systemInstruction = llmRequest.config?.systemInstruction;
-    const systemMsg = systemInstructionToOpenAI(
-      systemInstruction as Content | string | undefined,
-    );
-    if (systemMsg) {
-      messages.push(systemMsg);
+    const span = tracer.startSpan("llm.generate");
+    try {
+      span.setAttribute("llm.model", modelName);
+      span.setAttribute("llm.tool_count", toolCount);
+      span.setAttribute("llm.message_count", llmRequest.contents.length);
+
+      // Build OpenAI messages from ADK request
+      const messages: OpenAI.ChatCompletionMessageParam[] = [];
+
+      // System instruction
+      const systemInstruction = llmRequest.config?.systemInstruction;
+      const systemMsg = systemInstructionToOpenAI(
+        systemInstruction as Content | string | undefined,
+      );
+      if (systemMsg) {
+        messages.push(systemMsg);
+      }
+
+      // Conversation contents
+      messages.push(...contentsToOpenAI(llmRequest.contents));
+
+      // Tools
+      const tools = toolsToOpenAI(toolDefs);
+
+      // Make the API call (non-streaming for now — streaming can be added later)
+      const response = await this.client.chat.completions.create({
+        model: modelName,
+        messages,
+        tools,
+        temperature: llmRequest.config?.temperature ?? undefined,
+        top_p: llmRequest.config?.topP ?? undefined,
+        max_tokens:
+          (llmRequest.config as Record<string, unknown>)?.maxOutputTokens as
+            | number
+            | undefined,
+      });
+
+      // Record response metadata
+      if (response.usage) {
+        span.setAttribute(
+          "llm.usage.prompt_tokens",
+          response.usage.prompt_tokens,
+        );
+        span.setAttribute(
+          "llm.usage.completion_tokens",
+          response.usage.completion_tokens,
+        );
+        span.setAttribute(
+          "llm.usage.total_tokens",
+          response.usage.total_tokens,
+        );
+      }
+
+      const choice = response.choices[0];
+      if (choice) {
+        span.setAttribute(
+          "llm.finish_reason",
+          choice.finish_reason ?? "unknown",
+        );
+        span.setAttribute(
+          "llm.tool_calls_count",
+          choice.message.tool_calls?.length ?? 0,
+        );
+      }
+
+      span.setStatus({ code: SpanStatusCode.OK });
+
+      yield openAIResponseToLlmResponse(response);
+    } catch (err) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    } finally {
+      span.end();
     }
-
-    // Conversation contents
-    messages.push(...contentsToOpenAI(llmRequest.contents));
-
-    // Tools
-    const tools = toolsToOpenAI(
-      llmRequest.config?.tools as Tool[] | undefined,
-    );
-
-    // Make the API call (non-streaming for now — streaming can be added later)
-    const response = await this.client.chat.completions.create({
-      model: llmRequest.model ?? this.model,
-      messages,
-      tools,
-      temperature: llmRequest.config?.temperature ?? undefined,
-      top_p: llmRequest.config?.topP ?? undefined,
-      max_tokens:
-        (llmRequest.config as Record<string, unknown>)?.maxOutputTokens as
-          | number
-          | undefined,
-    });
-
-    yield openAIResponseToLlmResponse(response);
   }
 
   async connect(_llmRequest: LlmRequest): Promise<BaseLlmConnection> {

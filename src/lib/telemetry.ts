@@ -13,6 +13,7 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
+import { trace, type Tracer } from "@opentelemetry/api";
 
 let sdk: NodeSDK | null = null;
 
@@ -34,6 +35,11 @@ export function initTelemetry() {
   });
 
   sdk.start();
+}
+
+/** Get a tracer for the given instrumentation scope. */
+export function getTracer(name = "word-coach-annie"): Tracer {
+  return trace.getTracer(name);
 }
 
 export async function shutdownTelemetry() {

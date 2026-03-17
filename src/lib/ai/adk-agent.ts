@@ -18,6 +18,8 @@ import type { Content } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
 import type { ToolCategory } from "./adk-tools";
 import { OpenAICompatibleLlm } from "./adk-openai-llm";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { getTracer } from "@/lib/telemetry";
 
 const AGENT_NAME = "writing_assistant";
 
@@ -36,105 +38,138 @@ export async function runChatAgent(params: {
   userMessage: string;
   aiConfig: { baseUrl: string; apiKey: string; model: string };
 }): Promise<ChatAgentResult> {
-  const llm = new OpenAICompatibleLlm({
-    model: params.aiConfig.model,
-    apiKey: params.aiConfig.apiKey,
-    baseUrl: params.aiConfig.baseUrl,
-  });
+  const tracer = getTracer();
 
-  const toolset = new DynamicToolset();
+  return tracer.startActiveSpan("agent.run", async (span) => {
+    try {
+      span.setAttribute("agent.name", AGENT_NAME);
+      span.setAttribute("agent.model", params.aiConfig.model);
+      span.setAttribute("agent.history_length", params.chatHistory.length);
+      span.setAttribute(
+        "agent.user_message_length",
+        params.userMessage.length,
+      );
 
-  const agent = new LlmAgent({
-    name: AGENT_NAME,
-    model: llm,
-    instruction: params.systemPrompt,
-    tools: [toolset],
-    afterToolCallback: async ({ tool, args }) => {
-      // When load_toolset is called, expand the DynamicToolset so subsequent
-      // LLM turns see the newly loaded category's tools.
-      if (tool.name === "load_toolset") {
-        const { category } = args as { category: string };
-        toolset.loadCategory(category as ToolCategory);
-      }
-      return undefined;
-    },
-  });
+      const llm = new OpenAICompatibleLlm({
+        model: params.aiConfig.model,
+        apiKey: params.aiConfig.apiKey,
+        baseUrl: params.aiConfig.baseUrl,
+      });
 
-  const runner = new InMemoryRunner({ agent, appName: "word-coach-annie" });
+      const toolset = new DynamicToolset();
 
-  // Create session and populate with chat history
-  const session = await runner.sessionService.createSession({
-    appName: "word-coach-annie",
-    userId: "default",
-  });
-
-  for (const msg of params.chatHistory) {
-    if (msg.role === "system") continue; // Skip tool log system messages
-    await runner.sessionService.appendEvent({
-      session,
-      event: createEvent({
-        author: msg.role === "assistant" ? AGENT_NAME : "user",
-        content: {
-          role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.content }],
+      const agent = new LlmAgent({
+        name: AGENT_NAME,
+        model: llm,
+        instruction: params.systemPrompt,
+        tools: [toolset],
+        afterToolCallback: async ({ tool, args }) => {
+          // When load_toolset is called, expand the DynamicToolset so subsequent
+          // LLM turns see the newly loaded category's tools.
+          if (tool.name === "load_toolset") {
+            const { category } = args as { category: string };
+            toolset.loadCategory(category as ToolCategory);
+          }
+          return undefined;
         },
-        actions: createEventActions(),
-        invocationId: "history",
-      }),
-    });
-  }
+      });
 
-  // Run the agent with the new user message
-  const newMessage: Content = {
-    role: "user",
-    parts: [{ text: params.userMessage }],
-  };
+      const runner = new InMemoryRunner({
+        agent,
+        appName: "word-coach-annie",
+      });
 
-  const toolLog: ChatAgentResult["toolLog"] = [];
-  let finalContent = "";
-  const pendingCalls = new Map<
-    string,
-    { name: string; args: Record<string, unknown> }
-  >();
+      // Create session and populate with chat history
+      const session = await runner.sessionService.createSession({
+        appName: "word-coach-annie",
+        userId: "default",
+      });
 
-  for await (const event of runner.runAsync({
-    userId: "default",
-    sessionId: session.id,
-    newMessage,
-  })) {
-    // Collect tool calls
-    for (const call of getFunctionCalls(event)) {
-      if (call.id && call.name) {
-        pendingCalls.set(call.id, {
-          name: call.name,
-          args: (call.args ?? {}) as Record<string, unknown>,
+      for (const msg of params.chatHistory) {
+        if (msg.role === "system") continue; // Skip tool log system messages
+        await runner.sessionService.appendEvent({
+          session,
+          event: createEvent({
+            author: msg.role === "assistant" ? AGENT_NAME : "user",
+            content: {
+              role: msg.role === "assistant" ? "model" : "user",
+              parts: [{ text: msg.content }],
+            },
+            actions: createEventActions(),
+            invocationId: "history",
+          }),
         });
       }
-    }
 
-    // Match tool results to their calls
-    for (const resp of getFunctionResponses(event)) {
-      const callInfo = pendingCalls.get(resp.id ?? "");
-      if (callInfo) {
-        toolLog.push({
-          tool: callInfo.name,
-          args: callInfo.args,
-          result: JSON.stringify(resp.response ?? {}),
-        });
-        pendingCalls.delete(resp.id ?? "");
+      // Run the agent with the new user message
+      const newMessage: Content = {
+        role: "user",
+        parts: [{ text: params.userMessage }],
+      };
+
+      const toolLog: ChatAgentResult["toolLog"] = [];
+      let finalContent = "";
+      const pendingCalls = new Map<
+        string,
+        { name: string; args: Record<string, unknown> }
+      >();
+
+      for await (const event of runner.runAsync({
+        userId: "default",
+        sessionId: session.id,
+        newMessage,
+      })) {
+        // Collect tool calls
+        for (const call of getFunctionCalls(event)) {
+          if (call.id && call.name) {
+            pendingCalls.set(call.id, {
+              name: call.name,
+              args: (call.args ?? {}) as Record<string, unknown>,
+            });
+          }
+        }
+
+        // Match tool results to their calls
+        for (const resp of getFunctionResponses(event)) {
+          const callInfo = pendingCalls.get(resp.id ?? "");
+          if (callInfo) {
+            toolLog.push({
+              tool: callInfo.name,
+              args: callInfo.args,
+              result: JSON.stringify(resp.response ?? {}),
+            });
+            pendingCalls.delete(resp.id ?? "");
+          }
+        }
+
+        // Capture final text content from the agent (not tool call/result events)
+        if (
+          event.author === AGENT_NAME &&
+          getFunctionCalls(event).length === 0 &&
+          getFunctionResponses(event).length === 0
+        ) {
+          const text = stringifyContent(event);
+          if (text) finalContent = text;
+        }
       }
-    }
 
-    // Capture final text content from the agent (not tool call/result events)
-    if (
-      event.author === AGENT_NAME &&
-      getFunctionCalls(event).length === 0 &&
-      getFunctionResponses(event).length === 0
-    ) {
-      const text = stringifyContent(event);
-      if (text) finalContent = text;
-    }
-  }
+      // Record summary attributes
+      span.setAttribute("agent.tool_calls_total", toolLog.length);
+      span.setAttribute(
+        "agent.response_length",
+        finalContent.length,
+      );
+      span.setStatus({ code: SpanStatusCode.OK });
 
-  return { finalContent, toolLog };
+      return { finalContent, toolLog };
+    } catch (err) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    } finally {
+      span.end();
+    }
+  });
 }
