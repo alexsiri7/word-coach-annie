@@ -1,5 +1,49 @@
 import { prisma } from "@/lib/db";
 
+/** Strip beat markers (HTML comments and editor divs) from HTML content */
+export function stripBeatMarkers(html: string): string {
+  let result = html;
+  // Strip HTML comment beats: <!-- beat: ... -->
+  result = result.replace(/<!-- beat: [\s\S]*?-->/g, "");
+  // Strip editor beat divs: <div data-type="beat-annotation">...</div>
+  result = result.replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, "");
+  return result;
+}
+
+/** Convert HTML content to plain text, stripping all tags and beat markers */
+export function htmlToPlainText(html: string): string {
+  if (!html || html === "<p></p>") return "";
+
+  let text = stripBeatMarkers(html);
+
+  // Convert block elements to newlines
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<\/h[1-6]>/gi, "\n\n");
+  text = text.replace(/<\/li>/gi, "\n");
+  text = text.replace(/<\/(?:ul|ol|blockquote)>/gi, "\n");
+
+  // Strip all remaining HTML tags
+  text = text.replace(/<[^>]+>/g, "");
+
+  // Decode HTML entities
+  text = text.replace(/&amp;/g, "&");
+  text = text.replace(/&lt;/g, "<");
+  text = text.replace(/&gt;/g, ">");
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&ldquo;/g, "\u201C");
+  text = text.replace(/&rdquo;/g, "\u201D");
+  text = text.replace(/&mdash;/g, "\u2014");
+  text = text.replace(/&ndash;/g, "\u2013");
+  text = text.replace(/&nbsp;/g, " ");
+
+  // Clean up whitespace
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  return text.trim();
+}
+
 export async function exportProjectJson(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error(`Project not found: ${projectId}`);
@@ -82,6 +126,8 @@ export async function exportProjectJson(projectId: string) {
       id: v.id,
       nodeId: v.nodeId,
       content: v.content,
+      contentHtml: stripBeatMarkers(v.content),
+      contentPlainText: htmlToPlainText(v.content),
       wordCount: v.wordCount,
       createdAt: v.createdAt.toISOString(),
     })),

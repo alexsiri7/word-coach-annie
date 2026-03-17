@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { stripBeatMarkers, htmlToPlainText } from "@/lib/export-json";
 
 // Test the HTML-to-Markdown conversion logic used in export
 function htmlToMarkdown(html: string): string {
@@ -80,5 +81,73 @@ describe("HTML to Markdown conversion", () => {
     expect(md).toContain("*dark*");
     expect(md).toContain("- A sword");
     expect(md).toContain("- A shield");
+  });
+});
+
+describe("stripBeatMarkers", () => {
+  it("strips HTML comment beats", () => {
+    const html = '<p>Hello</p><!-- beat: Action scene --><p>World</p>';
+    expect(stripBeatMarkers(html)).toBe("<p>Hello</p><p>World</p>");
+  });
+
+  it("strips editor beat divs", () => {
+    const html = '<p>Hello</p><div data-type="beat-annotation">Chase scene</div><p>World</p>';
+    expect(stripBeatMarkers(html)).toBe("<p>Hello</p><p>World</p>");
+  });
+
+  it("strips multiple beats", () => {
+    const html = '<!-- beat: First --><!-- beat: Second --><p>Content</p>';
+    expect(stripBeatMarkers(html)).toBe("<p>Content</p>");
+  });
+
+  it("returns HTML unchanged when no beats present", () => {
+    const html = "<p>No beats here</p>";
+    expect(stripBeatMarkers(html)).toBe(html);
+  });
+
+  it("strips multiline beat comments", () => {
+    const html = '<p>Before</p><!-- beat: This is\na multiline\nbeat --><p>After</p>';
+    expect(stripBeatMarkers(html)).toBe("<p>Before</p><p>After</p>");
+  });
+});
+
+describe("htmlToPlainText", () => {
+  it("converts empty or minimal HTML", () => {
+    expect(htmlToPlainText("")).toBe("");
+    expect(htmlToPlainText("<p></p>")).toBe("");
+  });
+
+  it("converts paragraphs to plain text", () => {
+    expect(htmlToPlainText("<p>Hello world</p>")).toBe("Hello world");
+    expect(htmlToPlainText("<p>First</p><p>Second</p>")).toBe("First\n\nSecond");
+  });
+
+  it("strips formatting tags", () => {
+    expect(htmlToPlainText("<p><strong>bold</strong> and <em>italic</em></p>")).toBe("bold and italic");
+  });
+
+  it("strips beat markers from plain text", () => {
+    const html = '<p>Before beat</p><!-- beat: Action --><p>After beat</p>';
+    const text = htmlToPlainText(html);
+    expect(text).toBe("Before beat\n\nAfter beat");
+    expect(text).not.toContain("beat:");
+    expect(text).not.toContain("Action");
+  });
+
+  it("strips editor beat divs from plain text", () => {
+    const html = '<p>Content</p><div data-type="beat-annotation">Chase</div><p>More</p>';
+    const text = htmlToPlainText(html);
+    expect(text).toBe("Content\n\nMore");
+    expect(text).not.toContain("Chase");
+  });
+
+  it("decodes HTML entities", () => {
+    expect(htmlToPlainText("<p>A &amp; B</p>")).toBe("A & B");
+    expect(htmlToPlainText("<p>&ldquo;Hello&rdquo;</p>")).toBe("\u201CHello\u201D");
+    expect(htmlToPlainText("<p>dash &mdash; here</p>")).toBe("dash \u2014 here");
+  });
+
+  it("handles line breaks", () => {
+    expect(htmlToPlainText("<p>Line one<br>Line two</p>")).toBe("Line one\nLine two");
   });
 });
