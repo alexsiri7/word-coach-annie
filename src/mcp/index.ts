@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { SpanStatusCode } from "@opentelemetry/api";
 import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
 import { env } from "@/lib/env";
+import { getTracer } from "@/lib/telemetry";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -92,6 +94,39 @@ const server = new McpServer({
     name: "word-coach-annie",
     version: "1.0.0",
 });
+
+// Instrument all MCP tool handlers with OTEL spans.
+// Wraps the original server.tool() so every handler runs inside an `mcp.tool.<name>` span.
+const _originalTool = server.tool.bind(server);
+server.tool = ((...args: unknown[]) => {
+    // server.tool() has multiple overloads; the handler is always the last arg
+    // and the tool name is always the first.
+    const toolName = args[0] as string;
+    const handlerIdx = args.length - 1;
+    const originalHandler = args[handlerIdx] as (...a: unknown[]) => Promise<unknown>;
+
+    args[handlerIdx] = async (...handlerArgs: unknown[]) => {
+        const tracer = getTracer();
+        return tracer.startActiveSpan(`mcp.tool.${toolName}`, async (span) => {
+            try {
+                span.setAttribute("mcp.tool.name", toolName);
+                const result = await originalHandler(...handlerArgs);
+                span.setStatus({ code: SpanStatusCode.OK });
+                return result;
+            } catch (err) {
+                span.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: err instanceof Error ? err.message : String(err),
+                });
+                throw err;
+            } finally {
+                span.end();
+            }
+        });
+    };
+
+    return (_originalTool as (...a: unknown[]) => unknown)(...args);
+}) as typeof server.tool;
 
 /** Guard for destructive tools — returns error if not allowed. */
 function destructiveGuard(): { content: [{ type: "text"; text: string }]; isError: true } | null {

@@ -4,10 +4,19 @@
  * Designed to avoid repeated DB queries during a single agent session.
  * The cache lives in the Node.js process — it resets when the MCP server restarts.
  */
+import { trace } from "@opentelemetry/api";
 
 interface CacheEntry<T> {
     value: T;
     expiresAt: number;
+}
+
+/** Add a cache event to the current active span (if any). */
+function addCacheEvent(eventName: string, attrs: Record<string, string | number>) {
+    const span = trace.getActiveSpan();
+    if (span) {
+        span.addEvent(eventName, attrs);
+    }
 }
 
 export class TTLCache {
@@ -23,11 +32,16 @@ export class TTLCache {
 
     get<T>(key: string): T | undefined {
         const entry = this.store.get(key);
-        if (!entry) return undefined;
-        if (Date.now() > entry.expiresAt) {
-            this.store.delete(key);
+        if (!entry) {
+            addCacheEvent("cache.miss", { "cache.key": key });
             return undefined;
         }
+        if (Date.now() > entry.expiresAt) {
+            this.store.delete(key);
+            addCacheEvent("cache.miss", { "cache.key": key, "cache.reason": "expired" });
+            return undefined;
+        }
+        addCacheEvent("cache.hit", { "cache.key": key });
         return entry.value as T;
     }
 
@@ -57,16 +71,25 @@ export class TTLCache {
 
     /** Invalidate all keys matching a prefix. */
     invalidatePrefix(prefix: string): void {
+        let count = 0;
         for (const key of this.store.keys()) {
             if (key.startsWith(prefix)) {
                 this.store.delete(key);
+                count++;
             }
+        }
+        if (count > 0) {
+            addCacheEvent("cache.invalidate", { "cache.prefix": prefix, "cache.invalidated_count": count });
         }
     }
 
     /** Invalidate everything. */
     clear(): void {
+        const count = this.store.size;
         this.store.clear();
+        if (count > 0) {
+            addCacheEvent("cache.clear", { "cache.invalidated_count": count });
+        }
     }
 
     /** Number of entries (including expired ones not yet evicted). */
