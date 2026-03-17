@@ -1,4 +1,5 @@
 import { StoryObjectController } from "@/lib/controllers/story-objects";
+import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
 
 function storyObjectsKey(params: { projectId: string; type?: string; search?: string; limit?: number; offset?: number }): string {
@@ -78,7 +79,12 @@ export async function batchCreateStoryObjects(
         tags?: string;
     }>
 ) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", objects.length);
+    span?.setAttribute("batch.operation", "create_story_objects");
     const result = await StoryObjectController.batchCreateStoryObjects(projectId, objects);
+    span?.setAttribute("batch.total_created", result.totalCreated ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     mcpCache.invalidatePrefix(`storyObjects:${projectId}:`);
     mcpCache.invalidatePrefix("projects:");
     mcpCache.delete(`projectSummary:${projectId}`);
@@ -95,7 +101,12 @@ export async function batchUpdateStoryObjects(
         tags?: string;
     }>
 ) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", updates.length);
+    span?.setAttribute("batch.operation", "update_story_objects");
     const result = await StoryObjectController.batchUpdateStoryObjects(updates);
+    span?.setAttribute("batch.total_updated", result.totalUpdated ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     mcpCache.invalidatePrefix("storyObjects:");
     for (const u of updates) {
         mcpCache.delete(`storyObject:${u.objectId}`);
@@ -104,7 +115,12 @@ export async function batchUpdateStoryObjects(
 }
 
 export async function batchDeleteStoryObjects(objectIds: string[]) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", objectIds.length);
+    span?.setAttribute("batch.operation", "delete_story_objects");
     const result = await StoryObjectController.batchDeleteStoryObjects(objectIds);
+    span?.setAttribute("batch.total_deleted", result.totalDeleted ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     mcpCache.invalidatePrefix("storyObjects:");
     mcpCache.invalidatePrefix("projects:");
     mcpCache.invalidatePrefix("projectSummary:");

@@ -1,4 +1,5 @@
 import { StructureController } from "@/lib/controllers/structure";
+import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
 
 /** Invalidate caches affected by structure/content changes. */
@@ -115,7 +116,12 @@ export async function batchCreateNodes(
         status?: string;
     }>
 ) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", nodes.length);
+    span?.setAttribute("batch.operation", "create_nodes");
     const result = await StructureController.batchCreateNodes(projectId, nodes);
+    span?.setAttribute("batch.total_created", result.totalCreated ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     invalidateStructureCaches(projectId);
     return result;
 }
@@ -130,13 +136,23 @@ export async function batchUpdateNodes(
         parentId?: string | null;
     }>
 ) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", updates.length);
+    span?.setAttribute("batch.operation", "update_nodes");
     const result = await StructureController.batchUpdateNodes(updates);
+    span?.setAttribute("batch.total_updated", result.totalUpdated ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     invalidateStructureCaches();
     return result;
 }
 
 export async function batchDeleteNodes(nodeIds: string[]) {
+    const span = trace.getActiveSpan();
+    span?.setAttribute("batch.size", nodeIds.length);
+    span?.setAttribute("batch.operation", "delete_nodes");
     const result = await StructureController.batchDeleteNodes(nodeIds);
+    span?.setAttribute("batch.total_deleted", result.totalDeleted ?? 0);
+    span?.setAttribute("batch.total_errors", result.totalErrors ?? 0);
     invalidateStructureCaches();
     return result;
 }
