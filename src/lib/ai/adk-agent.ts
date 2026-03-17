@@ -16,7 +16,7 @@ import {
 } from "@google/adk";
 import type { Content } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
-import type { ToolCategory } from "./tool-registry";
+import type { ToolCategory } from "./adk-tools";
 import { OpenAICompatibleLlm } from "./adk-openai-llm";
 
 const AGENT_NAME = "writing_assistant";

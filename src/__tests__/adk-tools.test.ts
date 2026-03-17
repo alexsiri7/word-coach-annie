@@ -7,12 +7,12 @@ import {
   getAdkCategories,
   loadToolsetTool,
   DynamicToolset,
+  getAllTools,
 } from "@/lib/ai/adk-tools";
-import { getAllTools, getCoreTools } from "@/lib/ai/tool-registry";
 
 describe("ADK tools", () => {
   describe("tool coverage", () => {
-    it("should have an ADK tool for every tool-registry definition", () => {
+    it("should have an ADK tool for every tool definition", () => {
       const registryTools = getAllTools();
       const adkTools = getAllAdkTools();
       const adkNames = new Set(adkTools.map((t) => t.name));
@@ -22,7 +22,7 @@ describe("ADK tools", () => {
       }
     });
 
-    it("should have the same total count as tool-registry", () => {
+    it("should have the same total count as tool definitions", () => {
       const registryCount = getAllTools().length;
       const adkCount = getAllAdkTools().length;
       expect(adkCount).toBe(registryCount);
@@ -60,7 +60,7 @@ describe("ADK tools", () => {
       expect(names).toContain("get_project");
     });
 
-    it("should match tool counts per category with tool-registry", () => {
+    it("should match tool counts per category with definitions", () => {
       const categories = getAdkCategories();
       for (const cat of categories) {
         const registryCount = getAllTools().filter((t) => t.category === cat).length;
@@ -71,23 +71,6 @@ describe("ADK tools", () => {
   });
 
   describe("schema parity", () => {
-    it("should generate identical JSON schemas as tool-registry for core tools", () => {
-      // Compare the OpenAI-format schemas from tool-registry with ADK tool declarations
-      const openaiTools = getCoreTools();
-      const adkCoreTools = getCoreAdkTools();
-
-      for (const openaiTool of openaiTools) {
-        const name = openaiTool.function.name;
-        const adkTool = adkCoreTools.find((t) => t.name === name);
-        if (!adkTool) continue; // load_toolset checked separately
-
-        const declaration = adkTool._getDeclaration();
-        expect(declaration).toBeDefined();
-        expect(declaration.name).toBe(name);
-        expect(declaration.description).toBe(openaiTool.function.description);
-      }
-    });
-
     it("should generate declarations for all tools", () => {
       const allTools = getAllAdkTools();
       for (const tool of allTools) {
