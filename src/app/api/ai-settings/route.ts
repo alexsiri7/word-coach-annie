@@ -66,25 +66,29 @@ export async function PUT(request: NextRequest) {
 
     // Save to user-level settings if authenticated
     if (userId) {
-      const settings = await prisma.userAiSettings.upsert({
-        where: { userId },
-        update: data,
-        create: {
-          userId,
-          baseUrl: data.baseUrl ?? "",
-          apiKey: data.apiKey ?? "",
-          model: data.model ?? "",
-        },
-      });
+      try {
+        const settings = await prisma.userAiSettings.upsert({
+          where: { userId },
+          update: data,
+          create: {
+            userId,
+            baseUrl: data.baseUrl ?? "",
+            apiKey: data.apiKey ?? "",
+            model: data.model ?? "",
+          },
+        });
 
-      const decryptedKey = decrypt(settings.apiKey);
-      return NextResponse.json({
-        baseUrl: settings.baseUrl,
-        apiKey: decryptedKey ? maskKey(decryptedKey) : "",
-        model: settings.model,
-        hasApiKey: !!decryptedKey,
-        scope: "user",
-      });
+        const decryptedKey = decrypt(settings.apiKey);
+        return NextResponse.json({
+          baseUrl: settings.baseUrl,
+          apiKey: decryptedKey ? maskKey(decryptedKey) : "",
+          model: settings.model,
+          hasApiKey: !!decryptedKey,
+          scope: "user",
+        });
+      } catch {
+        // Table may not exist yet — fall through to global settings
+      }
     }
 
     // Fall back to global settings for unauthenticated/dev mode
