@@ -86,8 +86,9 @@ export async function PUT(request: NextRequest) {
           hasApiKey: !!decryptedKey,
           scope: "user",
         });
-      } catch {
+      } catch (userSettingsError) {
         // Table may not exist yet — fall through to global settings
+        logger.error("PUT /api/ai-settings: userAiSettings upsert failed, falling back to global", userSettingsError);
       }
     }
 
