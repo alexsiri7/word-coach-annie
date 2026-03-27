@@ -16,24 +16,29 @@ vi.mock("@/lib/db", () => ({
 // Mock crypto
 vi.mock("@/lib/crypto", () => ({
   encrypt: vi.fn((val: string) => `enc:${val}`),
-  decrypt: vi.fn((val: string) => val.replace("enc:", "")),
+  decrypt: vi.fn((val: string) => val.replace(/^enc:/, "")),
 }));
 
-// Mock auth
+// Mock api-auth
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(),
 }));
 
 // Mock logger
 vi.mock("@/lib/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+  },
 }));
 
 import { PUT } from "@/app/api/ai-settings/route";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { logger } from "@/lib/logger";
 
-function makeRequest(body: Record<string, unknown>): NextRequest {
+function makePutRequest(body: Record<string, unknown>, userId?: string): NextRequest {
+  vi.mocked(getCurrentUserId).mockReturnValue(userId ?? null);
   return new NextRequest("http://localhost:3000/api/ai-settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -46,50 +51,74 @@ describe("PUT /api/ai-settings", () => {
     vi.clearAllMocks();
   });
 
-  it("saves to userAiSettings when authenticated", async () => {
-    vi.mocked(getCurrentUserId).mockReturnValue("user-1");
-    vi.mocked(prisma.userAiSettings.upsert).mockResolvedValue({
-      id: "1",
-      userId: "user-1",
-      baseUrl: "https://example.com",
-      apiKey: "enc:my-key",
-      model: "my-model",
-    } as never);
-
-    const res = await PUT(makeRequest({ baseUrl: "https://example.com", apiKey: "my-key", model: "my-model" }));
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.scope).toBe("user");
-    expect(prisma.userAiSettings.upsert).toHaveBeenCalled();
-  });
-
-  it("falls through to global settings when userAiSettings.upsert throws", async () => {
-    vi.mocked(getCurrentUserId).mockReturnValue("user-1");
-    vi.mocked(prisma.userAiSettings.upsert).mockRejectedValue(new Error("table not found"));
+  it("falls through to global settings when userAiSettings table is missing", async () => {
+    vi.mocked(prisma.userAiSettings.upsert).mockRejectedValue(
+      new Error("table 'UserAiSettings' doesn't exist")
+    );
     vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
       id: "default",
-      baseUrl: "https://global.com",
-      apiKey: "enc:global-key",
+      baseUrl: "https://global.example.com",
+      apiKey: "global-key",
       model: "global-model",
     } as never);
 
-    const res = await PUT(makeRequest({ baseUrl: "https://global.com", apiKey: "global-key", model: "global-model" }));
+    const req = makePutRequest({ model: "gpt-4" }, "user-123");
+    const res = await PUT(req);
+
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.scope).toBe("global");
     expect(prisma.aiSettings.upsert).toHaveBeenCalled();
   });
 
-  it("saves to global settings when unauthenticated", async () => {
-    vi.mocked(getCurrentUserId).mockReturnValue(null);
+  it("logs an error when userAiSettings upsert fails", async () => {
+    const tableError = new Error("table 'UserAiSettings' doesn't exist");
+    vi.mocked(prisma.userAiSettings.upsert).mockRejectedValue(tableError);
     vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
       id: "default",
-      baseUrl: "https://global.com",
-      apiKey: "enc:global-key",
+      baseUrl: "",
+      apiKey: "",
+      model: "",
+    } as never);
+
+    const req = makePutRequest({ model: "gpt-4" }, "user-123");
+    await PUT(req);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("userAiSettings upsert failed"),
+      tableError
+    );
+  });
+
+  it("saves to user settings when authenticated and table exists", async () => {
+    vi.mocked(prisma.userAiSettings.upsert).mockResolvedValue({
+      userId: "user-123",
+      baseUrl: "https://user.example.com",
+      apiKey: "enc:user-key",
+      model: "user-model",
+    } as never);
+
+    const req = makePutRequest({ model: "user-model" }, "user-123");
+    const res = await PUT(req);
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.scope).toBe("user");
+    expect(prisma.userAiSettings.upsert).toHaveBeenCalled();
+    expect(prisma.aiSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("saves to global settings when unauthenticated", async () => {
+    vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
+      id: "default",
+      baseUrl: "",
+      apiKey: "",
       model: "global-model",
     } as never);
 
-    const res = await PUT(makeRequest({ baseUrl: "https://global.com", apiKey: "global-key", model: "global-model" }));
+    const req = makePutRequest({ model: "global-model" });
+    const res = await PUT(req);
+
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.scope).toBe("global");
