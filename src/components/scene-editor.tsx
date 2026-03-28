@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
-import { MessageSquare, AlertTriangle, RefreshCw, Check } from "lucide-react";
+import { MessageSquare, AlertTriangle, RefreshCw, Check, ChevronRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -18,6 +18,8 @@ import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { useWritingSession } from "@/hooks/use-writing-session";
+import { useRouter } from "next/navigation";
 
 interface SceneEditorProps {
   node: StructureNode;
@@ -27,6 +29,7 @@ interface SceneEditorProps {
 }
 
 export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -39,6 +42,13 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
+  const [nextScenePrompt, setNextScenePrompt] = useState<{ id: string; title: string } | null>(null);
+
+  const { onKeystroke, sessionStats } = useWritingSession({
+    projectId,
+    nodeId: node.id,
+    initialWordCount: node.wordCount || 0,
+  });
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
@@ -130,6 +140,7 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         });
         const words = textContent.trim() === "" ? 0 : textContent.trim().split(/\s+/).length;
         setWordCount(words);
+        onKeystroke(words);
 
         scheduleSave(html);
       },
@@ -222,6 +233,18 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
       body: JSON.stringify({ status: newStatus }),
     });
     onNodeUpdated?.();
+
+    // Show next scene prompt when marking a scene as completed
+    if (newStatus === "DRAFT" || newStatus === "REVISED" || newStatus === "FINAL") {
+      fetch(`/api/projects/${projectId}/progress`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.nextScene && data.nextScene.id !== node.id) {
+            setNextScenePrompt(data.nextScene);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const loadVersionHistory = async () => {
@@ -359,15 +382,63 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
             )}
           </div>
 
+          {/* Next scene prompt */}
+          {nextScenePrompt && (
+            <div className="flex items-center gap-2 px-4 py-2 border-t border-accent/30 bg-accent/10 text-xs shrink-0">
+              <span className="flex-1 text-text-primary font-medium truncate">
+                Next: {nextScenePrompt.title}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs gap-1 text-accent hover:bg-accent/20"
+                onClick={() => {
+                  router.push(`/project/${projectId}?scene=${nextScenePrompt.id}`);
+                  setNextScenePrompt(null);
+                }}
+              >
+                <ChevronRight className="h-3 w-3" />
+                Start
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs gap-1 text-text-muted hover:bg-surface-overlay"
+                onClick={() => router.push(`/project/${projectId}`)}
+              >
+                Outline
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-text-muted hover:bg-surface-overlay"
+                onClick={() => setNextScenePrompt(null)}
+                aria-label="Dismiss"
+              >
+                <XIcon className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+
           {/* Bottom bar */}
           <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0" role="status" aria-live="polite">
             <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
-            {lastSaved && (
-              <span className="flex items-center gap-1">
-                <Check className="h-3 w-3 text-success" aria-hidden="true" />
-                Last saved {lastSaved}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {sessionStats && sessionStats.wordsWritten > 0 && (
+                <span className="tabular-nums text-text-secondary">
+                  Session: {sessionStats.wordsWritten.toLocaleString()} words
+                  {sessionStats.durationSeconds >= 60 && (
+                    <> in {Math.round(sessionStats.durationSeconds / 60)} min</>
+                  )}
+                </span>
+              )}
+              {lastSaved && (
+                <span className="flex items-center gap-1">
+                  <Check className="h-3 w-3 text-success" aria-hidden="true" />
+                  Last saved {lastSaved}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

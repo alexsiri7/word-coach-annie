@@ -62,6 +62,7 @@ model Project {
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
+  writingSessions WritingSession[]
 
   @@index([userId])
 }
@@ -128,6 +129,7 @@ model StructureNode {
   parent          StructureNode?   @relation("StructureNodeToStructureNode", fields: [parentId], references: [id], onDelete: Cascade)
   children        StructureNode[]  @relation("StructureNodeToStructureNode")
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  writingSessions WritingSession[]
 
   @@index([parentId, orderIndex])
   @@index([projectId])
@@ -220,6 +222,21 @@ model UserAiSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WritingSession {
+  id           String        @id @default(cuid())
+  projectId    String
+  nodeId       String?
+  startedAt    DateTime      @default(now())
+  endedAt      DateTime?
+  wordsWritten Int           @default(0)
+  duration     Int           @default(0) // seconds
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node         StructureNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, startedAt(sort: Desc)])
+  @@index([nodeId])
 }
 
 model GoogleDocExport {

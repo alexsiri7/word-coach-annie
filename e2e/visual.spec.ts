@@ -242,6 +242,9 @@ async function mockDashboardApi(page: Page) {
     }
     return route.continue()
   })
+  await page.route('**/api/sessions*', route =>
+    route.fulfill({ json: { sessions: [], byDate: {} }, status: 200 })
+  )
 }
 
 /** Intercept all API calls for the project editor view */

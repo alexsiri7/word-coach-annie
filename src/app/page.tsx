@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
+import { WritingActivityHeatmap } from "@/components/writing-activity-heatmap";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -252,6 +253,10 @@ export default function Dashboard() {
                     {project.synopsis}
                   </p>
                 )}
+
+                <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                  <WritingActivityHeatmap projectId={project.id} />
+                </div>
 
                 <div className="flex items-center gap-3 mt-4 text-xs text-text-muted">
                   {project.genre && (
