@@ -106,7 +106,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           {loading ? (
             <div className="space-y-4">
@@ -242,7 +242,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
