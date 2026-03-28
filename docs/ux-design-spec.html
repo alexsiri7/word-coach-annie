@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Coach Annie — UX Design Spec</title>
+  <style>
+    /* ============================================================
+       DESIGN TOKENS — matches Annie's dark theme (Shadcn/Tailwind)
+       ============================================================ */
+    :root {
+      --bg: #09090b;
+      --bg-card: #18181b;
+      --bg-muted: #27272a;
+      --border: #3f3f46;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --primary: #8b5cf6;       /* violet-500 */
+      --primary-dim: #4c1d95;
+      --primary-text: #ddd6fe;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --radius: 8px;
+      --radius-sm: 4px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .spec-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+    }
+
+    .spec-nav a {
+      display: inline-block;
+      padding: 14px 16px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .spec-nav a:hover,
+    .spec-nav a.active {
+      color: var(--text);
+      border-bottom-color: var(--primary);
+    }
+
+    .spec-nav .brand {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 14px;
+      margin-right: 8px;
+      padding-right: 16px;
+      border-right: 1px solid var(--border);
+    }
+
+    .section {
+      display: none;
+      padding: 48px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section.active { display: block; }
+
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 32px 0 12px; }
+    h3 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; color: var(--text); }
+    p { color: var(--text-muted); margin-bottom: 12px; font-size: 14px; }
+    .subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: var(--primary-dim);
+      color: var(--primary-text);
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .badge.green { background: #14532d; color: #bbf7d0; }
+    .badge.blue { background: #1e3a5f; color: #bfdbfe; }
+    .badge.amber { background: #451a03; color: #fde68a; }
+
+    /* ============================================================
+       MOCK CHROME / WINDOW
+       ============================================================ */
+    .mock-window {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 24px 0;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    }
+
+    .mock-titlebar {
+      background: var(--bg-muted);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .mock-dot.red { background: #ef4444; }
+    .mock-dot.amber { background: #f59e0b; }
+    .mock-dot.green { background: #22c55e; }
+
+    .mock-url {
+      flex: 1;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 0 8px;
+    }
+
+    /* ============================================================
+       MOCK APP CHROME
+       ============================================================ */
+    .app-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .app-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-muted);
+      color: var(--text);
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--primary-dim);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary-text);
+    }
+
+    /* ============================================================
+       DASHBOARD MOCKUP
+       ============================================================ */
+    .dashboard-body {
+      padding: 28px 28px;
+      background: var(--bg);
+    }
+
+    .resume-card {
+      background: linear-gradient(135deg, #1e1b4b 0%, #1e3a5f 100%);
+      border: 1px solid #3b3f6e;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .resume-card-left { display: flex; align-items: center; gap: 16px; }
+
+    .resume-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--primary-dim);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .resume-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      margin-bottom: 2px;
+    }
+
+    .resume-scene { font-size: 16px; font-weight: 600; color: var(--text); }
+
+    .resume-meta {
+      font-size: 12px;
+      color: #818cf8;
+      margin-top: 2px;
+    }
+
+    .resume-session {
+      text-align: right;
+      font-size: 12px;
+      color: #a5b4fc;
+    }
+
+    .session-bar {
+      width: 160px;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      margin: 6px 0;
+      overflow: hidden;
+    }
+
+    .session-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 3px;
+      width: 72%;
+    }
+
+    .heatmap-row {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 28px;
+    }
+
+    .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
+
+    .heatmap-day {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--bg-muted);
+    }
+
+    .heatmap-day.d1 { background: #3b1d8a; }
+    .heatmap-day.d2 { background: #5b21b6; }
+    .heatmap-day.d3 { background: #7c3aed; }
+    .heatmap-day.d4 { background: #8b5cf6; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .project-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .project-card:hover { border-color: var(--primary); }
+
+    .project-type-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .project-type-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .project-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 6px 0 4px;
+    }
+
+    .project-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--bg-muted);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--primary);
+    }
+
+    .progress-fill.green { background: var(--green); }
+    .progress-fill.blue { background: var(--blue); }
+    .progress-fill.amber { background: var(--amber); }
+
+    .project-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    .next-scene-link {
+      color: var(--primary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       EDITOR LAYOUT
+       ============================================================ */
+    .editor-layout {
+      display: flex;
+      height: 600px;
+    }
+
+    .editor-sidebar {
+      width: 220px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .sidebar-tab {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .sidebar-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--primary);
+    }
+
+    .sidebar-content { padding: 12px; overflow-y: auto; flex: 1; }
+
+    .context-section { margin-bottom: 16px; }
+
+    .context-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .context-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .context-item:hover { background: var(--bg-muted); }
+
+    .context-item-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--bg-muted);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .context-item-name {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .context-item-tag {
+      font-size: 10px;
+      color: var(--text-dim);
+      background: var(--bg-muted);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .context-item-tag.in-scene {
+      background: var(--primary-dim);
+      color: var(--primary-text);
+    }
+
+    .context-show-more {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    .context-show-more:hover { color: var(--text-muted); }
+
+    .outline-tree {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .outline-item {
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .outline-item:hover { background: var(--bg-muted); }
+
+    .outline-item.active {
+      background: var(--primary-dim);
+      color: var(--text);
+    }
+
+    .outline-item .scene-status {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .scene-status.final { background: var(--green); }
+    .scene-status.draft { background: var(--blue); }
+    .scene-status.outline { background: var(--text-dim); }
+
+    .outline-beat {
+      padding: 3px 12px 3px 28px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .beat-arrow { color: var(--text-dim); }
+
+    .thread-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .thread-dot.advancing { background: var(--blue); }
+    .thread-dot.mentioned { background: var(--amber); }
+    .thread-dot.dormant { background: var(--text-dim); }
+
+    .editor-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .editor-toolbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .toolbar-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: background 0.1s;
+    }
+
+    .toolbar-btn:hover {
+      background: var(--bg-muted);
+      color: var(--text);
+    }
+
+    .toolbar-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    .toolbar-spacer { flex: 1; }
+
+    .scene-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-muted);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .alert-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #451a03;
+      color: #fde68a;
+      cursor: pointer;
+    }
+
+    .editor-content {
+      flex: 1;
+      padding: 32px 48px;
+      overflow-y: auto;
+      font-family: "Georgia", serif;
+      font-size: 15px;
+      line-height: 1.8;
+      color: #d4d4d8;
+      background: var(--bg);
+    }
+
+    .editor-content h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      font-family: inherit;
+    }
+
+    .mention {
+      display: inline-block;
+      background: #1e3a5f;
+      color: #93c5fd;
+      padding: 0 4px;
+      border-radius: 3px;
+      font-size: inherit;
+      cursor: pointer;
+    }
+
+    .editor-footer {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* ============================================================
+       FLOATING AI ACTION BAR
+       ============================================================ */
+    .floating-action-bar {
+      position: relative;
+      margin: 24px 0;
+    }
+
+    .selected-text {
+      background: rgba(139, 92, 246, 0.2);
+      border-radius: 2px;
+    }
+
+    .floating-bar {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      gap: 2px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+
+    .floating-bar-btn {
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-radius: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .floating-bar-btn:hover {
+      background: var(--bg-muted);
+      color: var(--text);
+    }
+
+    .floating-bar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+
+    .floating-result {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 8px;
+      font-size: 14px;
+      color: var(--text);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+
+    .floating-result-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ============================================================
+       AI TAB CONTEXTUAL PROMPTS
+       ============================================================ */
+    .ai-prompts-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin: 12px 0;
+    }
+
+    .ai-scene-status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .ai-prompts-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .ai-prompt-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .ai-prompt-btn:hover {
+      background: var(--bg-muted);
+      border-color: var(--border);
+    }
+
+    .ai-prompt-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--bg-muted);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .ai-prompt-text { font-size: 13px; color: var(--text); flex: 1; }
+
+    .ai-prompt-sub { font-size: 11px; color: var(--text-dim); }
+
+    .ai-chat-input {
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 12px;
+      cursor: text;
+    }
+
+    /* ============================================================
+       PROGRESS VIEW
+       ============================================================ */
+    .progress-view {
+      padding: 24px;
+      background: var(--bg);
+    }
+
+    .progress-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .parts-progress { margin-bottom: 28px; }
+
+    .part-row {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 8px;
+    }
+
+    .part-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .part-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .part-count { font-size: 12px; color: var(--text-dim); }
+
+    .multi-progress {
+      height: 8px;
+      background: var(--bg-muted);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .multi-seg { height: 100%; }
+
+    .next-up-card {
+      background: linear-gradient(135deg, #1e1b4b, #1e3a5f);
+      border: 1px solid #3b3f6e;
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .next-up-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      margin-bottom: 4px;
+    }
+
+    .next-up-scene { font-size: 16px; font-weight: 600; color: var(--text); }
+
+    .next-up-meta { font-size: 12px; color: #818cf8; margin-top: 3px; }
+
+    /* ============================================================
+       NEXT SCENE FLOW TOAST
+       ============================================================ */
+    .toast-demo {
+      position: relative;
+      min-height: 80px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 16px;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+      max-width: 320px;
+      width: 100%;
+    }
+
+    .toast-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .toast-icon {
+      width: 28px;
+      height: 28px;
+      background: #14532d;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .toast-title { font-size: 14px; font-weight: 600; color: var(--text); }
+
+    .toast-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+
+    .toast-actions { display: flex; gap: 8px; }
+
+    /* ============================================================
+       CONSISTENCY ALERTS
+       ============================================================ */
+    .consistency-alert {
+      background: #1c1917;
+      border: 1px solid #78350f;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 12px 0;
+      font-family: -apple-system, sans-serif;
+      font-size: 13px;
+    }
+
+    .consistency-alert-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .consistency-alert-title {
+      font-weight: 600;
+      color: #fbbf24;
+      font-size: 12px;
+    }
+
+    .consistency-source { color: var(--text-dim); font-size: 12px; }
+
+    .consistency-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .consistency-btn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      background: var(--bg-muted);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    /* ============================================================
+       ANNOTATION LABELS
+       ============================================================ */
+    .annotation {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+      padding: 10px 14px;
+      background: rgba(139,92,246,0.08);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .annotation-num {
+      width: 22px;
+      height: 22px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    .annotation-text { font-size: 13px; color: var(--text-muted); }
+    .annotation-text strong { color: var(--text); }
+
+    /* ============================================================
+       MISC
+       ============================================================ */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    code {
+      background: var(--bg-muted);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #a5b4fc;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    @media (max-width: 600px) {
+      .two-col, .three-col, .progress-stats { grid-template-columns: 1fr; }
+      .editor-sidebar { display: none; }
+      .section { padding: 24px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAVIGATION
+     ============================================================ -->
+<nav class="spec-nav">
+  <span class="brand">Annie UX Spec</span>
+  <a href="#overview" class="active" onclick="show('overview', this)">Overview</a>
+  <a href="#phase1" onclick="show('phase1', this)">Phase 1: Launchpad</a>
+  <a href="#phase2" onclick="show('phase2', this)">Phase 2: Context</a>
+  <a href="#phase3" onclick="show('phase3', this)">Phase 3: AI Partner</a>
+  <a href="#phase4" onclick="show('phase4', this)">Phase 4: Momentum</a>
+  <a href="#phase5" onclick="show('phase5', this)">Phase 5: Intelligence</a>
+</nav>
+
+<!-- ============================================================
+     OVERVIEW
+     ============================================================ -->
+<div id="overview" class="section active">
+  <h1>Writing-First Experience Redesign</h1>
+  <p class="subtitle">UX strategy for GH#118 — interactive design spec for all 5 implementation phases.</p>
+
+  <div class="three-col">
+    <div class="stat-card">
+      <div class="stat-label">Core Problem</div>
+      <div class="stat-value" style="font-size:18px;">3+ clicks</div>
+      <div class="stat-sub">before a returning writer reaches their scene</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Design Direction</div>
+      <div class="stat-value" style="font-size:18px;">Editor = Home</div>
+      <div class="stat-sub">every decision routes back to writing</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">AI Direction</div>
+      <div class="stat-value" style="font-size:18px;">In the editor</div>
+      <div class="stat-sub">not a competing sidebar tab</div>
+    </div>
+  </div>
+
+  <h2>Design Principles</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px;">
+    <div class="annotation">
+      <div class="annotation-num">1</div>
+      <div class="annotation-text"><strong>Writing is the center of gravity.</strong> The editor is home. Every default route and post-action redirect drops the writer into a scene.</div>
+    </div>
+    <div class="annotation">
+      <div class="annotation-num">2</div>
+      <div class="annotation-text"><strong>Context follows the cursor.</strong> Show what's relevant to this scene — not master lists of all characters, all threads, all time.</div>
+    </div>
+    <div class="annotation">
+      <div class="annotation-num">3</div>
+      <div class="annotation-text"><strong>Progressive complexity.</strong> A fresh project needs a blank scene. Features emerge as the manuscript grows.</div>
+    </div>
+    <div class="annotation">
+      <div class="annotation-num">4</div>
+      <div class="annotation-text"><strong>Show momentum, not metrics.</strong> No streaks, no badges. A visual record that the work is happening.</div>
+    </div>
+  </div>
+  <div class="annotation" style="max-width:640px;">
+    <div class="annotation-num">5</div>
+    <div class="annotation-text"><strong>AI assists the writing, not the interface.</strong> Select text → get options. Contextual prompts. Never a generic chatbot sidebar.</div>
+  </div>
+
+  <h2>Phase Roadmap</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:10px 8px;color:var(--text-dim);font-weight:600;">Phase</th>
+          <th style="text-align:left;padding:10px 8px;color:var(--text-dim);font-weight:600;">Name</th>
+          <th style="text-align:left;padding:10px 8px;color:var(--text-dim);font-weight:600;">Key Changes</th>
+          <th style="text-align:left;padding:10px 8px;color:var(--text-dim);font-weight:600;">Issue</th>
+          <th style="text-align:left;padding:10px 8px;color:var(--text-dim);font-weight:600;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 8px;color:var(--text);">1</td>
+          <td style="padding:10px 8px;color:var(--text);">Writing Launchpad</td>
+          <td style="padding:10px 8px;color:var(--text-muted);">Resume card, session tracker, enriched cards, onboarding</td>
+          <td style="padding:10px 8px;"><code>GH#119</code></td>
+          <td style="padding:10px 8px;"><span class="badge blue">In Progress</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 8px;color:var(--text);">2</td>
+          <td style="padding:10px 8px;color:var(--text);">Scene-Aware Context</td>
+          <td style="padding:10px 8px;color:var(--text-muted);">Context sidebar, @-mentions, beats in outline</td>
+          <td style="padding:10px 8px;"><code>GH#120</code></td>
+          <td style="padding:10px 8px;"><span class="badge blue">In Progress</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 8px;color:var(--text);">3</td>
+          <td style="padding:10px 8px;color:var(--text);">Integrated AI Writing Partner</td>
+          <td style="padding:10px 8px;color:var(--text-muted);">Inline AI actions, scene-aware AI tab, manuscript AI</td>
+          <td style="padding:10px 8px;"><code>GH#121</code></td>
+          <td style="padding:10px 8px;"><span class="badge">Queued</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 8px;color:var(--text);">4</td>
+          <td style="padding:10px 8px;color:var(--text);">Writing Momentum</td>
+          <td style="padding:10px 8px;color:var(--text-muted);">Progress view, session heatmap, next-scene flow</td>
+          <td style="padding:10px 8px;"><code>GH#122</code></td>
+          <td style="padding:10px 8px;"><span class="badge">Queued</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 8px;color:var(--text);">5</td>
+          <td style="padding:10px 8px;color:var(--text);">Story Intelligence</td>
+          <td style="padding:10px 8px;color:var(--text-muted);">Consistency alerts, voice monitor, plot thread status</td>
+          <td style="padding:10px 8px;"><code>GH#123</code></td>
+          <td style="padding:10px 8px;"><span class="badge">Future</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============================================================
+     PHASE 1: WRITING LAUNCHPAD
+     ============================================================ -->
+<div id="phase1" class="section">
+  <h1>Phase 1: Writing Launchpad <span class="badge blue">GH#119</span></h1>
+  <p class="subtitle">Returning writer has cursor in a scene within 2 seconds. New writer is writing within 60 seconds.</p>
+
+  <h2>Dashboard — After</h2>
+
+  <div class="mock-window">
+    <div class="mock-titlebar">
+      <div class="mock-dot red"></div>
+      <div class="mock-dot amber"></div>
+      <div class="mock-dot green"></div>
+      <div class="mock-url">localhost:3000</div>
+    </div>
+    <div class="app-header">
+      <div class="app-logo">
+        <div class="logo-icon">✍</div>
+        Word Coach Annie
+      </div>
+      <div class="app-nav-actions">
+        <button class="btn btn-primary">+ New Project</button>
+        <div class="avatar">A</div>
+      </div>
+    </div>
+    <div class="dashboard-body">
+
+      <!-- Resume Card -->
+      <div class="resume-card">
+        <div class="resume-card-left">
+          <div class="resume-icon">📖</div>
+          <div>
+            <div class="resume-label">Continue Writing</div>
+            <div class="resume-scene">Chapter 12 — The Crossing at Dunmore</div>
+            <div class="resume-meta">The Obsidian Crown · 847 words · Edited 2h ago</div>
+          </div>
+        </div>
+        <div>
+          <div class="resume-session">Today's goal: 1,200 words</div>
+          <div class="session-bar"><div class="session-bar-fill"></div></div>
+          <div class="resume-session">847 / 1,200 words · 72%</div>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
+            <button class="btn btn-primary">Continue Writing →</button>
+            <button class="btn btn-ghost">Focus Mode</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Writing Activity Heatmap (preview) -->
+      <div class="section-header">
+        <span class="section-title">Writing Activity — Last 4 Weeks</span>
+        <span style="font-size:12px;color:var(--text-dim);">See full heatmap in Progress view</span>
+      </div>
+      <div class="heatmap-row" style="margin-bottom:24px;">
+        <div class="heatmap-week">
+          <div class="heatmap-day d1"></div><div class="heatmap-day"></div>
+          <div class="heatmap-day d2"></div><div class="heatmap-day d1"></div>
+          <div class="heatmap-day d3"></div><div class="heatmap-day d2"></div><div class="heatmap-day"></div>
+        </div>
+        <div class="heatmap-week">
+          <div class="heatmap-day d2"></div><div class="heatmap-day d3"></div>
+          <div class="heatmap-day d4"></div><div class="heatmap-day d3"></div>
+          <div class="heatmap-day d2"></div><div class="heatmap-day d1"></div><div class="heatmap-day"></div>
+        </div>
+        <div class="heatmap-week">
+          <div class="heatmap-day d1"></div><div class="heatmap-day d2"></div>
+          <div class="heatmap-day d3"></div><div class="heatmap-day d4"></div>
+          <div class="heatmap-day d3"></div><div class="heatmap-day d2"></div><div class="heatmap-day d1"></div>
+        </div>
+        <div class="heatmap-week">
+          <div class="heatmap-day d2"></div><div class="heatmap-day d3"></div>
+          <div class="heatmap-day d4"></div><div class="heatmap-day d3"></div>
+          <div class="heatmap-day d4"></div><div class="heatmap-day d2"></div><div class="heatmap-day d1"></div>
+        </div>
+      </div>
+
+      <!-- Project Cards -->
+      <div class="section-header">
+        <span class="section-title">Your Projects</span>
+      </div>
+      <div class="projects-grid">
+        <div class="project-card" style="border-color:var(--primary);">
+          <div><div class="project-type-dot"></div><span class="project-type-label">Novel · Active</span></div>
+          <div class="project-title">The Obsidian Crown</div>
+          <div class="project-meta">68,400 words · Last edited today</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:61%;background:linear-gradient(90deg,#22c55e 40%,#3b82f6 70%,#6b21a8 100%)"></div>
+          </div>
+          <div class="project-footer">
+            <span>24/39 scenes · 61%</span>
+            <span class="next-scene-link">→ Ch. 12 Scene 3</span>
+          </div>
+        </div>
+        <div class="project-card">
+          <div><div class="project-type-dot" style="background:var(--blue)"></div><span class="project-type-label">Articles</span></div>
+          <div class="project-title">Views on AI Safety</div>
+          <div class="project-meta">12,200 words · Last edited 3 days ago</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:40%;background:var(--blue)"></div>
+          </div>
+          <div class="project-footer">
+            <span>4/10 articles · 40%</span>
+            <span class="next-scene-link">→ Article 5 draft</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <h2>Key Changes Annotated</h2>
+  <div class="annotation">
+    <div class="annotation-num">1</div>
+    <div class="annotation-text"><strong>Resume Card</strong> — always the first thing on the dashboard. Last-edited scene, word count, and one-click continue. Session progress bar shows today's goal inline.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">2</div>
+    <div class="annotation-text"><strong>Project Cards enriched</strong> — tri-color progress bar (green=Final, blue=mixed, amber=outline). Next unwritten scene linked directly. Word count and last-edited date.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">3</div>
+    <div class="annotation-text"><strong>Heatmap preview</strong> on dashboard (non-gamified). Full heatmap lives in the Progress view (Phase 4) but a teaser keeps it visible.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">4</div>
+    <div class="annotation-text"><strong>Onboarding wizard rewritten</strong> — step 1: fiction/articles/general → step 2: project name → step 3: structure template → step 4: drop into Scene 1 in Focus Mode. API keys move to Settings.</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PHASE 2: SCENE-AWARE CONTEXT
+     ============================================================ -->
+<div id="phase2" class="section">
+  <h1>Phase 2: Scene-Aware Context <span class="badge blue">GH#120</span></h1>
+  <p class="subtitle">&lt;20% of writing sessions involve switching to a master-list tab.</p>
+
+  <h2>Editor — Context Sidebar + @-Mentions</h2>
+
+  <div class="mock-window">
+    <div class="mock-titlebar">
+      <div class="mock-dot red"></div>
+      <div class="mock-dot amber"></div>
+      <div class="mock-dot green"></div>
+      <div class="mock-url">localhost:3000/project/abc/scene/s12</div>
+    </div>
+    <div class="app-header" style="height:48px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+        <span style="color:var(--text);">The Obsidian Crown</span>
+        <span>›</span>
+        <span>Part II</span>
+        <span>›</span>
+        <span style="color:var(--text);">Ch. 12 — The Crossing at Dunmore</span>
+      </div>
+      <div class="app-nav-actions">
+        <button class="btn btn-ghost" style="font-size:12px;">Focus Mode</button>
+        <div class="avatar">A</div>
+      </div>
+    </div>
+    <div class="editor-layout">
+      <!-- Sidebar -->
+      <div class="editor-sidebar">
+        <div class="sidebar-tabs">
+          <div class="sidebar-tab active">Context</div>
+          <div class="sidebar-tab">Characters</div>
+          <div class="sidebar-tab">AI</div>
+          <div class="sidebar-tab">…</div>
+        </div>
+        <div class="sidebar-content">
+          <!-- Characters in scene -->
+          <div class="context-section">
+            <div class="context-section-title">In this scene (2)</div>
+            <div class="context-item">
+              <div class="context-item-icon">👤</div>
+              <div class="context-item-name">Mira Ashford</div>
+              <span class="context-item-tag in-scene">POV</span>
+            </div>
+            <div class="context-item">
+              <div class="context-item-icon">👤</div>
+              <div class="context-item-name">Lord Vayne</div>
+              <span class="context-item-tag in-scene">scene</span>
+            </div>
+            <div class="context-show-more">+ 4 other characters — show all</div>
+          </div>
+          <!-- Location -->
+          <div class="context-section">
+            <div class="context-section-title">Location</div>
+            <div class="context-item">
+              <div class="context-item-icon">🏰</div>
+              <div class="context-item-name">Dunmore Bridge</div>
+              <span class="context-item-tag in-scene">set</span>
+            </div>
+          </div>
+          <!-- Active plotlines -->
+          <div class="context-section">
+            <div class="context-section-title">Active Plotlines</div>
+            <div class="context-item">
+              <div class="context-item-icon">🧵</div>
+              <div class="context-item-name">The Lost Heir</div>
+              <span class="context-item-tag in-scene">advancing</span>
+            </div>
+            <div class="context-item">
+              <div class="context-item-icon">🧵</div>
+              <div class="context-item-name">Mira's betrayal</div>
+              <span class="context-item-tag">mentioned</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Editor -->
+      <div class="editor-main">
+        <div class="editor-toolbar">
+          <div class="toolbar-btn" style="font-weight:700;">B</div>
+          <div class="toolbar-btn" style="font-style:italic;font-family:serif;">I</div>
+          <div class="toolbar-btn">¶</div>
+          <div class="toolbar-sep"></div>
+          <div class="toolbar-btn">H₁</div>
+          <div class="toolbar-btn">H₂</div>
+          <div class="toolbar-sep"></div>
+          <div class="toolbar-btn">@</div>
+          <div class="toolbar-spacer"></div>
+          <div class="scene-status-pill">
+            <div class="scene-status draft"></div>
+            Draft
+          </div>
+        </div>
+        <div class="editor-content">
+          <h2>Chapter 12 — The Crossing at Dunmore</h2>
+          <p style="font-size:15px;line-height:1.8;color:#d4d4d8;font-family:Georgia,serif;">
+            The bridge groaned under the weight of the retreating column.
+            <span class="mention">@Mira Ashford</span> pressed her back to the stone wall
+            and watched the last cart trundle past. Somewhere behind her,
+            <span class="mention">@Lord Vayne</span> was still arguing with the toll-keeper
+            about coin they didn't have.
+          </p>
+          <p style="font-size:15px;line-height:1.8;color:#d4d4d8;font-family:Georgia,serif;margin-top:16px;">
+            She had three minutes before the rear guard reached
+            <span class="mention">@Dunmore Bridge</span>. Three minutes to decide whether
+            the <span class="mention">@The Lost Heir</span> thread was worth the crossing.
+          </p>
+          <!-- @-mention autocomplete dropdown -->
+          <div style="margin-top:16px;">
+            <span style="font-family:Georgia,serif;color:#d4d4d8;font-size:15px;">She reached for the— @</span>
+            <div style="display:inline-block;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,0.6);min-width:200px;vertical-align:top;margin-left:2px;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);padding:4px 8px;">Characters</div>
+              <div class="context-item" style="padding:6px 8px;background:var(--primary-dim);">
+                <div class="context-item-icon">👤</div>
+                <div style="font-size:13px;color:var(--text);">Mira Ashford</div>
+                <span class="context-item-tag in-scene">in scene</span>
+              </div>
+              <div class="context-item" style="padding:6px 8px;">
+                <div class="context-item-icon">👤</div>
+                <div style="font-size:13px;color:var(--text);">Lord Vayne</div>
+                <span class="context-item-tag in-scene">in scene</span>
+              </div>
+              <div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);padding:4px 8px;margin-top:4px;">Locations</div>
+              <div class="context-item" style="padding:6px 8px;">
+                <div class="context-item-icon">🏰</div>
+                <div style="font-size:13px;color:var(--text);">Dunmore Bridge</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="editor-footer">
+          <span>Autosaved · 847 words</span>
+          <span>Session: 340 words in 24 min · 850 wph</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Outline Tree — Beats + Thread Indicators</h2>
+
+  <div class="mock-window" style="max-width:300px;">
+    <div class="mock-titlebar">
+      <div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div>
+      <div class="mock-url" style="font-size:11px;">Outline</div>
+    </div>
+    <div style="padding:8px 0;">
+      <div class="outline-item">
+        <div class="scene-status final"></div>
+        Ch. 11 — The Siege Lifts
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot advancing"></div>
+          <div class="thread-dot mentioned"></div>
+        </div>
+      </div>
+      <div class="outline-item active">
+        <div class="scene-status draft"></div>
+        Ch. 12 — The Crossing at Dunmore
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot advancing"></div>
+          <div class="thread-dot mentioned"></div>
+        </div>
+      </div>
+      <div class="outline-beat">
+        <span class="beat-arrow">→</span>
+        Mira watches retreat
+      </div>
+      <div class="outline-beat">
+        <span class="beat-arrow">→</span>
+        Lord Vayne / toll dispute
+      </div>
+      <div class="outline-beat">
+        <span class="beat-arrow">→</span>
+        Decision: cross or not
+      </div>
+      <div class="outline-item">
+        <div class="scene-status outline"></div>
+        Ch. 13 — The River Keep
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot dormant"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Key Changes Annotated</h2>
+  <div class="annotation">
+    <div class="annotation-num">1</div>
+    <div class="annotation-text"><strong>Context tab</strong> — default active when any scene is open. Shows characters (in-scene vs others), current location, active plotlines. Pulls from relationship data — no new API needed.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">2</div>
+    <div class="annotation-text"><strong>@-mentions</strong> — type <code>@</code> to trigger autocomplete, grouped by type. Inserting a mention auto-creates the scene→object relationship. Hover for tooltip, click to open panel. Tiptap ProseMirror extension.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">3</div>
+    <div class="annotation-text"><strong>Beats in outline tree</strong> — scene beats parsed from <code>&lt;!-- beat: ... --&gt;</code> comments, shown as indented "→ Beat" items. Thread dots (blue=advancing / amber=mentioned / gray=dormant) per scene.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">4</div>
+    <div class="annotation-text"><strong>Session word counter in footer</strong> — "Session: 340 words in 24 min · 850 wph". Detects start on first keystroke, resets after 5 min inactivity. Preview of Phase 4 session tracking.</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PHASE 3: INTEGRATED AI WRITING PARTNER
+     ============================================================ -->
+<div id="phase3" class="section">
+  <h1>Phase 3: Integrated AI Writing Partner <span class="badge">GH#121</span></h1>
+  <p class="subtitle">60% of AI interactions occur within 30 seconds of editing text.</p>
+
+  <h2>Inline AI Action Bar</h2>
+
+  <div class="mock-window">
+    <div class="mock-titlebar">
+      <div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div>
+      <div class="mock-url">localhost:3000/project/abc/scene/s12</div>
+    </div>
+    <div style="padding:40px 64px;background:var(--bg);font-family:Georgia,serif;font-size:15px;line-height:1.8;color:#d4d4d8;">
+      <p>The bridge groaned under the weight of the retreating column.</p>
+
+      <!-- Selected text with floating bar -->
+      <div class="floating-action-bar">
+        <div style="position:absolute;top:-38px;left:0;">
+          <div class="floating-bar">
+            <div class="floating-bar-btn">✨ Rewrite (vivid)</div>
+            <div class="floating-bar-sep"></div>
+            <div class="floating-bar-btn">→ Continue</div>
+            <div class="floating-bar-sep"></div>
+            <div class="floating-bar-btn">↔ Expand</div>
+            <div class="floating-bar-sep"></div>
+            <div class="floating-bar-btn">🎭 Voice check</div>
+            <div class="floating-bar-sep"></div>
+            <div class="floating-bar-btn">💬 Ask Annie</div>
+          </div>
+        </div>
+        <p style="margin-top:24px;"><span class="selected-text">Mira pressed her back to the stone wall and watched the last cart trundle past.</span></p>
+        <div class="floating-result">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:8px;">✨ Rewrite (vivid)</div>
+          <div style="font-family:Georgia,serif;font-size:14px;color:var(--text-muted);">Mira flattened herself against the cold stone, counting wheels as the last cart jolted past — four spokes from the moment she'd have to choose.</div>
+          <div class="floating-result-actions">
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px;">Accept</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;">Try again</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;">Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Scene-Aware AI Tab</h2>
+
+  <div class="two-col">
+    <!-- Draft status prompts -->
+    <div>
+      <h3>When scene status = Draft</h3>
+      <div class="mock-window">
+        <div class="mock-titlebar"><div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div></div>
+        <div style="padding:12px;">
+          <div class="ai-prompts-panel">
+            <div class="ai-scene-status-header">
+              <span class="ai-prompts-label">AI Writing Partner</span>
+              <span class="scene-status-pill"><div class="scene-status draft"></div> Draft</span>
+            </div>
+            <div class="ai-prompt-btn">
+              <div class="ai-prompt-icon">📊</div>
+              <div>
+                <div class="ai-prompt-text">Pacing check</div>
+                <div class="ai-prompt-sub">Is the scene too fast or slow?</div>
+              </div>
+            </div>
+            <div class="ai-prompt-btn" style="background:var(--bg-muted);border-color:var(--border);">
+              <div class="ai-prompt-icon">🎭</div>
+              <div>
+                <div class="ai-prompt-text">Character voice audit</div>
+                <div class="ai-prompt-sub">Check Mira's voice consistency</div>
+              </div>
+            </div>
+            <div class="ai-prompt-btn">
+              <div class="ai-prompt-icon">▶</div>
+              <div>
+                <div class="ai-prompt-text">Continue from here</div>
+                <div class="ai-prompt-sub">Draft the next paragraph</div>
+              </div>
+            </div>
+            <div class="ai-prompt-btn">
+              <div class="ai-prompt-icon">🏁</div>
+              <div>
+                <div class="ai-prompt-text">Suggest an ending</div>
+                <div class="ai-prompt-sub">Scene-level resolution options</div>
+              </div>
+            </div>
+            <div class="ai-chat-input">Ask Annie anything about this scene…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outline status prompts -->
+    <div>
+      <h3>When scene status = Outline</h3>
+      <div class="mock-window">
+        <div class="mock-titlebar"><div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div></div>
+        <div style="padding:12px;">
+          <div class="ai-prompts-panel">
+            <div class="ai-scene-status-header">
+              <span class="ai-prompts-label">AI Writing Partner</span>
+              <span class="scene-status-pill"><div class="scene-status outline"></div> Outline</span>
+            </div>
+            <div class="ai-prompt-btn" style="background:var(--bg-muted);border-color:var(--border);">
+              <div class="ai-prompt-icon">📝</div>
+              <div>
+                <div class="ai-prompt-text">Draft from beats</div>
+                <div class="ai-prompt-sub">Expand 3 beats into a full scene</div>
+              </div>
+            </div>
+            <div class="ai-prompt-btn">
+              <div class="ai-prompt-icon">💡</div>
+              <div>
+                <div class="ai-prompt-text">Suggest opening line</div>
+                <div class="ai-prompt-sub">3 options based on beat outline</div>
+              </div>
+            </div>
+            <div class="ai-prompt-btn">
+              <div class="ai-prompt-icon">📋</div>
+              <div>
+                <div class="ai-prompt-text">Expand beat outline</div>
+                <div class="ai-prompt-sub">Add sub-beats and notes</div>
+              </div>
+            </div>
+            <div class="ai-chat-input">Ask Annie anything about this scene…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Key Changes Annotated</h2>
+  <div class="annotation">
+    <div class="annotation-num">1</div>
+    <div class="annotation-text"><strong>Floating action bar</strong> — appears above any text selection. Uses existing <code>/api/chat</code> but scoped to the selected text + full scene context. Accept replaces selection in-place.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">2</div>
+    <div class="annotation-text"><strong>Scene-aware AI tab</strong> — prompts change based on scene <code>status</code> field. Outline → generate; Draft → evaluate/continue; Revised/Final → edit. Maps to existing MCP skills.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">3</div>
+    <div class="annotation-text"><strong>Free-form chat remains</strong> as secondary input at the bottom of the AI panel — writers who want to ask arbitrary questions still can.</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PHASE 4: WRITING MOMENTUM
+     ============================================================ -->
+<div id="phase4" class="section">
+  <h1>Phase 4: Writing Momentum <span class="badge">GH#122</span></h1>
+  <p class="subtitle">Writers using session tracking write 20%+ more words per week.</p>
+
+  <h2>Manuscript Progress View <code style="font-size:13px;">/project/[id]/progress</code></h2>
+
+  <div class="mock-window">
+    <div class="mock-titlebar">
+      <div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div>
+      <div class="mock-url">localhost:3000/project/abc/progress</div>
+    </div>
+    <div class="app-header" style="height:48px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+        <span style="color:var(--text);">The Obsidian Crown</span>
+        <span>›</span>
+        <span style="color:var(--text);">Progress</span>
+      </div>
+      <div class="app-nav-actions">
+        <button class="btn btn-ghost" style="font-size:12px;">Back to writing</button>
+      </div>
+    </div>
+    <div class="progress-view">
+
+      <!-- Summary stats -->
+      <div class="progress-stats">
+        <div class="stat-card">
+          <div class="stat-label">Total Words</div>
+          <div class="stat-value">68,400</div>
+          <div class="stat-sub">+847 today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Scenes Drafted</div>
+          <div class="stat-value">24 / 39</div>
+          <div class="stat-sub">61% complete</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Est. Completion</div>
+          <div class="stat-value">~8 weeks</div>
+          <div class="stat-sub">at current pace</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">This Week</div>
+          <div class="stat-value">4,120</div>
+          <div class="stat-sub">words · 6 sessions</div>
+        </div>
+      </div>
+
+      <!-- Part progress -->
+      <h2 style="margin-top:0;">Part Progress</h2>
+      <div class="parts-progress">
+        <div class="part-row">
+          <div class="part-header">
+            <div class="part-name">Part I — The Long Winter</div>
+            <div class="part-count">8 / 8 scenes</div>
+          </div>
+          <div class="multi-progress">
+            <div class="multi-seg" style="width:70%;background:var(--green);"></div>
+            <div class="multi-seg" style="width:20%;background:var(--blue);"></div>
+            <div class="multi-seg" style="width:10%;background:var(--amber);"></div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--text-dim);">
+            <span style="color:var(--green);">■ 6 Final</span>
+            <span style="color:var(--blue);">■ 1 Revised</span>
+            <span style="color:var(--amber);">■ 1 Draft</span>
+          </div>
+        </div>
+        <div class="part-row">
+          <div class="part-header">
+            <div class="part-name">Part II — The Crossing</div>
+            <div class="part-count">12 / 16 scenes</div>
+          </div>
+          <div class="multi-progress">
+            <div class="multi-seg" style="width:38%;background:var(--green);"></div>
+            <div class="multi-seg" style="width:37%;background:var(--blue);"></div>
+            <div class="multi-seg" style="width:25%;background:var(--text-dim);"></div>
+          </div>
+        </div>
+        <div class="part-row">
+          <div class="part-header">
+            <div class="part-name">Part III — The Reckoning</div>
+            <div class="part-count">4 / 15 scenes</div>
+          </div>
+          <div class="multi-progress">
+            <div class="multi-seg" style="width:27%;background:var(--blue);"></div>
+            <div class="multi-seg" style="width:73%;background:var(--bg-muted);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Next up -->
+      <div class="next-up-card">
+        <div>
+          <div class="next-up-label">Next Up</div>
+          <div class="next-up-scene">Chapter 12 Scene 3 — The Toll Keeper's Choice</div>
+          <div class="next-up-meta">Outline stage · Part II · 0 words</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary">Start Writing →</button>
+          <button class="btn btn-ghost">View Outline</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <h2>Next Scene Flow — Completion Toast</h2>
+
+  <div class="mock-window" style="max-width:640px;">
+    <div class="mock-titlebar"><div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div></div>
+    <div style="background:var(--bg);position:relative;min-height:120px;">
+      <div style="padding:16px;font-size:13px;color:var(--text-dim);">
+        [Editor content — writer just changed scene status to "Draft" ↓]
+      </div>
+      <div class="toast-demo">
+        <div class="toast">
+          <div class="toast-header">
+            <div class="toast-icon">✓</div>
+            <div class="toast-title">Scene marked as Draft</div>
+          </div>
+          <div class="toast-sub">Ch. 12 — The Crossing at Dunmore · 847 words</div>
+          <div class="toast-actions">
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px;">Next: Ch. 12 Scene 3 →</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;">Back to Outline</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;">Take a Break</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Key Changes Annotated</h2>
+  <div class="annotation">
+    <div class="annotation-num">1</div>
+    <div class="annotation-text"><strong>Progress route</strong> at <code>/project/[id]/progress</code>. Reads scene <code>status</code> field and word counts — no new data model except for <code>WritingSession</code> for session tracking.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">2</div>
+    <div class="annotation-text"><strong>Tri-color progress bars</strong> — green=Final, blue=Revised, amber=Draft, gray=Outline. These provide a clearer picture of manuscript state than a single percentage.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">3</div>
+    <div class="annotation-text"><strong>Next Scene Flow toast</strong> — triggers when writer changes a scene's status. Options: next scene / back to outline / take a break. Reduces friction between finishing a scene and starting the next.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">4</div>
+    <div class="annotation-text"><strong>Editor footer session counter</strong> (from Phase 2 preview) now writes to a persistent <code>WritingSession</code> record. Dashboard heatmap aggregates from these sessions.</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PHASE 5: STORY INTELLIGENCE
+     ============================================================ -->
+<div id="phase5" class="section">
+  <h1>Phase 5: Story Intelligence <span class="badge">GH#123</span></h1>
+  <p class="subtitle">Writers with 50+ scenes report higher consistency confidence.</p>
+
+  <h2>Consistency Alerts — Inline in Editor</h2>
+
+  <div class="mock-window">
+    <div class="mock-titlebar"><div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div></div>
+    <div style="padding:16px 16px 8px;background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+      <div class="toolbar-spacer"></div>
+      <div class="alert-pill">⚠ 2 alerts</div>
+      <div class="scene-status-pill"><div class="scene-status draft"></div> Draft</div>
+    </div>
+    <div style="padding:32px 64px;background:var(--bg);font-family:Georgia,serif;font-size:15px;line-height:1.8;color:#d4d4d8;">
+      <p>Lord Vayne studied her with those <span style="background:rgba(239,68,68,0.15);border-bottom:2px solid #ef4444;border-radius:2px;cursor:pointer;">cold blue eyes</span>.</p>
+
+      <div class="consistency-alert">
+        <div class="consistency-alert-header">
+          <span>⚠</span>
+          <span class="consistency-alert-title">Consistency alert: Eye colour</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);">
+          In <strong style="color:var(--text);">Chapter 3, Scene 1</strong>: "Lord Vayne's <em>grey eyes</em> showed nothing."
+        </div>
+        <div class="consistency-source">This chapter says "blue eyes".</div>
+        <div class="consistency-actions">
+          <div class="consistency-btn">Fix here → grey</div>
+          <div class="consistency-btn">Fix in Ch. 3</div>
+          <div class="consistency-btn" style="color:var(--green);border-color:var(--green);">Not an error</div>
+        </div>
+      </div>
+
+      <p style="margin-top:24px;">She had not eaten since the morning of the <span style="background:rgba(239,68,68,0.15);border-bottom:2px solid #ef4444;border-radius:2px;cursor:pointer;">siege's second day</span>.</p>
+      <div class="consistency-alert">
+        <div class="consistency-alert-header">
+          <span>⚠</span>
+          <span class="consistency-alert-title">Timeline check: Siege timeline</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);">
+          In <strong style="color:var(--text);">Chapter 9</strong> the siege began on "the third day of the Long Winter". Chapter 11 describes it ending after 4 days. This scene places her 2 days into the siege — does that match your intended timeline?
+        </div>
+        <div class="consistency-actions">
+          <div class="consistency-btn">View timeline</div>
+          <div class="consistency-btn" style="color:var(--green);border-color:var(--green);">Correct as written</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Plot Thread Status in Outline</h2>
+
+  <div class="mock-window" style="max-width:300px;">
+    <div class="mock-titlebar"><div class="mock-dot red"></div><div class="mock-dot amber"></div><div class="mock-dot green"></div></div>
+    <div style="padding:8px 0;">
+      <div style="padding:8px 12px 4px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);">Plot Threads Legend</div>
+      <div style="padding:4px 12px;font-size:12px;color:var(--text-dim);display:flex;gap:12px;">
+        <span><span class="thread-dot advancing" style="display:inline-block;"></span> Advancing</span>
+        <span><span class="thread-dot mentioned" style="display:inline-block;"></span> Mentioned</span>
+        <span><span class="thread-dot dormant" style="display:inline-block;"></span> Dormant</span>
+      </div>
+      <div class="outline-item">
+        <div class="scene-status final"></div>
+        Ch. 10 — The Parley
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot advancing" title="The Lost Heir"></div>
+          <div class="thread-dot advancing" title="Mira's betrayal"></div>
+          <div class="thread-dot dormant" title="The Obsidian Crown"></div>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="scene-status final"></div>
+        Ch. 11 — The Siege Lifts
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot advancing" title="The Lost Heir"></div>
+          <div class="thread-dot mentioned" title="Mira's betrayal"></div>
+          <div class="thread-dot dormant" title="The Obsidian Crown"></div>
+        </div>
+      </div>
+      <div class="outline-item active">
+        <div class="scene-status draft"></div>
+        Ch. 12 — The Crossing
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot advancing" title="The Lost Heir"></div>
+          <div class="thread-dot mentioned" title="Mira's betrayal"></div>
+          <div class="thread-dot dormant" title="The Obsidian Crown"></div>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="scene-status outline"></div>
+        Ch. 13 — The River Keep
+        <div style="display:flex;gap:3px;margin-left:auto;">
+          <div class="thread-dot dormant" title="The Obsidian Crown"></div>
+        </div>
+      </div>
+      <div style="padding:8px 12px;font-size:11px;color:var(--amber);background:rgba(245,158,11,0.06);border-top:1px solid var(--border);margin-top:4px;">
+        ⚠ "The Obsidian Crown" thread dormant since Ch. 8
+      </div>
+    </div>
+  </div>
+
+  <h2>Key Changes Annotated</h2>
+  <div class="annotation">
+    <div class="annotation-num">1</div>
+    <div class="annotation-text"><strong>Consistency alerts</strong> — background AI analysis compares story object descriptions across scenes. Alerts appear as highlighted text with inline callouts (not blocking). Actions train the system.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">2</div>
+    <div class="annotation-text"><strong>Alert counter in toolbar</strong> — "⚠ 2 alerts" pill. Clicking navigates to first alert in document. Non-intrusive until the writer wants to address them.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">3</div>
+    <div class="annotation-text"><strong>Plot thread dots</strong> — reuse relationship data from Phase 2. New: "dormant since Ch. N" warnings for threads that haven't appeared in many scenes.</div>
+  </div>
+  <div class="annotation">
+    <div class="annotation-num">4</div>
+    <div class="annotation-text"><strong>Phase 5 requires new infrastructure:</strong> background processing pipeline for consistency analysis, <code>ConsistencyAlert</code> table. Plan for post-Phase 4 implementation only.</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCRIPT
+     ============================================================ -->
+<script>
+  function show(id, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.spec-nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
