@@ -71,8 +71,16 @@ export interface StructureNode {
   updatedAt: string;
 }
 
+export interface PlotlineIndicator {
+  id: string;
+  name: string;
+  status: "advancing" | "mentioned" | "dormant";
+  lastSeenTitle?: string;
+}
+
 export interface OutlineNode extends StructureNode {
   children: OutlineNode[];
+  plotIndicators?: PlotlineIndicator[];
 }
 
 export type StoryObjectType = "CHARACTER" | "LOCATION" | "PLOTLINE" | "WORLD_ELEMENT" | "NOTE";

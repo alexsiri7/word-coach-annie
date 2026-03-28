@@ -55,9 +55,20 @@ import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
+import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType } from "@/lib/types";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
+
+function mergeIndicators(
+  nodes: OutlineNode[],
+  plotMap: Map<string, PlotlineIndicator[]>
+): OutlineNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    plotIndicators: node.type === "SCENE" ? (plotMap.get(node.id) ?? []) : undefined,
+    children: mergeIndicators(node.children, plotMap),
+  }));
+}
 
 const STORY_TABS: { key: SidebarTab; type: StoryObjectType; label: string; icon: typeof Users }[] = [
   { key: "characters", type: "CHARACTER", label: "Characters", icon: Users },
@@ -107,11 +118,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }, [projectId]);
 
   const fetchOutline = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/nodes`);
-    if (res.ok) {
-      const data = await res.json();
-      setOutline(data.tree || []);
+    const [nodesRes, plotRes] = await Promise.all([
+      fetch(`/api/projects/${projectId}/nodes`),
+      fetch(`/api/projects/${projectId}/plot-thread-status`),
+    ]);
+    if (!nodesRes.ok) return;
+    const data = await nodesRes.json();
+    let tree: OutlineNode[] = data.tree || [];
+
+    if (plotRes.ok) {
+      const plotStatus: { sceneId: string; indicators: PlotlineIndicator[] }[] = await plotRes.json();
+      const plotMap = new Map(plotStatus.map((s) => [s.sceneId, s.indicators]));
+      tree = mergeIndicators(tree, plotMap);
     }
+
+    setOutline(tree);
   }, [projectId]);
 
   const fetchStoryObjects = useCallback(async () => {
@@ -219,6 +240,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   };
 
   const selectedNode = selectedNodeId ? findNode(outline, selectedNodeId) : null;
+
+  // Build flat scene list for the timeline strip (derived from outline)
+  const timelineScenes = useMemo(() => {
+    const scenes: { id: string; title: string; status: string; orderIndex: number; chapterTitle?: string }[] = [];
+    function collectScenes(nodes: OutlineNode[], chapterTitle?: string) {
+      for (const n of nodes) {
+        if (n.type === "SCENE") {
+          scenes.push({ id: n.id, title: n.title, status: n.status, orderIndex: n.orderIndex, chapterTitle });
+        } else {
+          collectScenes(n.children, n.type === "CHAPTER" ? n.title : chapterTitle);
+        }
+      }
+    }
+    collectScenes(outline);
+    return scenes;
+  }, [outline]);
 
   // Filter story objects by active tab
   const activeStoryTab = STORY_TABS.find((t) => t.key === activeTab);
@@ -563,6 +600,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 node={selectedNode}
                 projectId={projectId}
                 onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
+                timelineScenes={timelineScenes}
+                linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
               />
             </ErrorBoundary>
           ) : (

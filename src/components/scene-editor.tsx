@@ -12,21 +12,41 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import type { StructureNode, SceneStatus, ContentVersion, Annotation } from "@/lib/types";
+import type { StructureNode, SceneStatus, ContentVersion, Annotation, StoryObject } from "@/lib/types";
 import { getEditorExtensions, commentsToBeats } from "@/components/editor/editor-config";
 import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { ConsistencyAlertsPanel } from "@/components/editor/consistency-alerts-panel";
+import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
+import { TimelineStrip } from "@/components/timeline/timeline-strip";
+
+interface TimelineSceneItem {
+  id: string;
+  title: string;
+  status: string;
+  orderIndex: number;
+  chapterTitle?: string;
+}
 
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
+  timelineScenes?: TimelineSceneItem[];
+  linkedCharacters?: StoryObject[];
 }
 
-export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
+export function SceneEditor({
+  node,
+  projectId,
+  onNodeUpdated,
+  showFocusButton = true,
+  timelineScenes,
+  linkedCharacters = [],
+}: SceneEditorProps) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -39,6 +59,9 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
+  const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
+  const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
+  const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
@@ -295,6 +318,11 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
         projectId={projectId}
         nodeId={node.id}
         onInsertBeat={insertBeat}
+        onToggleConsistencyAlerts={() => setShowConsistencyAlerts((v) => !v)}
+        showConsistencyAlerts={showConsistencyAlerts}
+        consistencyAlertCount={consistencyAlertCount}
+        onToggleVoiceMonitor={() => setShowVoiceMonitor((v) => !v)}
+        showVoiceMonitor={showVoiceMonitor}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
@@ -380,7 +408,39 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
             onDelete={deleteAnnotation}
           />
         )}
+
+        {/* Consistency Alerts Panel */}
+        {showConsistencyAlerts && (
+          <div className="w-72 shrink-0 border-l border-border overflow-y-auto">
+            <ConsistencyAlertsPanel
+              projectId={projectId}
+              sceneId={node.id}
+              onClose={() => setShowConsistencyAlerts(false)}
+            />
+          </div>
+        )}
+
+        {/* Voice Monitor Panel */}
+        {showVoiceMonitor && (
+          <div className="w-72 shrink-0 border-l border-border overflow-y-auto">
+            <VoiceMonitorPanel
+              projectId={projectId}
+              sceneId={node.id}
+              linkedCharacters={linkedCharacters}
+              onClose={() => setShowVoiceMonitor(false)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Timeline Strip */}
+      {timelineScenes && timelineScenes.length > 0 && (
+        <TimelineStrip
+          scenes={timelineScenes}
+          currentSceneId={node.id}
+          projectId={projectId}
+        />
+      )}
     </div>
   );
 }

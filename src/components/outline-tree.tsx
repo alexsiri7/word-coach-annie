@@ -40,8 +40,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { OutlineNode, SceneStatus, ProjectType } from "@/lib/types";
+import type { OutlineNode, PlotlineIndicator, SceneStatus, ProjectType } from "@/lib/types";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface OutlineTreeProps {
   nodes: OutlineNode[];
@@ -74,6 +80,53 @@ function StatusDot({ status }: { status: SceneStatus }) {
       role="img"
       aria-label={`Status: ${STATUS_LABELS[status]}`}
     />
+  );
+}
+
+function PlotThreadDots({ indicators }: { indicators: PlotlineIndicator[] }) {
+  const active = indicators.filter((i) => i.status !== "dormant");
+  const dormant = indicators.filter((i) => i.status === "dormant");
+
+  return (
+    <TooltipProvider>
+      <span className="flex items-center gap-0.5 flex-shrink-0">
+        {active.map((ind) => (
+          <Tooltip key={ind.id}>
+            <TooltipTrigger asChild>
+              <span
+                className={cn(
+                  "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
+                  ind.status === "advancing" ? "bg-blue-500" : "bg-amber-500"
+                )}
+                aria-label={`${ind.name}: ${ind.status}`}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-48">
+              <p className="text-xs font-medium">{ind.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{ind.status}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+        {dormant.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40 flex-shrink-0"
+                aria-label={`${dormant.length} dormant plotline(s)`}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-56">
+              <p className="text-xs font-medium mb-1">Dormant threads</p>
+              {dormant.map((ind) => (
+                <p key={ind.id} className="text-xs text-muted-foreground">
+                  {ind.name}{ind.lastSeenTitle ? ` (last: ${ind.lastSeenTitle})` : ""}
+                </p>
+              ))}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </span>
+    </TooltipProvider>
   );
 }
 
@@ -171,6 +224,9 @@ function NodeContent({
       )}
       <span className="truncate flex-1">{node.title}</span>
       {isScene && <StatusDot status={node.status as SceneStatus} />}
+      {isScene && node.plotIndicators && node.plotIndicators.length > 0 && (
+        <PlotThreadDots indicators={node.plotIndicators} />
+      )}
       {isScene && node.wordCount !== undefined && node.wordCount > 0 && (
         <span className="text-xs text-text-muted tabular-nums">{node.wordCount}</span>
       )}
