@@ -2,7 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
+import {
+  Plus,
+  MoreVertical,
+  Trash2,
+  Pencil,
+  PenLine,
+  Sparkles,
+  Globe,
+  ArrowRight,
+  BookOpen,
+  Target,
+  Play,
+  ChevronRight,
+} from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -41,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
+import { useLastScene, useWritingSession, useDailyWordGoal } from "@/hooks/use-writing-session";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -52,6 +66,9 @@ interface Project {
   projectType: ProjectType;
   wordCount: number;
   nodeCount: number;
+  sceneCount: number;
+  draftedSceneCount: number;
+  nextUnwrittenScene: { id: string; title: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,6 +84,12 @@ export default function Dashboard() {
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
+  const [goalEditOpen, setGoalEditOpen] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+
+  const { lastScene } = useLastScene();
+  const { wordsWrittenToday } = useWritingSession();
+  const { goal, setGoal } = useDailyWordGoal();
 
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
@@ -111,6 +134,12 @@ export default function Dashboard() {
     fetchProjects();
   };
 
+  const handleSaveGoal = () => {
+    const n = parseInt(goalInput, 10);
+    if (!isNaN(n) && n >= 0) setGoal(n);
+    setGoalEditOpen(false);
+  };
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       month: "short",
@@ -125,6 +154,15 @@ export default function Dashboard() {
   };
 
   const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
+
+  // Check if the last scene's project still exists
+  const lastSceneProject = lastScene
+    ? projects.find((p) => p.id === lastScene.projectId)
+    : null;
+  const showResumeCard = !!lastSceneProject;
+
+  const goalProgress = goal > 0 ? Math.min(1, wordsWrittenToday / goal) : 0;
+  const showSessionTracker = goal > 0 || wordsWrittenToday > 0;
 
   return (
     <main id="main-content" className="min-h-screen">
@@ -163,6 +201,71 @@ export default function Dashboard() {
             <UserMenu />
           </div>
         </div>
+
+        {/* Resume Card + Session Tracker row */}
+        {!loading && (showResumeCard || showSessionTracker) && (
+          <div className="flex flex-col sm:flex-row gap-4 mb-8 animate-fade-in">
+            {/* Resume Card */}
+            {showResumeCard && lastScene && (
+              <div
+                className="flex-1 glass-card p-5 cursor-pointer hover:border-accent/50 transition-colors group"
+                onClick={() => router.push(`/project/${lastScene.projectId}/scene/${lastScene.sceneId}`)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
+                      <Play className="h-4 w-4 text-accent" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-text-muted mb-0.5">Continue writing</p>
+                      <p className="font-semibold text-text-primary truncate group-hover:text-accent transition-colors">
+                        {lastScene.sceneTitle}
+                      </p>
+                      <p className="text-xs text-text-muted truncate">{lastScene.projectTitle}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-text-muted group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
+                </div>
+              </div>
+            )}
+
+            {/* Session Tracker */}
+            <div className="flex-1 glass-card p-5">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
+                    <Target className="h-4 w-4 text-accent" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-muted mb-0.5">Today&apos;s writing</p>
+                    <p className="font-semibold text-text-primary">
+                      {formatWordCount(wordsWrittenToday)} words
+                      {goal > 0 && (
+                        <span className="text-text-muted font-normal">
+                          {" "}&mdash; {Math.round(goalProgress * 100)}% of goal
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setGoalInput(String(goal || "")); setGoalEditOpen(true); }}
+                  className="text-xs text-text-muted hover:text-accent transition-colors flex-shrink-0"
+                >
+                  {goal > 0 ? `Goal: ${formatWordCount(goal)}` : "Set goal"}
+                </button>
+              </div>
+              {goal > 0 && (
+                <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-accent rounded-full transition-all duration-500"
+                    style={{ width: `${goalProgress * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -207,7 +310,7 @@ export default function Dashboard() {
             {projects.map((project, i) => (
               <div
                 key={project.id}
-                className="group glass-card p-5 cursor-pointer animate-slide-up"
+                className="group glass-card p-5 cursor-pointer animate-slide-up flex flex-col"
                 style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}
                 onClick={() => router.push(`/project/${project.id}`)}
               >
@@ -251,6 +354,39 @@ export default function Dashboard() {
                   <p className="text-sm text-text-secondary mt-1 line-clamp-2 leading-relaxed">
                     {project.synopsis}
                   </p>
+                )}
+
+                {/* Manuscript progress bar */}
+                {project.sceneCount > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-text-muted mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        {project.draftedSceneCount}/{project.sceneCount} scenes drafted
+                      </span>
+                      <span>{Math.round((project.draftedSceneCount / project.sceneCount) * 100)}%</span>
+                    </div>
+                    <div className="h-1 bg-surface-overlay rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent/60 rounded-full"
+                        style={{ width: `${(project.draftedSceneCount / project.sceneCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Next unwritten scene */}
+                {project.nextUnwrittenScene && (
+                  <button
+                    className="mt-3 flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors text-left"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/project/${project.id}/scene/${project.nextUnwrittenScene!.id}`);
+                    }}
+                  >
+                    <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">Next: {project.nextUnwrittenScene.title}</span>
+                  </button>
                 )}
 
                 <div className="flex items-center gap-3 mt-4 text-xs text-text-muted">
@@ -330,6 +466,32 @@ export default function Dashboard() {
             <Button onClick={handleCreate} disabled={!newTitle.trim()}>
               Create
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Daily Goal Dialog */}
+      <Dialog open={goalEditOpen} onOpenChange={setGoalEditOpen}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Daily Word Goal</DialogTitle>
+            <DialogDescription>Set how many words you want to write each day.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              type="number"
+              min={0}
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+              placeholder="e.g. 1000"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && handleSaveGoal()}
+            />
+            <p className="text-xs text-text-muted mt-2">Set to 0 to disable the daily goal tracker.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGoalEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveGoal}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

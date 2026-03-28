@@ -18,15 +18,17 @@ import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { useLastScene, useWritingSession } from "@/hooks/use-writing-session";
 
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
+  projectTitle?: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
 }
 
-export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
+export function SceneEditor({ node, projectId, projectTitle, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -51,6 +53,27 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     },
     onNodeUpdated,
   });
+
+  const { recordLastScene } = useLastScene();
+  const { recordWords } = useWritingSession();
+
+  // Record this scene as the last-edited scene when opened
+  useEffect(() => {
+    recordLastScene({
+      projectId,
+      projectTitle: projectTitle || "",
+      sceneId: node.id,
+      sceneTitle: node.title,
+      timestamp: Date.now(),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id, projectId]);
+
+  // Track session words whenever word count changes
+  useEffect(() => {
+    if (wordCount > 0) recordWords(wordCount);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wordCount]);
 
   // Load initial content
   useEffect(() => {

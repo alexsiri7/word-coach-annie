@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
   const projectIds = projects.map((p) => p.id);
   const allScenes = await prisma.structureNode.findMany({
     where: { projectId: { in: projectIds }, type: "SCENE" },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, status: true, title: true, orderIndex: true, parentId: true },
+    orderBy: [{ projectId: "asc" }, { orderIndex: "asc" }],
   });
 
   // Batch: get latest content version word counts for all scenes in one query
@@ -52,17 +53,37 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Calculate word counts per project
+  // Calculate word counts per project and find next unwritten scene + scene progress
   const projectWordCounts = new Map<string, number>();
+  const projectSceneCounts = new Map<string, number>();
+  const projectDraftedCounts = new Map<string, number>();
+  const projectNextUnwritten = new Map<string, { id: string; title: string } | null>();
+
   for (const scene of allScenes) {
-    const current = projectWordCounts.get(scene.projectId) || 0;
-    projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
+    const pid = scene.projectId;
+    const current = projectWordCounts.get(pid) || 0;
+    projectWordCounts.set(pid, current + (latestWordCounts.get(scene.id) || 0));
+
+    projectSceneCounts.set(pid, (projectSceneCounts.get(pid) || 0) + 1);
+
+    const drafted = scene.status !== "OUTLINE";
+    if (drafted) {
+      projectDraftedCounts.set(pid, (projectDraftedCounts.get(pid) || 0) + 1);
+    }
+
+    // First OUTLINE scene per project = next unwritten
+    if (!drafted && !projectNextUnwritten.has(pid)) {
+      projectNextUnwritten.set(pid, { id: scene.id, title: scene.title });
+    }
   }
 
   const projectsWithWordCount = projects.map((project) => ({
     ...project,
     wordCount: projectWordCounts.get(project.id) || 0,
     nodeCount: project._count.structureNodes,
+    sceneCount: projectSceneCounts.get(project.id) || 0,
+    draftedSceneCount: projectDraftedCounts.get(project.id) || 0,
+    nextUnwrittenScene: projectNextUnwritten.get(project.id) ?? null,
   }));
 
   return NextResponse.json({ projects: projectsWithWordCount, total });
