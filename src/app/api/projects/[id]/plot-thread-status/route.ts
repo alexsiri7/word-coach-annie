@@ -153,7 +153,6 @@ interface NodeInfo {
 }
 
 function buildOrderedScenes(nodes: NodeInfo[]): NodeInfo[] {
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const childrenMap = new Map<string | null, NodeInfo[]>();
 
   for (const node of nodes) {

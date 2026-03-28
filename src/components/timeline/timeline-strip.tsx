@@ -8,7 +8,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { SCENE_STATUS_DOT_COLORS } from "@/lib/constants";
 import type { SceneStatus } from "@/lib/types";
 
 interface TimelineScene {
