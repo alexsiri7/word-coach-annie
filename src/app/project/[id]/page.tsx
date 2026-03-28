@@ -17,6 +17,7 @@ import {
   Menu,
   X as XIcon,
   MessageSquare,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => 
 const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
+const ManuscriptAIPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAIPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -99,6 +101,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [showSearch, setShowSearch] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
+  const [showManuscriptAI, setShowManuscriptAI] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -338,6 +341,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          onClick={() => setShowManuscriptAI(true)}
+          aria-label="Manuscript AI analysis"
+          title="Manuscript analysis"
+        >
+          <BookOpen className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
           aria-label="Project settings"
         >
@@ -354,6 +367,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           onSelectScene={handleSearchSelectScene}
           onSelectObject={handleSearchSelectObject}
           onClose={() => setShowSearch(false)}
+        />
+      )}
+
+      {/* Manuscript AI panel */}
+      {showManuscriptAI && (
+        <ManuscriptAIPanel
+          projectId={projectId}
+          open={showManuscriptAI}
+          onClose={() => setShowManuscriptAI(false)}
         />
       )}
 
@@ -437,6 +459,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <AIChatPanel
                   projectId={projectId}
                   sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
+                  sceneStatus={selectedNode?.type === "SCENE" ? selectedNode.status as "OUTLINE" | "DRAFT" | "REVISED" | "FINAL" : undefined}
                 />
               </ErrorBoundary>
             ) : activeTab === "outline" ? (

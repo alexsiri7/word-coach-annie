@@ -18,6 +18,7 @@ import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { InlineAIBubble } from "@/components/inline-ai-bubble";
 
 interface SceneEditorProps {
   node: StructureNode;
@@ -39,6 +40,8 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
+  const [showInlineAI, setShowInlineAI] = useState(false);
+  const [inlineAIText, setInlineAIText] = useState("");
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
@@ -322,39 +325,75 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
           <div className="flex-1 overflow-y-auto tiptap-editor relative">
             <EditorContent editor={editor} className="h-full" />
             {editor && (
-              <BubbleMenu editor={editor}>
-                <Popover>
-                  <PopoverTrigger asChild>
+              <BubbleMenu
+                editor={editor}
+              >
+                {showInlineAI ? (
+                  <InlineAIBubble
+                    projectId={projectId}
+                    sceneId={node.id}
+                    selectedText={inlineAIText}
+                    onAccept={(result) => {
+                      // Replace selected text with AI result
+                      const { from, to } = editor.state.selection;
+                      editor.chain().focus().deleteRange({ from, to }).insertContentAt(from, result).run();
+                      saveContent(editor.getHTML());
+                      setShowInlineAI(false);
+                    }}
+                    onDismiss={() => setShowInlineAI(false)}
+                  />
+                ) : (
+                  <div className="flex items-center gap-1 bg-surface-raised border border-border rounded-lg shadow-lg p-1">
                     <Button
                       size="sm"
-                      variant="secondary"
-                      className="shadow-lg gap-1.5 h-8 px-2 bg-surface-raised border border-border text-xs"
-                      onClick={(e) => {
+                      variant="ghost"
+                      className="gap-1 h-7 px-2 text-xs text-accent hover:bg-accent/10"
+                      onClick={() => {
                         const { from, to } = editor.state.selection;
-                        if (from === to) e.preventDefault();
+                        const text = editor.state.doc.textBetween(from, to);
+                        if (text.trim()) {
+                          setInlineAIText(text);
+                          setShowInlineAI(true);
+                        }
                       }}
                     >
-                      <MessageSquare className="h-3.5 w-3.5" /> Comment
+                      <span className="text-accent">✦</span> AI
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-3" align="start" sideOffset={5}>
-                    <div className="flex flex-col gap-2">
-                      <h4 className="font-medium text-xs text-text-secondary">Add Annotation</h4>
-                      <Textarea
-                        placeholder="Type your comment..."
-                        className="text-sm min-h-[80px] w-full"
-                        id="new-annotation-input"
-                        autoFocus
-                      />
-                      <div className="flex justify-end">
-                        <Button size="sm" onClick={() => {
-                          const el = document.getElementById("new-annotation-input") as HTMLTextAreaElement;
-                          if (el && el.value.trim()) addAnnotation(el.value);
-                        }}>Save</Button>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    <div className="w-px h-4 bg-border" />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 h-7 px-2 text-xs"
+                          onClick={(e) => {
+                            const { from, to } = editor.state.selection;
+                            if (from === to) e.preventDefault();
+                          }}
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" /> Comment
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start" sideOffset={5}>
+                        <div className="flex flex-col gap-2">
+                          <h4 className="font-medium text-xs text-text-secondary">Add Annotation</h4>
+                          <Textarea
+                            placeholder="Type your comment..."
+                            className="text-sm min-h-[80px] w-full"
+                            id="new-annotation-input"
+                            autoFocus
+                          />
+                          <div className="flex justify-end">
+                            <Button size="sm" onClick={() => {
+                              const el = document.getElementById("new-annotation-input") as HTMLTextAreaElement;
+                              if (el && el.value.trim()) addAnnotation(el.value);
+                            }}>Save</Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
               </BubbleMenu>
             )}
           </div>

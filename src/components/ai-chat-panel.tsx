@@ -26,9 +26,41 @@ interface ToolActivity {
   summary?: string;
 }
 
+type SceneStatus = "OUTLINE" | "DRAFT" | "REVISED" | "FINAL";
+
+const STATUS_SUGGESTIONS: Record<SceneStatus, string[]> = {
+  OUTLINE: [
+    "Draft from beats — turn my outline into prose",
+    "Suggest an opening line for this scene",
+    "Expand the beat outline with more detail",
+  ],
+  DRAFT: [
+    "What's working well in this scene?",
+    "Check the pacing — is it too slow or too fast?",
+    "Audit the character voices — do they sound distinct?",
+  ],
+  REVISED: [
+    "Give me a developmental edit of this scene",
+    "Line edit for clarity and rhythm",
+    "Check consistency with earlier scenes",
+  ],
+  FINAL: [
+    "Final consistency check against the story",
+    "Line edit for polish",
+    "Developmental feedback on this scene",
+  ],
+};
+
+const DEFAULT_SUGGESTIONS = [
+  "What are the main themes so far?",
+  "Suggest a conflict for this scene",
+  "How can I improve the pacing?",
+];
+
 interface AIChatPanelProps {
   projectId: string;
   sceneContext?: string;
+  sceneStatus?: SceneStatus;
 }
 
 function formatTime(dateStr: string): string {
@@ -78,7 +110,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   );
 }
 
-export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
+export function AIChatPanel({ projectId, sceneContext, sceneStatus }: AIChatPanelProps) {
   const { isOnline } = useNetworkStatus();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -276,14 +308,17 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         {!loadingHistory && messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-sm text-text-muted mb-2">
-              Ask about your story — plot, characters, pacing, ideas...
+              {sceneStatus
+                ? "Scene-aware suggestions:"
+                : "Ask about your story — plot, characters, pacing, ideas..."}
             </p>
+            {sceneStatus && (
+              <span className="text-[10px] uppercase tracking-wider text-text-muted/60 mb-2 font-medium">
+                {sceneStatus.charAt(0) + sceneStatus.slice(1).toLowerCase()} stage
+              </span>
+            )}
             <div className="space-y-1.5 w-full">
-              {[
-                "What are the main themes so far?",
-                "Suggest a conflict for this scene",
-                "How can I improve the pacing?",
-              ].map((suggestion) => (
+              {(sceneStatus ? STATUS_SUGGESTIONS[sceneStatus] : DEFAULT_SUGGESTIONS).map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => {
