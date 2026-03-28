@@ -22,6 +22,7 @@ import { ConsistencyAlertsPanel } from "@/components/editor/consistency-alerts-p
 import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
 import { TimelineStrip } from "@/components/timeline/timeline-strip";
 import { InlineAiActionBar } from "@/components/inline-ai-action-bar";
+import { useLastScene, useWritingSession } from "@/hooks/use-writing-session";
 
 interface TimelineSceneItem {
   id: string;
@@ -34,6 +35,7 @@ interface TimelineSceneItem {
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
+  projectTitle?: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
   timelineScenes?: TimelineSceneItem[];
@@ -43,6 +45,7 @@ interface SceneEditorProps {
 export function SceneEditor({
   node,
   projectId,
+  projectTitle,
   onNodeUpdated,
   showFocusButton = true,
   timelineScenes,
@@ -75,6 +78,27 @@ export function SceneEditor({
     },
     onNodeUpdated,
   });
+
+  const { recordLastScene } = useLastScene();
+  const { recordWords } = useWritingSession();
+
+  // Record this scene as the last-edited scene when opened
+  useEffect(() => {
+    recordLastScene({
+      projectId,
+      projectTitle: projectTitle || "",
+      sceneId: node.id,
+      sceneTitle: node.title,
+      timestamp: Date.now(),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id, projectId]);
+
+  // Track session words whenever word count changes
+  useEffect(() => {
+    if (wordCount > 0) recordWords(wordCount);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wordCount]);
 
   // Load initial content
   useEffect(() => {

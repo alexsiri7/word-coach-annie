@@ -1,18 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Eye,
-  EyeOff,
   ArrowRight,
   ArrowLeft,
-  Check,
-  PenLine,
-  MessageSquare,
-  FileText,
   BookOpen,
+  FileText,
+  PenLine,
+  Layers,
   Sparkles,
-  Key,
+  Check,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
@@ -24,107 +22,147 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import type { ProjectType } from "@/lib/types";
 
 const DISMISSED_KEY = "setup-wizard-dismissed";
 
-const FEATURES = [
+type WritingType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL";
+
+const WRITING_TYPES: { value: WritingType; label: string; description: string; icon: typeof BookOpen }[] = [
   {
+    value: "FICTION",
+    label: "Fiction",
+    description: "Novels, short stories, screenplays — narrative writing with characters and plot",
     icon: BookOpen,
-    title: "Projects",
-    description:
-      "Organize your writing into projects with chapters, scenes, and story objects like characters and locations.",
   },
   {
-    icon: PenLine,
-    title: "Editor",
-    description:
-      "A distraction-free writing environment with version history, annotations, and focus mode.",
-  },
-  {
-    icon: MessageSquare,
-    title: "AI Chat",
-    description:
-      "Chat with an AI assistant about your story — brainstorm ideas, get feedback, or work through plot problems.",
-  },
-  {
+    value: "ARTICLE_COLLECTION",
+    label: "Articles",
+    description: "Blog posts, essays, journalism — informational writing organized by topic",
     icon: FileText,
-    title: "Export",
-    description:
-      "Export your manuscript as a formatted document. Generate story bibles and per-chapter summaries.",
+  },
+  {
+    value: "GENERAL",
+    label: "General",
+    description: "Notes, research, anything else — flexible structure for any kind of writing",
+    icon: Layers,
   },
 ];
 
-export function SetupWizard() {
-  const [open, setOpen] = useState(false);
-  const [step, setStep] = useState(0); // 0 = welcome/api-key, 1 = tour, 2 = done
-  const [loading, setLoading] = useState(true);
+const TEMPLATES: Record<WritingType, { label: string; description: string; chapters: string[] }[]> = {
+  FICTION: [
+    {
+      label: "Novel",
+      description: "Three-act structure with chapters and scenes",
+      chapters: ["Act 1", "Act 2", "Act 3"],
+    },
+    {
+      label: "Short Story",
+      description: "Single arc — opening, conflict, resolution",
+      chapters: ["Opening", "Conflict", "Resolution"],
+    },
+    {
+      label: "Blank",
+      description: "Start with an empty project",
+      chapters: [],
+    },
+  ],
+  ARTICLE_COLLECTION: [
+    {
+      label: "Blog Series",
+      description: "A collection of related posts",
+      chapters: ["Introduction", "Part 1", "Part 2", "Conclusion"],
+    },
+    {
+      label: "Blank",
+      description: "Start with an empty project",
+      chapters: [],
+    },
+  ],
+  GENERAL: [
+    {
+      label: "Blank",
+      description: "Start with an empty project",
+      chapters: [],
+    },
+  ],
+};
 
-  // API key form state
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+export function SetupWizard() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState(0);
+
+  // Step 0: writing type
+  const [writingType, setWritingType] = useState<WritingType>("FICTION");
+  // Step 1: project name
+  const [projectName, setProjectName] = useState("");
+  // Step 2: template
+  const [templateIndex, setTemplateIndex] = useState(0);
+  // Creating state
+  const [creating, setCreating] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Check if wizard was previously dismissed
     if (localStorage.getItem(DISMISSED_KEY)) {
       setLoading(false);
       return;
     }
-
-    // Check if setup is already complete
     fetch("/api/setup-status")
       .then((res) => res.json())
       .then((data) => {
-        if (!data.setupComplete) {
-          setOpen(true);
-        }
+        if (!data.setupComplete) setOpen(true);
       })
-      .catch(() => {
-        // If we can't check, don't block the user
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  const handleSaveKey = async () => {
-    if (!apiKey.trim()) return;
-    setSaving(true);
-    setSaved(false);
-
-    try {
-      const body: Record<string, string> = { baseUrl, model };
-      body.apiKey = apiKey;
-
-      const res = await offlineFetch("/api/ai-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        setSaved(true);
-        // Auto-advance to tour after a brief delay
-        setTimeout(() => setStep(1), 800);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSkipKey = () => {
-    setStep(1);
-  };
-
-  const handleFinish = () => {
-    localStorage.setItem(DISMISSED_KEY, "true");
-    setOpen(false);
-  };
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISSED_KEY, "true");
     setOpen(false);
+  };
+
+  const templates = TEMPLATES[writingType];
+
+  const handleCreate = async () => {
+    if (!projectName.trim()) return;
+    setCreating(true);
+    try {
+      const template = templates[templateIndex];
+
+      // Create the project
+      const res = await offlineFetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: projectName.trim(),
+          projectType: writingType as ProjectType,
+        }),
+      });
+      if (!res.ok) return;
+      const project = await res.json();
+
+      // Create chapters from template
+      for (let i = 0; i < template.chapters.length; i++) {
+        await offlineFetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: template.chapters[i], type: "CHAPTER", orderIndex: i }),
+        }).catch(() => {});
+      }
+
+      setDone(true);
+      localStorage.setItem(DISMISSED_KEY, "true");
+
+      // Navigate to the project
+      setTimeout(() => {
+        setOpen(false);
+        router.push(`/project/${project.id}`);
+      }, 800);
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (loading) return null;
@@ -132,101 +170,9 @@ export function SetupWizard() {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleDismiss(); }}>
       <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => e.preventDefault()}>
+
+        {/* Step 0: Choose writing type */}
         {step === 0 && (
-          <>
-            <DialogHeader>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                  <Key className="h-5 w-5 text-accent" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl">Welcome to Word Coach Annie</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    Set up your AI provider to unlock chat, feedback, and brainstorming features.
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="space-y-4 pt-2">
-              <p className="text-xs text-text-muted">
-                Bring your own API key from any OpenAI-compatible provider (OpenRouter, OpenAI, Ollama, etc.).
-                Your key is encrypted and stored locally.
-              </p>
-
-              <div>
-                <label htmlFor="setup-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  API Key *
-                </label>
-                <div className="relative">
-                  <Input
-                    id="setup-api-key"
-                    type={showKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="pr-10"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-                    aria-label={showKey ? "Hide API key" : "Show API key"}
-                  >
-                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="setup-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="setup-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="setup-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Model
-                </label>
-                <Input
-                  id="setup-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, gemini-2.0-flash..."
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <Button variant="ghost" onClick={handleSkipKey} className="text-text-muted">
-                  Skip for now
-                </Button>
-                <Button onClick={handleSaveKey} disabled={saving || !apiKey.trim()} className="gap-1.5">
-                  {saving ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : saved ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" />
-                  )}
-                  {saving ? "Saving..." : saved ? "Saved!" : "Continue"}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {step === 1 && (
           <>
             <DialogHeader>
               <div className="flex items-center gap-3 mb-1">
@@ -234,31 +180,84 @@ export function SetupWizard() {
                   <Sparkles className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <DialogTitle className="text-xl">Quick Tour</DialogTitle>
+                  <DialogTitle className="text-xl">Welcome to Word Coach Annie</DialogTitle>
                   <DialogDescription className="mt-1">
-                    Here&apos;s what you can do with Word Coach Annie.
+                    What are you writing?
                   </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
 
-            <div className="grid gap-3 pt-2">
-              {FEATURES.map((feature) => (
-                <div
-                  key={feature.title}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-surface-raised border border-border"
+            <div className="space-y-2 pt-2">
+              {WRITING_TYPES.map(({ value, label, description, icon: Icon }) => (
+                <button
+                  key={value}
+                  className={[
+                    "w-full flex items-start gap-3 p-3.5 rounded-lg border text-left transition-colors",
+                    writingType === value
+                      ? "border-accent bg-accent/5"
+                      : "border-border bg-surface-raised hover:border-accent/40",
+                  ].join(" ")}
+                  onClick={() => setWritingType(value)}
                 >
                   <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <feature.icon className="h-4 w-4 text-accent" />
+                    <Icon className="h-4 w-4 text-accent" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">{feature.title}</h3>
-                    <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-                      {feature.description}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-text-primary">{label}</span>
+                      {writingType === value && <Check className="h-3.5 w-3.5 text-accent" />}
+                    </div>
+                    <p className="text-xs text-text-secondary mt-0.5">{description}</p>
                   </div>
-                </div>
+                </button>
               ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <Button variant="ghost" onClick={handleDismiss} className="text-text-muted">
+                Skip
+              </Button>
+              <Button onClick={() => setStep(1)} className="gap-1.5">
+                Next
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 1: Project name */}
+        {step === 1 && (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                  <PenLine className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl">Name your project</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    You can always change this later.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="pt-2">
+              <Input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder={
+                  writingType === "FICTION"
+                    ? "e.g. The Last Horizon"
+                    : writingType === "ARTICLE_COLLECTION"
+                    ? "e.g. My Tech Blog"
+                    : "e.g. Research Notes"
+                }
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && projectName.trim() && setStep(2)}
+                className="text-base"
+              />
             </div>
 
             <div className="flex items-center justify-between pt-3">
@@ -266,9 +265,81 @@ export function SetupWizard() {
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-              <Button onClick={handleFinish} className="gap-1.5">
-                Get Started
+              <Button onClick={() => setStep(2)} disabled={!projectName.trim()} className="gap-1.5">
+                Next
                 <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 2: Template */}
+        {step === 2 && (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                  <Layers className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl">Choose a structure</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Pre-populate your project with a starter outline.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-2 pt-2">
+              {templates.map((template, idx) => (
+                <button
+                  key={template.label}
+                  className={[
+                    "w-full flex items-start gap-3 p-3.5 rounded-lg border text-left transition-colors",
+                    templateIndex === idx
+                      ? "border-accent bg-accent/5"
+                      : "border-border bg-surface-raised hover:border-accent/40",
+                  ].join(" ")}
+                  onClick={() => setTemplateIndex(idx)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-text-primary">{template.label}</span>
+                      {templateIndex === idx && <Check className="h-3.5 w-3.5 text-accent" />}
+                    </div>
+                    <p className="text-xs text-text-secondary mt-0.5">{template.description}</p>
+                    {template.chapters.length > 0 && (
+                      <p className="text-xs text-text-muted mt-1">
+                        {template.chapters.join(" → ")}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <Button variant="ghost" onClick={() => setStep(1)} className="gap-1.5">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <Button onClick={handleCreate} disabled={creating} className="gap-1.5">
+                {done ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Opening project&hellip;
+                  </>
+                ) : creating ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creating&hellip;
+                  </>
+                ) : (
+                  <>
+                    Start writing
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
             </div>
           </>
