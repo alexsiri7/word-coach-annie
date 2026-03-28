@@ -103,7 +103,7 @@ jobs:
           key: ${{ secrets.SSH_DEPLOY_KEY }}
           envs: GHCR_TOKEN,GHCR_USER
           script: |
-            cd /home/asiri/gt/annie/mayor/rig
+            cd /mnt/ext-fast/gc/rigs/annie
 
             # Pull latest compose file
             git pull --rebase
