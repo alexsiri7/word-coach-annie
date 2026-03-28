@@ -60,7 +60,7 @@ export function SceneEditor({
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
-  const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
+  const [consistencyAlertCount, _setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
