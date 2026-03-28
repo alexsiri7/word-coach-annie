@@ -1,0 +1,2164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Coach Annie — UX Design Spec</title>
+<style>
+  :root {
+    /* Annie's color system — blue-indigo accent, warm neutrals */
+    --accent-50: #eef2ff;
+    --accent-100: #e0e7ff;
+    --accent-200: #c7d2fe;
+    --accent-400: #818cf8;
+    --accent-500: #6366f1;
+    --accent-600: #4f46e5;
+    --accent-700: #4338ca;
+    --gray-50: #fafafa;
+    --gray-100: #f4f4f5;
+    --gray-200: #e4e4e7;
+    --gray-300: #d4d4d8;
+    --gray-400: #a1a1aa;
+    --gray-500: #71717a;
+    --gray-600: #52525b;
+    --gray-700: #3f3f46;
+    --gray-800: #27272a;
+    --gray-900: #18181b;
+    --green-50: #f0fdf4;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --amber-50: #fffbeb;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --red-50: #fef2f2;
+    --red-500: #ef4444;
+    --blue-50: #eff6ff;
+    --blue-500: #3b82f6;
+    --purple-50: #faf5ff;
+    --purple-500: #a855f7;
+    /* Dark mode editor colors */
+    --dark-bg: #1a1a2e;
+    --dark-surface: #1e1e32;
+    --dark-border: #2d2d44;
+    --dark-text: #e4e4e7;
+    --dark-muted: #71717a;
+    /* Spacing & shape */
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f0f5;
+    color: var(--gray-900);
+    line-height: 1.5;
+  }
+
+  /* === SPEC LAYOUT === */
+  .spec-header {
+    background: linear-gradient(135deg, var(--gray-900) 0%, #1e1b4b 100%);
+    color: white;
+    padding: 48px 32px;
+    text-align: center;
+  }
+  .spec-header h1 { font-size: 36px; font-weight: 700; margin-bottom: 8px; }
+  .spec-header .accent-line {
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent-500), var(--purple-500));
+    border-radius: 2px;
+    margin: 16px auto;
+  }
+  .spec-header p { color: var(--gray-400); font-size: 16px; max-width: 640px; margin: 0 auto; }
+
+  .spec-nav {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .spec-nav a {
+    display: inline-block;
+    padding: 14px 16px;
+    color: var(--gray-500);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .spec-nav a:hover, .spec-nav a.active {
+    color: var(--accent-600);
+    border-bottom-color: var(--accent-600);
+  }
+
+  .spec-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 32px;
+  }
+  .spec-section h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .spec-section .subtitle {
+    color: var(--gray-500);
+    font-size: 15px;
+    margin-bottom: 32px;
+    max-width: 700px;
+  }
+  .spec-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-500);
+    margin: 32px 0 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .screen-pair {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+  .screen-pair .desktop-frame { flex: 1; min-width: 700px; }
+  .screen-pair .mobile-frame { flex: 0 0 375px; }
+
+  .frame-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  /* Desktop frame */
+  .desktop-chrome {
+    background: var(--gray-800);
+    border-radius: 12px 12px 0 0;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .desktop-chrome .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .desktop-chrome .dot.r { background: #ff5f57; }
+  .desktop-chrome .dot.y { background: #febc2e; }
+  .desktop-chrome .dot.g { background: #28c840; }
+  .desktop-chrome .url-bar {
+    flex: 1;
+    background: var(--gray-700);
+    border-radius: 6px;
+    padding: 4px 12px;
+    color: var(--gray-400);
+    font-size: 12px;
+    margin-left: 8px;
+  }
+
+  .desktop-viewport {
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    height: 600px;
+    position: relative;
+  }
+
+  /* Dark desktop viewport */
+  .desktop-viewport.dark {
+    background: var(--dark-bg);
+    border-color: var(--dark-border);
+  }
+
+  /* Mobile frame */
+  .mobile-chrome {
+    background: var(--gray-900);
+    border-radius: 32px 32px 0 0;
+    padding: 12px 24px 0;
+    text-align: center;
+  }
+  .mobile-notch {
+    width: 120px;
+    height: 28px;
+    background: var(--gray-900);
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+  .mobile-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .mobile-viewport {
+    background: white;
+    border-left: 3px solid var(--gray-800);
+    border-right: 3px solid var(--gray-800);
+    overflow: hidden;
+    height: 720px;
+    position: relative;
+  }
+  .mobile-viewport.dark {
+    background: var(--dark-bg);
+  }
+  .mobile-bottom-chrome {
+    background: var(--gray-900);
+    border-radius: 0 0 32px 32px;
+    padding: 8px 0 20px;
+    text-align: center;
+  }
+  .mobile-home-indicator {
+    width: 134px;
+    height: 5px;
+    background: white;
+    border-radius: 3px;
+    margin: 0 auto;
+  }
+
+  /* Annotation callouts */
+  .callout {
+    background: var(--accent-50);
+    border-left: 3px solid var(--accent-500);
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 14px;
+    color: var(--gray-700);
+  }
+  .callout strong { color: var(--accent-700); }
+
+  /* === MOCKUP COMPONENTS === */
+
+  /* Annie logo */
+  .annie-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .annie-logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--accent-600);
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Accent gradient line */
+  .gradient-line {
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #6366f1);
+  }
+
+  /* Sidebar */
+  .mock-sidebar {
+    width: 260px;
+    height: 100%;
+    border-right: 1px solid var(--gray-200);
+    background: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    font-size: 13px;
+  }
+  .mock-sidebar.dark {
+    background: var(--dark-surface);
+    border-color: var(--dark-border);
+    color: var(--dark-text);
+  }
+  .mock-sidebar-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--gray-100);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+  }
+  .mock-sidebar .section-label {
+    padding: 12px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+  }
+  .mock-sidebar .tree-item {
+    padding: 6px 16px 6px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 1px 8px;
+  }
+  .mock-sidebar .tree-item:hover { background: var(--gray-50); }
+  .mock-sidebar .tree-item.active {
+    background: var(--accent-50);
+    color: var(--accent-700);
+    font-weight: 600;
+  }
+  .mock-sidebar .tree-item .word-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--gray-400);
+    font-variant-numeric: tabular-nums;
+  }
+  .mock-sidebar .tree-item .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.final { background: var(--green-500); }
+  .status-dot.draft { background: var(--amber-500); }
+  .status-dot.outline { background: var(--gray-300); }
+  .status-dot.revised { background: var(--blue-500); }
+
+  /* Editor area */
+  .mock-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mock-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .mock-editor-toolbar .separator {
+    width: 1px;
+    height: 20px;
+    background: var(--gray-200);
+    margin: 0 4px;
+  }
+  .mock-toolbar-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--gray-600);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    background: none;
+  }
+  .mock-toolbar-btn:hover { background: var(--gray-100); }
+  .mock-toolbar-btn.active { background: var(--accent-50); color: var(--accent-600); }
+
+  .mock-prose {
+    flex: 1;
+    padding: 32px 48px;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--gray-800);
+    overflow-y: auto;
+  }
+  .mock-prose.dark {
+    color: var(--dark-text);
+  }
+  .mock-prose p { margin-bottom: 1em; }
+  .mock-prose .placeholder {
+    color: var(--gray-400);
+    font-style: italic;
+  }
+  .mock-prose .mention {
+    background: var(--accent-50);
+    color: var(--accent-700);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .mock-prose .mention:hover {
+    background: var(--accent-100);
+  }
+
+  .mock-editor-footer {
+    padding: 8px 16px;
+    border-top: 1px solid var(--gray-100);
+    font-size: 12px;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* Related panel (right sidebar) */
+  .mock-related {
+    width: 280px;
+    height: 100%;
+    border-left: 1px solid var(--gray-200);
+    background: white;
+    flex-shrink: 0;
+    overflow-y: auto;
+    font-size: 13px;
+  }
+  .mock-related-header {
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mock-related .related-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gray-50);
+  }
+  .mock-related .related-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mock-related .related-card {
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+  }
+  .mock-related .related-card .name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gray-800);
+  }
+  .mock-related .related-card .role {
+    font-size: 11px;
+    color: var(--accent-600);
+    font-style: italic;
+  }
+  .mock-related .related-card .desc {
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-top: 4px;
+  }
+
+  /* Resume card */
+  .resume-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  .resume-card .label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    margin-bottom: 8px;
+  }
+  .resume-card .title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 4px;
+  }
+  .resume-card .meta {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-bottom: 12px;
+  }
+  .resume-card .actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent-600);
+    color: white;
+  }
+  .btn-secondary {
+    background: white;
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+  }
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* Project cards */
+  .project-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .project-card:hover { box-shadow: var(--shadow-md); }
+  .project-card .card-title { font-weight: 700; font-size: 16px; margin-bottom: 2px; }
+  .project-card .card-author { font-size: 13px; color: var(--gray-500); margin-bottom: 8px; }
+  .project-card .card-synopsis { font-size: 13px; color: var(--gray-600); margin-bottom: 12px; line-height: 1.5; }
+  .project-card .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--gray-400);
+  }
+  .project-card .genre-tag {
+    padding: 2px 8px;
+    background: var(--gray-100);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-600);
+  }
+  .project-card .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--gray-100);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .project-card .progress-bar .fill {
+    height: 100%;
+    background: var(--accent-500);
+    border-radius: 2px;
+  }
+
+  /* Session tracker */
+  .session-tracker {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: var(--accent-50);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--gray-700);
+    margin-bottom: 24px;
+  }
+  .session-tracker .goal-bar {
+    flex: 1;
+    max-width: 200px;
+    height: 6px;
+    background: var(--accent-100);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .session-tracker .goal-bar .fill {
+    height: 100%;
+    background: var(--accent-500);
+    border-radius: 3px;
+  }
+
+  /* AI inline panel */
+  .ai-inline-panel {
+    background: white;
+    border: 1px solid var(--accent-200);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 12px 0;
+    box-shadow: var(--shadow-md);
+  }
+  .ai-inline-panel .ai-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-600);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ai-inline-panel .ai-suggestion {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--gray-700);
+    padding: 8px 12px;
+    background: var(--accent-50);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    border-left: 3px solid var(--accent-400);
+  }
+  .ai-inline-panel .ai-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* AI scene panel */
+  .ai-scene-panel {
+    padding: 16px;
+  }
+  .ai-scene-panel .scene-status {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-bottom: 12px;
+  }
+  .ai-scene-panel .ai-prompt-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--gray-700);
+    cursor: pointer;
+    text-align: left;
+    margin-bottom: 6px;
+    transition: all 0.1s;
+  }
+  .ai-scene-panel .ai-prompt-btn:hover {
+    background: var(--accent-50);
+    border-color: var(--accent-200);
+    color: var(--accent-700);
+  }
+
+  /* Consistency alert */
+  .consistency-alert {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--amber-50);
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--gray-700);
+    margin: 8px 0;
+  }
+  .consistency-alert .alert-icon { flex-shrink: 0; }
+  .consistency-alert .alert-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  /* Progress visualization */
+  .manuscript-progress {
+    padding: 20px;
+  }
+  .manuscript-progress .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .manuscript-progress .progress-header .title {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .manuscript-progress .progress-header .summary {
+    font-size: 13px;
+    color: var(--gray-500);
+  }
+  .part-progress {
+    margin-bottom: 12px;
+  }
+  .part-progress .part-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .part-progress .part-label .name { font-weight: 600; }
+  .part-progress .part-label .meta { color: var(--gray-400); font-size: 12px; }
+  .part-progress .bar {
+    height: 8px;
+    background: var(--gray-100);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .part-progress .bar .fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .bar .fill.complete { background: var(--green-500); }
+  .bar .fill.partial { background: var(--accent-500); }
+  .bar .fill.early { background: var(--amber-500); }
+
+  /* Beat items in outline */
+  .beat-item {
+    padding: 2px 16px 2px 44px;
+    font-size: 11px;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .beat-item::before {
+    content: "→";
+    color: var(--gray-300);
+  }
+
+  /* Plot thread indicators */
+  .thread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .thread-dot.active { background: var(--blue-500); }
+  .thread-dot.mentioned { background: var(--amber-500); }
+  .thread-dot.dormant { background: var(--gray-300); }
+
+  /* Command palette */
+  .cmd-palette {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 520px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    overflow: hidden;
+    z-index: 50;
+  }
+  .cmd-palette-input {
+    width: 100%;
+    padding: 16px 20px;
+    border: none;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 15px;
+    outline: none;
+    color: var(--gray-900);
+  }
+  .cmd-palette-results {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .cmd-palette .group-label {
+    padding: 8px 20px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+  }
+  .cmd-palette .result-item {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .cmd-palette .result-item:hover, .cmd-palette .result-item.selected {
+    background: var(--accent-50);
+  }
+  .cmd-palette .result-item .icon {
+    width: 24px;
+    height: 24px;
+    background: var(--gray-100);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--gray-500);
+    flex-shrink: 0;
+  }
+  .cmd-palette .result-item .meta {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--gray-400);
+  }
+
+  /* Heatmap calendar */
+  .heatmap {
+    display: grid;
+    grid-template-columns: repeat(7, 16px);
+    gap: 3px;
+  }
+  .heatmap .day {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--gray-100);
+  }
+  .heatmap .day.l1 { background: var(--accent-100); }
+  .heatmap .day.l2 { background: var(--accent-200); }
+  .heatmap .day.l3 { background: var(--accent-400); }
+  .heatmap .day.l4 { background: var(--accent-600); }
+
+  /* Selection highlight */
+  .text-selected {
+    background: #bfdbfe;
+    border-radius: 2px;
+  }
+
+  /* AI floating action bar */
+  .ai-float-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--gray-900);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .ai-float-bar .float-btn {
+    padding: 6px 10px;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .ai-float-bar .float-btn:hover { background: var(--gray-700); }
+  .ai-float-bar .float-btn.accent { background: var(--accent-600); }
+
+  /* Tab bar for sidebar */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0;
+    overflow-x: auto;
+  }
+  .tab-bar .tab {
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-500);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab-bar .tab.active {
+    color: var(--accent-600);
+    border-bottom-color: var(--accent-600);
+  }
+  .tab-bar .tab:hover { color: var(--gray-700); }
+
+  /* Header bar */
+  .mock-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 13px;
+    color: var(--gray-600);
+    background: white;
+  }
+  .mock-header .breadcrumb { display: flex; align-items: center; gap: 6px; }
+  .mock-header .breadcrumb a { color: var(--gray-500); text-decoration: none; }
+  .mock-header .breadcrumb a:hover { color: var(--accent-600); }
+  .mock-header .breadcrumb .sep { color: var(--gray-300); }
+  .mock-header .breadcrumb .current { color: var(--gray-900); font-weight: 600; }
+  .mock-header .spacer { flex: 1; }
+  .mock-header .header-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--gray-500);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .mock-header .header-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+
+  /* Overlay for modals / palette */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 40;
+  }
+
+  /* "Next scene" prompt */
+  .next-scene-prompt {
+    background: var(--green-50);
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .next-scene-prompt .check-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--green-500);
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================== HEADER ============================== -->
+<div class="spec-header">
+  <h1>Word Coach Annie</h1>
+  <div class="accent-line"></div>
+  <p>Interactive UX Design Spec — desktop and mobile mockups for each proposed screen. Open this file in any browser.</p>
+</div>
+
+<!-- ============================== NAV ============================== -->
+<nav class="spec-nav">
+  <a href="#dashboard">Dashboard</a>
+  <a href="#editor">Editor</a>
+  <a href="#context-panel">Context Panel</a>
+  <a href="#mentions">@-Mentions</a>
+  <a href="#ai-inline">AI Inline</a>
+  <a href="#ai-scene">AI Scene Panel</a>
+  <a href="#cmd-palette">Command Palette</a>
+  <a href="#progress">Progress View</a>
+  <a href="#consistency">Consistency Alerts</a>
+  <a href="#tokens">Design Tokens</a>
+</nav>
+
+<!-- ============================== 1. DASHBOARD ============================== -->
+<section class="spec-section" id="dashboard">
+  <h2>1. Writing Launchpad (Dashboard)</h2>
+  <p class="subtitle">The dashboard transforms from a project picker into a writing launchpad. Resume card at top, session tracker, and enriched project cards with manuscript progress.</p>
+
+  <h3>Desktop — 1280 &times; 720</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000</div>
+      </div>
+      <div class="desktop-viewport" style="padding: 24px 40px; overflow-y: auto;">
+        <div class="gradient-line" style="margin: -24px -40px 24px; border-radius: 0;"></div>
+
+        <!-- Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <div class="annie-logo">
+              <div class="annie-logo-icon">&#x270E;</div>
+              Word Coach Annie
+            </div>
+            <div style="font-size: 13px; color: var(--gray-400); margin-top: 4px;">3 projects &middot; 67.5k words total</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary">&#127760; Universes</button>
+            <button class="btn btn-primary">+ New Project</button>
+          </div>
+        </div>
+
+        <!-- Resume card -->
+        <div class="resume-card">
+          <div class="label">Continue writing</div>
+          <div class="title">The Amber Throne &mdash; War Council</div>
+          <div class="meta">Chapter 2: The Summons &middot; Last edited 2 hours ago &middot; 1,400 words &middot; <span style="color: var(--amber-500);">&#9679;</span> Draft</div>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm">Open in Editor</button>
+            <button class="btn btn-secondary btn-sm">Open in Focus Mode</button>
+          </div>
+        </div>
+
+        <!-- Session tracker -->
+        <div class="session-tracker">
+          <span>Today: <strong>847 words</strong> across 2 sessions</span>
+          <span style="color: var(--gray-400);">&middot;</span>
+          <span>Goal: 1,000/day</span>
+          <div class="goal-bar"><div class="fill" style="width: 85%;"></div></div>
+          <span style="font-weight: 600; color: var(--accent-600);">85%</span>
+        </div>
+
+        <!-- Project cards -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+          <div class="project-card">
+            <div class="card-title">The Amber Throne</div>
+            <div class="card-author">by Jane Doe</div>
+            <div class="card-synopsis">A reluctant queen must unite warring kingdoms before an ancient evil returns.</div>
+            <div style="font-size: 12px; color: var(--gray-400); margin-bottom: 8px;">Next: <span style="color: var(--gray-600);">Departure at Dawn</span> (Outline)</div>
+            <div class="card-footer">
+              <span class="genre-tag">Fantasy</span>
+              <span>42.5k words</span>
+              <div class="progress-bar"><div class="fill" style="width: 65%;"></div></div>
+              <span>16/24 scenes</span>
+            </div>
+          </div>
+          <div class="project-card">
+            <div class="card-title">Echoes of Mars</div>
+            <div class="card-author">by Jane Doe</div>
+            <div class="card-synopsis">First-generation colonists discover they are not alone on Mars.</div>
+            <div style="font-size: 12px; color: var(--gray-400); margin-bottom: 8px;">Next: <span style="color: var(--gray-600);">The Signal</span> (Draft)</div>
+            <div class="card-footer">
+              <span class="genre-tag">Sci-Fi</span>
+              <span>18.2k words</span>
+              <div class="progress-bar"><div class="fill" style="width: 40%;"></div></div>
+              <span>6/15 scenes</span>
+            </div>
+          </div>
+          <div class="project-card">
+            <div class="card-title">Writing Better Dialogue</div>
+            <div class="card-author">by Jane Doe</div>
+            <div class="card-synopsis">A practical guide to crafting authentic character voices.</div>
+            <div style="font-size: 12px; color: var(--gray-400); margin-bottom: 8px;">Next: <span style="color: var(--gray-600);">Subtext</span> (Outline)</div>
+            <div class="card-footer">
+              <span class="genre-tag">Craft</span>
+              <span>6.8k words</span>
+              <div class="progress-bar"><div class="fill" style="width: 25%;"></div></div>
+              <span>3/12 sections</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-frame">
+      <div class="frame-label">Mobile — iPhone 14</div>
+      <div class="mobile-chrome">
+        <div class="mobile-status-bar"><span>9:41</span><span>&#128267;</span></div>
+        <div class="mobile-notch"></div>
+      </div>
+      <div class="mobile-viewport" style="padding: 16px; overflow-y: auto;">
+        <div class="gradient-line" style="margin: -16px -16px 16px; border-radius: 0;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <div class="annie-logo" style="font-size: 16px;">
+            <div class="annie-logo-icon" style="width: 28px; height: 28px; font-size: 14px;">&#x270E;</div>
+            Annie
+          </div>
+          <button class="btn btn-primary btn-sm">+ New</button>
+        </div>
+
+        <!-- Mobile resume card -->
+        <div class="resume-card" style="padding: 14px 16px;">
+          <div class="label">Continue writing</div>
+          <div class="title" style="font-size: 15px;">War Council</div>
+          <div class="meta" style="font-size: 12px;">The Amber Throne &middot; 1,400 words &middot; <span style="color: var(--amber-500);">&#9679;</span> Draft</div>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm" style="flex: 1; justify-content: center;">Resume Writing</button>
+          </div>
+        </div>
+
+        <!-- Mobile session -->
+        <div class="session-tracker" style="font-size: 12px; flex-wrap: wrap; gap: 8px;">
+          <span>Today: <strong>847 words</strong></span>
+          <div class="goal-bar" style="flex: 1; min-width: 100px;"><div class="fill" style="width: 85%;"></div></div>
+          <span style="font-weight: 600; color: var(--accent-600);">85%</span>
+        </div>
+
+        <!-- Mobile project cards (stacked) -->
+        <div class="project-card" style="margin-bottom: 12px;">
+          <div class="card-title" style="font-size: 15px;">The Amber Throne</div>
+          <div class="card-footer" style="margin-top: 8px;">
+            <span class="genre-tag">Fantasy</span>
+            <span>42.5k</span>
+            <div class="progress-bar"><div class="fill" style="width: 65%;"></div></div>
+            <span>16/24</span>
+          </div>
+        </div>
+        <div class="project-card" style="margin-bottom: 12px;">
+          <div class="card-title" style="font-size: 15px;">Echoes of Mars</div>
+          <div class="card-footer" style="margin-top: 8px;">
+            <span class="genre-tag">Sci-Fi</span>
+            <span>18.2k</span>
+            <div class="progress-bar"><div class="fill" style="width: 40%;"></div></div>
+            <span>6/15</span>
+          </div>
+        </div>
+        <div class="project-card" style="margin-bottom: 12px;">
+          <div class="card-title" style="font-size: 15px;">Writing Better Dialogue</div>
+          <div class="card-footer" style="margin-top: 8px;">
+            <span class="genre-tag">Craft</span>
+            <span>6.8k</span>
+            <div class="progress-bar"><div class="fill" style="width: 25%;"></div></div>
+            <span>3/12</span>
+          </div>
+        </div>
+      </div>
+      <div class="mobile-bottom-chrome"><div class="mobile-home-indicator"></div></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> Resume card provides one-click return to last scene. Session tracker shows daily word count goal. Project cards now include manuscript progress bars and "next scene" quick-jump links. The dashboard becomes a writing launchpad, not just a project list.
+  </div>
+</section>
+
+<!-- ============================== 2. EDITOR ============================== -->
+<section class="spec-section" id="editor">
+  <h2>2. Main Editor with Scene Context</h2>
+  <p class="subtitle">The editor brings focus mode's context-aware pattern into the main view. The sidebar defaults to showing related elements for the current scene, with the outline one tab away.</p>
+
+  <h3>Desktop — 1280 &times; 720</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <!-- Header -->
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968; Home</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">War Council</span>
+            <span class="genre-tag" style="margin-left: 8px;">Fantasy</span>
+          </div>
+          <div class="spacer"></div>
+          <span style="font-size: 12px; color: var(--gray-400); font-variant-numeric: tabular-nums;">42,500 words</span>
+          <span class="header-btn">&#128269;</span>
+          <span class="header-btn">&#9776;</span>
+          <span class="header-btn">&#9881;</span>
+        </div>
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <div class="tab">Outline</div>
+          <div class="tab active">Context</div>
+          <div class="tab">Characters</div>
+          <div class="tab">Locations</div>
+          <div class="tab">AI</div>
+        </div>
+        <!-- Main layout -->
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <!-- Sidebar: Context view -->
+          <div class="mock-sidebar" style="border-top: none;">
+            <div class="mock-sidebar-header">
+              Scene Context
+              <span style="font-size: 10px; color: var(--accent-600); cursor: pointer;">Switch to Outline</span>
+            </div>
+
+            <!-- Scene info -->
+            <div style="padding: 12px 16px; border-bottom: 1px solid var(--gray-100);">
+              <div style="font-weight: 600; margin-bottom: 4px;">War Council</div>
+              <div style="font-size: 12px; color: var(--gray-500);">Chapter 2: The Summons</div>
+              <div style="display: flex; gap: 12px; margin-top: 8px;">
+                <div style="padding: 6px 10px; background: var(--gray-50); border-radius: 6px; font-size: 12px;">
+                  <span style="color: var(--amber-500);">&#9679;</span> Draft
+                </div>
+                <div style="padding: 6px 10px; background: var(--gray-50); border-radius: 6px; font-size: 12px;">
+                  1,400 words
+                </div>
+              </div>
+            </div>
+
+            <!-- Characters in this scene -->
+            <div class="section-label">Characters in this scene (2)</div>
+            <div style="padding: 4px 12px;">
+              <div class="related-card">
+                <div class="name">Queen Mira</div>
+                <div class="role">Protagonist</div>
+                <div class="desc">Young ruler of the Southern Kingdom.</div>
+              </div>
+              <div class="related-card">
+                <div class="name">Lord Ashford</div>
+                <div class="role">Antagonist</div>
+                <div class="desc">Commander of the Northern Armies.</div>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="section-label" style="margin-top: 4px;">Location (1)</div>
+            <div style="padding: 4px 12px;">
+              <div class="related-card">
+                <div class="name">Sunstone Keep</div>
+                <div class="desc">The royal palace of the Southern Kingdom.</div>
+              </div>
+            </div>
+
+            <!-- Plotlines -->
+            <div class="section-label" style="margin-top: 4px;">Active plotlines (2)</div>
+            <div style="padding: 4px 12px;">
+              <div style="padding: 6px 10px; background: var(--gray-50); border-radius: 6px; margin-bottom: 4px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <span class="thread-dot active"></span> The Lost Heir
+              </div>
+              <div style="padding: 6px 10px; background: var(--gray-50); border-radius: 6px; margin-bottom: 4px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <span class="thread-dot mentioned"></span> Alliance of Crowns
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="mock-editor">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span class="mock-toolbar-btn" style="text-decoration: underline;">U</span>
+              <span class="separator"></span>
+              <span class="mock-toolbar-btn">H1</span>
+              <span class="mock-toolbar-btn">H2</span>
+              <span class="mock-toolbar-btn">H3</span>
+              <span class="separator"></span>
+              <span class="mock-toolbar-btn">&#9776;</span>
+              <span class="mock-toolbar-btn">1.</span>
+              <span class="mock-toolbar-btn">&#10077;</span>
+              <span class="separator"></span>
+              <span class="mock-toolbar-btn">&#9839;</span>
+              <span style="flex: 1;"></span>
+              <span style="font-size: 12px; color: var(--green-500);">&#9679; Connected</span>
+              <span class="mock-toolbar-btn" style="font-size: 12px; padding: 4px 10px; background: var(--gray-50); border-radius: 6px;">Draft &#9662;</span>
+              <span class="mock-toolbar-btn">&#128190; Save</span>
+              <span class="mock-toolbar-btn">&#128337;</span>
+            </div>
+            <div class="mock-prose">
+              <p>The war council assembled in the great hall of Sunstone Keep as the last light of day bled through the amber windows. <span class="mention">Queen Mira</span> stood at the head of the stone table, her hand resting on the map of the Northern Reaches.</p>
+              <p>"We cannot afford to wait," <span class="mention">Lord Ashford</span> said, his voice cutting through the murmur of advisors. "Every day we deliberate is a day the enemy advances."</p>
+              <p>Mira studied the map. The mountain passes were marked in red — blocked by early snow. The coastal route would take three weeks longer, but it was the only path that avoided the Ashford garrison at Thornwall.</p>
+              <p>"The coastal route," she said quietly. The room fell silent.</p>
+            </div>
+            <div class="mock-editor-footer">
+              <span>1,400 words</span>
+              <span>&middot;</span>
+              <span>Session: 340 words in 25 min</span>
+              <span style="flex: 1;"></span>
+              <span>Auto-saved 2s ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-frame">
+      <div class="frame-label">Mobile — iPhone 14</div>
+      <div class="mobile-chrome">
+        <div class="mobile-status-bar"><span>9:41</span><span>&#128267;</span></div>
+        <div class="mobile-notch"></div>
+      </div>
+      <div class="mobile-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header" style="padding: 8px 12px; font-size: 12px;">
+          <span>&#9776;</span>
+          <div class="breadcrumb" style="font-size: 12px;">
+            <span class="current">War Council</span>
+          </div>
+          <div class="spacer"></div>
+          <span>&#128269;</span>
+        </div>
+        <div class="mock-editor-toolbar" style="font-size: 12px; padding: 6px 8px; overflow-x: auto; flex-wrap: nowrap;">
+          <span class="mock-toolbar-btn" style="font-size: 12px;"><strong>B</strong></span>
+          <span class="mock-toolbar-btn" style="font-size: 12px;"><em>I</em></span>
+          <span class="mock-toolbar-btn" style="font-size: 12px;">H1</span>
+          <span class="mock-toolbar-btn" style="font-size: 12px;">H2</span>
+          <span class="separator"></span>
+          <span class="mock-toolbar-btn" style="font-size: 12px;">&#9776;</span>
+          <span class="mock-toolbar-btn" style="font-size: 12px;">&#10077;</span>
+        </div>
+        <div class="mock-prose" style="padding: 16px; font-size: 15px;">
+          <p>The war council assembled in the great hall of Sunstone Keep as the last light of day bled through the amber windows. <span class="mention">Queen Mira</span> stood at the head of the stone table, her hand resting on the map of the Northern Reaches.</p>
+          <p>"We cannot afford to wait," <span class="mention">Lord Ashford</span> said, his voice cutting through the murmur of advisors. "Every day we deliberate is a day the enemy advances."</p>
+          <p>Mira studied the map. The mountain passes were marked in red — blocked by early snow.</p>
+        </div>
+        <div class="mock-editor-footer" style="font-size: 11px;">
+          <span>1,400 words</span>
+          <span>&middot;</span>
+          <span>Session: 340 words</span>
+        </div>
+        <!-- Mobile bottom bar -->
+        <div style="padding: 8px 16px; background: white; border-top: 1px solid var(--gray-100); display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;">Scene Info</button>
+          <button class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;">Context</button>
+          <button class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;">AI</button>
+        </div>
+      </div>
+      <div class="mobile-bottom-chrome"><div class="mobile-home-indicator"></div></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> New "Context" tab replaces the flat story-object tabs as the default sidebar view. Shows only characters, locations, and plotlines relevant to the current scene. @-mentions are highlighted in the prose. Session word count appears in the editor footer. The sidebar is scene-aware, not project-wide.
+  </div>
+</section>
+
+<!-- ============================== 3. CONTEXT PANEL ============================== -->
+<section class="spec-section" id="context-panel">
+  <h2>3. Outline with Beats and Plot Threads</h2>
+  <p class="subtitle">The outline tree becomes a structural overview of the manuscript. Scene beats and active plot threads are visible without opening each scene.</p>
+
+  <h3>Desktop — 1280 &times; 720</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — Outline Tab</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968; Home</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">War Council</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab active">Outline</div>
+          <div class="tab">Context</div>
+          <div class="tab">Characters</div>
+          <div class="tab">Locations</div>
+          <div class="tab">AI</div>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <div class="mock-sidebar" style="border-top: none; width: 320px;">
+            <div class="mock-sidebar-header">
+              Structure
+              <span style="font-size: 16px; cursor: pointer; color: var(--gray-400);">+</span>
+            </div>
+
+            <!-- Part 1 -->
+            <div style="padding: 4px 0;">
+              <div class="tree-item" style="padding-left: 12px; font-weight: 600; color: var(--gray-500);">
+                &#9660; Part 1: The Summons
+              </div>
+
+              <div class="tree-item active" style="padding-left: 28px;">
+                &#128196; Throne Room
+                <span class="status-dot final"></span>
+                <span class="word-count">1,800</span>
+              </div>
+              <div class="beat-item">The queen receives the northern envoy</div>
+              <div class="beat-item">Ashford reveals the scale of the threat</div>
+              <div class="beat-item">Mira's private doubt</div>
+
+              <div class="tree-item" style="padding-left: 28px;">
+                &#128196; War Council
+                <span class="status-dot draft"></span>
+                <span class="word-count">1,400</span>
+              </div>
+              <div class="beat-item">The generals disagree on strategy</div>
+              <div class="beat-item">Mira chooses the coastal route</div>
+              <div style="padding: 2px 28px 2px 44px; font-size: 11px; display: flex; gap: 4px; align-items: center;">
+                <span class="thread-dot active" style="width: 6px; height: 6px;"></span>
+                <span style="color: var(--blue-500); font-size: 10px;">The Lost Heir</span>
+                <span class="thread-dot mentioned" style="width: 6px; height: 6px; margin-left: 4px;"></span>
+                <span style="color: var(--amber-500); font-size: 10px;">Alliance</span>
+              </div>
+
+              <div class="tree-item" style="padding-left: 28px;">
+                &#128196; The Secret Letter
+                <span class="status-dot outline"></span>
+                <span class="word-count">0</span>
+              </div>
+              <div class="beat-item">Mira finds a coded message from her mother</div>
+              <div class="beat-item">The cipher reveals a hidden alliance</div>
+            </div>
+
+            <!-- Part 2 -->
+            <div style="padding: 4px 0;">
+              <div class="tree-item" style="padding-left: 12px; font-weight: 600; color: var(--gray-500);">
+                &#9660; Part 2: The Road North
+              </div>
+              <div class="tree-item" style="padding-left: 28px;">
+                &#128196; Departure at Dawn
+                <span class="status-dot outline"></span>
+                <span class="word-count">0</span>
+              </div>
+              <div class="beat-item">Kael discovers the map is fake</div>
+              <div class="beat-item">Confrontation with the merchant</div>
+              <div class="beat-item">Decision to continue anyway</div>
+
+              <div class="tree-item" style="padding-left: 28px;">
+                &#128196; The Mountain Pass
+                <span class="status-dot outline"></span>
+                <span class="word-count">0</span>
+              </div>
+              <div class="beat-item">Storm forces a detour</div>
+
+              <div class="tree-item" style="padding-left: 28px;">
+                &#128196; The Borderlands
+                <span class="status-dot outline"></span>
+                <span class="word-count">0</span>
+              </div>
+            </div>
+
+            <!-- Part 3 (collapsed) -->
+            <div style="padding: 4px 0;">
+              <div class="tree-item" style="padding-left: 12px; font-weight: 600; color: var(--gray-400);">
+                &#9654; Part 3: The Amber Court <span style="font-size: 11px; color: var(--gray-400); margin-left: 4px;">(6 scenes)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="mock-editor">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span class="mock-toolbar-btn" style="text-decoration: underline;">U</span>
+              <span class="separator"></span>
+              <span class="mock-toolbar-btn">H1</span>
+              <span class="mock-toolbar-btn">H2</span>
+              <span style="flex: 1;"></span>
+              <span class="mock-toolbar-btn">&#128190; Save</span>
+            </div>
+            <div class="mock-prose">
+              <p>The war council assembled in the great hall of Sunstone Keep as the last light of day bled through the amber windows. <span class="mention">Queen Mira</span> stood at the head of the stone table.</p>
+              <p>"We cannot afford to wait," <span class="mention">Lord Ashford</span> said.</p>
+              <p>Mira studied the map. The mountain passes were marked in red.</p>
+              <p>"The coastal route," she said quietly.</p>
+            </div>
+            <div class="mock-editor-footer">
+              <span>1,400 words</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> Scene beats are visible inline in the outline tree, turning it into a story structure overview. Plot thread indicators show which threads are active in each scene. Collapsed parts show scene count. Writers can scan their entire manuscript structure without opening individual scenes.
+  </div>
+</section>
+
+<!-- ============================== 4. @-MENTIONS ============================== -->
+<section class="spec-section" id="mentions">
+  <h2>4. @-Mentions in the Editor</h2>
+  <p class="subtitle">Type @ to reference characters, locations, or plotlines inline. Mentions create relationships automatically and provide hover context without leaving the prose.</p>
+
+  <h3>Desktop — Mention Autocomplete</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — @-mention dropdown</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968;</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">The Secret Letter</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <div class="mock-editor" style="flex: 1;">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span class="mock-toolbar-btn" style="text-decoration: underline;">U</span>
+              <span class="separator"></span>
+              <span class="mock-toolbar-btn">H1</span>
+              <span class="mock-toolbar-btn">H2</span>
+              <span style="flex: 1;"></span>
+              <span class="mock-toolbar-btn">&#128190; Save</span>
+            </div>
+            <div class="mock-prose" style="position: relative;">
+              <p>Mira broke the seal with trembling hands. The letter was written in her mother's cipher — a code she hadn't used since before the war.</p>
+              <p>She carried it to the window of <span class="mention">Sunstone Keep</span> and held the parchment to the fading light. The first line read:</p>
+              <p><em>"Trust no one from the North, least of all @</em><span style="color: var(--accent-600); font-family: Georgia, serif;">Ash</span><span style="animation: blink 1s infinite; border-right: 2px solid var(--accent-600);">&nbsp;</span></p>
+
+              <!-- Autocomplete dropdown -->
+              <div style="position: absolute; top: 200px; left: 380px; width: 260px; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); overflow: hidden; z-index: 10;">
+                <div style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); border-bottom: 1px solid var(--gray-100);">Characters</div>
+                <div style="padding: 8px 12px; background: var(--accent-50); display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <span style="width: 24px; height: 24px; background: var(--red-50); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">&#128100;</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--gray-900);">Lord Ashford</div>
+                    <div style="font-size: 11px; color: var(--gray-500);">Antagonist &middot; Commander</div>
+                  </div>
+                </div>
+                <div style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <span style="width: 24px; height: 24px; background: var(--gray-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">&#128100;</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 600;">Ashara the Blind</div>
+                    <div style="font-size: 11px; color: var(--gray-500);">Oracle &middot; Neutral</div>
+                  </div>
+                </div>
+                <div style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); border-top: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100);">Locations</div>
+                <div style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <span style="width: 24px; height: 24px; background: var(--gray-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">&#128205;</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 600;">Ashford Garrison</div>
+                    <div style="font-size: 11px; color: var(--gray-500);">Northern fortress</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mock-editor-footer">
+              <span>280 words</span>
+              <span>&middot;</span>
+              <span style="color: var(--accent-600); font-size: 11px;">@ to mention &middot; Esc to cancel</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> @-mention autocomplete appears inline as the writer types, grouped by object type. Selecting a mention creates a styled inline reference and automatically builds a relationship between the scene and the referenced object. The footer shows a hint when the @-mention mode is active.
+  </div>
+</section>
+
+<!-- ============================== 5. AI INLINE ============================== -->
+<section class="spec-section" id="ai-inline">
+  <h2>5. AI Inline Actions</h2>
+  <p class="subtitle">Select text in the editor to get a floating AI action bar. Results appear inline without leaving the writing surface.</p>
+
+  <h3>Desktop — Text Selection with AI Bar</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — Inline AI</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968;</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">War Council</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <div class="mock-editor" style="flex: 1;">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span style="flex: 1;"></span>
+              <span class="mock-toolbar-btn">&#128190; Save</span>
+            </div>
+            <div class="mock-prose" style="position: relative;">
+              <p>The war council assembled in the great hall of Sunstone Keep as the last light of day bled through the amber windows. <span class="mention">Queen Mira</span> stood at the head of the stone table, her hand resting on the map of the Northern Reaches.</p>
+
+              <p><span class="text-selected">"We cannot afford to wait," Lord Ashford said, his voice cutting through the murmur of advisors. "Every day we deliberate is a day the enemy advances."</span></p>
+
+              <!-- AI floating bar -->
+              <div style="position: absolute; top: 130px; left: 200px;">
+                <div class="ai-float-bar">
+                  <span class="float-btn accent">&#10024; Rewrite</span>
+                  <span class="float-btn">Continue</span>
+                  <span class="float-btn">Expand</span>
+                  <span class="float-btn">Voice check</span>
+                  <span class="float-btn">Ask Annie</span>
+                </div>
+              </div>
+
+              <!-- AI result panel -->
+              <div class="ai-inline-panel" style="margin-top: 24px;">
+                <div class="ai-label">&#10024; Rewrite &mdash; tighter</div>
+                <div class="ai-suggestion">
+                  "We can't wait." Ashford's voice cut through the room like a blade. "Every day of deliberation is a gift to the enemy."
+                </div>
+                <div class="ai-actions">
+                  <button class="btn btn-primary btn-sm">Accept</button>
+                  <button class="btn btn-secondary btn-sm">Try again</button>
+                  <button class="btn btn-secondary btn-sm">Dismiss</button>
+                </div>
+              </div>
+
+              <p>Mira studied the map. The mountain passes were marked in red — blocked by early snow. The coastal route would take three weeks longer, but it was the only path that avoided the Ashford garrison at Thornwall.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-frame">
+      <div class="frame-label">Mobile — AI Inline</div>
+      <div class="mobile-chrome">
+        <div class="mobile-status-bar"><span>9:41</span><span>&#128267;</span></div>
+        <div class="mobile-notch"></div>
+      </div>
+      <div class="mobile-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header" style="padding: 8px 12px; font-size: 12px;">
+          <span>&#9776;</span>
+          <span class="current" style="font-size: 12px;">War Council</span>
+          <div class="spacer"></div>
+        </div>
+        <div class="mock-prose" style="flex: 1; padding: 16px; font-size: 15px; position: relative;">
+          <p>The war council assembled in the great hall.</p>
+          <p><span class="text-selected">"We cannot afford to wait," Lord Ashford said.</span></p>
+
+          <!-- Mobile AI bar (bottom sheet style) -->
+          <div style="position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--gray-200); border-radius: 16px 16px 0 0; padding: 12px 16px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
+            <div style="width: 32px; height: 4px; background: var(--gray-200); border-radius: 2px; margin: 0 auto 12px;"></div>
+            <div style="display: flex; gap: 8px; overflow-x: auto;">
+              <button class="btn btn-primary btn-sm">&#10024; Rewrite</button>
+              <button class="btn btn-secondary btn-sm">Continue</button>
+              <button class="btn btn-secondary btn-sm">Expand</button>
+              <button class="btn btn-secondary btn-sm">Voice</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mobile-bottom-chrome"><div class="mobile-home-indicator"></div></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> AI interaction moves from a sidebar chat to inline context. Select text to get a floating action bar. Results appear as a suggestion panel with accept/dismiss actions. On mobile, the action bar appears as a bottom sheet. The writer never leaves the prose.
+  </div>
+</section>
+
+<!-- ============================== 6. AI SCENE PANEL ============================== -->
+<section class="spec-section" id="ai-scene">
+  <h2>6. AI Scene Panel</h2>
+  <p class="subtitle">The AI tab transforms from generic chat into scene-aware contextual prompts. Different scene states surface different AI capabilities.</p>
+
+  <h3>Desktop — Scene-Aware AI Prompts</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — AI Tab (Draft scene)</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968;</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">War Council</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab">Outline</div>
+          <div class="tab">Context</div>
+          <div class="tab active">AI</div>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <!-- AI sidebar -->
+          <div class="mock-sidebar" style="border-top: none;">
+            <div class="mock-sidebar-header">
+              Annie &middot; AI Assistant
+            </div>
+
+            <div class="ai-scene-panel">
+              <div class="scene-status">
+                <strong>War Council</strong> &mdash; 1,400 words &middot; <span style="color: var(--amber-500);">&#9679;</span> Draft
+              </div>
+
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); margin-bottom: 8px;">Scene Actions</div>
+
+              <div class="ai-prompt-btn">&#128172; What's working in this scene?</div>
+              <div class="ai-prompt-btn">&#9889; Pacing check</div>
+              <div class="ai-prompt-btn">&#127917; Character voice audit</div>
+              <div class="ai-prompt-btn">&#9997; Continue from where I left off</div>
+              <div class="ai-prompt-btn">&#127915; Suggest a scene ending</div>
+
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); margin: 16px 0 8px;">Manuscript</div>
+
+              <div class="ai-prompt-btn">&#128214; Plot thread tracker</div>
+              <div class="ai-prompt-btn">&#128100; Character arc — Queen Mira</div>
+              <div class="ai-prompt-btn">&#128270; Consistency check</div>
+
+              <div style="border-top: 1px solid var(--gray-100); margin-top: 16px; padding-top: 12px;">
+                <div style="font-size: 11px; color: var(--gray-400); margin-bottom: 8px;">Or ask anything...</div>
+                <div style="display: flex; gap: 6px;">
+                  <div style="flex: 1; padding: 8px 12px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 13px; color: var(--gray-400);">Ask Annie about this scene...</div>
+                  <button class="btn btn-primary btn-sm">&#9654;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="mock-editor">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span style="flex: 1;"></span>
+            </div>
+            <div class="mock-prose">
+              <p>The war council assembled in the great hall of <span class="mention">Sunstone Keep</span> as the last light of day bled through the amber windows.</p>
+              <p>"We cannot afford to wait," <span class="mention">Lord Ashford</span> said.</p>
+              <p>Mira studied the map. The mountain passes were marked in red.</p>
+              <p>"The coastal route," she said quietly. The room fell silent.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> The AI tab shows contextual prompts based on scene state (Outline scenes get "Draft from beats," Draft scenes get "Pacing check," Final scenes get "Line edit"). Scene-level and manuscript-level AI actions are separated. Free-form chat moves to the bottom as a secondary option. Each prompt maps to an existing MCP skill.
+  </div>
+</section>
+
+<!-- ============================== 7. COMMAND PALETTE ============================== -->
+<section class="spec-section" id="cmd-palette">
+  <h2>7. Command Palette</h2>
+  <p class="subtitle">Cmd+K opens a spotlight-style search for fast navigation to any scene, story object, or action.</p>
+
+  <h3>Desktop — Command Palette Open</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — Cmd+K</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column; position: relative;">
+        <div class="gradient-line"></div>
+        <div class="mock-header" style="opacity: 0.5;">
+          <div class="breadcrumb">
+            <span class="current">War Council</span>
+          </div>
+        </div>
+
+        <!-- Dimmed editor -->
+        <div style="flex: 1; opacity: 0.3;">
+          <div class="mock-prose" style="padding: 32px 48px;">
+            <p>The war council assembled in the great hall...</p>
+          </div>
+        </div>
+
+        <!-- Overlay -->
+        <div class="overlay"></div>
+
+        <!-- Command palette -->
+        <div class="cmd-palette">
+          <input class="cmd-palette-input" value="queen" placeholder="Search scenes, characters, actions..." />
+          <div class="cmd-palette-results">
+            <div class="group-label">Characters</div>
+            <div class="result-item selected">
+              <span class="icon">&#128100;</span>
+              <span><strong>Queen</strong> Mira</span>
+              <span class="meta">Protagonist</span>
+            </div>
+            <div class="group-label">Scenes</div>
+            <div class="result-item">
+              <span class="icon">&#128196;</span>
+              <span>The <strong>Queen</strong>'s Gambit</span>
+              <span class="meta">Ch. 5 &middot; Draft</span>
+            </div>
+            <div class="result-item">
+              <span class="icon">&#128196;</span>
+              <span>Throne Room</span>
+              <span class="meta">Ch. 1 &middot; Final</span>
+            </div>
+            <div class="group-label">Actions</div>
+            <div class="result-item">
+              <span class="icon">&#10024;</span>
+              <span>Ask Annie about <strong>Queen</strong> Mira's arc</span>
+              <span class="meta">AI</span>
+            </div>
+            <div class="result-item">
+              <span class="icon">&#128203;</span>
+              <span>View <strong>Queen</strong> Mira's relationships</span>
+              <span class="meta">Graph</span>
+            </div>
+          </div>
+          <div style="padding: 8px 20px; border-top: 1px solid var(--gray-100); font-size: 11px; color: var(--gray-400); display: flex; gap: 12px;">
+            <span>&#8593;&#8595; Navigate</span>
+            <span>&#9166; Open</span>
+            <span>Esc Close</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> Cmd+K command palette provides instant fuzzy search across scenes, characters, locations, plotlines, and AI actions. Results are grouped by type. The palette leverages existing full-text search infrastructure and becomes the fastest way to navigate large manuscripts.
+  </div>
+</section>
+
+<!-- ============================== 8. PROGRESS VIEW ============================== -->
+<section class="spec-section" id="progress">
+  <h2>8. Manuscript Progress View</h2>
+  <p class="subtitle">A progress visualization showing manuscript completion by part, with scene status breakdown and writing activity heatmap.</p>
+
+  <h3>Desktop — Progress Panel</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — Progress View</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968;</a> <span class="sep">&rsaquo;</span>
+            <span class="current">The Amber Throne</span>
+            <span class="sep">&rsaquo;</span>
+            <span style="color: var(--accent-600);">Progress</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+
+        <div style="flex: 1; padding: 24px 32px; overflow-y: auto;">
+          <!-- Summary -->
+          <div style="display: flex; gap: 24px; margin-bottom: 32px;">
+            <div style="flex: 1; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 20px;">
+              <div style="font-size: 32px; font-weight: 700; color: var(--gray-900);">42,500</div>
+              <div style="font-size: 13px; color: var(--gray-500);">words written</div>
+              <div style="font-size: 12px; color: var(--gray-400); margin-top: 4px;">~80,000 estimated total</div>
+            </div>
+            <div style="flex: 1; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 20px;">
+              <div style="font-size: 32px; font-weight: 700; color: var(--gray-900);">16<span style="font-size: 18px; color: var(--gray-400);"> / 24</span></div>
+              <div style="font-size: 13px; color: var(--gray-500);">scenes drafted or better</div>
+              <div style="font-size: 12px; color: var(--gray-400); margin-top: 4px;">3 Final &middot; 5 Revised &middot; 8 Draft &middot; 8 Outline</div>
+            </div>
+            <div style="flex: 1; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 20px;">
+              <div style="font-size: 13px; color: var(--gray-500); margin-bottom: 8px;">Writing activity (4 weeks)</div>
+              <div class="heatmap">
+                <div class="day"></div><div class="day l1"></div><div class="day l2"></div><div class="day l3"></div><div class="day l1"></div><div class="day"></div><div class="day"></div>
+                <div class="day l1"></div><div class="day l4"></div><div class="day l2"></div><div class="day l1"></div><div class="day l3"></div><div class="day"></div><div class="day l1"></div>
+                <div class="day l2"></div><div class="day l3"></div><div class="day"></div><div class="day l2"></div><div class="day l4"></div><div class="day l1"></div><div class="day"></div>
+                <div class="day l1"></div><div class="day l2"></div><div class="day l3"></div><div class="day l4"></div><div class="day"></div><div class="day"></div><div class="day"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Part-by-part progress -->
+          <div style="background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 24px;">
+            <div style="font-weight: 700; font-size: 16px; margin-bottom: 20px;">Manuscript Structure</div>
+
+            <div class="part-progress">
+              <div class="part-label">
+                <span class="name">Part 1: The Summons</span>
+                <span class="meta">3/3 scenes &middot; 5,200 words &middot; All Final</span>
+              </div>
+              <div class="bar"><div class="fill complete" style="width: 100%;"></div></div>
+            </div>
+
+            <div class="part-progress">
+              <div class="part-label">
+                <span class="name">Part 2: The Road North</span>
+                <span class="meta">4/6 scenes &middot; 12,800 words &middot; Mixed</span>
+              </div>
+              <div class="bar"><div class="fill partial" style="width: 67%;"></div></div>
+            </div>
+
+            <div class="part-progress">
+              <div class="part-label">
+                <span class="name">Part 3: The Amber Court</span>
+                <span class="meta">4/9 scenes &middot; 18,200 words &middot; Mostly Draft</span>
+              </div>
+              <div class="bar"><div class="fill early" style="width: 44%;"></div></div>
+            </div>
+
+            <div class="part-progress">
+              <div class="part-label">
+                <span class="name">Part 4: The Return</span>
+                <span class="meta">0/6 scenes &middot; 0 words &middot; Not started</span>
+              </div>
+              <div class="bar"><div class="fill" style="width: 0%;"></div></div>
+            </div>
+          </div>
+
+          <!-- Next scene prompt -->
+          <div class="next-scene-prompt" style="margin-top: 24px;">
+            <div class="check-icon">&#10003;</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">Next up: Departure at Dawn</div>
+              <div style="font-size: 13px; color: var(--gray-500);">Part 2, Chapter 4 &middot; 3 beats planned &middot; Outline status</div>
+            </div>
+            <button class="btn btn-primary btn-sm">Start Writing</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> A dedicated progress view shows manuscript completion at a glance. Progress bars use color to indicate quality (green=final, blue=mixed, amber=early). Writing activity heatmap provides a non-gamified visual record. "Next up" prompt guides the writer to their next scene.
+  </div>
+</section>
+
+<!-- ============================== 9. CONSISTENCY ALERTS ============================== -->
+<section class="spec-section" id="consistency">
+  <h2>9. Consistency Alerts</h2>
+  <p class="subtitle">AI-powered consistency checking surfaces potential contradictions inline while writing, without interrupting flow.</p>
+
+  <h3>Desktop — Margin Alerts</h3>
+  <div class="screen-pair">
+    <div class="desktop-frame">
+      <div class="frame-label">Desktop — Consistency Alert</div>
+      <div class="desktop-chrome">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">localhost:3000/project/1</div>
+      </div>
+      <div class="desktop-viewport" style="display: flex; flex-direction: column;">
+        <div class="gradient-line"></div>
+        <div class="mock-header">
+          <div class="breadcrumb">
+            <a>&#127968;</a> <span class="sep">&rsaquo;</span>
+            <a>The Amber Throne</a> <span class="sep">&rsaquo;</span>
+            <span class="current">The Mountain Pass</span>
+          </div>
+          <div class="spacer"></div>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;">
+          <div class="mock-editor" style="flex: 1;">
+            <div class="mock-editor-toolbar">
+              <span class="mock-toolbar-btn"><strong>B</strong></span>
+              <span class="mock-toolbar-btn"><em>I</em></span>
+              <span style="flex: 1;"></span>
+              <span style="font-size: 12px; color: var(--amber-500); display: flex; align-items: center; gap: 4px;">
+                &#9888; 2 alerts
+              </span>
+              <span class="mock-toolbar-btn">&#128190; Save</span>
+            </div>
+            <div class="mock-prose" style="position: relative;">
+              <p>The mountain trail narrowed as they climbed. <span class="mention">Lord Ashford</span> rode at the head of the column, his <span style="background: #fef3c7; padding: 1px 2px; border-radius: 2px; border-bottom: 2px solid var(--amber-500);">blue eyes</span> scanning the ridgeline for signs of an ambush.</p>
+
+              <div class="consistency-alert">
+                <span class="alert-icon">&#9888;&#65039;</span>
+                <div>
+                  <div>In <strong>Throne Room</strong> (Ch. 1), Lord Ashford has <em>"grey eyes."</em> Here you wrote <em>"blue eyes."</em></div>
+                  <div class="alert-actions">
+                    <button class="btn btn-secondary btn-sm">Fix here</button>
+                    <button class="btn btn-secondary btn-sm">Fix in Ch. 1</button>
+                    <button class="btn btn-secondary btn-sm" style="color: var(--gray-400);">Not an error</button>
+                  </div>
+                </div>
+              </div>
+
+              <p>Behind him, <span class="mention">Kael</span> clutched the reins of his horse. The boy hadn't spoken since they left <span style="background: #fef3c7; padding: 1px 2px; border-radius: 2px; border-bottom: 2px solid var(--amber-500);">Thornwall</span> at dawn.</p>
+
+              <div class="consistency-alert">
+                <span class="alert-icon">&#9888;&#65039;</span>
+                <div>
+                  <div><strong>Timeline:</strong> In <em>Departure at Dawn</em>, the group left from <strong>Sunstone Keep</strong>, not Thornwall. Thornwall is the Ashford garrison they're trying to avoid.</div>
+                  <div class="alert-actions">
+                    <button class="btn btn-secondary btn-sm">Fix here</button>
+                    <button class="btn btn-secondary btn-sm" style="color: var(--gray-400);">Dismiss</button>
+                  </div>
+                </div>
+              </div>
+
+              <p>The snow had started falling an hour ago, and the trail ahead was disappearing under a white blanket. They needed to reach the pass before nightfall or risk being stranded.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key changes from current:</strong> AI-powered consistency alerts appear inline when potential contradictions are detected. Alerts show the conflicting reference, link to the source, and offer quick-fix actions. An alert counter in the toolbar lets the writer address them when ready. "Not an error" feedback trains the system.
+  </div>
+</section>
+
+<!-- ============================== DESIGN TOKENS ============================== -->
+<section class="spec-section" id="tokens">
+  <h2>Design Tokens</h2>
+  <p class="subtitle">Semantic color, typography, spacing, and interaction tokens used across all mockups. These align with Annie's existing Tailwind + Shadcn/ui design system.</p>
+
+  <h3>Colors</h3>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 32px;">
+    <div style="background: var(--accent-600); color: white; padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Accent / Primary</div>
+      <div style="font-size: 12px; opacity: 0.8;">#4f46e5 — indigo-600</div>
+    </div>
+    <div style="background: var(--green-500); color: white; padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Success / Final</div>
+      <div style="font-size: 12px; opacity: 0.8;">#22c55e — green-500</div>
+    </div>
+    <div style="background: var(--amber-500); color: white; padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Warning / Draft</div>
+      <div style="font-size: 12px; opacity: 0.8;">#f59e0b — amber-500</div>
+    </div>
+    <div style="background: var(--blue-500); color: white; padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Info / Revised</div>
+      <div style="font-size: 12px; opacity: 0.8;">#3b82f6 — blue-500</div>
+    </div>
+    <div style="background: var(--red-500); color: white; padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Danger / Error</div>
+      <div style="font-size: 12px; opacity: 0.8;">#ef4444 — red-500</div>
+    </div>
+    <div style="background: var(--gray-300); padding: 16px; border-radius: var(--radius-sm);">
+      <div style="font-weight: 600;">Outline Status</div>
+      <div style="font-size: 12px; color: var(--gray-600);">#d4d4d8 — gray-300</div>
+    </div>
+  </div>
+
+  <h3>Typography</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 10px 0; font-weight: 600; width: 140px;">UI Font</td>
+      <td style="padding: 10px 0;">system-ui, -apple-system, 'Inter', sans-serif</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 10px 0; font-weight: 600;">Prose Font</td>
+      <td style="padding: 10px 0; font-family: Georgia, serif;">Georgia, 'Times New Roman', serif — 16px / 1.8</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 10px 0; font-weight: 600;">Headings</td>
+      <td style="padding: 10px 0;">700 weight &middot; H1: 28px &middot; H2: 22px &middot; H3: 18px</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 10px 0; font-weight: 600;">Body</td>
+      <td style="padding: 10px 0;">400 weight &middot; 13-14px UI &middot; 16px prose</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 10px 0; font-weight: 600;">Labels</td>
+      <td style="padding: 10px 0;">600 weight &middot; 10-11px &middot; uppercase &middot; 0.05em tracking</td>
+    </tr>
+  </table>
+
+  <h3>Spacing</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0; width: 100px;"><code>4px</code></td><td>Tight gaps, icon padding</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>8px</code></td><td>Component internal spacing</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>12px</code></td><td>Card padding, sidebar items</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>16px</code></td><td>Section padding, standard gap</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>24px</code></td><td>Section margins, large padding</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>32px</code></td><td>Page padding, prose margins</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><code>48px</code></td><td>Section spacing, prose padding</td>
+    </tr>
+  </table>
+
+  <h3>Border Radius</h3>
+  <div style="display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap;">
+    <div style="text-align: center;">
+      <div style="width: 60px; height: 60px; border: 2px solid var(--gray-300); border-radius: 4px; margin: 0 auto 8px;"></div>
+      <div style="font-size: 12px; color: var(--gray-500);">4px — tags, dots</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 60px; height: 60px; border: 2px solid var(--gray-300); border-radius: 8px; margin: 0 auto 8px;"></div>
+      <div style="font-size: 12px; color: var(--gray-500);">8px — buttons, inputs</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 60px; height: 60px; border: 2px solid var(--gray-300); border-radius: 12px; margin: 0 auto 8px;"></div>
+      <div style="font-size: 12px; color: var(--gray-500);">12px — cards, panels</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 60px; height: 60px; border: 2px solid var(--gray-300); border-radius: 16px; margin: 0 auto 8px;"></div>
+      <div style="font-size: 12px; color: var(--gray-500);">16px — modals</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 60px; height: 60px; border: 2px solid var(--gray-300); border-radius: 20px; margin: 0 auto 8px;"></div>
+      <div style="font-size: 12px; color: var(--gray-500);">20px — mobile sheets</div>
+    </div>
+  </div>
+
+  <h3>Responsive Breakpoints</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0; font-weight: 600; width: 100px;">Mobile</td>
+      <td>&lt; 768px — single column, bottom sheets, overlay panels</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0; font-weight: 600;">Tablet</td>
+      <td>768px–1024px — sidebar collapsible, two-column editor</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0; font-weight: 600;">Desktop</td>
+      <td>&gt; 1024px — full three-panel layout</td>
+    </tr>
+  </table>
+
+  <h3>Keyboard Shortcuts</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0; width: 200px;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+K</kbd></td>
+      <td>Command palette / search</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+Enter</kbd></td>
+      <td>Toggle focus mode</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+/</kbd></td>
+      <td>Open AI assistant</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+Shift+B</kbd></td>
+      <td>Toggle sidebar</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">@</kbd></td>
+      <td>Insert story object mention</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+.</kbd> / <kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Cmd+,</kbd></td>
+      <td>Next / previous scene</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--gray-200);">
+      <td style="padding: 8px 0;"><kbd style="padding: 2px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 4px; font-size: 12px;">Esc</kbd></td>
+      <td>Close panels / exit focus mode</td>
+    </tr>
+  </table>
+</section>
+
+<div style="text-align: center; padding: 48px 32px; color: var(--gray-400); font-size: 13px;">
+  Word Coach Annie UX Design Spec &mdash; Generated 2026-03-28
+</div>
+
+</body>
+</html>
