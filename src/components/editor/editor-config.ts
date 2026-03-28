@@ -3,6 +3,8 @@ import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
+import { buildMentionExtension } from "@/components/editor/extensions/mention";
+import type { StoryObject } from "@/lib/types";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
@@ -26,8 +28,12 @@ export const AnnotationMark = Highlight.extend({
   },
 });
 
-export function getEditorExtensions() {
-  return [
+export function getEditorExtensions(
+  storyObjects?: StoryObject[],
+  onMentionInserted?: (objectId: string) => void
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const extensions: any[] = [
     StarterKit,
     Underline,
     AnnotationMark.configure({
@@ -37,10 +43,16 @@ export function getEditorExtensions() {
       },
     }),
     Placeholder.configure({
-      placeholder: "Start writing your scene...",
+      placeholder: "Start writing your scene... (type @ to mention a character, location, or plotline)",
     }),
     BeatAnnotation,
   ];
+
+  if (storyObjects && onMentionInserted) {
+    extensions.push(buildMentionExtension(storyObjects, onMentionInserted));
+  }
+
+  return extensions;
 }
 
 // Helper to convert HTML comments to beat nodes for Tiptap

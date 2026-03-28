@@ -12,6 +12,7 @@ export interface OutlineNode {
     orderIndex: number;
     parentId: string | null;
     wordCount?: number;
+    beats?: string[];
     children: OutlineNode[];
 }
 
@@ -93,7 +94,7 @@ export class StructureController {
                 contentVersions: {
                     orderBy: { createdAt: "desc" },
                     take: 1,
-                    select: { wordCount: true },
+                    select: { wordCount: true, content: true },
                 },
             },
         });
@@ -102,6 +103,13 @@ export class StructureController {
         const roots: OutlineNode[] = [];
 
         for (const node of nodes) {
+            let beats: string[] | undefined;
+            if (node.type === "SCENE" && node.contentVersions[0]?.content) {
+                const beatMatches = [...node.contentVersions[0].content.matchAll(/<!-- beat:\s*([\s\S]*?)\s*-->/g)];
+                if (beatMatches.length > 0) {
+                    beats = beatMatches.map((m) => m[1].trim());
+                }
+            }
             nodeMap.set(node.id, {
                 id: node.id,
                 type: node.type,
@@ -111,6 +119,7 @@ export class StructureController {
                 orderIndex: node.orderIndex,
                 parentId: node.parentId,
                 wordCount: node.type === "SCENE" ? (node.contentVersions[0]?.wordCount ?? 0) : undefined,
+                beats,
                 children: [],
             });
         }

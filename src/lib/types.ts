@@ -72,6 +72,7 @@ export interface StructureNode {
 }
 
 export interface OutlineNode extends StructureNode {
+  beats?: string[];
   children: OutlineNode[];
 }
 

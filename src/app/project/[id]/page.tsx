@@ -17,6 +17,7 @@ import {
   Menu,
   X as XIcon,
   MessageSquare,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => 
 const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
+const SceneContextPanel = dynamic(() => import("@/components/scene-context-panel").then(m => m.SceneContextPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -57,7 +59,7 @@ import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, StoryObject, StoryObjectType } from "@/lib/types";
 
-type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
+type SidebarTab = "outline" | "context" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
 
 const STORY_TABS: { key: SidebarTab; type: StoryObjectType; label: string; icon: typeof Users }[] = [
   { key: "characters", type: "CHARACTER", label: "Characters", icon: Users },
@@ -395,6 +397,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             >
               Outline
             </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "context"}
+              onClick={() => { setActiveTab("context"); setSelectedObjectId(null); }}
+              className={cn(
+                "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
+                activeTab === "context"
+                  ? "bg-accent/15 text-accent"
+                  : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50",
+                !selectedNode && "opacity-40 cursor-default"
+              )}
+              aria-label="Scene Context"
+              title={selectedNode ? "Scene context" : "Select a scene to see context"}
+            >
+              <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="text-xs font-medium hidden lg:inline">Context</span>
+            </button>
             {STORY_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -439,6 +458,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
                 />
               </ErrorBoundary>
+            ) : activeTab === "context" ? (
+              selectedNode?.type === "SCENE" ? (
+                <ErrorBoundary fallbackTitle="Context panel crashed">
+                  <div className="px-3 pt-2 pb-1">
+                    <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Scene Context
+                    </span>
+                  </div>
+                  <SceneContextPanel
+                    projectId={projectId}
+                    sceneId={selectedNode.id}
+                    storyObjects={storyObjects}
+                    onSelectObject={(objectId, objectType) => {
+                      setSelectedObjectId(objectId);
+                      setSelectedObjectSource("project");
+                      setSelectedNodeId(null);
+                      const tab = OBJECT_TYPE_TO_TAB[objectType];
+                      if (tab) setActiveTab(tab);
+                      setSidebarOpen(false);
+                    }}
+                  />
+                </ErrorBoundary>
+              ) : (
+                <div className="px-4 py-8 text-center text-sm text-text-muted">
+                  <p>Select a scene to see its context.</p>
+                </div>
+              )
             ) : activeTab === "outline" ? (
               <>
                 <div className="flex items-center justify-between px-3 py-2">
@@ -458,7 +504,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     nodes={outline}
                     projectType={project.projectType}
                     selectedNodeId={selectedNodeId}
-                    onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); setSidebarOpen(false); }}
+                    onSelectNode={(id) => {
+                      setSelectedNodeId(id);
+                      setSelectedObjectId(null);
+                      setSidebarOpen(false);
+                      // Auto-switch to context tab when selecting a scene
+                      setActiveTab("context");
+                    }}
                     onAddNode={openAddNode}
                     onRenameNode={openRename}
                     onDeleteNode={openDelete}
@@ -563,6 +615,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 node={selectedNode}
                 projectId={projectId}
                 onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
+                storyObjects={storyObjects}
               />
             </ErrorBoundary>
           ) : (

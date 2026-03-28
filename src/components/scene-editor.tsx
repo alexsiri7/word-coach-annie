@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import type { StructureNode, SceneStatus, ContentVersion, Annotation } from "@/lib/types";
+import type { StructureNode, SceneStatus, ContentVersion, Annotation, StoryObject } from "@/lib/types";
 import { getEditorExtensions, commentsToBeats } from "@/components/editor/editor-config";
 import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
@@ -24,9 +24,10 @@ interface SceneEditorProps {
   projectId: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
+  storyObjects?: StoryObject[];
 }
 
-export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
+export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true, storyObjects }: SceneEditorProps) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -108,9 +109,28 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
   // Cleanup save timeout on unmount
   useEffect(() => cleanup, [cleanup]);
 
+  // Create relationship when an @mention is inserted
+  const handleMentionInserted = useCallback(async (objectId: string) => {
+    try {
+      await offlineFetch(`/api/projects/${projectId}/relationships`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "APPEARS_IN",
+          fromObjectId: objectId,
+          toNodeId: node.id,
+        }),
+      });
+      // Notify context panel to refresh
+      window.dispatchEvent(new CustomEvent("scene-relationship-created"));
+    } catch {
+      // Relationship creation is best-effort — don't interrupt writing
+    }
+  }, [projectId, node.id]);
+
   const editor = useEditor(
     {
-      extensions: getEditorExtensions(),
+      extensions: getEditorExtensions(storyObjects, handleMentionInserted),
       content: initialContent || "",
       editorProps: {
         attributes: {

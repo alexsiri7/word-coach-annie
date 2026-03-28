@@ -28,6 +28,7 @@ import {
   Trash2,
   Pencil,
   BookOpen,
+  ArrowRight,
   Maximize,
   GripVertical,
 } from "lucide-react";
@@ -308,6 +309,22 @@ function SortableTreeNode({
           className="h-0.5 bg-accent rounded-full mx-2"
           style={{ marginLeft: `${depth * 16 + 8}px` }}
         />
+      )}
+
+      {/* Beat annotations under scene nodes */}
+      {node.type === "SCENE" && node.beats && node.beats.length > 0 && !isDragging && (
+        <div style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}>
+          {node.beats.map((beat, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-1.5 py-0.5 text-xs text-text-muted"
+              title={beat}
+            >
+              <ArrowRight className="h-3 w-3 flex-shrink-0 mt-0.5 text-accent/40" aria-hidden="true" />
+              <span className="truncate italic">{beat}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Children */}

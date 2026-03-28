@@ -441,6 +441,64 @@
   box-shadow: 0 4px 24px hsl(0 0% 0% / 0.3);
 }
 
+/* @-Mention inline chip */
+.mention-inline {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: hsl(var(--accent) / 0.12);
+  color: hsl(var(--accent));
+  font-size: 0.9em;
+  cursor: pointer;
+  border: 1px solid hsl(var(--accent) / 0.25);
+  white-space: nowrap;
+}
+
+/* @-Mention autocomplete dropdown */
+.mention-dropdown {
+  background: hsl(var(--surface-raised));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.25);
+  min-width: 180px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.mention-dropdown-group-label {
+  padding: 4px 8px 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--text-muted));
+}
+
+.mention-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  color: hsl(var(--text-secondary));
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.mention-dropdown-item:hover {
+  background: hsl(var(--surface-overlay) / 0.6);
+  color: hsl(var(--text-primary));
+}
+
+.mention-dropdown-empty {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  color: hsl(var(--text-muted));
+}
+
 @layer base {
   * {
     @apply border-border;
