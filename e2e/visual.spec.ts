@@ -231,6 +231,41 @@ async function disableAnimations(page: Page) {
   })
 }
 
+const MOCK_PROGRESS_DATA = {
+  totalWords: 42500,
+  totalScenes: 12,
+  scenesDrafted: 9,
+  sceneStatusCounts: { FINAL: 5, REVISED: 2, DRAFT: 2, OUTLINE: 3 },
+  partProgress: [
+    {
+      id: 'ch-1',
+      title: 'The Summons',
+      chapterCount: 0,
+      sceneCount: 3,
+      wordCount: 8200,
+      statusCounts: { FINAL: 3, REVISED: 0, DRAFT: 0, OUTLINE: 0 },
+    },
+    {
+      id: 'ch-2',
+      title: 'The Journey',
+      chapterCount: 0,
+      sceneCount: 4,
+      wordCount: 18300,
+      statusCounts: { FINAL: 2, REVISED: 1, DRAFT: 1, OUTLINE: 0 },
+    },
+    {
+      id: 'ch-3',
+      title: 'The Confrontation',
+      chapterCount: 0,
+      sceneCount: 5,
+      wordCount: 16000,
+      statusCounts: { FINAL: 0, REVISED: 1, DRAFT: 1, OUTLINE: 3 },
+    },
+  ],
+  nextScene: { id: 'sc-10', title: 'The Final Confrontation' },
+  estimatedTotalWords: 56667,
+}
+
 /** Intercept all API calls for the dashboard (project list) */
 async function mockDashboardApi(page: Page) {
   await page.route('**/api/projects?*', route =>
@@ -294,6 +329,20 @@ async function mockUniverseApi(page: Page) {
     }
     return route.continue()
   })
+}
+
+/** Intercept API calls for the progress page */
+async function mockProgressApi(page: Page) {
+  await page.route('**/api/projects/proj-1/progress', route =>
+    route.fulfill({ json: MOCK_PROGRESS_DATA, status: 200 })
+  )
+  await page.route('**/api/sessions*', route =>
+    route.fulfill({ json: { sessions: [], byDate: {} }, status: 200 })
+  )
+  await page.route(
+    url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
+  )
 }
 
 /** Intercept API calls for the focus mode page */
@@ -393,6 +442,18 @@ test.describe('Visual regression – Annie', () => {
     await page.waitForTimeout(500)
 
     await expect(page).toHaveScreenshot('universe-list.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('manuscript progress view', async ({ page }) => {
+    await mockProgressApi(page)
+    await page.goto('/project/proj-1/progress')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.waitForTimeout(500)
+
+    await expect(page).toHaveScreenshot('progress-view.png', {
       animations: 'disabled',
     })
   })
