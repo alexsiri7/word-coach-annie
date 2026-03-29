@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Settings,
@@ -17,6 +17,7 @@ import {
   Menu,
   X as XIcon,
   MessageSquare,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const resolvedParams = use(params);
   const projectId = resolvedParams.id;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [project, setProject] = useState<Project | null>(null);
   const [outline, setOutline] = useState<OutlineNode[]>([]);
   const [storyObjects, setStoryObjects] = useState<StoryObject[]>([]);
@@ -148,6 +150,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     fetchOutline();
     fetchStoryObjects();
   }, [fetchProject, fetchOutline, fetchStoryObjects]);
+
+  // Handle ?scene= query param (e.g., from next-scene prompt)
+  useEffect(() => {
+    const sceneId = searchParams.get("scene");
+    if (sceneId) {
+      setSelectedNodeId(sceneId);
+      setSelectedObjectId(null);
+      setActiveTab("outline");
+    }
+  }, [searchParams]);
 
   // Handlers
   const handleAddNode = async () => {
@@ -352,6 +364,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-expanded={showSearch}
         >
           <Search className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/progress`)}
+          aria-label="Writing progress"
+        >
+          <TrendingUp className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"

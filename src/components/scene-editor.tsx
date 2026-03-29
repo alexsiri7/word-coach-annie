@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
-import { MessageSquare, AlertTriangle, RefreshCw, Check } from "lucide-react";
+import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -21,6 +22,7 @@ import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
 import { ConsistencyAlertsPanel } from "@/components/editor/consistency-alerts-panel";
 import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
 import { TimelineStrip } from "@/components/timeline/timeline-strip";
+import { useWritingSession } from "@/hooks/use-writing-session";
 
 interface TimelineSceneItem {
   id: string;
@@ -47,6 +49,7 @@ export function SceneEditor({
   timelineScenes,
   linkedCharacters = [],
 }: SceneEditorProps) {
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -62,6 +65,14 @@ export function SceneEditor({
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
   const [consistencyAlertCount, _setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
+  const [nextScenePrompt, setNextScenePrompt] = useState<{
+    id: string;
+    title: string;
+    parentTitle: string | null;
+    newStatus: string;
+  } | null>(null);
+
+  const session = useWritingSession({ projectId, nodeId: node.id });
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
@@ -153,6 +164,7 @@ export function SceneEditor({
         });
         const words = textContent.trim() === "" ? 0 : textContent.trim().split(/\s+/).length;
         setWordCount(words);
+        session.onActivity(words);
 
         scheduleSave(html);
       },
@@ -239,12 +251,32 @@ export function SceneEditor({
 
   const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus as SceneStatus);
+    setNextScenePrompt(null);
     await offlineFetch(`/api/nodes/${node.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
     onNodeUpdated?.();
+    // Show next-scene prompt when marking a scene as done
+    if (newStatus === "DRAFT" || newStatus === "REVISED" || newStatus === "FINAL") {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/progress`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.nextScene && data.nextScene.id !== node.id) {
+            setNextScenePrompt({
+              id: data.nextScene.id,
+              title: data.nextScene.title,
+              parentTitle: data.nextScene.parentTitle,
+              newStatus,
+            });
+          }
+        }
+      } catch {
+        // best-effort
+      }
+    }
   };
 
   const loadVersionHistory = async () => {
@@ -298,6 +330,46 @@ export function SceneEditor({
             <RefreshCw className="h-3 w-3" />
             Refresh
           </Button>
+        </div>
+      )}
+
+      {/* Next Scene Prompt */}
+      {nextScenePrompt && (
+        <div className="bg-success/15 border-b border-success/30 px-4 py-2 flex items-center justify-between animate-slide-down">
+          <span className="text-sm text-success flex items-center gap-2">
+            <Check className="h-4 w-4" />
+            Scene marked as {nextScenePrompt.newStatus.toLowerCase()}.{" "}
+            <span className="font-medium">
+              Next up:{" "}
+              {nextScenePrompt.parentTitle
+                ? `${nextScenePrompt.parentTitle} / `
+                : ""}
+              {nextScenePrompt.title}
+            </span>
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs gap-1 text-success hover:bg-success/20"
+              onClick={() => {
+                router.push(`/project/${projectId}?scene=${nextScenePrompt.id}`);
+                setNextScenePrompt(null);
+              }}
+            >
+              <ArrowRight className="h-3 w-3" />
+              Start writing
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-success/70 hover:bg-success/20"
+              onClick={() => setNextScenePrompt(null)}
+              aria-label="Dismiss"
+            >
+              <XIcon className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -390,12 +462,22 @@ export function SceneEditor({
           {/* Bottom bar */}
           <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0" role="status" aria-live="polite">
             <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
-            {lastSaved && (
-              <span className="flex items-center gap-1">
-                <Check className="h-3 w-3 text-success" aria-hidden="true" />
-                Last saved {lastSaved}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {session.active && session.wordsWritten > 0 && (
+                <span className="tabular-nums text-accent">
+                  Session: {session.wordsWritten.toLocaleString()} words in{" "}
+                  {session.durationSeconds < 60
+                    ? `${session.durationSeconds}s`
+                    : `${Math.round(session.durationSeconds / 60)} min`}
+                </span>
+              )}
+              {lastSaved && (
+                <span className="flex items-center gap-1">
+                  <Check className="h-3 w-3 text-success" aria-hidden="true" />
+                  Last saved {lastSaved}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
