@@ -12,8 +12,9 @@ vi.mock("@sentry/nextjs", () => ({
   captureRequestError: vi.fn(),
 }));
 
-// Use a separate test database
-const TEST_DATABASE_URL = "file:./test.db";
+// Use a separate test database — set TEST_DATABASE_URL to override.
+// Defaults to a local SQLite file for fast CI; use a Postgres URL for integration tests.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || "file:./test.db";
 
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 
@@ -21,23 +22,15 @@ export const testPrisma = new PrismaClient({
   datasources: { db: { url: TEST_DATABASE_URL } },
 });
 
-// Clean all tables before each test using raw SQL in a transaction for speed.
-// A single transaction with raw DELETEs is much faster than 12 sequential
-// Prisma deleteMany calls, especially in constrained environments (Docker, CI).
+// Clean all tables before each test. TRUNCATE CASCADE handles FK ordering
+// automatically on PostgreSQL — no need to worry about delete order.
 beforeEach(async () => {
-  await testPrisma.$transaction([
-    testPrisma.$executeRawUnsafe('DELETE FROM "GoogleDocExport"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "GoogleCredential"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "Relationship"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "Annotation"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "ContentVersion"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "WritingSession"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "StoryObject"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "StructureNode"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "WorldObjectTimelineEntry"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "WorldObject"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "Project"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "Universe"'),
-    testPrisma.$executeRawUnsafe('DELETE FROM "User"'),
-  ]);
+  await testPrisma.$executeRawUnsafe(
+    `TRUNCATE TABLE
+      "GoogleDocExport", "GoogleCredential", "ChatMessage", "UserAiSettings",
+      "AiSettings", "WritingSession", "Relationship", "Annotation",
+      "ContentVersion", "StoryObject", "StructureNode",
+      "WorldObjectTimelineEntry", "WorldObject", "Project", "Universe", "User"
+    CASCADE`
+  );
 });

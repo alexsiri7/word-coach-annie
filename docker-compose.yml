@@ -4,14 +4,10 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
-    volumes:
-      # Persist SQLite database outside the container
-      - ./data:/app/data
     env_file:
       - .env.local
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/word-coach-annie.db
       - OTEL_ENABLED=true
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
     depends_on:
@@ -31,6 +27,14 @@ services:
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     command: tunnel --no-autoupdate run
+    networks:
+      - default
+      - reli
+
+networks:
+  reli:
+    external: true
+    name: reli_default
 
 volumes:
   phoenix-data:

@@ -70,3 +70,7 @@ data/*.db-journal
 __pycache__/
 state.json
 .beads/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db

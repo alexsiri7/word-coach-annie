@@ -19,7 +19,7 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "_applied_migrations" (
       "name" TEXT NOT NULL PRIMARY KEY,
-      "applied_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "applied_at" TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `)
 
