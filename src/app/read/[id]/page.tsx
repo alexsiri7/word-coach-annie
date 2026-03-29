@@ -34,8 +34,9 @@ async function getManuscriptData(projectId: string) {
   });
 
   // Batch: get latest content for all scenes in one query
+  // Only include scenes that are DRAFT or above (exclude OUTLINE)
   const sceneIds = nodes
-    .filter((n) => n.type === "SCENE")
+    .filter((n) => n.type === "SCENE" && n.status !== "OUTLINE")
     .map((n) => n.id);
   const contentMap: Record<string, string> = {};
 
@@ -57,7 +58,12 @@ async function getManuscriptData(projectId: string) {
   const nodeMap = new Map<string, OutlineNode>();
   const roots: OutlineNode[] = [];
 
-  for (const node of nodes) {
+  // Exclude OUTLINE scenes from the tree entirely
+  const visibleNodes = nodes.filter(
+    (n) => n.type !== "SCENE" || n.status !== "OUTLINE"
+  );
+
+  for (const node of visibleNodes) {
     nodeMap.set(node.id, {
       id: node.id,
       type: node.type,
@@ -69,7 +75,7 @@ async function getManuscriptData(projectId: string) {
     });
   }
 
-  for (const node of nodes) {
+  for (const node of visibleNodes) {
     const outlineNode = nodeMap.get(node.id)!;
     if (node.parentId && nodeMap.has(node.parentId)) {
       nodeMap.get(node.parentId)!.children.push(outlineNode);
