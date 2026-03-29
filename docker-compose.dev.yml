@@ -11,11 +11,8 @@ services:
       - .:/app
       # Prevent node_modules from being overwritten by mount
       - /app/node_modules
-      # Persist SQLite database outside the container
-      - ./data:/app/data
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:/app/data/word-coach-annie.db
       - OTEL_ENABLED=true
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
     command: /app/scripts/start-docker.sh
