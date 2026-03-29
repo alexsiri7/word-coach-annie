@@ -51,6 +51,7 @@ const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => 
 const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ShareButton } from "@/components/share-dialog";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
@@ -334,6 +335,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Network className="h-4 w-4" />
         </Button>
+        <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button
           variant="ghost"
           size="icon"
