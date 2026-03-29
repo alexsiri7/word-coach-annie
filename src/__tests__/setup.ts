@@ -31,6 +31,7 @@ beforeEach(async () => {
     testPrisma.$executeRawUnsafe('DELETE FROM "Relationship"'),
     testPrisma.$executeRawUnsafe('DELETE FROM "Annotation"'),
     testPrisma.$executeRawUnsafe('DELETE FROM "ContentVersion"'),
+    testPrisma.$executeRawUnsafe('DELETE FROM "WritingSession"'),
     testPrisma.$executeRawUnsafe('DELETE FROM "StoryObject"'),
     testPrisma.$executeRawUnsafe('DELETE FROM "StructureNode"'),
     testPrisma.$executeRawUnsafe('DELETE FROM "WorldObjectTimelineEntry"'),

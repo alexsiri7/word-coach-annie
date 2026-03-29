@@ -62,6 +62,7 @@ model Project {
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
+  writingSessions WritingSession[]
 
   @@index([userId])
 }
@@ -123,6 +124,7 @@ model StructureNode {
   updatedAt       DateTime         @updatedAt
   annotations     Annotation[]
   contentVersions ContentVersion[]
+  writingSessions WritingSession[]
   relationships   Relationship[]   @relation("Relationship_toNodeIdToStructureNode")
   relatedBy       Relationship[]   @relation("Relationship_fromNodeIdToStructureNode")
   parent          StructureNode?   @relation("StructureNodeToStructureNode", fields: [parentId], references: [id], onDelete: Cascade)
@@ -237,4 +239,20 @@ model GoogleDocExport {
   @@unique([projectId, universeId, exportMode])
   @@index([projectId])
   @@index([universeId])
+}
+
+model WritingSession {
+  id              String        @id @default(cuid())
+  projectId       String
+  nodeId          String?
+  startedAt       DateTime      @default(now())
+  endedAt         DateTime?
+  wordsWritten    Int           @default(0)
+  durationSeconds Int           @default(0)
+  date            String        @default("") // YYYY-MM-DD for heatmap grouping
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node            StructureNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, date])
+  @@index([date])
 }

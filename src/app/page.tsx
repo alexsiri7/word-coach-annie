@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
+import { WritingHeatmap } from "@/components/writing-heatmap";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -203,6 +204,7 @@ export default function Dashboard() {
             </Button>
           </div>
         ) : (
+          <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
             {projects.map((project, i) => (
               <div
@@ -263,6 +265,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+          <WritingHeatmap />
+          </>
         )}
       </div>
 
