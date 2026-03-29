@@ -61,7 +61,7 @@ vi.mock("next/server", () => {
         NextResponse: Object.assign(
             function (body: unknown, init?: { status?: number }) {
                 return new MockResp(body, init);
-            } as unknown,
+            } as object,
             {
                 json: (data: unknown, init?: { status?: number }) => {
                     const r = new MockResp(data, init);
