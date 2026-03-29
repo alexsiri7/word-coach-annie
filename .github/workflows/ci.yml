@@ -7,8 +7,35 @@ on:
     branches: [master]
 
 jobs:
-  quality:
-    name: Quality Gates (Node 20)
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Setup
+        run: ./scripts/gates.sh setup
+
+      - name: Lint & Typecheck
+        run: ./scripts/gates.sh lint & ./scripts/gates.sh typecheck & wait
+
+  test:
+    name: Test
     runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -47,14 +74,32 @@ jobs:
       - name: Setup
         run: ./scripts/gates.sh setup
 
-      - name: Lint
-        run: ./scripts/gates.sh lint
-
-      - name: Typecheck
-        run: ./scripts/gates.sh typecheck
-
       - name: Test
         run: ./scripts/gates.sh test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Setup
+        run: ./scripts/gates.sh setup
 
       - name: Build
         run: ./scripts/gates.sh build
