@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
@@ -18,6 +18,7 @@ import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { InlineAiActionBar } from "@/components/inline-ai-action-bar";
 
 interface SceneEditorProps {
   node: StructureNode;
@@ -323,38 +324,48 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
             <EditorContent editor={editor} className="h-full" />
             {editor && (
               <BubbleMenu editor={editor}>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="shadow-lg gap-1.5 h-8 px-2 bg-surface-raised border border-border text-xs"
-                      onClick={(e) => {
-                        const { from, to } = editor.state.selection;
-                        if (from === to) e.preventDefault();
-                      }}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" /> Comment
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-3" align="start" sideOffset={5}>
-                    <div className="flex flex-col gap-2">
-                      <h4 className="font-medium text-xs text-text-secondary">Add Annotation</h4>
-                      <Textarea
-                        placeholder="Type your comment..."
-                        className="text-sm min-h-[80px] w-full"
-                        id="new-annotation-input"
-                        autoFocus
-                      />
-                      <div className="flex justify-end">
-                        <Button size="sm" onClick={() => {
-                          const el = document.getElementById("new-annotation-input") as HTMLTextAreaElement;
-                          if (el && el.value.trim()) addAnnotation(el.value);
-                        }}>Save</Button>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <div className="flex flex-col gap-1">
+                  {/* Inline AI Actions */}
+                  <InlineAiActionBar
+                    editor={editor}
+                    sceneContext={contentRef.current?.replace(/<[^>]+>/g, " ").trim().slice(0, 800)}
+                  />
+                  {/* Comment button */}
+                  <div className="flex px-1">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs gap-1 text-text-muted hover:text-text-secondary bg-surface-raised border border-border shadow-sm"
+                          onClick={(e) => {
+                            const { from, to } = editor.state.selection;
+                            if (from === to) e.preventDefault();
+                          }}
+                        >
+                          <MessageSquare className="h-3 w-3" /> Comment
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start" sideOffset={5}>
+                        <div className="flex flex-col gap-2">
+                          <h4 className="font-medium text-xs text-text-secondary">Add Annotation</h4>
+                          <Textarea
+                            placeholder="Type your comment..."
+                            className="text-sm min-h-[80px] w-full"
+                            id="new-annotation-input"
+                            autoFocus
+                          />
+                          <div className="flex justify-end">
+                            <Button size="sm" onClick={() => {
+                              const el = document.getElementById("new-annotation-input") as HTMLTextAreaElement;
+                              if (el && el.value.trim()) addAnnotation(el.value);
+                            }}>Save</Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
               </BubbleMenu>
             )}
           </div>
