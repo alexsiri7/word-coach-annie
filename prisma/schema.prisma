@@ -62,8 +62,21 @@ model Project {
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
+  shares         ProjectShare[]
 
   @@index([userId])
+}
+
+model ProjectShare {
+  id        String   @id @default(cuid())
+  projectId String
+  email     String
+  role      String   @default("READER")
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
 }
 
 model Relationship {
