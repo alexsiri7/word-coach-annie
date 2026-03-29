@@ -18,15 +18,17 @@ import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
 import { AnnotationsSidebar } from "@/components/editor/annotations-sidebar";
+import { recordLastEdited, recordSave, recordSessionBaseline } from "@/lib/writing-session";
 
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
+  projectTitle?: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
 }
 
-export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
+export function SceneEditor({ node, projectId, projectTitle = "", onNodeUpdated, showFocusButton = true }: SceneEditorProps) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(node.wordCount || 0);
@@ -48,6 +50,10 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
       setLatestVersionId(v.id);
       setLastSaved(new Date().toLocaleTimeString());
       setExternalChangeDetected(false);
+      // Track session words and last-edited scene
+      const savedWordCount = v.wordCount ?? wordCount;
+      recordSave(node.id, savedWordCount);
+      recordLastEdited(projectId, projectTitle, node.id, node.title, savedWordCount);
     },
     onNodeUpdated,
   });
@@ -104,6 +110,11 @@ export function SceneEditor({ node, projectId, onNodeUpdated, showFocusButton = 
     }, 10000);
     return () => clearInterval(interval);
   }, [node.id, latestVersionId]);
+
+  // Record session baseline when scene opens
+  useEffect(() => {
+    recordSessionBaseline(node.id, node.wordCount || 0);
+  }, [node.id, node.wordCount]);
 
   // Cleanup save timeout on unmount
   useEffect(() => cleanup, [cleanup]);

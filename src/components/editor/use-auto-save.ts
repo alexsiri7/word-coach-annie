@@ -6,7 +6,7 @@ interface UseAutoSaveOptions {
   nodeId: string;
   onSaveStart: () => void;
   onSaveEnd: () => void;
-  onVersionCreated: (version: { id: string }) => void;
+  onVersionCreated: (version: { id: string; wordCount?: number }) => void;
   onNodeUpdated?: () => void;
 }
 

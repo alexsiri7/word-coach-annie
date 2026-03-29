@@ -562,6 +562,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 key={selectedNode.id}
                 node={selectedNode}
                 projectId={projectId}
+                projectTitle={project?.title}
                 onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
               />
             </ErrorBoundary>

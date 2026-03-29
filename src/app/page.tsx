@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
+import {
+  Plus,
+  MoreVertical,
+  Trash2,
+  Pencil,
+  PenLine,
+  Sparkles,
+  Globe,
+  ArrowRight,
+  Target,
+  Pen,
+} from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -42,6 +53,13 @@ import {
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
 import type { ProjectType } from "@/lib/types";
+import {
+  getGlobalLastEdited,
+  getTodayWords,
+  getDailyGoal,
+  setDailyGoal,
+  type LastEditedScene,
+} from "@/lib/writing-session";
 
 interface Project {
   id: string;
@@ -52,6 +70,9 @@ interface Project {
   projectType: ProjectType;
   wordCount: number;
   nodeCount: number;
+  totalScenes: number;
+  draftedScenes: number;
+  nextUnwrittenScene: { id: string; title: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,6 +89,13 @@ export default function Dashboard() {
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
 
+  // Session tracking state (localStorage, client-side only)
+  const [lastEdited, setLastEdited] = useState<LastEditedScene | null>(null);
+  const [todayWords, setTodayWords] = useState(0);
+  const [dailyGoal, setDailyGoalState] = useState(500);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
     const data = await res.json();
@@ -77,6 +105,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchProjects();
+    // Load session data from localStorage
+    setLastEdited(getGlobalLastEdited());
+    setTodayWords(getTodayWords());
+    const goal = getDailyGoal();
+    setDailyGoalState(goal);
+    setGoalInput(String(goal));
   }, []);
 
   const handleCreate = async () => {
@@ -111,6 +145,15 @@ export default function Dashboard() {
     fetchProjects();
   };
 
+  const handleSaveGoal = () => {
+    const g = parseInt(goalInput, 10);
+    if (g > 0) {
+      setDailyGoal(g);
+      setDailyGoalState(g);
+    }
+    setEditingGoal(false);
+  };
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       month: "short",
@@ -126,6 +169,14 @@ export default function Dashboard() {
 
   const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
 
+  // Resume card: show if edited in last 7 days
+  const showResumeCard =
+    lastEdited && Date.now() - lastEdited.ts < 7 * 24 * 60 * 60 * 1000;
+
+  // Session bar: show if user has written today or has a goal set
+  const goalPct = dailyGoal > 0 ? Math.min(100, Math.round((todayWords / dailyGoal) * 100)) : 0;
+  const showSessionBar = todayWords > 0 || dailyGoal !== 500;
+
   return (
     <main id="main-content" className="min-h-screen">
       <SetupWizard />
@@ -134,7 +185,7 @@ export default function Dashboard() {
 
       <div className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex items-end justify-between mb-10">
+        <div className="flex items-end justify-between mb-8">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
@@ -163,6 +214,94 @@ export default function Dashboard() {
             <UserMenu />
           </div>
         </div>
+
+        {/* Resume Card */}
+        {showResumeCard && lastEdited && (
+          <div
+            className="glass-card p-4 mb-4 flex items-center gap-4 cursor-pointer group border-accent/20 hover:border-accent/40 transition-colors animate-fade-in"
+            onClick={() => router.push(`/project/${lastEdited.projectId}`)}
+          >
+            <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <Pen className="h-5 w-5 text-accent" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-text-muted mb-0.5">Continue writing</p>
+              <p className="font-medium text-text-primary truncate">
+                {lastEdited.sceneTitle}
+              </p>
+              {lastEdited.projectTitle && (
+                <p className="text-xs text-text-muted truncate">
+                  in {lastEdited.projectTitle} · {formatWordCount(lastEdited.wordCount)} words
+                </p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 flex-shrink-0 group-hover:text-accent"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/project/${lastEdited.projectId}`);
+              }}
+            >
+              Open
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
+        {/* Session Progress Bar */}
+        {showSessionBar && (
+          <div className="glass-card p-4 mb-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-accent" />
+                <span className="text-sm font-medium text-text-primary">
+                  Today: {todayWords.toLocaleString()} words
+                </span>
+                {goalPct >= 100 && (
+                  <span className="text-xs text-accent font-medium">Goal reached!</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {editingGoal ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      value={goalInput}
+                      onChange={(e) => setGoalInput(e.target.value)}
+                      className="h-7 w-20 text-xs"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveGoal();
+                        if (e.key === "Escape") setEditingGoal(false);
+                      }}
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs" onClick={handleSaveGoal}>
+                      Save
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    className="text-xs text-text-muted hover:text-text-primary transition-colors"
+                    onClick={() => {
+                      setGoalInput(String(dailyGoal));
+                      setEditingGoal(true);
+                    }}
+                  >
+                    Goal: {dailyGoal.toLocaleString()} words
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+              <div
+                className="h-full bg-accent rounded-full transition-all duration-500"
+                style={{ width: `${goalPct}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -207,7 +346,7 @@ export default function Dashboard() {
             {projects.map((project, i) => (
               <div
                 key={project.id}
-                className="group glass-card p-5 cursor-pointer animate-slide-up"
+                className="group glass-card p-5 cursor-pointer animate-slide-up flex flex-col"
                 style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}
                 onClick={() => router.push(`/project/${project.id}`)}
               >
@@ -253,13 +392,48 @@ export default function Dashboard() {
                   </p>
                 )}
 
-                <div className="flex items-center gap-3 mt-4 text-xs text-text-muted">
+                {/* Manuscript progress bar */}
+                {project.totalScenes > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-text-muted mb-1">
+                      <span>
+                        {project.draftedScenes}/{project.totalScenes} scenes drafted
+                      </span>
+                      <span>
+                        {Math.round((project.draftedScenes / project.totalScenes) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-1 bg-surface-overlay rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent/60 rounded-full"
+                        style={{
+                          width: `${(project.draftedScenes / project.totalScenes) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mt-3 text-xs text-text-muted">
                   {project.genre && (
                     <span className="tag-pill">{project.genre}</span>
                   )}
                   <span className="tabular-nums">{formatWordCount(project.wordCount)} words</span>
                   <span className="ml-auto">{formatDate(project.updatedAt)}</span>
                 </div>
+
+                {/* Next unwritten scene */}
+                {project.nextUnwrittenScene && (
+                  <button
+                    className="mt-2 text-xs text-accent hover:underline text-left truncate"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/project/${project.id}`);
+                    }}
+                  >
+                    Next: {project.nextUnwrittenScene.title} →
+                  </button>
+                )}
               </div>
             ))}
           </div>

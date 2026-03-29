@@ -142,6 +142,7 @@ export default function FocusModePage() {
                         <SceneEditor
                             node={{ ...sceneContext, type: "SCENE" }}
                             projectId={projectId}
+                            projectTitle={projectTitle}
                             showFocusButton={false}
                         />
                     </ErrorBoundary>

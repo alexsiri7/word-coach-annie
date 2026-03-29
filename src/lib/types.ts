@@ -10,6 +10,9 @@ export interface Project {
   genre: string;
   projectType: ProjectType;
   wordCount?: number;
+  totalScenes?: number;
+  draftedScenes?: number;
+  nextUnwrittenScene?: { id: string; title: string } | null;
   createdAt: string;
   updatedAt: string;
 }

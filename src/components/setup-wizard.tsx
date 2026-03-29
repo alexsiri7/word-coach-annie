@@ -1,18 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Eye,
-  EyeOff,
   ArrowRight,
   ArrowLeft,
-  Check,
-  PenLine,
-  MessageSquare,
-  FileText,
   BookOpen,
+  FileText,
+  PenLine,
   Sparkles,
-  Key,
+  Loader2,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
@@ -27,99 +24,176 @@ import {
 
 const DISMISSED_KEY = "setup-wizard-dismissed";
 
-const FEATURES = [
+type WritingType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL";
+type TemplateKey = "novel" | "short_story" | "article" | "blog_post" | "blank";
+
+interface Template {
+  key: TemplateKey;
+  label: string;
+  description: string;
+}
+
+const FICTION_TEMPLATES: Template[] = [
+  { key: "novel", label: "Novel", description: "Chapters → Scenes structure" },
+  { key: "short_story", label: "Short Story", description: "Single-scene structure" },
+  { key: "blank", label: "Blank", description: "Start from scratch" },
+];
+
+const ARTICLE_TEMPLATES: Template[] = [
+  { key: "article", label: "Article", description: "Section → Draft structure" },
+  { key: "blog_post", label: "Blog Post", description: "Single draft" },
+  { key: "blank", label: "Blank", description: "Start from scratch" },
+];
+
+const GENERAL_TEMPLATES: Template[] = [
+  { key: "blank", label: "Blank", description: "Start from scratch" },
+];
+
+const WRITING_TYPES = [
   {
+    type: "FICTION" as WritingType,
     icon: BookOpen,
-    title: "Projects",
-    description:
-      "Organize your writing into projects with chapters, scenes, and story objects like characters and locations.",
+    label: "Fiction",
+    description: "Novels, short stories, screenplays",
   },
   {
-    icon: PenLine,
-    title: "Editor",
-    description:
-      "A distraction-free writing environment with version history, annotations, and focus mode.",
-  },
-  {
-    icon: MessageSquare,
-    title: "AI Chat",
-    description:
-      "Chat with an AI assistant about your story — brainstorm ideas, get feedback, or work through plot problems.",
-  },
-  {
+    type: "ARTICLE_COLLECTION" as WritingType,
     icon: FileText,
-    title: "Export",
-    description:
-      "Export your manuscript as a formatted document. Generate story bibles and per-chapter summaries.",
+    label: "Articles",
+    description: "Blog posts, essays, journalism",
+  },
+  {
+    type: "GENERAL" as WritingType,
+    icon: PenLine,
+    label: "General",
+    description: "Notes, research, other writing",
   },
 ];
 
 export function SetupWizard() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState(0); // 0 = welcome/api-key, 1 = tour, 2 = done
+  const [step, setStep] = useState(0); // 0=type, 1=name+template, 2=creating
   const [loading, setLoading] = useState(true);
 
-  // API key form state
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [writingType, setWritingType] = useState<WritingType>("FICTION");
+  const [projectName, setProjectName] = useState("");
+  const [template, setTemplate] = useState<TemplateKey>("novel");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    // Check if wizard was previously dismissed
     if (localStorage.getItem(DISMISSED_KEY)) {
       setLoading(false);
       return;
     }
-
-    // Check if setup is already complete
-    fetch("/api/setup-status")
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.setupComplete) {
-          setOpen(true);
-        }
-      })
-      .catch(() => {
-        // If we can't check, don't block the user
-      })
-      .finally(() => setLoading(false));
+    // Show wizard for new users (no dismissed flag)
+    setOpen(true);
+    setLoading(false);
   }, []);
 
-  const handleSaveKey = async () => {
-    if (!apiKey.trim()) return;
-    setSaving(true);
-    setSaved(false);
+  const templates =
+    writingType === "FICTION"
+      ? FICTION_TEMPLATES
+      : writingType === "ARTICLE_COLLECTION"
+      ? ARTICLE_TEMPLATES
+      : GENERAL_TEMPLATES;
 
-    try {
-      const body: Record<string, string> = { baseUrl, model };
-      body.apiKey = apiKey;
-
-      const res = await offlineFetch("/api/ai-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        setSaved(true);
-        // Auto-advance to tour after a brief delay
-        setTimeout(() => setStep(1), 800);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSkipKey = () => {
+  const handleTypeSelect = (type: WritingType) => {
+    setWritingType(type);
+    // Set default template for this type
+    if (type === "FICTION") setTemplate("novel");
+    else if (type === "ARTICLE_COLLECTION") setTemplate("article");
+    else setTemplate("blank");
     setStep(1);
   };
 
-  const handleFinish = () => {
-    localStorage.setItem(DISMISSED_KEY, "true");
-    setOpen(false);
+  const handleCreate = async () => {
+    if (!projectName.trim()) return;
+    setCreating(true);
+
+    try {
+      // 1. Create project
+      const projRes = await offlineFetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: projectName.trim(), projectType: writingType }),
+      });
+      if (!projRes.ok) return;
+      const project = await projRes.json();
+
+      // 2. Create template structure
+      let firstSceneId: string | null = null;
+
+      if (template === "novel") {
+        const chapRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "CHAPTER", title: "Chapter 1", orderIndex: 0 }),
+        });
+        if (chapRes.ok) {
+          const chap = await chapRes.json();
+          const sceneRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "SCENE", title: "Scene 1", parentId: chap.id, orderIndex: 0 }),
+          });
+          if (sceneRes.ok) {
+            const scene = await sceneRes.json();
+            firstSceneId = scene.id;
+          }
+        }
+      } else if (template === "short_story") {
+        const sceneRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "SCENE", title: "Scene 1", orderIndex: 0 }),
+        });
+        if (sceneRes.ok) {
+          const scene = await sceneRes.json();
+          firstSceneId = scene.id;
+        }
+      } else if (template === "article") {
+        const chapRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "CHAPTER", title: "Article 1", orderIndex: 0 }),
+        });
+        if (chapRes.ok) {
+          const chap = await chapRes.json();
+          const sceneRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "SCENE", title: "Draft", parentId: chap.id, orderIndex: 0 }),
+          });
+          if (sceneRes.ok) {
+            const scene = await sceneRes.json();
+            firstSceneId = scene.id;
+          }
+        }
+      } else if (template === "blog_post") {
+        const sceneRes = await offlineFetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "SCENE", title: "Draft", orderIndex: 0 }),
+        });
+        if (sceneRes.ok) {
+          const scene = await sceneRes.json();
+          firstSceneId = scene.id;
+        }
+      }
+
+      // 3. Mark wizard as done and navigate
+      localStorage.setItem(DISMISSED_KEY, "true");
+      setOpen(false);
+
+      if (firstSceneId) {
+        router.push(`/project/${project.id}/scene/${firstSceneId}/focus`);
+      } else {
+        router.push(`/project/${project.id}`);
+      }
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleDismiss = () => {
@@ -137,91 +211,43 @@ export function SetupWizard() {
             <DialogHeader>
               <div className="flex items-center gap-3 mb-1">
                 <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                  <Key className="h-5 w-5 text-accent" />
+                  <Sparkles className="h-5 w-5 text-accent" />
                 </div>
                 <div>
                   <DialogTitle className="text-xl">Welcome to Word Coach Annie</DialogTitle>
                   <DialogDescription className="mt-1">
-                    Set up your AI provider to unlock chat, feedback, and brainstorming features.
+                    What are you writing?
                   </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
 
-            <div className="space-y-4 pt-2">
-              <p className="text-xs text-text-muted">
-                Bring your own API key from any OpenAI-compatible provider (OpenRouter, OpenAI, Ollama, etc.).
-                Your key is encrypted and stored locally.
-              </p>
+            <div className="grid gap-3 pt-2">
+              {WRITING_TYPES.map(({ type, icon: Icon, label, description }) => (
+                <button
+                  key={type}
+                  className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface-raised hover:border-accent/50 hover:bg-accent/5 transition-colors text-left group"
+                  onClick={() => handleTypeSelect(type)}
+                >
+                  <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 group-hover:bg-accent/20 transition-colors">
+                    <Icon className="h-5 w-5 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-text-primary">{label}</p>
+                    <p className="text-sm text-text-muted">{description}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
 
-              <div>
-                <label htmlFor="setup-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  API Key *
-                </label>
-                <div className="relative">
-                  <Input
-                    id="setup-api-key"
-                    type={showKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="pr-10"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-                    aria-label={showKey ? "Hide API key" : "Show API key"}
-                  >
-                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="setup-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="setup-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="setup-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Model
-                </label>
-                <Input
-                  id="setup-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, gemini-2.0-flash..."
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <Button variant="ghost" onClick={handleSkipKey} className="text-text-muted">
-                  Skip for now
-                </Button>
-                <Button onClick={handleSaveKey} disabled={saving || !apiKey.trim()} className="gap-1.5">
-                  {saving ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : saved ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" />
-                  )}
-                  {saving ? "Saving..." : saved ? "Saved!" : "Continue"}
-                </Button>
-              </div>
+            <div className="pt-2 text-center">
+              <button
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+                onClick={handleDismiss}
+              >
+                Skip setup — I&apos;ll explore on my own
+              </button>
             </div>
           </>
         )}
@@ -231,44 +257,88 @@ export function SetupWizard() {
             <DialogHeader>
               <div className="flex items-center gap-3 mb-1">
                 <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-accent" />
+                  <PenLine className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <DialogTitle className="text-xl">Quick Tour</DialogTitle>
+                  <DialogTitle className="text-xl">Name your project</DialogTitle>
                   <DialogDescription className="mt-1">
-                    Here&apos;s what you can do with Word Coach Annie.
+                    Choose a name and starting structure.
                   </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
 
-            <div className="grid gap-3 pt-2">
-              {FEATURES.map((feature) => (
-                <div
-                  key={feature.title}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-surface-raised border border-border"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <feature.icon className="h-4 w-4 text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">{feature.title}</h3>
-                    <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-                      {feature.description}
-                    </p>
-                  </div>
+            <div className="space-y-5 pt-2">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Project title
+                </label>
+                <Input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder={
+                    writingType === "FICTION"
+                      ? "My Novel"
+                      : writingType === "ARTICLE_COLLECTION"
+                      ? "My Article Collection"
+                      : "My Project"
+                  }
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && projectName.trim() && handleCreate()}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Start with
+                </label>
+                <div className="grid gap-2">
+                  {templates.map((t) => (
+                    <button
+                      key={t.key}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors ${
+                        template === t.key
+                          ? "border-accent bg-accent/5 text-text-primary"
+                          : "border-border bg-surface-raised text-text-secondary hover:border-accent/40"
+                      }`}
+                      onClick={() => setTemplate(t.key)}
+                    >
+                      <div
+                        className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${
+                          template === t.key ? "border-accent bg-accent" : "border-border"
+                        }`}
+                      />
+                      <div>
+                        <span className="text-sm font-medium">{t.label}</span>
+                        <span className="text-xs text-text-muted ml-2">{t.description}</span>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
 
-            <div className="flex items-center justify-between pt-3">
+            <div className="flex items-center justify-between pt-2">
               <Button variant="ghost" onClick={() => setStep(0)} className="gap-1.5">
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-              <Button onClick={handleFinish} className="gap-1.5">
-                Get Started
-                <ArrowRight className="h-4 w-4" />
+              <Button
+                onClick={handleCreate}
+                disabled={!projectName.trim() || creating}
+                className="gap-1.5"
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Start writing
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
             </div>
           </>

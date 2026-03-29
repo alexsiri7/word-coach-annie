@@ -27,11 +27,12 @@ export async function GET(request: NextRequest) {
     prisma.project.count({ where }),
   ]);
 
-  // Batch: get all scenes for all projects in one query
+  // Batch: get all scenes for all projects in one query (include status + title for enriched cards)
   const projectIds = projects.map((p) => p.id);
   const allScenes = await prisma.structureNode.findMany({
     where: { projectId: { in: projectIds }, type: "SCENE" },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, status: true, title: true, orderIndex: true },
+    orderBy: { orderIndex: "asc" },
   });
 
   // Batch: get latest content version word counts for all scenes in one query
@@ -52,17 +53,39 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Calculate word counts per project
+  // Calculate word counts and scene stats per project
   const projectWordCounts = new Map<string, number>();
+  const projectSceneStats = new Map<string, {
+    totalScenes: number;
+    draftedScenes: number;
+    nextUnwrittenScene: { id: string; title: string } | null;
+  }>();
   for (const scene of allScenes) {
     const current = projectWordCounts.get(scene.projectId) || 0;
     projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
+
+    const stats = projectSceneStats.get(scene.projectId) || {
+      totalScenes: 0,
+      draftedScenes: 0,
+      nextUnwrittenScene: null,
+    };
+    stats.totalScenes++;
+    if (scene.status !== "OUTLINE") stats.draftedScenes++;
+    if (!stats.nextUnwrittenScene && scene.status === "OUTLINE") {
+      stats.nextUnwrittenScene = { id: scene.id, title: scene.title };
+    }
+    projectSceneStats.set(scene.projectId, stats);
   }
 
   const projectsWithWordCount = projects.map((project) => ({
     ...project,
     wordCount: projectWordCounts.get(project.id) || 0,
     nodeCount: project._count.structureNodes,
+    ...(projectSceneStats.get(project.id) || {
+      totalScenes: 0,
+      draftedScenes: 0,
+      nextUnwrittenScene: null,
+    }),
   }));
 
   return NextResponse.json({ projects: projectsWithWordCount, total });
