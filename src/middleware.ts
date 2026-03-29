@@ -6,6 +6,7 @@ import {
     verifySessionToken,
     isAuthEnabled,
 } from "@/lib/auth";
+import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -17,6 +18,9 @@ const PUBLIC_PATHS = [
     "/api/auth/google",
     "/api/auth/me",
     "/login",
+    "/.well-known/oauth-authorization-server",
+    "/oauth/register",
+    "/oauth/token",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -76,19 +80,42 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Check Authorization header (programmatic / MCP access via API_TOKEN)
+    // Check Authorization header (programmatic / MCP access)
     const apiToken = env.API_TOKEN;
     const authHeader = request.headers.get("authorization");
-    if (authHeader && apiToken) {
+    if (authHeader) {
         const token = authHeader.startsWith("Bearer ")
             ? authHeader.slice(7)
             : null;
-        if (token && token === apiToken) {
-            // Rate limit API_TOKEN users by token (single shared identity)
+
+        // 1. Check static API_TOKEN
+        if (token && apiToken && token === apiToken) {
             const rateLimited = applyRateLimit(pathname, "apitoken");
             if (rateLimited) return rateLimited;
             return NextResponse.next();
         }
+
+        // 2. Check MCP OAuth access token (JWT with type: "mcp_access")
+        if (token) {
+            const mcpSession = await verifyMcpToken(token, "mcp_access");
+            if (mcpSession) {
+                const rateLimited = applyRateLimit(pathname, mcpSession.userId);
+                if (rateLimited) return rateLimited;
+
+                Sentry.setUser({
+                    id: mcpSession.userId,
+                    email: mcpSession.email,
+                });
+
+                const requestHeaders = new Headers(request.headers);
+                requestHeaders.set("x-user-id", mcpSession.userId);
+                requestHeaders.set("x-user-email", mcpSession.email);
+                return NextResponse.next({
+                    request: { headers: requestHeaders },
+                });
+            }
+        }
+
         // Invalid bearer token on API route → 401 immediately
         if (pathname.startsWith("/api/")) {
             return NextResponse.json(
