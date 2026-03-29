@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, List, X as XIcon } from "lucide-react";
+import { List, X as XIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -66,9 +66,9 @@ function collectTocEntries(nodes: OutlineNode[], depth: number = 0): TocEntry[] 
 }
 
 /** Check if a node (or its descendants) has any content */
-function hasContent(node: OutlineNode): boolean {
+function _hasContent(node: OutlineNode): boolean {
   if (node.type === "SCENE" && node.content && node.content !== "<p></p>") return true;
-  return node.children.some(hasContent);
+  return node.children.some(_hasContent);
 }
 
 function SceneContent({ content }: { content: string }) {
@@ -182,10 +182,6 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
-
-  const hasChapters = outline.some(
-    (n) => n.type === "CHAPTER" || n.type === "PART" || n.children.length > 0
-  );
 
   return (
     <div className="min-h-screen bg-background">
