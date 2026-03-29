@@ -1,20 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "./setup";
 
-vi.mock("next/server", () => {
-  const nr = class {
-    body: string;
-    status: number;
-    constructor(body: string, init?: { status: number }) {
-      this.body = body;
-      this.status = init?.status || 200;
-    }
-    static json(data: unknown, init?: { status?: number }) {
-      return { data, status: init?.status || 200, async json() { return data; } };
-    }
-  };
-  return { NextResponse: nr };
-});
+class MockNextRequest {
+  private _body: unknown;
+  nextUrl: { searchParams: URLSearchParams };
+  headers: Map<string, string>;
+
+  constructor(url: string, init?: { method?: string; body?: string }) {
+    this._body = init?.body ? JSON.parse(init.body) : null;
+    this.nextUrl = { searchParams: new URL(url, "http://localhost").searchParams };
+    this.headers = new Map();
+  }
+
+  async json() {
+    return this._body;
+  }
+}
+
+vi.mock("next/server", () => ({
+  NextRequest: MockNextRequest,
+  NextResponse: {
+    json: (data: unknown, init?: { status?: number }) => ({
+      data,
+      status: init?.status || 200,
+      async json() { return data; },
+    }),
+  },
+}));
 
 function mockParams<T>(params: T): { params: Promise<T> } {
   return { params: Promise.resolve(params) };
@@ -160,12 +172,11 @@ describe("Sessions API routes", () => {
 
   it("POST /api/projects/[id]/sessions creates a session", async () => {
     const { POST } = await import("@/app/api/projects/[id]/sessions/route");
-    const req = new Request("http://localhost", {
+    const req = new MockNextRequest("http://localhost", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ wordsWritten: 200, durationSeconds: 600, date: "2026-03-29" }),
     });
-    const res = await POST(req, mockParams({ id: projectId }));
+    const res = await POST(req as never, mockParams({ id: projectId }));
     expect((res as any).status).toBe(201);
     const body = await (res as any).json();
     expect(body.projectId).toBe(projectId);
@@ -174,8 +185,8 @@ describe("Sessions API routes", () => {
 
   it("GET /api/projects/[id]/progress returns progress", async () => {
     const { GET } = await import("@/app/api/projects/[id]/progress/route");
-    const req = new Request("http://localhost");
-    const res = await GET(req, mockParams({ id: projectId }));
+    const req = new MockNextRequest("http://localhost");
+    const res = await GET(req as never, mockParams({ id: projectId }));
     expect((res as any).status || 200).toBe(200);
     const body = await (res as any).json();
     expect(body.totalScenes).toBe(0);
