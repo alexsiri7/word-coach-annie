@@ -91,13 +91,11 @@ export function SceneEditor({
       sceneTitle: node.title,
       timestamp: Date.now(),
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.id, projectId]);
 
   // Track session words whenever word count changes
   useEffect(() => {
     if (wordCount > 0) recordWords(wordCount);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wordCount]);
 
   // Load initial content
