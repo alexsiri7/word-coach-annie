@@ -54,6 +54,7 @@ const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-
 const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ShareButton } from "@/components/share-dialog";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
@@ -395,6 +396,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Network className="h-4 w-4" />
         </Button>
+        <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button
           variant="ghost"
           size="icon"
