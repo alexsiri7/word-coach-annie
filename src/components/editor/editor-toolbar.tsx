@@ -21,6 +21,8 @@ import {
   Maximize,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +52,11 @@ interface EditorToolbarProps {
   projectId: string;
   nodeId: string;
   onInsertBeat: () => void;
+  onToggleConsistencyAlerts?: () => void;
+  showConsistencyAlerts?: boolean;
+  consistencyAlertCount?: number;
+  onToggleVoiceMonitor?: () => void;
+  showVoiceMonitor?: boolean;
 }
 
 export function EditorToolbar({
@@ -69,6 +76,11 @@ export function EditorToolbar({
   projectId,
   nodeId,
   onInsertBeat,
+  onToggleConsistencyAlerts,
+  showConsistencyAlerts,
+  consistencyAlertCount = 0,
+  onToggleVoiceMonitor,
+  showVoiceMonitor,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
@@ -175,6 +187,39 @@ export function EditorToolbar({
             )}
           </div>
         </Button>
+
+        {onToggleConsistencyAlerts && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", showConsistencyAlerts && "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
+            onClick={onToggleConsistencyAlerts}
+            aria-label={`${showConsistencyAlerts ? "Hide" : "Show"} consistency alerts${consistencyAlertCount > 0 ? ` (${consistencyAlertCount})` : ""}`}
+            aria-pressed={showConsistencyAlerts}
+          >
+            <div className="relative">
+              <AlertTriangle className="h-4 w-4" />
+              {consistencyAlertCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-500 text-white text-[8px] flex items-center justify-center font-bold" aria-hidden="true">
+                  {consistencyAlertCount > 9 ? "9+" : consistencyAlertCount}
+                </span>
+              )}
+            </div>
+          </Button>
+        )}
+
+        {onToggleVoiceMonitor && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", showVoiceMonitor && "bg-blue-500/15 text-blue-600 dark:text-blue-400")}
+            onClick={onToggleVoiceMonitor}
+            aria-label={`${showVoiceMonitor ? "Hide" : "Show"} voice monitor`}
+            aria-pressed={showVoiceMonitor}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        )}
 
         {showFocusButton && (
           <Button
