@@ -53,13 +53,15 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         parentId: true,
         type: true,
         title: true,
+        status: true,
         orderIndex: true,
       },
       orderBy: { orderIndex: "asc" },
     });
 
     // Get latest content for all scenes in one query
-    const sceneIds = nodes.filter((n) => n.type === "SCENE").map((n) => n.id);
+    // Only include scenes that are DRAFT or above (exclude OUTLINE)
+    const sceneIds = nodes.filter((n) => n.type === "SCENE" && n.status !== "OUTLINE").map((n) => n.id);
     const contentVersions =
       sceneIds.length > 0
         ? await prisma.contentVersion.findMany({
@@ -77,9 +79,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       }
     }
 
+    // Exclude OUTLINE scenes from the manuscript
+    const visibleNodes = nodes.filter(
+      (n) => n.type !== "SCENE" || n.status !== "OUTLINE"
+    );
+
     // Build lookup maps
-    const childrenMap = new Map<string | null, typeof nodes>();
-    for (const node of nodes) {
+    const childrenMap = new Map<string | null, typeof visibleNodes>();
+    for (const node of visibleNodes) {
       const key = node.parentId;
       if (!childrenMap.has(key)) childrenMap.set(key, []);
       childrenMap.get(key)!.push(node);
@@ -87,14 +94,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
     const topLevel = childrenMap.get(null) ?? [];
 
-    function buildScene(node: (typeof nodes)[0]): ManuscriptScene {
+    function buildScene(node: (typeof visibleNodes)[0]): ManuscriptScene {
       return {
         title: node.title,
         content: latestContent.get(node.id) ?? "",
       };
     }
 
-    function buildChapter(node: (typeof nodes)[0]): ManuscriptChapter {
+    function buildChapter(node: (typeof visibleNodes)[0]): ManuscriptChapter {
       const children = childrenMap.get(node.id) ?? [];
       return {
         title: node.title,
