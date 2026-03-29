@@ -46,7 +46,7 @@ export function ShareDialog({
       const res = await fetch(`/api/projects/${projectId}/share`);
       if (res.ok) {
         const data = await res.json();
-        setShares(data);
+        setShares(data.shares || data);
       }
     } finally {
       setLoading(false);
