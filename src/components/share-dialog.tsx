@@ -258,12 +258,13 @@ export function ShareButton({
     <>
       <Button
         variant="ghost"
-        size="icon"
-        className="h-8 w-8"
+        size="sm"
+        className="h-8 gap-1.5"
         onClick={() => setOpen(true)}
         aria-label="Share project"
       >
         <Share2 className="h-4 w-4" />
+        <span className="hidden sm:inline text-xs">Share</span>
       </Button>
       <ShareDialog
         projectId={projectId}
