@@ -29,6 +29,8 @@ interface ToolActivity {
 interface AIChatPanelProps {
   projectId: string;
   sceneContext?: string;
+  initialMessage?: string;
+  onPromptConsumed?: () => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -78,7 +80,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   );
 }
 
-export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
+export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptConsumed }: AIChatPanelProps) {
   const { isOnline } = useNetworkStatus();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -88,6 +90,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const initialMessageFiredRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -111,8 +114,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
     scrollToBottom();
   }, [messages, streamingContent, toolActivities, scrollToBottom]);
 
-  const sendMessage = async () => {
-    const text = input.trim();
+  const sendMessageText = useCallback(async (text: string) => {
     if (!text || isStreaming || !isOnline) return;
 
     setInput("");
@@ -120,7 +122,6 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
     setStreamingContent("");
     setToolActivities([]);
 
-    // Optimistically add user message
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -136,9 +137,7 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         body: JSON.stringify({ projectId, message: text, sceneContext }),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No reader");
@@ -186,7 +185,6 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
         }
       }
 
-      // Add completed assistant message
       const assistantMsg: ChatMessage = {
         id: `temp-${Date.now()}-assistant`,
         role: "assistant",
@@ -208,6 +206,22 @@ export function AIChatPanel({ projectId, sceneContext }: AIChatPanelProps) {
     } finally {
       setIsStreaming(false);
     }
+  }, [isStreaming, isOnline, projectId, sceneContext]);
+
+  // Auto-send initialMessage once history is loaded
+  useEffect(() => {
+    if (initialMessage && !loadingHistory && !initialMessageFiredRef.current) {
+      initialMessageFiredRef.current = true;
+      onPromptConsumed?.();
+      sendMessageText(initialMessage);
+    }
+  }, [initialMessage, loadingHistory, sendMessageText, onPromptConsumed]);
+
+  const sendMessage = () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+    sendMessageText(text);
   };
 
   const clearHistory = async () => {

@@ -17,6 +17,7 @@ import {
   Menu,
   X as XIcon,
   MessageSquare,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,14 +49,15 @@ const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => 
 });
 const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
-const AIChatPanel = dynamic(() => import("@/components/ai-chat-panel").then(m => m.AIChatPanel));
+const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
+const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType } from "@/lib/types";
+import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
 
@@ -110,6 +112,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [showSearch, setShowSearch] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
+  const [showManuscriptAI, setShowManuscriptAI] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -374,6 +377,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <Button
           variant="ghost"
           size="icon"
+          className={cn("h-8 w-8", showManuscriptAI && "text-accent bg-accent/10")}
+          onClick={() => setShowManuscriptAI(!showManuscriptAI)}
+          aria-label="Manuscript AI analysis"
+          aria-pressed={showManuscriptAI}
+          title="Manuscript AI"
+        >
+          <BookOpen className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
           aria-label="Project settings"
@@ -471,8 +485,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <div className="flex-1 overflow-y-auto flex flex-col">
             {activeTab === "ai-chat" ? (
               <ErrorBoundary fallbackTitle="Chat panel crashed">
-                <AIChatPanel
+                <SceneAwareChatPanel
                   projectId={projectId}
+                  sceneId={selectedNode?.type === "SCENE" ? selectedNode.id : undefined}
+                  sceneStatus={selectedNode?.type === "SCENE" ? (selectedNode.status as SceneStatus) : undefined}
+                  sceneTitle={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
                   sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
                 />
               </ErrorBoundary>
@@ -579,43 +596,57 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </aside>
 
         {/* Main content */}
-        <main id="main-content" className="flex-1 overflow-hidden">
-          {selectedObjectId ? (
-            <ErrorBoundary fallbackTitle="Story object panel crashed">
-              <StoryObjectPanel
-                objectId={selectedObjectId}
-                source={selectedObjectSource}
-                onClose={() => setSelectedObjectId(null)}
-                onDeleted={() => {
-                  setSelectedObjectId(null);
-                  fetchStoryObjects();
-                }}
-                onUpdated={fetchStoryObjects}
-              />
-            </ErrorBoundary>
-          ) : selectedNode && selectedNode.type === "SCENE" ? (
-            <ErrorBoundary fallbackTitle="Scene editor crashed">
-              <SceneEditor
-                key={selectedNode.id}
-                node={selectedNode}
-                projectId={projectId}
-                onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
-                timelineScenes={timelineScenes}
-                linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
-              />
-            </ErrorBoundary>
-          ) : (
-            <div className="flex items-center justify-center h-full text-text-muted animate-fade-in">
-              <div className="text-center">
-                <div className="h-16 w-16 rounded-2xl bg-surface-raised border border-border flex items-center justify-center mx-auto mb-4">
-                  <PenLine className="h-7 w-7 text-accent/50" />
+        <main id="main-content" className="flex-1 overflow-hidden flex">
+          <div className="flex-1 overflow-hidden">
+            {selectedObjectId ? (
+              <ErrorBoundary fallbackTitle="Story object panel crashed">
+                <StoryObjectPanel
+                  objectId={selectedObjectId}
+                  source={selectedObjectSource}
+                  onClose={() => setSelectedObjectId(null)}
+                  onDeleted={() => {
+                    setSelectedObjectId(null);
+                    fetchStoryObjects();
+                  }}
+                  onUpdated={fetchStoryObjects}
+                />
+              </ErrorBoundary>
+            ) : selectedNode && selectedNode.type === "SCENE" ? (
+              <ErrorBoundary fallbackTitle="Scene editor crashed">
+                <SceneEditor
+                  key={selectedNode.id}
+                  node={selectedNode}
+                  projectId={projectId}
+                  onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
+                  timelineScenes={timelineScenes}
+                  linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
+                />
+              </ErrorBoundary>
+            ) : (
+              <div className="flex items-center justify-center h-full text-text-muted animate-fade-in">
+                <div className="text-center">
+                  <div className="h-16 w-16 rounded-2xl bg-surface-raised border border-border flex items-center justify-center mx-auto mb-4">
+                    <PenLine className="h-7 w-7 text-accent/50" />
+                  </div>
+                  <p className="text-sm">
+                    {outline.length === 0
+                      ? "Create a chapter to get started"
+                      : "Select a scene to start writing"}
+                  </p>
                 </div>
-                <p className="text-sm">
-                  {outline.length === 0
-                    ? "Create a chapter to get started"
-                    : "Select a scene to start writing"}
-                </p>
               </div>
+            )}
+          </div>
+
+          {/* Manuscript AI panel (right rail) */}
+          {showManuscriptAI && (
+            <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
+              <ErrorBoundary fallbackTitle="Manuscript AI crashed">
+                <ManuscriptAiPanel
+                  projectId={projectId}
+                  onClose={() => setShowManuscriptAI(false)}
+                />
+              </ErrorBoundary>
             </div>
           )}
         </main>
