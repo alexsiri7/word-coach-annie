@@ -19,15 +19,18 @@ export function getCurrentUserId(request: NextRequest): string | null {
 }
 
 /**
- * Verify that a project belongs to the current user.
- * Returns the project if accessible, or a 403/404 response.
- * When userId is null (API_TOKEN/dev mode), all projects are accessible.
+ * Verify that a project belongs to the current user (owner-only).
+ * Returns the project and role if accessible, or a 403/404 response.
+ * When userId is null (API_TOKEN/dev mode), all projects are accessible (role = null).
  * Unowned projects (NULL userId) are denied to authenticated users.
  */
 export async function verifyProjectAccess(
     projectId: string,
     userId: string | null
-): Promise<{ authorized: true; project: { id: string; userId: string | null } } | { authorized: false; response: NextResponse }> {
+): Promise<
+    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | null }
+    | { authorized: false; response: NextResponse }
+> {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
         select: { id: true, userId: true },
@@ -42,7 +45,7 @@ export async function verifyProjectAccess(
 
     // No user scoping in API_TOKEN / dev mode
     if (!userId) {
-        return { authorized: true, project };
+        return { authorized: true, project, role: null };
     }
 
     if (project.userId !== userId) {
@@ -52,7 +55,63 @@ export async function verifyProjectAccess(
         };
     }
 
-    return { authorized: true, project };
+    return { authorized: true, project, role: "OWNER" };
+}
+
+/**
+ * Verify that the current user has read access to a project.
+ * Allows both owners and readers (via ProjectShare).
+ * When userId is null (API_TOKEN/dev mode), all projects are accessible (role = null).
+ */
+export async function verifyProjectReadAccess(
+    projectId: string,
+    userId: string | null,
+    userEmail?: string | null
+): Promise<
+    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "READER" | null }
+    | { authorized: false; response: NextResponse }
+> {
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, userId: true },
+    });
+
+    if (!project) {
+        return {
+            authorized: false,
+            response: NextResponse.json({ error: "Project not found" }, { status: 404 }),
+        };
+    }
+
+    // No user scoping in API_TOKEN / dev mode
+    if (!userId) {
+        return { authorized: true, project, role: null };
+    }
+
+    // Owner check
+    if (project.userId === userId) {
+        return { authorized: true, project, role: "OWNER" };
+    }
+
+    // Reader check via ProjectShare
+    if (userEmail) {
+        const share = await prisma.projectShare.findUnique({
+            where: {
+                projectId_email: {
+                    projectId,
+                    email: userEmail.toLowerCase(),
+                },
+            },
+        });
+        if (share) {
+            return { authorized: true, project, role: "READER" };
+        }
+    }
+
+    return {
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
 }
 
 /**
