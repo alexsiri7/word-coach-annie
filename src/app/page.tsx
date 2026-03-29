@@ -188,20 +188,76 @@ export default function Dashboard() {
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="text-center py-32 animate-fade-in">
-            <div className="h-20 w-20 rounded-2xl bg-surface-raised border border-border flex items-center justify-center mx-auto mb-6">
-              <Sparkles className="h-9 w-9 text-accent" />
+          <div className="animate-fade-in max-w-2xl mx-auto py-16">
+            {/* Welcome hero */}
+            <div className="text-center mb-12">
+              <div className="h-20 w-20 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="h-9 w-9 text-accent" />
+              </div>
+              <h2 className="text-2xl font-bold text-text-primary mb-3">
+                Welcome to Annie!
+              </h2>
+              <p className="text-text-secondary max-w-md mx-auto leading-relaxed">
+                Your AI-powered writing assistant. Organize your stories, articles, and ideas
+                with smart tools that help you write better.
+              </p>
             </div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">
-              Start your story
-            </h2>
-            <p className="text-text-muted mb-8 max-w-sm mx-auto">
-              Create your first writing project. Organize chapters, characters, and plotlines all in one place.
-            </p>
-            <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Project
-            </Button>
+
+            {/* Create project CTA card */}
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="w-full glass-card p-6 mb-10 group cursor-pointer text-left border-2 border-dashed border-accent/30 hover:border-accent/60 transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-accent/15 flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
+                  <Plus className="h-6 w-6 text-accent" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-text-primary group-hover:text-accent transition-colors">
+                    Create Your First Project
+                  </h3>
+                  <p className="text-sm text-text-muted mt-0.5">
+                    Start writing — it only takes a few seconds to set up.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Project type explanations */}
+            <div>
+              <h3 className="text-sm font-medium text-text-muted uppercase tracking-wider mb-4 text-center">
+                What can you create?
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="glass-card p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PenLine className="h-4 w-4 text-accent" />
+                    <h4 className="font-medium text-text-primary text-sm">Fiction</h4>
+                  </div>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Novels, short stories, and screenplays. Organize chapters, track characters, and plot threads.
+                  </p>
+                </div>
+                <div className="glass-card p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="h-4 w-4 text-accent" />
+                    <h4 className="font-medium text-text-primary text-sm">Article Collection</h4>
+                  </div>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Blog posts, essays, and non-fiction. Group related pieces and maintain a consistent voice.
+                  </p>
+                </div>
+                <div className="glass-card p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    <h4 className="font-medium text-text-primary text-sm">General</h4>
+                  </div>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Notes, journals, and freeform writing. A flexible workspace for any kind of project.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <>
