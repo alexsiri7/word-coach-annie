@@ -19,6 +19,7 @@ import {
   MessageSquare,
   BookOpen,
   TrendingUp,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -395,6 +396,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-label="Story graph"
         >
           <Network className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/read/${projectId}`)}
+          aria-label="Preview as reader"
+          title="Preview as reader"
+        >
+          <Eye className="h-4 w-4" />
         </Button>
         <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button
