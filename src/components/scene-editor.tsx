@@ -31,9 +31,44 @@ interface TimelineSceneItem {
   chapterTitle?: string;
 }
 
+const RESUME_KEY = "writing-launchpad-resume";
+const SESSION_KEY = "writing-launchpad-session";
+
+function updateResumeData(node: StructureNode, projectId: string, projectTitle: string, wordCount: number) {
+  try {
+    localStorage.setItem(RESUME_KEY, JSON.stringify({
+      projectId,
+      projectTitle,
+      sceneId: node.id,
+      sceneTitle: node.title,
+      wordCount,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function updateSessionWords(totalWords: number) {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const raw = localStorage.getItem(SESSION_KEY);
+    let session = raw ? JSON.parse(raw) : null;
+    if (!session || session.date !== today) {
+      session = { date: today, wordsAtStart: totalWords, currentWords: totalWords };
+    } else {
+      session.currentWords = Math.max(session.currentWords, totalWords);
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface SceneEditorProps {
   node: StructureNode;
   projectId: string;
+  projectTitle?: string;
   onNodeUpdated?: () => void;
   showFocusButton?: boolean;
   timelineScenes?: TimelineSceneItem[];
@@ -43,6 +78,7 @@ interface SceneEditorProps {
 export function SceneEditor({
   node,
   projectId,
+  projectTitle = "",
   onNodeUpdated,
   showFocusButton = true,
   timelineScenes,
@@ -154,6 +190,10 @@ export function SceneEditor({
         });
         const words = textContent.trim() === "" ? 0 : textContent.trim().split(/\s+/).length;
         setWordCount(words);
+
+        // Track resume data and session words on each edit
+        updateResumeData(node, projectId, projectTitle, words);
+        updateSessionWords(words);
 
         scheduleSave(html);
       },

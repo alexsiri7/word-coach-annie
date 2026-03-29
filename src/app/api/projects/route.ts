@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
   const projectIds = projects.map((p) => p.id);
   const allScenes = await prisma.structureNode.findMany({
     where: { projectId: { in: projectIds }, type: "SCENE" },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, title: true, status: true, orderIndex: true, parentId: true, updatedAt: true },
+    orderBy: { orderIndex: "asc" },
   });
 
   // Batch: get latest content version word counts for all scenes in one query
@@ -52,17 +53,45 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Calculate word counts per project
+  // Calculate word counts, scene progress, and next unwritten scene per project
   const projectWordCounts = new Map<string, number>();
+  const projectTotalScenes = new Map<string, number>();
+  const projectDraftedScenes = new Map<string, number>();
+  const projectNextUnwritten = new Map<string, { id: string; title: string }>();
+  const projectLastEditedScene = new Map<string, { id: string; title: string; updatedAt: Date }>();
+
   for (const scene of allScenes) {
+    const wc = latestWordCounts.get(scene.id) || 0;
     const current = projectWordCounts.get(scene.projectId) || 0;
-    projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
+    projectWordCounts.set(scene.projectId, current + wc);
+
+    const total = projectTotalScenes.get(scene.projectId) || 0;
+    projectTotalScenes.set(scene.projectId, total + 1);
+
+    const isDrafted = scene.status !== "OUTLINE";
+    if (isDrafted) {
+      const drafted = projectDraftedScenes.get(scene.projectId) || 0;
+      projectDraftedScenes.set(scene.projectId, drafted + 1);
+    } else if (!projectNextUnwritten.has(scene.projectId)) {
+      projectNextUnwritten.set(scene.projectId, { id: scene.id, title: scene.title });
+    }
+
+    const existing = projectLastEditedScene.get(scene.projectId);
+    if (!existing || scene.updatedAt > existing.updatedAt) {
+      projectLastEditedScene.set(scene.projectId, { id: scene.id, title: scene.title, updatedAt: scene.updatedAt });
+    }
   }
 
   const projectsWithWordCount = projects.map((project) => ({
     ...project,
     wordCount: projectWordCounts.get(project.id) || 0,
     nodeCount: project._count.structureNodes,
+    totalScenes: projectTotalScenes.get(project.id) || 0,
+    draftedScenes: projectDraftedScenes.get(project.id) || 0,
+    nextUnwrittenScene: projectNextUnwritten.get(project.id) || null,
+    lastEditedScene: projectLastEditedScene.has(project.id)
+      ? { id: projectLastEditedScene.get(project.id)!.id, title: projectLastEditedScene.get(project.id)!.title }
+      : null,
   }));
 
   return NextResponse.json({ projects: projectsWithWordCount, total });

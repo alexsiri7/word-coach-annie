@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Settings,
@@ -84,10 +84,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const resolvedParams = use(params);
   const projectId = resolvedParams.id;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [project, setProject] = useState<Project | null>(null);
   const [outline, setOutline] = useState<OutlineNode[]>([]);
   const [storyObjects, setStoryObjects] = useState<StoryObject[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(searchParams.get("scene"));
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedObjectSource, setSelectedObjectSource] = useState<"project" | "universe">("project");
   const [activeTab, setActiveTab] = useState<SidebarTab>("outline");
@@ -617,6 +618,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   key={selectedNode.id}
                   node={selectedNode}
                   projectId={projectId}
+                  projectTitle={project?.title || ""}
                   onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
                   timelineScenes={timelineScenes}
                   linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
