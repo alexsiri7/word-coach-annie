@@ -7,7 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
  * Used by MCP clients (e.g. Claude Code) to discover endpoints.
  */
 export function GET(request: NextRequest) {
-  const origin = new URL(request.url).origin;
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
+  const origin = `${proto}://${host}`;
 
   return NextResponse.json({
     issuer: origin,
