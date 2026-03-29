@@ -38,8 +38,9 @@ COPY --from=builder /app/.skills ./.skills
 
 # Prisma migrate deploy needs the CLI, schema, and migrations
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
-CMD npx prisma migrate deploy && node server.js
+CMD node_modules/.bin/prisma migrate deploy && node server.js
