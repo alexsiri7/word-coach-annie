@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, List, X as XIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -75,10 +75,17 @@ function SceneContent({ content }: { content: string }) {
   const cleaned = stripBeats(content);
   if (!cleaned || cleaned === "<p></p>") return null;
 
+  // Sanitize HTML to prevent XSS — content may come from another user via sharing
+  const sanitized = useMemo(() => {
+    if (typeof window === "undefined") return cleaned;
+    const DOMPurify = require("dompurify");
+    return DOMPurify.sanitize(cleaned);
+  }, [cleaned]);
+
   return (
     <div
       className="reader-prose"
-      dangerouslySetInnerHTML={{ __html: cleaned }}
+      dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
 }
