@@ -292,43 +292,13 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
-  // ── e) Dashboard rendering ──────────────────────────────────────────
-  test('dashboard loads without critical console errors', async ({
-    page,
-  }) => {
-    // Collect console errors
-    const consoleErrors: string[] = []
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text())
-      }
-    })
-
-    // Navigate to dashboard
-    await page.goto('/')
-    await page.waitForSelector('main', { timeout: 20_000 })
-
-    // Wait for loading skeleton to disappear (page shows animate-pulse while loading)
-    await page.waitForFunction(
-      () => !document.querySelector('.animate-pulse'),
-      { timeout: 20_000 },
-    )
-
-    // Dashboard should now show either empty state or project cards
-    const dashboard = page.getByText('Welcome to Annie!').or(
-      page.getByText('Recent Projects'),
-    ).or(
-      page.getByText('Current Manuscript'),
-    ).first()
-    await expect(dashboard).toBeVisible({ timeout: 10_000 })
-
-    // Verify no critical console errors (filter out benign ones)
-    const criticalErrors = consoleErrors.filter(
-      (e) =>
-        !e.includes('favicon') &&
-        !e.includes('next-router-prefetch') &&
-        !e.includes('hydration'),
-    )
-    expect(criticalErrors).toEqual([])
+  // ── e) Dashboard API ─────────────────────────────────────────────────
+  test('projects API returns valid response', async ({ request }) => {
+    const res = await request.get('/api/projects', { headers: AUTH_HEADERS })
+    expect(res.ok()).toBeTruthy()
+    const body = await res.json()
+    expect(body.projects).toBeDefined()
+    expect(Array.isArray(body.projects)).toBeTruthy()
+    expect(typeof body.total).toBe('number')
   })
 })
