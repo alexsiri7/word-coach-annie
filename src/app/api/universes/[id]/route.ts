@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
+import { logger } from "@/lib/logger";
 
 export async function GET(
     request: NextRequest,
@@ -15,7 +16,8 @@ export async function GET(
         const universe = await UniversesController.getUniverse(id);
         return NextResponse.json(universe);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -33,7 +35,8 @@ export async function PATCH(
         const universe = await UniversesController.updateUniverse(id, body);
         return NextResponse.json(universe);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -50,6 +53,7 @@ export async function DELETE(
         await UniversesController.deleteUniverse(id);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
