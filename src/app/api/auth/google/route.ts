@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import crypto from "crypto";
 import { env } from "@/lib/env";
@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
  * GET /api/auth/google — Redirect to Google OAuth consent screen.
  * Requests openid + email + profile scopes for user login.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
     const clientId = env.GOOGLE_CLIENT_ID;
     const clientSecret = env.GOOGLE_CLIENT_SECRET;
     const redirectUri = env.GOOGLE_REDIRECT_URI;
@@ -44,6 +44,19 @@ export async function GET() {
             maxAge: 600, // 10 minutes
             path: "/",
         });
+
+        // Persist the post-login redirect destination (e.g. /read/...) so the
+        // callback can send the user back where they came from.
+        const from = request.nextUrl.searchParams.get("from");
+        if (from && from.startsWith("/") && !from.startsWith("//")) {
+            response.cookies.set("oauth_redirect", from, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 600,
+                path: "/",
+            });
+        }
 
         return response;
     } catch (error) {
