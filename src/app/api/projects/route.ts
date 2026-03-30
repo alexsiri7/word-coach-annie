@@ -37,21 +37,22 @@ export async function GET(request: NextRequest) {
     });
 
     // Batch: get latest content version word counts for all scenes in one query
+    // Use distinct to only fetch the latest version per scene, avoiding loading
+    // the full version history for every scene.
     const sceneIds = allScenes.map((s) => s.id);
-    const allVersions = sceneIds.length > 0
+    const latestVersions = sceneIds.length > 0
       ? await prisma.contentVersion.findMany({
           where: { nodeId: { in: sceneIds } },
           orderBy: { createdAt: "desc" },
+          distinct: ["nodeId"],
           select: { nodeId: true, wordCount: true },
         })
       : [];
 
-    // Build map: nodeId -> latest version's wordCount (first match per nodeId is latest due to orderBy)
+    // Build map: nodeId -> latest version's wordCount
     const latestWordCounts = new Map<string, number>();
-    for (const v of allVersions) {
-      if (!latestWordCounts.has(v.nodeId)) {
-        latestWordCounts.set(v.nodeId, v.wordCount ?? 0);
-      }
+    for (const v of latestVersions) {
+      latestWordCounts.set(v.nodeId, v.wordCount ?? 0);
     }
 
     // Calculate word counts per project
