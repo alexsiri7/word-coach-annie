@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
+import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
@@ -13,6 +14,11 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // Verify user has access to the target universe
+        const userId = getCurrentUserId(request);
+        const access = await verifyUniverseAccess(universeId, userId);
+        if (!access.authorized) return access.response;
 
         const result = await UniversesController.transferStoryObjectToUniverse(
             storyObjectId,

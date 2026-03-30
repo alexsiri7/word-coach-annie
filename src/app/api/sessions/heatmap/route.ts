@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { SessionsController } from "@/lib/controllers/sessions";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const heatmap = await SessionsController.getGlobalHeatmap(28);
+    const userId = getCurrentUserId(request);
+    const heatmap = await SessionsController.getGlobalHeatmap(28, userId);
     return NextResponse.json(heatmap);
   } catch (error) {
     logger.error("Failed to get heatmap", { error });

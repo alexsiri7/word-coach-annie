@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ProgressController } from "@/lib/controllers/progress";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function GET(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: projectId } = await params;
   try {
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access.response;
+
     const progress = await ProgressController.getProjectProgress(projectId);
     return NextResponse.json(progress);
   } catch (error) {

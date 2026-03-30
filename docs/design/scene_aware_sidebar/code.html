@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Annie | Scene-Aware Workspace</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,700;1,400;1,700&amp;family=Manrope:wght@400;500;600&amp;family=Inter:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#36485b",
+              "surface-container-lowest": "#ffffff",
+              "error": "#ba1a1a",
+              "surface": "#faf9f5",
+              "on-tertiary-fixed-variant": "#910807",
+              "outline-variant": "#c4c6cd",
+              "primary-container": "#2c3e50",
+              "on-primary-container": "#96a9be",
+              "tertiary-fixed-dim": "#ffb4a9",
+              "background": "#faf9f5",
+              "primary-fixed": "#d1e4fb",
+              "primary": "#162839",
+              "on-secondary": "#ffffff",
+              "inverse-on-surface": "#f2f1ed",
+              "on-surface-variant": "#43474c",
+              "surface-tint": "#4e6073",
+              "on-background": "#1b1c1a",
+              "on-tertiary-container": "#ff8372",
+              "surface-container": "#efeeea",
+              "outline": "#74777d",
+              "tertiary-fixed": "#ffdad5",
+              "surface-variant": "#e3e2df",
+              "surface-dim": "#dbdad6",
+              "inverse-primary": "#b5c8df",
+              "on-secondary-container": "#007239",
+              "on-tertiary-fixed": "#410000",
+              "surface-container-high": "#e9e8e4",
+              "secondary-fixed": "#7efba4",
+              "tertiary-container": "#800002",
+              "surface-bright": "#faf9f5",
+              "on-secondary-fixed-variant": "#005228",
+              "primary-fixed-dim": "#b5c8df",
+              "on-primary-fixed": "#091d2e",
+              "secondary-container": "#7bf8a1",
+              "on-surface": "#1b1c1a",
+              "on-error-container": "#93000a",
+              "on-primary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "secondary": "#006d37",
+              "secondary-fixed-dim": "#61de8a",
+              "surface-container-highest": "#e3e2df",
+              "tertiary": "#570001",
+              "surface-container-low": "#f4f4f0",
+              "inverse-surface": "#2f312e",
+              "on-secondary-fixed": "#00210c",
+              "on-error": "#ffffff",
+              "error-container": "#ffdad6"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Manrope", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    vertical-align: middle
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuA6xQFsoxby1et4LA7mvkBQXM07_TElAvUao2V_et1PbHrAi812lD37qTsaljvg6uAprNuK_1O0VEF2H-q2RKq4KbnVBl2dHC0RpFKmCapIXKBLeSKxUdBhm0MuZmwgl46bugFQQZc6ybWfg4ymKPddGsH_xEKd6dWbY9BqRbH8LD0vr8_KOJmA3VGdUH4biVEsIkkupKAjlgJdXJ6KeOwt2FxU6s05IV2Nt31xytEYWkNK6uW8u0saoRjDBLeubLzd1YeZxL-BFhKK);
+    opacity: 0.02;
+    pointer-events: none
+    }
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px
+    }
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent
+    }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c4c6cd;
+    border-radius: 10px
+    }</style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-secondary-container selection:text-on-secondary-container">
+<div class="fixed inset-0 grain-overlay z-50"></div>
+<!-- TopAppBar -->
+<header class="bg-[#faf9f5] dark:bg-slate-900 text-[#162839] dark:text-slate-100 font-serif italic tracking-tight leading-relaxed full-width top-0 sticky no-border space-y-4 flat no shadows z-40">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-full mx-auto">
+<div class="flex items-center gap-6">
+<span class="text-2xl font-serif italic font-bold text-[#162839] dark:text-slate-100">Annie</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Drafts</a>
+<a class="text-[#162839] dark:text-white font-bold border-b-2 border-[#162839] hover:text-[#162839] transition-colors duration-200" href="#">Library</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-surface-container rounded-full transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined">speed</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container overflow-hidden ring-1 ring-outline-variant/30">
+<img alt="Annie's expressive avatar" data-alt="Close-up portrait of a woman with a kind expression and scholarly glasses in warm, cinematic library lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD27z79ZRKPdar7fRgfyB8kbQugBOrlm8SlhaRM9XSGTBL84AkIcKPcPK9-NQL_HbAG0XNCYL4dpcYggwuJ2mojGKO3_i1gmju-u1TGJ9LHuwEgKR8wLRdAnHTUbTaW5DlHFufYzQ8MSbHYVaJlIj_-WJNaFhLPVICDaWOWc-5Kz8_vaElCPy33wcKiUzvADDNG9b9QUqAgfd-GydgHHNrNMXPcfukEBojwuiIiC1aZZ2PRiFqlkl-hObVbe_MWmFob6DKmNIEa0HT5"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-64px)] overflow-hidden">
+<!-- SideNavBar (Left) -->
+<aside class="hidden md:flex flex-col h-full p-6 space-y-8 bg-[#f4f2ed] dark:bg-slate-800/50 text-[#162839] dark:text-slate-200 font-sans text-xs uppercase tracking-widest font-semibold h-screen w-64 border-r-0 tonal-shift bg-[#f4f2ed] flat">
+<div class="flex flex-col gap-2 mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white shadow-[2px_2px_0px_#000]">
+<span class="material-symbols-outlined">psychology_alt</span>
+</div>
+<div>
+<h2 class="text-lg font-serif italic text-[#162839] dark:text-white normal-case tracking-normal lowercase first-letter:uppercase">Scene-Aware Sidebar</h2>
+<p class="text-[10px] text-slate-500 normal-case tracking-tight">Contextual Story Elements</p>
+</div>
+</div>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span>Characters</span>
+</a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined">map</span>
+<span>Locations</span>
+</a>
+<a class="flex items-center gap-3 p-3 bg-[#162839] text-white rounded-sm shadow-[2px_2px_0px_#000] active:translate-y-[1px]" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span>Beats</span>
+</a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined">psychology_alt</span>
+<span>Annie's Tips</span>
+</a>
+</nav>
+<div class="pt-4 mt-auto">
+<button class="w-full py-3 bg-primary text-white text-[10px] font-bold tracking-widest uppercase shadow-[3px_3px_0px_rgba(0,0,0,0.1)] active:translate-y-[1px] transition-all">
+                    New Scene
+                </button>
+</div>
+<div class="pt-8 border-t border-outline-variant/20">
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area (The Canvas) -->
+<main class="flex-1 overflow-y-auto bg-surface p-8 md:p-14 lg:p-20 custom-scrollbar relative">
+<div class="max-w-3xl mx-auto">
+<!-- Manuscript Header -->
+<div class="mb-16">
+<span class="text-secondary font-label uppercase tracking-[0.2em] text-[10px] font-bold mb-4 block">Chapter Twelve</span>
+<h1 class="font-headline text-5xl text-primary leading-tight italic">The Midnight Carriage</h1>
+<div class="flex gap-4 mt-6">
+<span class="bg-surface-container px-3 py-1 text-[10px] font-label font-bold uppercase tracking-wider text-primary ring-1 ring-outline-variant/30">1,240 Words</span>
+<span class="bg-surface-container px-3 py-1 text-[10px] font-label font-bold uppercase tracking-wider text-primary ring-1 ring-outline-variant/30">Revised Dec 24</span>
+</div>
+</div>
+<!-- Editor Text Simulation -->
+<div class="font-headline text-xl leading-relaxed text-on-surface-variant space-y-8 first-letter:text-6xl first-letter:font-bold first-letter:mr-3 first-letter:float-left first-letter:text-primary">
+<p>
+                        The rain against the windowpane sounded like the frantic drumming of a thousand skeletal fingers. Lord Ashbury stood before the fireplace, the dying embers casting long, dancing shadows that stretched toward Lady Eleanor as she entered the mill. The Abandoned Mill had seen better centuries, its wooden skeleton groaning under the weight of the gale.
+                    </p>
+<p>
+                        "You shouldn't have come here, Eleanor," he said, his voice as dry as the old parchment clutched in his trembling hand. "The Discovery changes everything. If the Council finds out what we found beneath the floorboards, there will be no peace for Ashbury Manor."
+                    </p>
+<p>
+                        Eleanor didn't flinch. She took a step forward, her silk gown rustling over the debris of forgotten grain. "The Confrontation is inevitable, Arthur. We cannot hide from the truth just because it is buried in dust."
+                    </p>
+<p>
+                        A sudden draft extinguished the last of the fire, plunging the room into a deep, ink-stained darkness. 
+                    </p>
+</div>
+</div>
+</main>
+<!-- Right Side: Contextual Panel (Scene-Aware Sidebar) -->
+<aside class="hidden lg:flex flex-col w-[340px] bg-surface-container-low border-l-0 p-8 space-y-12 overflow-y-auto custom-scrollbar">
+<!-- Section: In This Scene -->
+<section>
+<header class="flex items-center justify-between mb-6">
+<h3 class="font-label text-[10px] font-extrabold uppercase tracking-widest text-outline">In This Scene</h3>
+<span class="material-symbols-outlined text-outline text-sm">more_horiz</span>
+</header>
+<div class="space-y-6">
+<!-- Characters -->
+<div class="space-y-4">
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-200">
+<span class="material-symbols-outlined text-base">face</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-primary">Lord Ashbury</h4>
+<p class="text-[11px] text-slate-500">Protagonist · Nervous</p>
+</div>
+</div>
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-200">
+<span class="material-symbols-outlined text-base">face_6</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-primary">Lady Eleanor</h4>
+<p class="text-[11px] text-slate-500">Antagonist · Calm</p>
+</div>
+</div>
+</div>
+<!-- Locations -->
+<div class="pt-4 border-t border-outline-variant/10">
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary group-hover:bg-secondary group-hover:text-white transition-colors duration-200">
+<span class="material-symbols-outlined text-base">location_on</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-primary">The Abandoned Mill</h4>
+<p class="text-[11px] text-slate-500">Exterior · Rain · Night</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Annie's Advice -->
+<section class="bg-surface-container-lowest p-6 rounded-lg ring-1 ring-outline-variant/10 shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-2">
+<span class="material-symbols-outlined text-secondary text-sm">auto_awesome</span>
+</div>
+<h3 class="font-label text-[10px] font-extrabold uppercase tracking-widest text-secondary mb-4">Annie's Advice</h3>
+<div class="space-y-4">
+<p class="font-headline text-base italic text-primary leading-snug">"The atmosphere feels heavy. Perhaps it's time to reveal the parchment's contents?"</p>
+<div class="flex flex-col gap-2">
+<button class="flex items-center justify-between p-2 text-[11px] text-primary bg-surface hover:bg-surface-container transition-colors border-b border-outline-variant/20 group">
+<span>Need a plot twist?</span>
+<span class="material-symbols-outlined text-xs group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-2 text-[11px] text-primary bg-surface hover:bg-surface-container transition-colors border-b border-outline-variant/20 group">
+<span>How about a character conflict?</span>
+<span class="material-symbols-outlined text-xs group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section: Beats -->
+<section>
+<header class="flex items-center justify-between mb-6">
+<h3 class="font-label text-[10px] font-extrabold uppercase tracking-widest text-outline">Narrative Beats</h3>
+<span class="text-[10px] font-bold text-secondary">2/4 DONE</span>
+</header>
+<div class="space-y-3">
+<label class="flex items-center gap-3 p-3 bg-white/50 border border-outline-variant/10 rounded group cursor-pointer hover:bg-white transition-colors">
+<input checked="" class="rounded-sm border-outline-variant text-secondary focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-sm font-medium text-slate-400 line-through decoration-slate-300">The Discovery</span>
+</label>
+<label class="flex items-center gap-3 p-3 bg-white/50 border border-outline-variant/10 rounded group cursor-pointer hover:bg-white transition-colors">
+<input checked="" class="rounded-sm border-outline-variant text-secondary focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-sm font-medium text-slate-400 line-through decoration-slate-300">The Confrontation</span>
+</label>
+<label class="flex items-center gap-3 p-3 bg-white border border-outline-variant rounded group cursor-pointer hover:shadow-sm transition-all">
+<input class="rounded-sm border-outline-variant text-secondary focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-sm font-medium text-primary">The Secret Revealed</span>
+</label>
+<label class="flex items-center gap-3 p-3 bg-white border border-outline-variant rounded group cursor-pointer hover:shadow-sm transition-all">
+<input class="rounded-sm border-outline-variant text-secondary focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-sm font-medium text-primary">The Final Escape</span>
+</label>
+</div>
+</section>
+</aside>
+</div>
+<!-- BottomNavBar (Mobile only) -->
+<footer class="md:hidden bg-[#faf9f5]/80 backdrop-blur-md dark:bg-slate-900/80 text-[#162839] dark:text-slate-300 font-sans text-[10px] uppercase font-bold tracking-wider fixed bottom-0 w-full z-50 border-t border-[#162839]/10 shadow-inner flex justify-between items-center px-12 py-3">
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined text-lg">history_edu</span>
+<span>Word Count</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined text-lg">schedule</span>
+<span>Reading Time</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-[#006d37] font-black">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">sentiment_satisfied</span>
+<span>Annie's Mood</span>
+</div>
+</footer>
+</body></html>

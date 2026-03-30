@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
+import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function GET(
@@ -10,6 +11,10 @@ export async function GET(
     const { id: nodeId } = await params;
 
     try {
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectAccessByNode(nodeId, userId);
+        if (!access.authorized) return access.response;
+
         const annotations = await prisma.annotation.findMany({
             where: { nodeId },
             orderBy: { createdAt: "desc" },
@@ -32,6 +37,10 @@ export async function POST(
     const { id: nodeId } = await params;
 
     try {
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectAccessByNode(nodeId, userId);
+        if (!access.authorized) return access.response;
+
         const body = await request.json();
         const { content, range, selectedText } = body;
 

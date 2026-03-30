@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import crypto from "crypto";
 import { env } from "@/lib/env";
 
 /**
@@ -20,6 +21,8 @@ export async function GET() {
 
     const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
+    const state = crypto.randomUUID();
+
     const authUrl = client.generateAuthUrl({
         access_type: "offline",
         scope: [
@@ -28,7 +31,17 @@ export async function GET() {
             "https://www.googleapis.com/auth/userinfo.profile",
         ],
         prompt: "consent",
+        state,
     });
 
-    return NextResponse.redirect(authUrl);
+    const response = NextResponse.redirect(authUrl);
+    response.cookies.set("oauth_state", state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 600, // 10 minutes
+        path: "/",
+    });
+
+    return response;
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function PATCH(
@@ -9,6 +10,18 @@ export async function PATCH(
     const { id } = await params;
 
     try {
+        // Verify access via parent node
+        const annotation = await prisma.annotation.findUnique({
+            where: { id },
+            select: { nodeId: true },
+        });
+        if (!annotation) {
+            return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+        }
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectAccessByNode(annotation.nodeId, userId);
+        if (!access.authorized) return access.response;
+
         const body = await request.json();
         const { content, resolved } = body;
 
@@ -23,12 +36,12 @@ export async function PATCH(
             );
         }
 
-        const annotation = await prisma.annotation.update({
+        const updated = await prisma.annotation.update({
             where: { id },
             data: updateData,
         });
 
-        return NextResponse.json(annotation);
+        return NextResponse.json(updated);
     } catch (error) {
         logger.error("Failed to update annotation", error);
         return NextResponse.json(
@@ -45,6 +58,18 @@ export async function DELETE(
     const { id } = await params;
 
     try {
+        // Verify access via parent node
+        const annotation = await prisma.annotation.findUnique({
+            where: { id },
+            select: { nodeId: true },
+        });
+        if (!annotation) {
+            return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+        }
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectAccessByNode(annotation.nodeId, userId);
+        if (!access.authorized) return access.response;
+
         await prisma.annotation.delete({
             where: { id },
         });
