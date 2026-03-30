@@ -90,9 +90,10 @@ test.describe('Integration tests — real server, real data', () => {
       expect(patchRes.ok()).toBeTruthy()
 
       // 5. Navigate to the project page and verify the updated title
+      //    (title is in a Breadcrumbs component, not an h1)
       await page.goto(`/project/${projectId}`)
       await page.waitForSelector('main', { timeout: 20_000 })
-      await expect(page.locator('h1')).toContainText(updatedTitle, {
+      await expect(page.locator('nav, header').first()).toContainText(updatedTitle, {
         timeout: 10_000,
       })
 
@@ -277,8 +278,8 @@ test.describe('Integration tests — real server, real data', () => {
       await page.goto(`/project/${projectId}`)
       await page.waitForSelector('main', { timeout: 20_000 })
 
-      // Click the Characters tab
-      const charsTab = page.locator('button[title="Characters"]').first()
+      // Click the Characters tab (uses aria-label, not title)
+      const charsTab = page.locator('button[aria-label="Characters"]').first()
       await charsTab.waitFor({ state: 'visible', timeout: 10_000 })
       await charsTab.click()
 
@@ -323,9 +324,12 @@ test.describe('Integration tests — real server, real data', () => {
       await page.waitForSelector('main', { timeout: 20_000 })
 
       // Verify at least one project card renders
-      // Project cards use the .glass-card class or contain project titles
-      const cards = page.locator('.glass-card')
-      await expect(cards.first()).toBeVisible({ timeout: 10_000 })
+      // Project cards use bg-surface-container-low in the "Recent Projects" grid
+      // or check for the hero section "Current Manuscript" heading
+      await expect(
+        page.locator('text=Recent Projects, text=Current Manuscript').first(),
+      ).toBeVisible({ timeout: 10_000 })
+      const cards = page.locator('.bg-surface-container-low')
       const count = await cards.count()
       expect(count).toBeGreaterThanOrEqual(1)
 
