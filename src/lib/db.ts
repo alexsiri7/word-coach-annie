@@ -7,12 +7,12 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    // During next build (page data collection), DATABASE_URL may not be set.
-    // Return a client that will fail on first query rather than at construction.
-    return new PrismaClient();
-  }
-  const adapter = new PrismaPg({ connectionString });
+  // During next build (page data collection), DATABASE_URL may not be set.
+  // Use a placeholder URL so PrismaClient can be constructed; it will fail on
+  // first actual query, which is fine since builds don't query the database.
+  const adapter = new PrismaPg({
+    connectionString: connectionString || "postgresql://build:build@localhost:5432/build",
+  });
   return new PrismaClient({ adapter });
 }
 
