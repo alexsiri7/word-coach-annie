@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
   },
   manifest: "/manifest.json",
-  themeColor: "#0f172a",
+  themeColor: "#162839",
   openGraph: {
     title: "Word Coach Annie",
     description: "Local fiction writing & book management tool",

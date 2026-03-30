@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clients, type ClientRegistration } from "@/lib/oauth-store";
+import { registerClient, type ClientRegistration } from "@/lib/oauth-store";
 
 /**
  * POST /oauth/register
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     registered_at: Date.now(),
   };
 
-  clients.set(clientId, registration);
+  await registerClient(registration);
 
   return NextResponse.json(
     {
