@@ -90,10 +90,9 @@ test.describe('Integration tests — real server, real data', () => {
       expect(patchRes.ok()).toBeTruthy()
 
       // 5. Navigate to the project page and verify the updated title
-      //    (title is in a Breadcrumbs component, not an h1)
       await page.goto(`/project/${projectId}`)
       await page.waitForSelector('main', { timeout: 20_000 })
-      await expect(page.locator('nav, header').first()).toContainText(updatedTitle, {
+      await expect(page.locator('h1')).toContainText(updatedTitle, {
         timeout: 10_000,
       })
 
@@ -278,8 +277,8 @@ test.describe('Integration tests — real server, real data', () => {
       await page.goto(`/project/${projectId}`)
       await page.waitForSelector('main', { timeout: 20_000 })
 
-      // Click the Characters tab (uses aria-label, not title)
-      const charsTab = page.locator('button[aria-label="Characters"]').first()
+      // Click the Characters tab
+      const charsTab = page.locator('button[title="Characters"]').first()
       await charsTab.waitFor({ state: 'visible', timeout: 10_000 })
       await charsTab.click()
 
@@ -292,13 +291,54 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
-  // ── e) Dashboard API ─────────────────────────────────────────────────
-  test('projects API returns valid response', async ({ request }) => {
-    const res = await request.get('/api/projects', { headers: AUTH_HEADERS })
-    expect(res.ok()).toBeTruthy()
-    const body = await res.json()
-    expect(body.projects).toBeDefined()
-    expect(Array.isArray(body.projects)).toBeTruthy()
-    expect(typeof body.total).toBe('number')
+  // ── e) Dashboard rendering ──────────────────────────────────────────
+  test('dashboard renders project cards without console errors', async ({
+    page,
+    request,
+  }) => {
+    let createdProjectId: string | undefined
+
+    try {
+      // Ensure at least one project exists
+      const listRes = await request.get('/api/projects', {
+        headers: AUTH_HEADERS,
+      })
+      const listBody = await listRes.json()
+
+      if (listBody.total === 0) {
+        const project = await createProject(request, 'dashboard')
+        createdProjectId = project.id
+      }
+
+      // Collect console errors
+      const consoleErrors: string[] = []
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') {
+          consoleErrors.push(msg.text())
+        }
+      })
+
+      // Navigate to dashboard
+      await page.goto('/')
+      await page.waitForSelector('main', { timeout: 20_000 })
+
+      // Verify at least one project card renders
+      // Project cards use the .glass-card class or contain project titles
+      const cards = page.locator('.glass-card')
+      await expect(cards.first()).toBeVisible({ timeout: 10_000 })
+      const count = await cards.count()
+      expect(count).toBeGreaterThanOrEqual(1)
+
+      // Verify no critical console errors (filter out benign ones)
+      const criticalErrors = consoleErrors.filter(
+        (e) =>
+          !e.includes('favicon') &&
+          !e.includes('next-router-prefetch') &&
+          !e.includes('hydration'),
+      )
+      expect(criticalErrors).toEqual([])
+    } finally {
+      if (createdProjectId) await deleteProject(request, createdProjectId)
+    }
   })
 })
