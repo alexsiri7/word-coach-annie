@@ -94,20 +94,21 @@ const pwaConfig = withPWA({
     skipWaiting: true,
     clientsClaim: true,
     runtimeCaching: [
-      // Stale-while-revalidate for API GET requests
+      // Network-first for API routes: fresh data when online, cached when offline
       {
         urlPattern: /^\/api\/.*$/i,
-        handler: "StaleWhileRevalidate",
+        handler: "NetworkFirst",
         method: "GET",
         options: {
           cacheName: "api-cache",
           expiration: {
             maxEntries: 64,
-            maxAgeSeconds: 24 * 60 * 60, // 24 hours
+            maxAgeSeconds: 24 * 60 * 60,
           },
           cacheableResponse: {
             statuses: [0, 200],
           },
+          networkTimeoutSeconds: 5,
         },
       },
       // Cache Google Fonts stylesheets
@@ -153,7 +154,6 @@ export default withSentryConfig(withAnalyzer(pwaConfig), {
   // Upload source maps only when SENTRY_AUTH_TOKEN is set
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
 
   // Automatically tree-shake Sentry logger statements for smaller bundles
   disableLogger: true,
