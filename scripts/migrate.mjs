@@ -13,7 +13,12 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 
-const prisma = new PrismaClient();
+// Use DIRECT_DATABASE_URL for migrations (bypasses PgBouncer transaction mode
+// which doesn't support multi-statement operations or advisory locks)
+const databaseUrl = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL;
+const prisma = new PrismaClient({
+  datasources: { db: { url: databaseUrl } },
+});
 
 async function ensureMigrationsTable() {
   await prisma.$executeRawUnsafe(`
