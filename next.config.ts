@@ -44,7 +44,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // Exclude OAuth authorize from global CSP — it needs form-action *
+        // to redirect back to arbitrary MCP client callback URLs.
+        source: "/((?!oauth/authorize).*)",
         headers: [
           {
             key: "Content-Security-Policy",
