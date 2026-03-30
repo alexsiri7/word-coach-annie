@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Annie | Writing Launchpad</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,700;1,400;1,700&amp;family=Manrope:wght@400;500;600;700&amp;family=Inter:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#36485b",
+              "surface-container-lowest": "#ffffff",
+              "error": "#ba1a1a",
+              "surface": "#faf9f5",
+              "on-tertiary-fixed-variant": "#910807",
+              "outline-variant": "#c4c6cd",
+              "primary-container": "#2c3e50",
+              "on-primary-container": "#96a9be",
+              "tertiary-fixed-dim": "#ffb4a9",
+              "background": "#faf9f5",
+              "primary-fixed": "#d1e4fb",
+              "primary": "#162839",
+              "on-secondary": "#ffffff",
+              "inverse-on-surface": "#f2f1ed",
+              "on-surface-variant": "#43474c",
+              "surface-tint": "#4e6073",
+              "on-background": "#1b1c1a",
+              "on-tertiary-container": "#ff8372",
+              "surface-container": "#efeeea",
+              "outline": "#74777d",
+              "tertiary-fixed": "#ffdad5",
+              "surface-variant": "#e3e2df",
+              "surface-dim": "#dbdad6",
+              "inverse-primary": "#b5c8df",
+              "on-secondary-container": "#007239",
+              "on-tertiary-fixed": "#410000",
+              "surface-container-high": "#e9e8e4",
+              "secondary-fixed": "#7efba4",
+              "tertiary-container": "#800002",
+              "surface-bright": "#faf9f5",
+              "on-secondary-fixed-variant": "#005228",
+              "primary-fixed-dim": "#b5c8df",
+              "on-primary-fixed": "#091d2e",
+              "secondary-container": "#7bf8a1",
+              "on-surface": "#1b1c1a",
+              "on-error-container": "#93000a",
+              "on-primary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "secondary": "#006d37",
+              "secondary-fixed-dim": "#61de8a",
+              "surface-container-highest": "#e3e2df",
+              "tertiary": "#570001",
+              "surface-container-low": "#f4f4f0",
+              "inverse-surface": "#2f312e",
+              "on-secondary-fixed": "#00210c",
+              "on-error": "#ffffff",
+              "error-container": "#ffdad6"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Manrope", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    display: inline-block;
+    line-height: 1
+    }
+.ink-grain {
+    position: relative
+    }
+.ink-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDBQEyt3L8KVcz3lSvtvWI5JmQGQgyOnnp1czNjrGU3_59gNaNq5eFPrRrrkR1d9bqDjLFvMjzMtuAL7shd1_DyyGeYwf9Ja2GyXfp6u8eiuCoZIfsBL26pZV7MsMl8dcn98dZIWOg5nRXkT0R8kBBwET2ha-_4KbnoTYgiibDyU7O3MzNhH3W-5xvU5AJz9694S_jrQVk60ujcQnR7wnuKLOV167UY6xQQQCeikEmdl4DeR_3cciQ49R6rpAjJiacE2J2NWjZ3W5gD);
+    opacity: 0.03;
+    pointer-events: none;
+    z-index: 10
+    }
+.stamp-effect {
+    box-shadow: 0 0 0 1px rgba(22, 40, 57, 0.1)
+    }</style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary-container ink-grain min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-[#faf9f5] dark:bg-slate-900 text-[#162839] dark:text-slate-100 full-width top-0 sticky z-40 no-border space-y-4 flat no shadows">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-full mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-serif italic font-bold text-[#162839] dark:text-slate-100">Annie</span>
+<nav class="hidden md:flex items-center space-x-6">
+<a class="text-[#162839] dark:text-white font-bold border-b-2 border-[#162839] font-serif italic tracking-tight leading-relaxed transition-all duration-200" href="#">Drafts</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium font-serif italic tracking-tight leading-relaxed hover:text-[#162839] transition-colors duration-200" href="#">Library</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium font-serif italic tracking-tight leading-relaxed hover:text-[#162839] transition-colors duration-200" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined p-2 hover:bg-surface-container rounded-full transition-colors" data-icon="speed">speed</button>
+<div class="flex items-center gap-3 pl-2 border-l border-outline-variant/30">
+<img alt="Annie's expressive avatar" class="w-8 h-8 rounded-full object-cover" data-alt="Close-up artistic portrait of a woman with a thoughtful expression in a warm-toned, vintage photography style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMbLV4NnkVdEY4-ImxMdR1aQev24k-yrwDF84u8sreTynqxI1M1Xn7i_hdlzWtNnBfRYSMMkwA94klY_kFhugkA6KUZoxjxig7E4mshkobrXyMH-SbnYmO3nHz-NWRLiDYjxrygfUeGY0e-CmZ-l00KGv-4DHPVybv8SHIxVjVSwNJySYCo8jF-qN-T0bQ_5nUvMto_g8bqurqxZr9uHvLMzJUPZ3GvA0kzJ4_hqbp4fonxTrTVxZ9LbZtsPPXLDPN2Qt_kv4gL0cO"/>
+<span class="material-symbols-outlined text-primary" data-icon="face_6">face_6</span>
+</div>
+</div>
+</div>
+</header>
+<div class="flex max-w-[1600px] mx-auto">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-6 space-y-8 bg-[#f4f2ed] dark:bg-slate-800/50 text-[#162839] dark:text-slate-200 sticky top-16 tonal-shift flat border-r-0">
+<div>
+<h3 class="font-serif italic text-lg text-[#162839] dark:text-white mb-1">Scene-Aware Sidebar</h3>
+<p class="text-[10px] uppercase tracking-widest font-semibold opacity-60">Contextual Story Elements</p>
+</div>
+<nav class="flex-grow space-y-2">
+<button class="w-full flex items-center gap-3 px-4 py-3 bg-[#162839] text-white rounded-sm shadow-[2px_2px_0px_#000] transition-all translate-y-[1px]">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-sans text-xs uppercase tracking-widest font-semibold">Characters</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-sans text-xs uppercase tracking-widest font-semibold">Locations</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+<span class="font-sans text-xs uppercase tracking-widest font-semibold">Beats</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" data-icon="psychology_alt">psychology_alt</span>
+<span class="font-sans text-xs uppercase tracking-widest font-semibold">Annie's Tips</span>
+</button>
+</nav>
+<div class="pt-6 border-t border-outline-variant/20">
+<button class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-sans text-xs uppercase tracking-widest font-semibold">Settings</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-grow p-8 md:p-12 lg:p-16 max-w-5xl mx-auto">
+<!-- Hero Section: Resume where you left off -->
+<section class="mb-16">
+<div class="grid md:grid-cols-2 gap-12 items-center bg-surface-container-low p-8 md:p-12 rounded-lg relative overflow-hidden group">
+<div class="relative z-10">
+<span class="font-label text-xs uppercase tracking-[0.2em] text-secondary mb-4 block">Current Manuscript</span>
+<h1 class="font-headline text-5xl mb-6 leading-tight">The Amber Throne</h1>
+<p class="font-headline italic text-xl text-on-surface-variant mb-8 max-w-md">"The dust motes danced in the shaft of light, oblivious to the carnage that lay beneath the gilded seat..."</p>
+<button class="bg-primary text-on-primary px-10 py-4 flex items-center gap-3 shadow-[4px_4px_0px_#2c3e50] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all duration-200">
+<span class="font-label font-bold uppercase tracking-widest text-sm">Continue Writing</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="hidden md:block relative h-64">
+<div class="absolute inset-0 bg-surface-container-highest rounded-sm border-l-8 border-primary rotate-3 shadow-xl p-8 transition-transform group-hover:rotate-0 duration-500">
+<div class="space-y-4 opacity-40">
+<div class="h-2 bg-on-surface w-full"></div>
+<div class="h-2 bg-on-surface w-3/4"></div>
+<div class="h-2 bg-on-surface w-5/6"></div>
+<div class="h-2 bg-on-surface w-2/3"></div>
+<div class="h-2 bg-on-surface w-full"></div>
+<div class="h-2 bg-on-surface w-1/2"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Content -->
+<div class="grid lg:grid-cols-3 gap-8">
+<!-- Today's Session Tracker -->
+<div class="lg:col-span-2 bg-surface-container-lowest p-8 border border-outline-variant/10 shadow-sm">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h2 class="font-headline text-3xl mb-1">Today's Writing Session</h2>
+<p class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Momentum is your only friend</p>
+</div>
+<div class="text-right">
+<span class="font-headline text-4xl block">587</span>
+<span class="font-label text-[10px] uppercase tracking-tighter opacity-50">Words / 1,000 Target</span>
+</div>
+</div>
+<!-- Typewriter Style Progress Bar -->
+<div class="relative h-12 bg-surface-container mb-4 flex items-center px-1 overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 bg-secondary/10 transition-all duration-700" style="width: 58.7%"></div>
+<div class="flex gap-1 flex-wrap">
+<!-- Simulated typed characters/blocks -->
+<div class="w-2 h-6 bg-primary opacity-80"></div>
+<div class="w-2 h-6 bg-primary opacity-80"></div>
+<div class="w-1.5 h-6 bg-primary opacity-80"></div>
+<div class="w-2 h-6 bg-primary opacity-80"></div>
+<div class="w-2 h-6 bg-primary opacity-80"></div>
+<div class="w-1.5 h-6 bg-primary opacity-80"></div>
+<div class="w-2 h-6 bg-primary opacity-80"></div>
+<div class="w-1.5 h-6 bg-primary opacity-40"></div>
+<div class="w-2 h-6 bg-primary opacity-30"></div>
+<div class="w-1 h-6 bg-primary animate-pulse"></div>
+</div>
+</div>
+<div class="flex justify-between font-label text-[10px] uppercase font-bold tracking-tighter text-on-surface-variant">
+<span>The Prologue</span>
+<span>Chapter 1: The Call</span>
+<span class="text-secondary">Next Milestone: 750 words</span>
+</div>
+</div>
+<!-- Quick Tip from Annie -->
+<div class="bg-tertiary-container text-on-tertiary-container p-8 relative overflow-hidden flex flex-col justify-between">
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-on-tertiary-container" data-icon="psychology_alt">psychology_alt</span>
+<span class="font-label text-xs uppercase font-extrabold tracking-widest">Annie's Edge</span>
+</div>
+<blockquote class="font-headline italic text-2xl leading-tight">
+                            "If you don't write 200 words in the next 10 minutes, I might have to... remind you again!"
+                        </blockquote>
+</div>
+<div class="mt-8 flex items-center gap-3">
+<button class="bg-on-tertiary-container text-tertiary-container px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:invert transition-all">Accept Challenge</button>
+</div>
+<!-- Aesthetic Ink Splash -->
+<div class="absolute -bottom-10 -right-10 w-32 h-32 bg-on-tertiary-container opacity-5 rounded-full blur-3xl"></div>
+</div>
+<!-- Recent Projects -->
+<div class="lg:col-span-3 mt-8">
+<div class="flex items-center justify-between mb-8">
+<h2 class="font-headline text-3xl">Recent Projects</h2>
+<button class="font-label text-xs uppercase font-bold tracking-widest border-b border-primary pb-1">View All</button>
+</div>
+<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Project Card 1 -->
+<div class="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-colors cursor-pointer border-l-2 border-transparent hover:border-primary">
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary/40 group-hover:text-primary transition-colors" data-icon="book_2">book_2</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-widest opacity-40">Modified 2h ago</span>
+</div>
+<h3 class="font-headline text-2xl mb-2">Midnight in Maine</h3>
+<div class="flex items-center gap-2 mb-4">
+<span class="px-2 py-1 bg-surface-container-highest text-[9px] font-extrabold uppercase tracking-tighter stamp-effect">Thriller</span>
+<span class="px-2 py-1 bg-surface-container-highest text-[9px] font-extrabold uppercase tracking-tighter stamp-effect">42,390 Words</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant line-clamp-2">The lighthouse stood as a silent witness to the secrets kept by the jagged cliffs below...</p>
+</div>
+<!-- Project Card 2 -->
+<div class="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-colors cursor-pointer border-l-2 border-transparent hover:border-primary">
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary/40 group-hover:text-primary transition-colors" data-icon="auto_stories">auto_stories</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-widest opacity-40">Modified yesterday</span>
+</div>
+<h3 class="font-headline text-2xl mb-2">Neon Embers</h3>
+<div class="flex items-center gap-2 mb-4">
+<span class="px-2 py-1 bg-surface-container-highest text-[9px] font-extrabold uppercase tracking-tighter stamp-effect">Sci-Fi</span>
+<span class="px-2 py-1 bg-surface-container-highest text-[9px] font-extrabold uppercase tracking-tighter stamp-effect">12,105 Words</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant line-clamp-2">In a city where rain washed away memories, Elias was the only one who dared to record them.</p>
+</div>
+<!-- New Project CTA -->
+<div class="border-2 border-dashed border-outline-variant flex flex-col items-center justify-center p-6 hover:bg-surface-container transition-colors group cursor-pointer min-h-[220px]">
+<span class="material-symbols-outlined text-4xl text-outline mb-4 group-hover:scale-110 transition-transform" data-icon="add_circle">add_circle</span>
+<span class="font-label text-xs uppercase font-extrabold tracking-widest text-on-surface-variant">Start a New Journey</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar -->
+<footer class="md:hidden bg-[#faf9f5]/80 backdrop-blur-md dark:bg-slate-900/80 fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-3 z-50 border-t border-[#162839]/10 shadow-inner">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[#006d37]" data-icon="history_edu" style="font-variation-settings: 'FILL' 1;">history_edu</span>
+<span class="font-sans text-[10px] uppercase font-black tracking-wider text-[#006d37]">Word Count</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-slate-500" data-icon="schedule">schedule</span>
+<span class="font-sans text-[10px] uppercase font-bold tracking-wider text-slate-500">Reading Time</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-slate-500" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+<span class="font-sans text-[10px] uppercase font-bold tracking-wider text-slate-500">Annie's Mood</span>
+</div>
+</footer>
+<!-- Visual Polish: Floating Action (Contextual) -->
+<div class="fixed bottom-8 right-8 hidden lg:block">
+<button class="bg-secondary text-on-secondary w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform group">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+<div class="absolute right-full mr-4 bg-primary text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Open Editor</div>
+</button>
+</div>
+</body></html>
