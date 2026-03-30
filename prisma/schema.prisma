@@ -267,6 +267,7 @@ model WritingSession {
 
   @@index([projectId, date])
   @@index([date])
+  @@index([nodeId])
 }
 
 model OAuthClient {
