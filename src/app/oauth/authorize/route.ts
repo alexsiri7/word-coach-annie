@@ -99,6 +99,12 @@ export async function POST(request: NextRequest) {
     redirectUrl.searchParams.set("state", state);
   }
 
+  // For localhost redirects (CLI tools via SSH, etc.), show the code on a page
+  // so the user can copy it manually if the redirect can't reach the local server.
+  if (redirectUrl.hostname === "localhost" || redirectUrl.hostname === "127.0.0.1") {
+    return renderCodePage(authCode.code, redirectUrl.toString());
+  }
+
   return NextResponse.redirect(redirectUrl.toString(), 303);
 }
 
@@ -207,6 +213,100 @@ function redirectToLogin(request: NextRequest): NextResponse {
   const fullPath = request.nextUrl.pathname + request.nextUrl.search;
   loginUrl.searchParams.set("from", fullPath);
   return NextResponse.redirect(loginUrl.toString());
+}
+
+/**
+ * Render a page that shows the authorization code for manual copy
+ * and also attempts an automatic redirect (works when localhost is reachable).
+ */
+function renderCodePage(code: string, redirectUrl: string): NextResponse {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Authorization Code - Annie</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      max-width: 480px;
+      width: 100%;
+      padding: 2rem;
+      text-align: center;
+    }
+    .logo { font-size: 1.75rem; font-weight: 700; color: #6366f1; margin-bottom: 1rem; }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .description { color: #64748b; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+    .code-box {
+      background: #f1f5f9;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+      user-select: all;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      transition: border-color 0.15s;
+    }
+    .code-box:hover { border-color: #6366f1; }
+    .copy-btn {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .copy-btn:hover { opacity: 0.85; }
+    .copied { color: #16a34a; font-size: 0.85rem; margin-top: 0.75rem; display: none; }
+    .redirect-note { color: #94a3b8; font-size: 0.8rem; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Annie</div>
+    <h1>Authorization Approved</h1>
+    <p class="description">Copy this code and paste it back into your CLI tool.</p>
+    <div class="code-box" id="code" title="Click to select">${escapeHtml(code)}</div>
+    <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+    <p class="copied" id="copied">Copied to clipboard!</p>
+    <p class="redirect-note">Attempting automatic redirect...</p>
+  </div>
+  <script>
+    function copyCode() {
+      navigator.clipboard.writeText(${JSON.stringify(code)}).then(function() {
+        document.getElementById('copied').style.display = 'block';
+        document.querySelector('.copy-btn').textContent = 'Copied!';
+      });
+    }
+    // Try the redirect anyway — works if localhost is reachable
+    setTimeout(function() { window.location.href = ${JSON.stringify(redirectUrl)}; }, 500);
+  </script>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 /** Render an inline HTML consent page. */

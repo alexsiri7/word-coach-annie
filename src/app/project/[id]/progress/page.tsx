@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, Play, Zap, Calendar, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -240,6 +240,60 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
                       {progress.totalScenes} scenes
                     </span>
                   </div>
+
+                  {/* Writing Pace */}
+                  {progress.pace && progress.pace.avgDailyWords > 0 && (
+                    <section className="mt-8 bg-surface-overlay/60 p-6 md:p-8 border-l-4 border-accent/20">
+                      <h3 className="font-editorial text-lg font-semibold italic text-text-primary mb-5">
+                        Writing Pace
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Zap className="h-4 w-4 text-accent shrink-0" />
+                          <div>
+                            <p className="label-md text-[9px] font-bold tracking-widest text-text-muted mb-0.5">
+                              Avg Daily Output
+                            </p>
+                            <p className="font-editorial text-xl font-bold text-accent tabular-nums">
+                              {formatWords(progress.pace.avgDailyWords)}
+                              <span className="text-sm text-text-muted font-normal ml-1">words/day</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-4 w-4 text-accent shrink-0" />
+                          <div>
+                            <p className="label-md text-[9px] font-bold tracking-widest text-text-muted mb-0.5">
+                              Active Days
+                            </p>
+                            <p className="font-editorial text-xl font-bold text-text-primary tabular-nums">
+                              {progress.pace.activeDays}
+                              <span className="text-sm text-text-muted font-normal ml-1">of 28</span>
+                            </p>
+                          </div>
+                        </div>
+                        {progress.pace.estimatedDaysRemaining !== null && (
+                          <div className="flex items-center gap-3">
+                            <TrendingUp className="h-4 w-4 text-success shrink-0" />
+                            <div>
+                              <p className="label-md text-[9px] font-bold tracking-widest text-text-muted mb-0.5">
+                                Est. Completion
+                              </p>
+                              <p className="font-editorial text-xl font-bold text-text-primary tabular-nums">
+                                ~{progress.pace.estimatedDaysRemaining}
+                                <span className="text-sm text-text-muted font-normal ml-1">
+                                  {progress.pace.estimatedDaysRemaining === 1 ? "day" : "days"}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="label-md text-[9px] tracking-widest text-text-muted mt-4">
+                        Based on 4 weeks of writing sessions
+                      </p>
+                    </section>
+                  )}
                 </div>
               </div>
             </div>

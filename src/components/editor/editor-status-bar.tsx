@@ -8,6 +8,7 @@ interface EditorStatusBarProps {
   lastSaved: string | null;
   sessionWordsWritten?: number;
   sessionDurationSeconds?: number;
+  sessionWordsPerHour?: number;
   sessionActive?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function EditorStatusBar({
   lastSaved,
   sessionWordsWritten = 0,
   sessionDurationSeconds = 0,
+  sessionWordsPerHour = 0,
   sessionActive = false,
 }: EditorStatusBarProps) {
   const readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 238));
@@ -57,6 +59,11 @@ export function EditorStatusBar({
                 ? `${sessionDurationSeconds}s`
                 : `${Math.round(sessionDurationSeconds / 60)} min`}
             </span>
+            {sessionWordsPerHour > 0 && sessionDurationSeconds >= 60 && (
+              <span className="text-text-muted tabular-nums">
+                ({sessionWordsPerHour.toLocaleString()} wph)
+              </span>
+            )}
           </div>
         )}
       </div>
