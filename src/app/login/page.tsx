@@ -5,6 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+function sanitizeRedirect(from: string | null): string {
+    if (!from) return "/";
+    if (!from.startsWith("/") || from.startsWith("//") || from.includes("://"))
+        return "/";
+    return from;
+}
+
 function LoginForm() {
     const [token, setToken] = useState("");
     const [error, setError] = useState("");
@@ -26,7 +33,7 @@ function LoginForm() {
             });
 
             if (res.ok) {
-                const from = searchParams.get("from") || "/";
+                const from = sanitizeRedirect(searchParams.get("from"));
                 router.push(from);
             } else {
                 const data = await res.json().catch(() => null);
