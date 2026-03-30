@@ -10,11 +10,7 @@ import {
   PenLine,
   Sparkles,
   Globe,
-  Users,
-  MapPin,
-  ListChecks,
   Lightbulb,
-  Settings,
   ArrowRight,
   BookText,
   CirclePlus,
@@ -74,16 +70,6 @@ interface Project {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sidebar nav items                                                  */
-/* ------------------------------------------------------------------ */
-const sidebarItems = [
-  { icon: Users, label: "Characters", active: true },
-  { icon: MapPin, label: "Locations", active: false },
-  { icon: ListChecks, label: "Beats", active: false },
-  { icon: Lightbulb, label: "Annie\u2019s Tips", active: false },
-] as const;
-
-/* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 function formatDate(dateStr: string) {
@@ -125,7 +111,6 @@ export default function Dashboard() {
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
-  const [activeSidebarItem, setActiveSidebarItem] = useState("Characters");
 
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
@@ -196,21 +181,12 @@ export default function Dashboard() {
               Annie
             </span>
             <nav className="hidden md:flex items-center space-x-6">
-              <a
-                href="#"
-                className="font-headline italic text-text-primary font-bold border-b-2 border-text-primary tracking-tight leading-relaxed transition-all duration-200"
-              >
-                Drafts
-              </a>
               <button
                 onClick={() => router.push("/universe")}
                 className="font-headline italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200"
               >
                 Library
               </button>
-              <span className="font-headline italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200 cursor-pointer">
-                Archive
-              </span>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -220,52 +196,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ── Main Layout: Sidebar + Content ─────────────────── */}
-      <div className="flex max-w-[1600px] mx-auto">
-        {/* ── Scene-Aware Sidebar ──────────────────────────── */}
-        <aside className="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-6 space-y-8 bg-surface-container-low sticky top-16">
-          <div>
-            <h3 className="font-headline italic text-lg text-text-primary mb-1">
-              Scene-Aware Sidebar
-            </h3>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-text-muted">
-              Contextual Story Elements
-            </p>
-          </div>
-          <nav className="flex-grow space-y-2">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeSidebarItem === item.label;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => setActiveSidebarItem(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all ${
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-[2px_2px_0px_#000] translate-y-[1px]"
-                      : "text-on-surface-variant hover:bg-surface-container-high"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-label text-xs uppercase tracking-widest font-semibold">
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-          <div className="pt-6 border-t border-outline-variant/20">
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors">
-              <Settings className="h-5 w-5" />
-              <span className="font-label text-xs uppercase tracking-widest font-semibold">
-                Settings
-              </span>
-            </button>
-          </div>
-        </aside>
-
-        {/* ── Content Area ─────────────────────────────────── */}
-        <div className="flex-grow p-8 md:p-12 lg:p-16 max-w-5xl mx-auto">
+      {/* ── Main Content ──────────────────────────────────── */}
+      <div className="max-w-[1600px] mx-auto">
+        <div className="p-8 md:p-12 lg:p-16 max-w-5xl mx-auto">
           {loading ? (
             /* ── Loading skeleton ─────────────────────────── */
             <div className="space-y-14">
@@ -467,11 +400,6 @@ export default function Dashboard() {
                     <blockquote className="font-headline italic text-2xl leading-tight">
                       &ldquo;If you don&apos;t write 200 words in the next 10 minutes, I might have to&hellip; remind you again!&rdquo;
                     </blockquote>
-                  </div>
-                  <div className="mt-8 flex items-center gap-3">
-                    <button className="bg-on-tertiary-container text-tertiary-container px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:opacity-80 transition-all">
-                      Accept Challenge
-                    </button>
                   </div>
                   {/* Decorative ink splash */}
                   <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-on-tertiary-container opacity-5 rounded-full blur-3xl" />
