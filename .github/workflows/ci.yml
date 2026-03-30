@@ -122,7 +122,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Push database schema
-        run: npx prisma db push --accept-data-loss
+        run: npx prisma db push --accept-data-loss --url "$DATABASE_URL"
 
       - name: Build Next.js
         run: npm run build
