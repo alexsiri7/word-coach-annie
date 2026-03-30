@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { exportProjectJson } from "@/lib/export-json";
+import { logger } from "@/lib/logger";
 
 interface OutlineNode {
   id: string;
@@ -310,71 +311,79 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(id, userId);
-  if (!access.authorized) return access.response;
+  try {
+    const { id } = await params;
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(id, userId);
+    if (!access.authorized) return access.response;
 
-  const searchParams = request.nextUrl.searchParams;
+    const searchParams = request.nextUrl.searchParams;
 
-  // Accept both "format" and "type" params for compatibility
-  const format = searchParams.get("format") || searchParams.get("type") || "full";
+    // Accept both "format" and "type" params for compatibility
+    const format = searchParams.get("format") || searchParams.get("type") || "full";
 
-  // Parse export options
-  const options: ExportOptions = {
-    includeSynopsis: searchParams.get("includeSynopsis") !== "false",
-    includeSceneBreaks: searchParams.get("includeSceneBreaks") !== "false",
-    chapterNumbering: searchParams.get("chapterNumbering") !== "false",
-  };
+    // Parse export options
+    const options: ExportOptions = {
+      includeSynopsis: searchParams.get("includeSynopsis") !== "false",
+      includeSceneBreaks: searchParams.get("includeSceneBreaks") !== "false",
+      chapterNumbering: searchParams.get("chapterNumbering") !== "false",
+    };
 
-  const project = await prisma.project.findUnique({ where: { id } });
-  if (!project) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
-  }
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
 
-  // Map aliases: "manuscript" -> "full", "story-bible" -> "bible"
-  let resolvedFormat = format;
-  if (format === "manuscript") resolvedFormat = "full";
-  if (format === "story-bible") resolvedFormat = "bible";
+    // Map aliases: "manuscript" -> "full", "story-bible" -> "bible"
+    let resolvedFormat = format;
+    if (format === "manuscript") resolvedFormat = "full";
+    if (format === "story-bible") resolvedFormat = "bible";
 
-  // JSON export
-  if (resolvedFormat === "json") {
-    const data = await exportProjectJson(id);
-    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.json`;
-    return new NextResponse(JSON.stringify(data, null, 2), {
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
-    });
-  }
+    // JSON export
+    if (resolvedFormat === "json") {
+      const data = await exportProjectJson(id);
+      const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.json`;
+      return new NextResponse(JSON.stringify(data, null, 2), {
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    }
 
-  if (resolvedFormat === "bible") {
-    const markdown = await exportStoryBible(id, project.title);
-    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}_story_bible.md`;
+    if (resolvedFormat === "bible") {
+      const markdown = await exportStoryBible(id, project.title);
+      const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}_story_bible.md`;
+      return new NextResponse(markdown, {
+        headers: {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    }
+
+    if (resolvedFormat === "chapters") {
+      const outline = await buildOutlineTree(id);
+      const chapters = exportChapters(project, outline, options);
+      return NextResponse.json({ chapters });
+    }
+
+    // Default: full manuscript
+    const outline = await buildOutlineTree(id);
+    const markdown = exportFullManuscript(project, outline, options);
+    const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`;
+
     return new NextResponse(markdown, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
+  } catch (error) {
+    logger.error("GET /api/projects/[id]/export error", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
-
-  if (resolvedFormat === "chapters") {
-    const outline = await buildOutlineTree(id);
-    const chapters = exportChapters(project, outline, options);
-    return NextResponse.json({ chapters });
-  }
-
-  // Default: full manuscript
-  const outline = await buildOutlineTree(id);
-  const markdown = exportFullManuscript(project, outline, options);
-  const filename = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`;
-
-  return new NextResponse(markdown, {
-    headers: {
-      "Content-Type": "text/markdown; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
 }
