@@ -192,21 +192,22 @@
     background: hsl(var(--surface-raised) / 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: none;
-    border-radius: 1rem;
+    border: 1px solid hsl(var(--border) / 0.15);
+    border-radius: 0.25rem;
     transition: all 0.2s ease;
   }
 
   .glass-card:hover {
-    box-shadow: 0 8px 32px hsl(var(--text-primary) / 0.04);
+    box-shadow: 0 24px 40px hsl(var(--text-primary) / 0.05);
   }
 
   .dark .glass-card {
     background: hsl(var(--surface-raised) / 0.7);
+    border-color: hsl(var(--border) / 0.15);
   }
 
   .dark .glass-card:hover {
-    box-shadow: 0 8px 32px hsl(0 0% 0% / 0.15);
+    box-shadow: 0 24px 40px hsl(0 0% 0% / 0.12);
   }
 
   /* Ghost border — accessibility boundary at 15% opacity */
@@ -222,14 +223,52 @@
         hsl(var(--accent)));
   }
 
-  /* Tag pill */
+  /* Tag pill — stamp chip style (square, not rounded pills) */
   .tag-pill {
     background: hsl(var(--surface-overlay));
     color: hsl(var(--text-secondary));
     padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
+    border-radius: 0;
     font-size: 0.75rem;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid hsl(var(--border) / 0.15);
+  }
+
+  /* Stamp chip — square metadata tags */
+  .stamp-chip {
+    display: inline-flex;
+    align-items: center;
+    background: hsl(var(--surface-overlay));
+    color: hsl(var(--text-secondary));
+    padding: 0.125rem 0.5rem;
+    border-radius: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid hsl(var(--border) / 0.15);
+  }
+
+  /* Annie's coaching cards — no dividers, tonal differentiation */
+  .coaching-card-intense {
+    background: hsl(var(--surface-sunken));
+    border: none;
+    border-radius: 0.25rem;
+    padding: 1.5rem;
+  }
+
+  .coaching-card-positive {
+    background: hsl(var(--accent-muted));
+    border: none;
+    border-radius: 0.25rem;
+    padding: 1.5rem;
+  }
+
+  .coaching-card-intense > * + *,
+  .coaching-card-positive > * + * {
+    margin-top: 1.5rem;
   }
 
   /* Status dots */
