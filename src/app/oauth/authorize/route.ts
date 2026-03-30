@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
-import { clients, createAuthCode } from "@/lib/oauth-store";
+import { getClient, createAuthCode } from "@/lib/oauth-store";
 
 /**
  * GET /oauth/authorize
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validate client_id
-  const client = clients.get(clientId);
+  const client = await getClient(clientId);
   if (!client) {
     return NextResponse.json(
       { error: "invalid_client", error_description: "Unknown client_id" },
