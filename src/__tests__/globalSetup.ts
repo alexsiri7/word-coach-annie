@@ -9,7 +9,7 @@ export function setup() {
   if (!TEST_DATABASE_URL) {
     throw new Error("TEST_DATABASE_URL or DATABASE_URL must be set for tests");
   }
-  execSync("npx prisma db push --skip-generate --accept-data-loss", {
+  execSync("npx prisma db push --accept-data-loss --url " + JSON.stringify(TEST_DATABASE_URL), {
     env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL, DIRECT_DATABASE_URL: TEST_DATABASE_URL },
     stdio: "inherit",
   });

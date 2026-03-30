@@ -8,8 +8,13 @@ export default {
   migrate: {
     async development() {
       return {
-        url: process.env.DATABASE_URL!,
-        directUrl: process.env.DIRECT_DATABASE_URL,
+        url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL!,
+        shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
+      };
+    },
+    async production() {
+      return {
+        url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL!,
       };
     },
   },
