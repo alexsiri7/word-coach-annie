@@ -305,7 +305,11 @@ function renderCodePage(code: string, redirectUrl: string): NextResponse {
 
   return new NextResponse(html, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action *",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -405,7 +409,11 @@ function renderConsentPage(
 
   return new NextResponse(html, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action *",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
