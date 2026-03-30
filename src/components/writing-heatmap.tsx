@@ -22,7 +22,12 @@ function intensityClass(intensity: number): string {
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function WritingHeatmap() {
+interface WritingHeatmapProps {
+  /** "default" renders with glass-card wrapper; "embedded" renders just the grid */
+  variant?: "default" | "embedded";
+}
+
+export function WritingHeatmap({ variant = "default" }: WritingHeatmapProps) {
   const [days, setDays] = useState<HeatmapDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalWords, setTotalWords] = useState(0);
@@ -71,6 +76,57 @@ export function WritingHeatmap() {
     }
   }
 
+  const gridContent = (
+    <div className="flex gap-1 overflow-x-auto pb-1">
+      {/* Day-of-week labels */}
+      <div className="flex flex-col gap-0.5 mr-1 shrink-0">
+        <div className="h-4" /> {/* spacer for month label row */}
+        {DAY_LABELS.map((label, i) => (
+          <div
+            key={i}
+            className={`h-[10px] w-4 text-[8px] text-text-muted flex items-center ${
+              i % 2 === 0 ? "opacity-0" : ""
+            }`}
+          >
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* Weeks */}
+      {weeks.map((week, wi) => {
+        const monthLabel = monthLabels.find((m) => m.col === wi);
+        return (
+          <div key={wi} className="flex flex-col gap-0.5 shrink-0">
+            {/* Month label row */}
+            <div className="h-4 text-[9px] text-text-muted leading-4 w-[10px] whitespace-nowrap">
+              {monthLabel ? monthLabel.label : ""}
+            </div>
+            {week.map((day, di) => {
+              if (!day) {
+                return <div key={di} className="h-[10px] w-[10px] rounded-sm" />;
+              }
+              const intensity = getIntensity(day.wordsWritten);
+              return (
+                <div
+                  key={di}
+                  className={`h-[10px] w-[10px] rounded-sm transition-colors ${intensityClass(intensity)}`}
+                  title={`${day.date}: ${day.wordsWritten.toLocaleString()} words`}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Embedded variant: just the grid, no wrapper
+  if (variant === "embedded") {
+    return gridContent;
+  }
+
+  // Default variant: glass-card wrapper with header
   return (
     <div className="glass-card p-5 mt-6">
       <div className="flex items-center justify-between mb-3">
@@ -81,48 +137,7 @@ export function WritingHeatmap() {
         </span>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {/* Day-of-week labels */}
-        <div className="flex flex-col gap-0.5 mr-1 shrink-0">
-          <div className="h-4" /> {/* spacer for month label row */}
-          {DAY_LABELS.map((label, i) => (
-            <div
-              key={i}
-              className={`h-[10px] w-4 text-[8px] text-text-muted flex items-center ${
-                i % 2 === 0 ? "opacity-0" : ""
-              }`}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-
-        {/* Weeks */}
-        {weeks.map((week, wi) => {
-          const monthLabel = monthLabels.find((m) => m.col === wi);
-          return (
-            <div key={wi} className="flex flex-col gap-0.5 shrink-0">
-              {/* Month label row */}
-              <div className="h-4 text-[9px] text-text-muted leading-4 w-[10px] whitespace-nowrap">
-                {monthLabel ? monthLabel.label : ""}
-              </div>
-              {week.map((day, di) => {
-                if (!day) {
-                  return <div key={di} className="h-[10px] w-[10px] rounded-sm" />;
-                }
-                const intensity = getIntensity(day.wordsWritten);
-                return (
-                  <div
-                    key={di}
-                    className={`h-[10px] w-[10px] rounded-sm transition-colors ${intensityClass(intensity)}`}
-                    title={`${day.date}: ${day.wordsWritten.toLocaleString()} words`}
-                  />
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+      {gridContent}
     </div>
   );
 }
