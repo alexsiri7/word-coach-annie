@@ -58,7 +58,7 @@ const nextConfig: NextConfig = {
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
-              "form-action 'self' https://annie.interstellarai.net",
+              "form-action *",
             ].join("; "),
           },
           {

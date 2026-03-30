@@ -1,0 +1,158 @@
+name: Production Deploy Check
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: Post-Deploy Health Check
+    runs-on: ubuntu-latest
+    # Only run after successful CI on master (or manual trigger)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      healthy: ${{ steps.check.outputs.healthy }}
+      status: ${{ steps.check.outputs.status }}
+    steps:
+      - name: Wait for Railway deploy
+        run: |
+          echo "Waiting 180s for Railway production deploy..."
+          sleep 180
+
+      - name: Health check with retries
+        id: check
+        run: |
+          HEALTH_URL="https://annie.interstellarai.net/api/health"
+          for i in 1 2 3 4 5; do
+            BODY=$(curl -s --max-time 15 "$HEALTH_URL" || echo '{"status":"unreachable"}')
+            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            echo "Attempt $i: status=$STATUS body=$BODY"
+
+            if [ "$STATUS" = "ok" ]; then
+              echo "healthy=true" >> "$GITHUB_OUTPUT"
+              echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+              echo "Production health check passed"
+              exit 0
+            fi
+
+            if [ "$i" -lt 5 ]; then
+              echo "Retrying in 30s..."
+              sleep 30
+            fi
+          done
+
+          echo "healthy=false" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "::error::Production health check failed after 5 attempts (status: $STATUS)"
+
+  rollback:
+    name: Rollback Deploy
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: needs.health-check.outputs.healthy == 'false'
+    steps:
+      - name: Attempt Railway rollback
+        id: rollback
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN not set, skipping automated rollback"
+            echo "rollback_attempted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Fetching latest deployments..."
+          # Get the two most recent deployments via Railway GraphQL API
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\" }, first: 2) { edges { node { id status } } } }\"
+            }")
+
+          echo "Deployments response: $RESPONSE"
+
+          CURRENT_ID=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.id // empty')
+          if [ -z "$CURRENT_ID" ]; then
+            echo "::warning::Could not find current deployment to rollback"
+            echo "rollback_attempted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Rolling back deployment $CURRENT_ID..."
+          ROLLBACK=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"mutation { deploymentRollback(id: \\\"$CURRENT_ID\\\") }\"
+            }")
+
+          echo "Rollback response: $ROLLBACK"
+
+          ERRORS=$(echo "$ROLLBACK" | jq -r '.errors // empty')
+          if [ -n "$ERRORS" ] && [ "$ERRORS" != "null" ]; then
+            echo "::warning::Rollback API returned errors: $ERRORS"
+            echo "rollback_attempted=true" >> "$GITHUB_OUTPUT"
+            echo "rollback_succeeded=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Rollback initiated successfully"
+            echo "rollback_attempted=true" >> "$GITHUB_OUTPUT"
+            echo "rollback_succeeded=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create failure issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.health-check.outputs.status }}';
+            const rollbackAttempted = '${{ steps.rollback.outputs.rollback_attempted }}' === 'true';
+            const rollbackSucceeded = '${{ steps.rollback.outputs.rollback_succeeded }}' === 'true';
+            const sha = context.sha || context.payload?.workflow_run?.head_sha || 'unknown';
+            const shortSha = sha.substring(0, 7);
+
+            let rollbackSection;
+            if (rollbackSucceeded) {
+              rollbackSection = '**Automatic rollback was initiated.** Verify production is healthy.';
+            } else if (rollbackAttempted) {
+              rollbackSection = '**Automatic rollback was attempted but may have failed.** Manual intervention required.';
+            } else {
+              rollbackSection = '**Automatic rollback was not attempted** (RAILWAY_TOKEN not configured). Manual rollback required.';
+            }
+
+            const body = [
+              `## Production Deploy Failed`,
+              ``,
+              `Health check returned \`${status}\` after deploy of ${shortSha}.`,
+              ``,
+              rollbackSection,
+              ``,
+              `### Manual rollback steps`,
+              `1. Go to [Railway Dashboard](https://railway.app) → Annie project → Deployments`,
+              `2. Find the last known-good deployment and click "Rollback"`,
+              `3. Or revert the commit: \`git revert ${shortSha} && git push origin master\``,
+              ``,
+              `### Investigation`,
+              `- Check [production health](https://annie.interstellarai.net/api/health)`,
+              `- Check Railway deploy logs`,
+              `- Check Supabase dashboard for DB issues`,
+              ``,
+              `Triggered by workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Production deploy failed — health check ${status} (${shortSha})`,
+              body: body,
+              labels: ['bug', 'production'],
+            });
