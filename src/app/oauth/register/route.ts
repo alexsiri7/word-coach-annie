@@ -40,13 +40,27 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    let parsed: URL;
     try {
-      new URL(uri);
+      parsed = new URL(uri);
     } catch {
       return NextResponse.json(
         {
           error: "invalid_client_metadata",
           error_description: `Invalid redirect_uri: ${uri}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Only allow localhost redirect URIs (standard for MCP clients)
+    const host = parsed.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1") {
+      return NextResponse.json(
+        {
+          error: "invalid_client_metadata",
+          error_description:
+            "redirect_uris must use localhost (localhost, 127.0.0.1, or ::1)",
         },
         { status: 400 }
       );
