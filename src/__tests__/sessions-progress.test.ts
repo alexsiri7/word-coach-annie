@@ -28,6 +28,11 @@ vi.mock("next/server", () => ({
   },
 }));
 
+vi.mock("@/lib/api-auth", () => ({
+  getCurrentUserId: vi.fn().mockReturnValue(null),
+  verifyProjectAccess: vi.fn().mockResolvedValue({ authorized: true, project: { id: "test", userId: null }, role: null }),
+}));
+
 function mockParams<T>(params: T): { params: Promise<T> } {
   return { params: Promise.resolve(params) };
 }
@@ -195,7 +200,7 @@ describe("Sessions API routes", () => {
 
   it("GET /api/sessions/heatmap returns 28 days", async () => {
     const { GET } = await import("@/app/api/sessions/heatmap/route");
-    const res = await GET();
+    const res = await GET(new MockNextRequest("http://localhost/api/sessions/heatmap") as any);
     expect((res as any).status || 200).toBe(200);
     const body = await (res as any).json();
     expect(Array.isArray(body)).toBe(true);

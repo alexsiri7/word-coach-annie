@@ -61,13 +61,18 @@ export class SessionsController {
     return aggregateHeatmap(sessions, days);
   }
 
-  static async getGlobalHeatmap(days = 28): Promise<HeatmapDay[]> {
+  static async getGlobalHeatmap(days = 28, userId?: string | null): Promise<HeatmapDay[]> {
     const since = new Date();
     since.setDate(since.getDate() - days);
     const sinceDate = since.toISOString().slice(0, 10);
 
+    const where: Record<string, unknown> = { date: { gte: sinceDate } };
+    if (userId) {
+      where.project = { userId };
+    }
+
     const sessions = await prisma.writingSession.findMany({
-      where: { date: { gte: sinceDate } },
+      where,
       select: { date: true, wordsWritten: true },
     });
 

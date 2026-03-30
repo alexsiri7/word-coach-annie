@@ -1,5 +1,6 @@
 import { TimelineController } from "@/lib/controllers/timeline";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
 ) {
     try {
         const { projectId } = await params;
+
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectAccess(projectId, userId);
+        if (!access.authorized) return access.response;
+
         const data = await TimelineController.getTimelineData(projectId);
         return NextResponse.json(data);
     } catch (error) {
