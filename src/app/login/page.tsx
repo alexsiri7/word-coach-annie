@@ -61,7 +61,7 @@ function LoginForm() {
                 className="w-full"
                 asChild
             >
-                <a href="/api/auth/google">
+                <a href={`/api/auth/google${searchParams.get("from") ? `?from=${encodeURIComponent(searchParams.get("from")!)}` : ""}`}>
                     Sign in with Google
                 </a>
             </Button>

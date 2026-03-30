@@ -111,11 +111,22 @@ export async function GET(request: NextRequest) {
             picture: user.picture || undefined,
         });
 
-        // Redirect to home with session cookie
+        // Redirect to the original page (if set) or home
         // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
         const baseUrl = new URL(redirectUri).origin;
-        const response = NextResponse.redirect(new URL("/", baseUrl));
-        // Clear the OAuth state cookie
+        const redirectTo = request.cookies.get("oauth_redirect")?.value;
+        const destination = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+            ? redirectTo
+            : "/";
+        const response = NextResponse.redirect(new URL(destination, baseUrl));
+        // Clear the OAuth state and redirect cookies
+        response.cookies.set("oauth_redirect", "", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 0,
+            path: "/",
+        });
         response.cookies.set("oauth_state", "", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
