@@ -23,6 +23,9 @@ import { ConsistencyAlertsPanel } from "@/components/editor/consistency-alerts-p
 import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
 import { TimelineStrip } from "@/components/timeline/timeline-strip";
 import { InlineAiActionBar } from "@/components/inline-ai-action-bar";
+import { EditorStatusBar } from "@/components/editor/editor-status-bar";
+import { AnnieCritiquePanel } from "@/components/editor/annie-critique-panel";
+import { SceneContextSidebar } from "@/components/editor/scene-context-sidebar";
 import { useWritingSession } from "@/hooks/use-writing-session";
 
 interface TimelineSceneItem {
@@ -66,6 +69,8 @@ export function SceneEditor({
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
   const [consistencyAlertCount, _setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
+  const [showCritiquePanel, setShowCritiquePanel] = useState(false);
+  const [showSceneContext, setShowSceneContext] = useState(false);
   const [nextScenePrompt, setNextScenePrompt] = useState<{
     id: string;
     title: string;
@@ -396,6 +401,10 @@ export function SceneEditor({
         consistencyAlertCount={consistencyAlertCount}
         onToggleVoiceMonitor={() => setShowVoiceMonitor((v) => !v)}
         showVoiceMonitor={showVoiceMonitor}
+        onToggleCritiquePanel={() => setShowCritiquePanel((v) => !v)}
+        showCritiquePanel={showCritiquePanel}
+        onToggleSceneContext={() => setShowSceneContext((v) => !v)}
+        showSceneContext={showSceneContext}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
@@ -421,6 +430,20 @@ export function SceneEditor({
 
           {/* Editor */}
           <div className="flex-1 overflow-y-auto tiptap-editor relative">
+            {/* Manuscript Header */}
+            <div className="px-12 pt-10 pb-2 max-w-3xl mx-auto">
+              <h1 className="font-editorial text-3xl md:text-4xl text-text-primary leading-tight italic">
+                {node.title}
+              </h1>
+              <div className="flex gap-3 mt-4">
+                <span className="stamp-chip text-[10px]">
+                  {wordCount.toLocaleString()} Words
+                </span>
+                <span className="stamp-chip text-[10px] capitalize">
+                  {status.toLowerCase()}
+                </span>
+              </div>
+            </div>
             <EditorContent editor={editor} className="h-full" />
             {editor && (
               <BubbleMenu editor={editor}>
@@ -470,26 +493,15 @@ export function SceneEditor({
             )}
           </div>
 
-          {/* Bottom bar */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-surface-raised text-xs text-text-muted shrink-0" role="status" aria-live="polite">
-            <span className="tabular-nums">{wordCount.toLocaleString()} words</span>
-            <div className="flex items-center gap-3">
-              {session.active && session.wordsWritten > 0 && (
-                <span className="tabular-nums text-accent">
-                  Session: {session.wordsWritten.toLocaleString()} words in{" "}
-                  {session.durationSeconds < 60
-                    ? `${session.durationSeconds}s`
-                    : `${Math.round(session.durationSeconds / 60)} min`}
-                </span>
-              )}
-              {lastSaved && (
-                <span className="flex items-center gap-1">
-                  <Check className="h-3 w-3 text-success" aria-hidden="true" />
-                  Last saved {lastSaved}
-                </span>
-              )}
-            </div>
-          </div>
+          {/* Bottom status bar */}
+          <EditorStatusBar
+            wordCount={wordCount}
+            saving={saving}
+            lastSaved={lastSaved}
+            sessionWordsWritten={session.wordsWritten}
+            sessionDurationSeconds={session.durationSeconds}
+            sessionActive={session.active}
+          />
         </div>
 
         {/* Annotations Sidebar */}
@@ -524,7 +536,26 @@ export function SceneEditor({
             />
           </div>
         )}
+
+        {/* Scene Context Sidebar */}
+        <SceneContextSidebar
+          projectId={projectId}
+          sceneId={node.id}
+          sceneTitle={node.title}
+          wordCount={wordCount}
+          updatedAt={node.updatedAt}
+          visible={showSceneContext}
+        />
       </div>
+
+      {/* Annie's Critique Floating Panel */}
+      <AnnieCritiquePanel
+        projectId={projectId}
+        sceneId={node.id}
+        sceneContent={contentRef.current?.replace(/<[^>]+>/g, " ").trim()}
+        visible={showCritiquePanel}
+        onClose={() => setShowCritiquePanel(false)}
+      />
 
       {/* Timeline Strip */}
       {timelineScenes && timelineScenes.length > 0 && (

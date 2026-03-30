@@ -10,14 +10,20 @@ jobs:
     name: Production Health Check
     runs-on: ubuntu-latest
     steps:
-      - name: Check health endpoint
+      - name: Check health + data integrity
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://annie.interstellarai.net/api/health)
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Production health check failed with status $STATUS"
+          BODY=$(curl -s --max-time 10 https://annie.interstellarai.net/api/health)
+          STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+          echo "Response: $BODY"
+          if [ "$STATUS" = "error" ]; then
+            echo "::error::Production health check failed — DB unreachable"
             exit 1
           fi
-          echo "Production health check passed (HTTP $STATUS)"
+          if [ "$STATUS" = "degraded" ]; then
+            echo "::error::Production database appears empty — possible data loss!"
+            exit 1
+          fi
+          echo "Production health check passed (status: $STATUS)"
 
   check-staging:
     name: Staging Health Check
@@ -25,9 +31,11 @@ jobs:
     steps:
       - name: Check health endpoint
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://amusing-blessing-staging.up.railway.app/api/health)
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Staging health check failed with status $STATUS"
+          BODY=$(curl -s --max-time 10 https://amusing-blessing-staging.up.railway.app/api/health)
+          STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+          echo "Response: $BODY"
+          if [ "$STATUS" = "error" ]; then
+            echo "::error::Staging health check failed — DB unreachable"
             exit 1
           fi
-          echo "Staging health check passed (HTTP $STATUS)"
+          echo "Staging health check passed (status: $STATUS)"
