@@ -13,9 +13,20 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 96 bits for GCM
 const PREFIX = "enc:v1:";
 
+let encryptionWarningLogged = false;
+
 function getEncryptionKey(): Buffer | null {
     const keySource = env.ENCRYPTION_KEY || env.API_TOKEN;
-    if (!keySource) return null;
+    if (!keySource) {
+        if (!encryptionWarningLogged) {
+            console.warn(
+                "[crypto] No ENCRYPTION_KEY or API_TOKEN set — " +
+                "encryption is disabled, values stored as plaintext."
+            );
+            encryptionWarningLogged = true;
+        }
+        return null;
+    }
     // Derive a 256-bit key from the source using SHA-256
     return createHash("sha256").update(keySource).digest();
 }
