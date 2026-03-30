@@ -6,6 +6,7 @@
  */
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "@/lib/env";
+import { resolveJwtSecret } from "@/lib/auth";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -17,8 +18,7 @@ export const REFRESH_TOKEN_TTL = 60 * 60 * 24 * 30;
  * Same derivation as src/lib/auth.ts getJwtKey().
  */
 async function getMcpJwtKey(): Promise<CryptoKey> {
-  const secret =
-    env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY || "annie-dev-secret";
+  const secret = resolveJwtSecret();
   return crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

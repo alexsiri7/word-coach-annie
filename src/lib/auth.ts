@@ -24,11 +24,28 @@ export interface SessionPayload {
 }
 
 /**
+ * Resolve the raw JWT secret string.
+ * Falls back to "annie-dev-secret" only when auth is disabled (local dev).
+ * Throws if auth is enabled but no secret is configured.
+ */
+export function resolveJwtSecret(): string {
+    const secret = env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY;
+    if (secret) return secret;
+    if (isAuthEnabled()) {
+        throw new Error(
+            "JWT secret is required when auth is enabled. " +
+            "Set JWT_SECRET, API_TOKEN, or ENCRYPTION_KEY."
+        );
+    }
+    return "annie-dev-secret";
+}
+
+/**
  * Get the JWT signing key. Uses API_TOKEN, ENCRYPTION_KEY, or a fallback.
  * Returns a CryptoKey suitable for jose sign/verify.
  */
 async function getJwtKey(): Promise<CryptoKey> {
-    const secret = env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY || "annie-dev-secret";
+    const secret = resolveJwtSecret();
     const encoder = new TextEncoder();
     return crypto.subtle.importKey(
         "raw",
