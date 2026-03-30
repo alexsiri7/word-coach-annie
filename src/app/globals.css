@@ -385,16 +385,17 @@
   pointer-events: none;
 }
 
-/* Reader view prose */
+/* Reader view prose — Editorial Cabin manuscript feel */
 .reader-prose {
   font-family: 'Newsreader', Georgia, Cambria, serif;
-  font-size: 1.125rem;
-  line-height: 1.75;
-  color: hsl(var(--text-primary));
+  font-size: 1.25rem;
+  line-height: 1.7;
+  font-weight: 300;
+  color: hsl(var(--text-primary) / 0.9);
 }
 
 .reader-prose p {
-  margin-bottom: 0.875rem;
+  margin-bottom: 1.5rem;
   text-indent: 1.5em;
 }
 
@@ -430,11 +431,12 @@
 }
 
 .reader-prose blockquote {
-  border-left: 3px solid hsl(var(--accent) / 0.4);
-  padding-left: 1.25rem;
-  margin: 1.25rem 0;
-  color: hsl(var(--text-secondary));
+  border-left: 2px solid hsl(var(--accent) / 0.2);
+  padding-left: 2rem;
+  margin: 2.5rem 0;
+  color: hsl(var(--text-primary) / 0.7);
   font-style: italic;
+  font-weight: 400;
 }
 
 .reader-prose blockquote p {
@@ -474,8 +476,15 @@
 
 @media (min-width: 640px) {
   .reader-prose {
-    font-size: 1.1875rem;
-    line-height: 1.8;
+    font-size: 1.375rem;
+    line-height: 1.7;
+  }
+}
+
+@media (min-width: 768px) {
+  .reader-prose {
+    font-size: 1.5rem;
+    line-height: 1.7;
   }
 }
 
