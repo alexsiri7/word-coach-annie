@@ -1,0 +1,20 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Every 5 minutes
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check health endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://annie.interstellarai.net/api/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Health check failed with status $STATUS"
+            exit 1
+          fi
+          echo "Health check passed (HTTP $STATUS)"

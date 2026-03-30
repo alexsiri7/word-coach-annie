@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Annie | The Editorial Cabin</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,700;1,400;1,700&amp;family=Manrope:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#36485b",
+              "surface-container-lowest": "#ffffff",
+              "error": "#ba1a1a",
+              "surface": "#faf9f5",
+              "on-tertiary-fixed-variant": "#910807",
+              "outline-variant": "#c4c6cd",
+              "primary-container": "#2c3e50",
+              "on-primary-container": "#96a9be",
+              "tertiary-fixed-dim": "#ffb4a9",
+              "background": "#faf9f5",
+              "primary-fixed": "#d1e4fb",
+              "primary": "#162839",
+              "on-secondary": "#ffffff",
+              "inverse-on-surface": "#f2f1ed",
+              "on-surface-variant": "#43474c",
+              "surface-tint": "#4e6073",
+              "on-background": "#1b1c1a",
+              "on-tertiary-container": "#ff8372",
+              "surface-container": "#efeeea",
+              "outline": "#74777d",
+              "tertiary-fixed": "#ffdad5",
+              "surface-variant": "#e3e2df",
+              "surface-dim": "#dbdad6",
+              "inverse-primary": "#b5c8df",
+              "on-secondary-container": "#007239",
+              "on-tertiary-fixed": "#410000",
+              "surface-container-high": "#e9e8e4",
+              "secondary-fixed": "#7efba4",
+              "tertiary-container": "#800002",
+              "surface-bright": "#faf9f5",
+              "on-secondary-fixed-variant": "#005228",
+              "primary-fixed-dim": "#b5c8df",
+              "on-primary-fixed": "#091d2e",
+              "secondary-container": "#7bf8a1",
+              "on-surface": "#1b1c1a",
+              "on-error-container": "#93000a",
+              "on-primary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "secondary": "#006d37",
+              "secondary-fixed-dim": "#61de8a",
+              "surface-container-highest": "#e3e2df",
+              "tertiary": "#570001",
+              "surface-container-low": "#f4f4f0",
+              "inverse-surface": "#2f312e",
+              "on-secondary-fixed": "#00210c",
+              "on-error": "#ffffff",
+              "error-container": "#ffdad6"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Manrope", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    display: inline-block;
+    vertical-align: middle
+    }
+.paper-texture {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuB5wp_OtmRwHNX9sbuv3UvvldfW3U6YwWzlGpcOUrLfDpcXsgO5c3gkPVrHOUvgL3O1yexNSUq-j0AaInC0xHpPPUH4Y1uRQ8dkyPFZViQCWdZM-aOCwntW5gmC-rOaOA2InkvU9hIYk8mex8WuPk6x4-zHdEr2hgmX7eBt6PW0G9nvAiyN87mhG8hn-8XZ4NvUanrHk6hX4srebLdCoEADmgCwJUPqda-vxR1bnC7FSwGH748WVoTf88FDuZrjmO6-55nr194agMd6);
+    background-repeat: repeat
+    }
+.grain-overlay {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAsEE0T7IHZRLFYEQDlw4Fkdtj1jttN97gBRlfohXUkI-E5NUSuVSgIIzJ4XW9ZQ6Ct_Zv9vKpN36ffNU2SMFYKYb7z6NyP35bwXEAblD0dumM1Si22MnKZdS4mmrEZRjQBM3ZRSrb9GlNmWzwA6_7Jnu0BD7LDBkR0miDjuCl_NEv8a6Ex_u5fBEuBaVPIQkGfTWHa5HWgQ_vabbBV2iZh4f3BdTJdaRrwJof-AcHgBcdS_rYddT_0iGvlqBx_ixZHkLqa0Xik16eP);
+    opacity: 0.03
+    }
+/* Hide scrollbar but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+    display: none
+    }
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none
+    }</style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary-container selection:text-on-secondary-container overflow-hidden">
+<div class="grain-overlay"></div>
+<!-- TopAppBar - Shell Navigation -->
+<header class="bg-[#faf9f5] dark:bg-slate-900 text-[#162839] dark:text-slate-100 font-serif italic tracking-tight leading-relaxed full-width top-0 sticky no-border space-y-4 flat no shadows z-40 transition-opacity duration-700 opacity-90 hover:opacity-100">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-full mx-auto">
+<div class="flex items-center space-x-8">
+<span class="text-2xl font-serif italic font-bold text-[#162839] dark:text-slate-100">Annie</span>
+<nav class="hidden md:flex space-x-6 text-sm">
+<a class="text-[#162839] dark:text-white font-bold border-b-2 border-[#162839] transition-colors duration-200" href="#">Drafts</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Library</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center space-x-4">
+<div class="text-center">
+<span class="block text-[10px] uppercase tracking-widest font-bold text-outline">Current Scene</span>
+<h1 class="font-headline text-lg italic">Chapter 4: The Escape</h1>
+</div>
+</div>
+<div class="flex items-center space-x-4">
+<button class="material-symbols-outlined text-slate-500 hover:text-primary transition-all duration-150 active:scale-95" data-icon="speed">speed</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Annie's expressive avatar" class="w-full h-full object-cover" data-alt="Close-up artistic portrait of a thoughtful woman with creative expression, soft vintage lighting, warm tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOO01Gq0DEWnboonk-H-kSSBSOrpRZwbWlzWPudPqY_XesQa_0GBUHVmZNU80Xlo7nTU96aCmLlShW_gIokVS0NkCYOy-E2fotBdyHN0J3soj6j1koFqRbDAr2ORxbBujklqLfGsVkwO0hGbFLCo2n0howfnkrgJo6SXX7JwDkdJZrRfXcWz0KF5jcpvdGH8uaNeSjS_TWKPXS8-n67irZ5vFXmSeGDvMxkUnTsEk7lH3wGn2bsAyZUVOm4SfUTOerfieWXh6l3m9F"/>
+</div>
+</div>
+</div>
+</header>
+<main class="relative h-[calc(100vh-140px)] flex overflow-hidden">
+<!-- SideNavBar - Scene Context (Hidden by default in Focus Mode, shown as Ghost) -->
+<aside class="bg-[#f4f2ed] dark:bg-slate-800/50 text-[#162839] dark:text-slate-200 font-sans text-xs uppercase tracking-widest font-semibold h-screen w-64 border-r-0 tonal-shift bg-[#f4f2ed] flat flex flex-col h-full p-6 space-y-8 z-30 transition-transform duration-500 -translate-x-full hover:translate-x-0 group fixed left-0">
+<div class="flex flex-col space-y-2">
+<span class="text-lg font-serif italic text-[#162839] dark:text-white">Scene-Aware Sidebar</span>
+<span class="text-[9px] lowercase font-normal tracking-normal italic opacity-60">Contextual Story Elements</span>
+</div>
+<nav class="flex flex-col space-y-2">
+<a class="flex items-center space-x-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all active:translate-y-[1px]" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span>Characters</span>
+</a>
+<a class="flex items-center space-x-3 p-3 bg-[#162839] text-white rounded-sm shadow-[2px_2px_0px_#000] active:translate-y-[1px] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span>Locations</span>
+</a>
+<a class="flex items-center space-x-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all active:translate-y-[1px]" href="#">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+<span>Beats</span>
+</a>
+<a class="flex items-center space-x-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-[#e8e6df] dark:hover:bg-slate-700 transition-all active:translate-y-[1px]" href="#">
+<span class="material-symbols-outlined" data-icon="psychology_alt">psychology_alt</span>
+<span>Annie's Tips</span>
+</a>
+</nav>
+<div class="mt-auto pt-8">
+<button class="w-full py-4 border border-primary text-primary hover:bg-primary hover:text-white transition-colors uppercase tracking-widest text-[10px] font-bold">New Scene</button>
+</div>
+</aside>
+<!-- Main Writing Canvas -->
+<section class="flex-1 overflow-y-auto no-scrollbar paper-texture pt-16 pb-32 px-4 md:px-0">
+<div class="max-w-2xl mx-auto relative">
+<!-- Writing Area -->
+<article class="font-headline text-2xl md:text-3xl leading-relaxed text-primary focus:outline-none min-h-[716px] italic selection:bg-secondary/20" contenteditable="true">
+<p class="mb-8">The rain drummed against the tin roof of the cabin, a persistent, rhythmic tapping that mirrored the frantic beating of Elias’s heart. He stared at the locked door, the wood scarred from years of neglect. He had only minutes before the lanterns appeared in the valley below.</p>
+<p class="mb-8">He reached into his coat pocket, feeling the cold weight of the locket. It was heavy, far heavier than any piece of jewelry had a right to be. It felt like it was pulling him down, anchoring him to this place, to the secrets buried beneath the floorboards.</p>
+<p class="mb-8 text-on-surface-variant opacity-40">Continue writing your masterpiece here...</p>
+</article>
+<!-- Annie Mood Indicator (In-canvas) -->
+<div class="fixed top-24 right-12 flex flex-col items-end space-y-2 pointer-events-none">
+<div class="w-12 h-12 rounded-full border-2 border-secondary p-0.5 bg-surface shadow-sm">
+<img alt="Annie Mood" class="w-full h-full rounded-full object-cover" data-alt="Close up avatar of a creative woman with a slight, encouraging smile, warm light filtering through a window" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHLFw-_rRHRDMTluu-FpSZuiCwoUhUTK5GEd56-yFRUq98lj8Ulhl4R1qDGf8IrYxa-PwnM64GcL_0Z7WrrfJSwkzeNElQ8CJxPC44kYzgeOCHSSArJfDzzMNBegtlZIRkZzCQBp3ukSQQrHzp7SZ4gCxALDtbXSaeKuGoHo4oIjMBF6xn0XE3DbPuSsuzSrBEvgQzNPzot5MOn1PILS4MH_9gOlu53mFZItiUW20lqx5Br9PRTFDRUl0kUzfQXtmnEREp4aSZYrAO"/>
+</div>
+<div class="bg-secondary text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-tighter rounded-sm">
+                        Annie's Mood: Pleased
+                    </div>
+</div>
+</div>
+</section>
+<!-- Annie AI Floating Panel (Scene-Aware Suggestions) -->
+<div class="fixed right-8 top-1/2 -translate-y-1/2 w-72 z-50">
+<div class="bg-surface-container-low/90 backdrop-blur-md p-6 shadow-2xl rounded-lg space-y-6 border border-white/20">
+<div class="flex items-center justify-between border-b border-outline-variant/30 pb-3">
+<span class="font-label text-[10px] font-extrabold uppercase tracking-widest text-primary">Annie's Critique</span>
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="space-y-4">
+<div class="group relative">
+<div class="absolute -left-3 top-0 bottom-0 w-0.5 bg-tertiary"></div>
+<p class="font-body text-xs leading-relaxed text-on-surface">
+                            "Wait, didn't <span class="font-bold">Elias</span> have blue eyes in <span class="italic underline decoration-tertiary/40">Chapter 2</span>? You just described them as 'dark as the ink on his desk'."
+                        </p>
+</div>
+<div class="p-3 bg-secondary-container rounded-sm">
+<p class="font-body text-[11px] text-on-secondary-container leading-snug">
+<span class="font-bold">Pro-Tip:</span> The pacing in this paragraph is excellent. The short sentences increase the tension. Keep it up!
+                        </p>
+</div>
+</div>
+<div class="pt-2">
+<button class="w-full bg-primary text-white py-2 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center space-x-2 active:scale-95 transition-all">
+<span>Apply Suggestion</span>
+<span class="material-symbols-outlined text-sm" data-icon="bolt">bolt</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar - Status & Stats -->
+<footer class="bg-[#faf9f5]/80 backdrop-blur-md dark:bg-slate-900/80 text-[#162839] dark:text-slate-300 font-sans text-[10px] uppercase font-bold tracking-wider fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-3 border-t border-[#162839]/10 shadow-inner z-50">
+<div class="flex items-center space-x-12">
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-slate-500" data-icon="history_edu">history_edu</span>
+<div class="flex flex-col">
+<span class="text-[8px] text-outline leading-none mb-1">Word Count</span>
+<span class="text-[#006d37] font-black">1,242 WORDS</span>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-slate-500" data-icon="schedule">schedule</span>
+<div class="flex flex-col">
+<span class="text-[8px] text-outline leading-none mb-1">Reading Time</span>
+<span class="text-primary font-black">5 MIN READ</span>
+</div>
+</div>
+</div>
+<div class="flex items-center space-x-8">
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-secondary" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+<div class="flex flex-col">
+<span class="text-[8px] text-outline leading-none mb-1">Annie's Intensity</span>
+<span class="text-primary font-black">MILDLY CRITICAL</span>
+</div>
+</div>
+<div class="h-8 w-[1px] bg-outline-variant/30"></div>
+<div class="flex space-x-4">
+<span class="px-2 py-1 bg-surface-container-highest border border-outline-variant/20 rounded-none text-[8px] font-black tracking-tighter">V.0.4.2-STABLE</span>
+<button class="material-symbols-outlined text-slate-400 hover:text-primary transition-colors" data-icon="fullscreen">fullscreen</button>
+</div>
+</div>
+</footer>
+<!-- Stamp Chips (Floating Metadata) -->
+<div class="fixed bottom-20 left-12 flex flex-col space-y-3 z-20 pointer-events-none">
+<div class="px-4 py-1 bg-surface-container-low border-l-2 border-primary text-[10px] font-bold text-primary tracking-widest uppercase shadow-sm">
+            Draft #4
+        </div>
+<div class="px-4 py-1 bg-surface-container-low border-l-2 border-secondary text-[10px] font-bold text-secondary tracking-widest uppercase shadow-sm">
+            Focus Mode Active
+        </div>
+</div>
+</body></html>

@@ -268,21 +268,28 @@ async function exportStoryBible(projectId: string, projectTitle: string): Promis
     }
   }
 
-  // Add relationships
-  const relationships = await prisma.relationship.findMany({
+  // Add relationships scoped to this project's nodes and objects
+  const nodeIds = (await prisma.structureNode.findMany({
+    where: { projectId },
+    select: { id: true },
+  })).map((n) => n.id);
+  const objectIds = storyObjects.map((o) => o.id);
+
+  const projectRelationships = await prisma.relationship.findMany({
+    where: {
+      OR: [
+        { fromNodeId: { in: nodeIds } },
+        { toNodeId: { in: nodeIds } },
+        { fromObjectId: { in: objectIds } },
+        { toObjectId: { in: objectIds } },
+      ],
+    },
     include: {
       fromNode: true,
       fromObject: true,
       toNode: true,
       toObject: true,
     },
-  });
-
-  // Filter to only this project's relationships
-  const projectRelationships = relationships.filter((r: { fromNode?: { projectId: string } | null; fromObject?: { projectId: string } | null; toNode?: { projectId: string } | null; toObject?: { projectId: string } | null }) => {
-    const fromProjectId = r.fromNode?.projectId || r.fromObject?.projectId;
-    const toProjectId = r.toNode?.projectId || r.toObject?.projectId;
-    return fromProjectId === projectId || toProjectId === projectId;
   });
 
   if (projectRelationships.length > 0) {

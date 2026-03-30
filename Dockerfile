@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
+COPY prisma ./prisma
 RUN npm ci
 
 # --- Stage 2: Build the application ---
@@ -36,6 +37,10 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/.skills ./.skills
 
+# Migration runner + migration SQL files
+COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /app/prisma/migrations ./prisma/migrations
+
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD node scripts/migrate.mjs && node server.js

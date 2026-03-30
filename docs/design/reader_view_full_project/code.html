@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Annie | Reader View</title>
+<!-- Google Fonts: Newsreader for Prose, Manrope for UI -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Manrope:wght@200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-high": "#e9e8e4",
+              "on-secondary-container": "#007239",
+              "tertiary": "#570001",
+              "surface-variant": "#e3e2df",
+              "surface-tint": "#4e6073",
+              "outline": "#74777d",
+              "background": "#faf9f5",
+              "inverse-on-surface": "#f2f1ed",
+              "on-primary-container": "#96a9be",
+              "secondary-fixed-dim": "#61de8a",
+              "on-error": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "secondary-fixed": "#7efba4",
+              "on-tertiary": "#ffffff",
+              "on-error-container": "#93000a",
+              "error": "#ba1a1a",
+              "surface-dim": "#dbdad6",
+              "on-tertiary-fixed": "#410000",
+              "on-background": "#1b1c1a",
+              "surface-container-low": "#f4f4f0",
+              "on-primary": "#ffffff",
+              "primary-container": "#2c3e50",
+              "error-container": "#ffdad6",
+              "secondary": "#006d37",
+              "tertiary-fixed": "#ffdad5",
+              "surface-container-highest": "#e3e2df",
+              "inverse-surface": "#2f312e",
+              "on-secondary-fixed": "#00210c",
+              "on-tertiary-fixed-variant": "#910807",
+              "on-tertiary-container": "#ff8372",
+              "on-primary-fixed": "#091d2e",
+              "surface-bright": "#faf9f5",
+              "tertiary-fixed-dim": "#ffb4a9",
+              "surface": "#faf9f5",
+              "primary-fixed": "#d1e4fb",
+              "secondary-container": "#7bf8a1",
+              "primary": "#162839",
+              "on-secondary-fixed-variant": "#005228",
+              "on-primary-fixed-variant": "#36485b",
+              "outline-variant": "#c4c6cd",
+              "on-surface-variant": "#43474c",
+              "primary-fixed-dim": "#b5c8df",
+              "tertiary-container": "#800002",
+              "on-secondary": "#ffffff",
+              "inverse-primary": "#b5c8df",
+              "surface-container": "#efeeea",
+              "on-surface": "#1b1c1a"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Newsreader", "serif"],
+              "label": ["Inter", "sans-serif"],
+              "ui": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>body {
+    background-color: #faf9f5;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCk7O3aZHu15MoIqdWwBFF9CehA6RKBh5Obg_plgc4EU-Ep6mZLUnSmKV5yaA736TzVDicj_l1qSmXl3B2cffpZBSExtCUhKJw1rDzkn9HU4jJnJZzUkEGY5TQ4wkLw_g3NLbAePZ9KNTWqkbbqczCqb49nRzAzPNz5slYzMzHrHZvI8ZpX74TWZMNRND7GUxsJkW3L6gY-2Rc1Krv-1H0tvPJ8W7v2BANKQUOhzpjpSA0RqaqspwWY6uJ2fpDx8yXDR0RgINUMdTM0);
+    background-blend-mode: multiply
+    }
+.prose-drop-cap::first-letter {
+    float: left;
+    font-size: 5.5rem;
+    line-height: 1;
+    padding-right: 0.75rem;
+    font-family: "Newsreader", serif;
+    font-weight: 200;
+    color: #162839
+    }
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    vertical-align: middle
+    }</style>
+</head>
+<body class="font-body text-primary selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- TopAppBar (Suppressed navigation per 'Reader View' focus, but maintaining identity) -->
+<header class="fixed top-0 left-0 w-full z-40 bg-surface/40 backdrop-blur-sm transition-all duration-300">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-full mx-auto">
+<div class="flex items-center gap-4">
+<button class="p-2 text-primary hover:bg-surface-container-high rounded-full transition-colors duration-150 active:scale-95">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="hidden md:block">
+<h1 class="text-lg font-serif italic font-bold text-primary leading-none tracking-tight">Annie</h1>
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-60">Reader Mode</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 font-label text-[10px] uppercase font-bold tracking-wider text-slate-500">
+<span class="material-symbols-outlined text-sm" data-icon="speed">speed</span>
+<span>12m read left</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/20">
+<img alt="Annie's expressive avatar" class="w-full h-full object-cover grayscale contrast-125" data-alt="Close-up portrait of a woman with a creative, intellectual look in soft morning library light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnFwES0GuMiXp_vmeSAi8Cgily9PzgMRt9ov7-S9UvgQQye8J76M3gWN27fwc4Ux4t80wxLyBTAEr2wCkjPJtoZkLePIUI_t6dMmWy_IjnHJSorM7HiqpPniJSSD_PSMzLyW5BJxVk0IzrzksfqYuMmp0uI1JXUHjT6WROFqbd5JhRIy_3wTxDJEegAlHCinwnXVDmixsOglnxozR_8Y3i-7co3i58eLUvQvoyMQaNrHAmGNrYY0Z0h3Quizdus4Joqf-PAILLoDn3"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Manuscript Canvas -->
+<main class="relative pt-32 pb-64 px-6 md:px-0 max-w-2xl mx-auto">
+<!-- Chapter Header -->
+<section class="mb-24 text-center">
+<span class="font-label text-xs uppercase tracking-[0.3em] text-on-surface-variant block mb-4">Chapter Fourteen</span>
+<h2 class="font-headline text-5xl md:text-6xl italic font-extralight tracking-tight text-primary leading-[1.1]">The Silent Architect</h2>
+<div class="mt-12 flex justify-center items-center gap-3">
+<div class="h-[1px] w-8 bg-outline-variant/40"></div>
+<span class="material-symbols-outlined text-outline-variant text-sm" data-icon="auto_stories">auto_stories</span>
+<div class="h-[1px] w-8 bg-outline-variant/40"></div>
+</div>
+</section>
+<!-- Prose Content -->
+<article class="space-y-10 text-xl md:text-2xl leading-[1.7] font-light text-primary/90">
+<p class="prose-drop-cap">
+                The fog didn't roll into the valley so much as it materialized from the very stones of the cabin. Elias watched through the glass—bubbles of moisture clinging to the pane like unsaid thoughts. He hadn't touched the typewriter in three days. The ink ribbon had dried, its black tongue silenced by the weight of a story that refused to be told.
+            </p>
+<p>
+                In the distance, the skeletal remains of the timber mill stood as a testament to an era of industry that the mountain had long since reclaimed. It was beautiful in its decay, a jagged silhouette against the bruised purple of the approaching dusk. He wondered if his own legacy would look much different—a structural skeleton stripped of its purpose, left to the mercy of the elements and the moss.
+            </p>
+<p>
+                "You're overthinking the metaphor," a voice drifted from the corner of the room. It wasn't a voice of air and vibration, but a resonance within his own mind. Annie was there, or rather, the idea of her was—a shimmering presence near the bookshelf that held his father's collection of architectural blueprints.
+            </p>
+<p>
+                He didn't turn around. To turn would be to acknowledge the hallucination, and Elias wasn't ready to be that lonely yet. "The mill is just a mill," he whispered, his breath fogging the glass further. 
+            </p>
+<blockquote class="pl-8 border-l-2 border-secondary/20 italic font-medium text-primary/70 my-16">
+                "No," Annie replied, her tone sharpening with that intellectual rigor he both feared and craved. "The mill is the architect's failure to account for time. You are trying to build a story that lasts forever, but stories are organic. They rot, Elias. Let this one rot a little. The soil will be better for it."
+            </blockquote>
+<p>
+                He finally turned. The room was empty, save for the long shadows stretching across the wide-planked floor. But on the desk, the carriage of the typewriter had moved. Just one space. A mechanical gasp in the silence of the woods.
+            </p>
+</article>
+<!-- Signature Component: The Stamp Chip Footer -->
+<footer class="mt-32 pt-16 border-t border-outline-variant/10 flex flex-wrap gap-4 justify-center">
+<div class="px-4 py-2 bg-surface-container-low border border-outline-variant/20 font-label text-[10px] uppercase tracking-widest text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-xs" data-icon="history_edu">history_edu</span>
+<span>842 Words</span>
+</div>
+<div class="px-4 py-2 bg-surface-container-low border border-outline-variant/20 font-label text-[10px] uppercase tracking-widest text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-xs" data-icon="schedule">schedule</span>
+<span>4:15 PM</span>
+</div>
+<div class="px-4 py-2 bg-surface-container-low border border-outline-variant/20 font-label text-[10px] uppercase tracking-widest text-secondary flex items-center gap-2">
+<span class="material-symbols-outlined text-xs" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+<span>Annie's Mood: Encouraging</span>
+</div>
+</footer>
+</main>
+<!-- Annie Floating Action Button (Glassmorphism) -->
+<div class="fixed bottom-10 right-10 z-50 group">
+<!-- Minimal Tooltip -->
+<div class="absolute bottom-full right-0 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+<div class="bg-primary text-white text-[10px] font-label uppercase tracking-widest px-3 py-2 rounded-sm whitespace-nowrap shadow-xl">
+                Ask Annie's Advice
+            </div>
+</div>
+<button class="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center shadow-[4px_4px_20px_rgba(22,40,57,0.3)] hover:shadow-[4px_4px_30px_rgba(22,40,57,0.5)] active:scale-90 transition-all duration-200 relative overflow-hidden">
+<span class="material-symbols-outlined text-2xl" data-icon="psychology_alt">psychology_alt</span>
+<div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10"></div>
+</button>
+</div>
+<!-- Minimal BottomNavBar (Translucent/Paper) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-3 bg-surface/80 backdrop-blur-md border-t border-primary/5 z-40">
+<div class="flex items-center gap-8">
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors" data-icon="list">list</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-wider text-slate-500">Outline</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors" data-icon="format_size">format_size</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-wider text-slate-500">Type</span>
+</button>
+</div>
+<div class="hidden md:flex items-center gap-4">
+<div class="w-48 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-3/4 h-full bg-secondary"></div>
+</div>
+<span class="font-label text-[10px] uppercase font-bold text-on-surface-variant">75% Complete</span>
+</div>
+<div class="flex items-center gap-8">
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors" data-icon="bookmark">bookmark</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-wider text-slate-500">Save</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors" data-icon="share">share</span>
+<span class="font-label text-[10px] uppercase font-bold tracking-wider text-slate-500">Export</span>
+</button>
+</div>
+</nav>
+<!-- Subtle Grain Overlay -->
+<div class="fixed inset-0 pointer-events-none opacity-[0.03] contrast-150 grayscale" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBrdWoPKLUR9dfD4NWT7nOAHccCvp5GxLi6ChOELk7m0BDrhpVZ78VwITXdzAWMKpE4BiWYh44kRGtR0tIPd-s7e21mijZ-_tybqG450Ofa16s7-IwUS8dMurNjym0835iiuiYOx89r2B9NJye0Rcf3atRCvsrExjCYZzMLvj9VpPcTqA2l2SGwCKVJXoTFjbB2e5OUui-JjccVgThGqr9apN3qJF8Clr5_qRBD9KYk4KFGkoCTuh8SKn0FepFIvTVnVC9aF_uEDt1c');"></div>
+</body></html>

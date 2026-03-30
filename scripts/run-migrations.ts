@@ -9,10 +9,14 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
-const prisma = new PrismaClient()
+const connectionString = process.env.DATABASE_URL
+if (!connectionString) throw new Error('DATABASE_URL is required')
+const adapter = new PrismaPg({ connectionString })
+const prisma = new PrismaClient({ adapter })
 
 async function runMigrations() {
   // Create tracking table if it doesn't exist

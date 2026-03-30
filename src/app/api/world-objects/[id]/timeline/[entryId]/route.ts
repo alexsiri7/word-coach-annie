@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
     request: Request,
@@ -11,7 +12,8 @@ export async function PATCH(
         const entry = await UniversesController.updateTimelineEntry(entryId, body);
         return NextResponse.json(entry);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -24,6 +26,7 @@ export async function DELETE(
         await UniversesController.deleteTimelineEntry(entryId);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
