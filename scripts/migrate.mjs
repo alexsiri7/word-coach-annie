@@ -10,7 +10,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { readFileSync, readdirSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 
@@ -36,6 +36,72 @@ async function ensureMigrationsTable() {
   `);
 }
 
+/**
+ * Trigger a Supabase backup via the Management API before applying migrations.
+ * Requires SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF env vars.
+ * Falls back to a local JSON dump if the API isn't configured.
+ */
+async function backupBeforeMigrate() {
+  const token = process.env.SUPABASE_ACCESS_TOKEN;
+  const projectRef = process.env.SUPABASE_PROJECT_REF;
+
+  if (token && projectRef) {
+    console.log('  backup: triggering Supabase backup...');
+    try {
+      const res = await fetch(
+        `https://api.supabase.com/v1/projects/${projectRef}/database/backups`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (res.ok) {
+        console.log('  backup: Supabase backup triggered successfully');
+        return;
+      }
+      console.warn(`  backup: Supabase API returned ${res.status} — falling back to local dump`);
+    } catch (e) {
+      console.warn(`  backup: Supabase API call failed (${e.message}) — falling back to local dump`);
+    }
+  }
+
+  // Fallback: dump all tables to a JSON file in the container
+  const tables = await prisma.$queryRawUnsafe(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != '_prisma_migrations'`
+  );
+
+  const backup = {};
+  let totalRows = 0;
+
+  for (const { tablename } of tables) {
+    try {
+      const rows = await prisma.$queryRawUnsafe(`SELECT * FROM "${tablename}"`);
+      backup[tablename] = rows;
+      totalRows += rows.length;
+    } catch (e) {
+      backup[tablename] = { error: e.message };
+    }
+  }
+
+  if (totalRows === 0) {
+    console.log('  backup: skipped (database is empty)');
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupDir = join(process.cwd(), 'backups');
+  try { mkdirSync(backupDir, { recursive: true }); } catch {}
+  const backupPath = join(backupDir, `pre-migrate-${timestamp}.json`);
+
+  writeFileSync(backupPath, JSON.stringify(backup, (_, v) =>
+    typeof v === 'bigint' ? v.toString() : v
+  ));
+  console.log(`  backup: ${totalRows} rows across ${tables.length} tables → ${backupPath} (local fallback)`);
+}
+
 async function migrate() {
   await ensureMigrationsTable();
 
@@ -56,6 +122,15 @@ async function migrate() {
     .map((d) => d.name)
     .sort();
 
+  // Check if there are pending migrations
+  const pending = dirs.filter((d) => !appliedNames.has(d) && existsSync(join(migrationsDir, d, 'migration.sql')));
+
+  // Backup before applying any new migrations
+  if (pending.length > 0) {
+    console.log(`  ${pending.length} pending migration(s) — backing up first...`);
+    await backupBeforeMigrate();
+  }
+
   let appliedCount = 0;
 
   for (const dir of dirs) {
@@ -71,6 +146,21 @@ async function migrate() {
 
     const sql = readFileSync(sqlPath, 'utf-8');
     const checksum = createHash('sha256').update(sql).digest('hex');
+
+    // Safety check: refuse to run migrations that contain destructive DDL
+    // if the database already has data. This prevents accidental data loss
+    // from re-applying the init migration against a populated database.
+    const destructivePatterns = /\b(DROP\s+TABLE|TRUNCATE|DROP\s+SCHEMA)\b/i;
+    if (destructivePatterns.test(sql)) {
+      const [{ count }] = await prisma.$queryRawUnsafe(
+        `SELECT COALESCE(SUM(n_tup_ins - n_tup_del), 0)::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public'`
+      );
+      if (count > 0) {
+        console.error(`  ABORT ${dir} — contains destructive DDL (DROP/TRUNCATE) and database has ${count} live rows`);
+        console.error(`  Refusing to run. If this is intentional, apply manually.`);
+        process.exit(1);
+      }
+    }
 
     console.log(`  apply ${dir}`);
 
