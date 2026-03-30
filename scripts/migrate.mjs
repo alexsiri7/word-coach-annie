@@ -72,6 +72,21 @@ async function migrate() {
     const sql = readFileSync(sqlPath, 'utf-8');
     const checksum = createHash('sha256').update(sql).digest('hex');
 
+    // Safety check: refuse to run migrations that contain destructive DDL
+    // if the database already has data. This prevents accidental data loss
+    // from re-applying the init migration against a populated database.
+    const destructivePatterns = /\b(DROP\s+TABLE|TRUNCATE|DROP\s+SCHEMA)\b/i;
+    if (destructivePatterns.test(sql)) {
+      const [{ count }] = await prisma.$queryRawUnsafe(
+        `SELECT COALESCE(SUM(n_tup_ins - n_tup_del), 0)::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public'`
+      );
+      if (count > 0) {
+        console.error(`  ABORT ${dir} — contains destructive DDL (DROP/TRUNCATE) and database has ${count} live rows`);
+        console.error(`  Refusing to run. If this is intentional, apply manually.`);
+        process.exit(1);
+      }
+    }
+
     console.log(`  apply ${dir}`);
 
     // Split into individual statements for Prisma's $executeRawUnsafe
