@@ -21,6 +21,7 @@ const PUBLIC_PATHS = [
     "/.well-known/oauth-authorization-server",
     "/oauth/register",
     "/oauth/token",
+    "/version.json",
 ];
 
 function isPublicPath(pathname: string): boolean {
