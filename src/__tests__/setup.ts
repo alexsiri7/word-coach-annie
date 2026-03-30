@@ -13,10 +13,19 @@ vi.mock("@sentry/nextjs", () => ({
   captureRequestError: vi.fn(),
 }));
 
-// Use a separate test database — set TEST_DATABASE_URL to override.
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+// SAFETY: Only use TEST_DATABASE_URL — never fall back to DATABASE_URL.
+// Falling back to DATABASE_URL destroyed production data when agents ran tests
+// in worktrees that had .env.local with the production connection string.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 if (!TEST_DATABASE_URL) {
-  throw new Error("TEST_DATABASE_URL or DATABASE_URL must be set for tests");
+  throw new Error(
+    "TEST_DATABASE_URL must be set for tests. " +
+    "This intentionally does NOT fall back to DATABASE_URL to prevent destroying production data."
+  );
+}
+
+if (TEST_DATABASE_URL.includes("supabase.com") || TEST_DATABASE_URL.includes("pooler.supabase.com")) {
+  throw new Error("TEST_DATABASE_URL points to Supabase — refusing to run tests against production.");
 }
 
 process.env.DATABASE_URL = TEST_DATABASE_URL;
