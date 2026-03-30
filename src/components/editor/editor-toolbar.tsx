@@ -23,6 +23,8 @@ import {
   WifiOff,
   AlertTriangle,
   Mic,
+  Sparkles,
+  PanelRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +59,10 @@ interface EditorToolbarProps {
   consistencyAlertCount?: number;
   onToggleVoiceMonitor?: () => void;
   showVoiceMonitor?: boolean;
+  onToggleCritiquePanel?: () => void;
+  showCritiquePanel?: boolean;
+  onToggleSceneContext?: () => void;
+  showSceneContext?: boolean;
 }
 
 export function EditorToolbar({
@@ -81,6 +87,10 @@ export function EditorToolbar({
   consistencyAlertCount = 0,
   onToggleVoiceMonitor,
   showVoiceMonitor,
+  onToggleCritiquePanel,
+  showCritiquePanel,
+  onToggleSceneContext,
+  showSceneContext,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
@@ -218,6 +228,32 @@ export function EditorToolbar({
             aria-pressed={showVoiceMonitor}
           >
             <Mic className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onToggleCritiquePanel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", showCritiquePanel && "bg-accent/15 text-accent")}
+            onClick={onToggleCritiquePanel}
+            aria-label={`${showCritiquePanel ? "Hide" : "Show"} Annie's critique`}
+            aria-pressed={showCritiquePanel}
+          >
+            <Sparkles className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onToggleSceneContext && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", showSceneContext && "bg-accent/15 text-accent")}
+            onClick={onToggleSceneContext}
+            aria-label={`${showSceneContext ? "Hide" : "Show"} scene context sidebar`}
+            aria-pressed={showSceneContext}
+          >
+            <PanelRight className="h-4 w-4" />
           </Button>
         )}
 
