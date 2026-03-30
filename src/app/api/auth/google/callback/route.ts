@@ -22,6 +22,19 @@ export async function GET(request: NextRequest) {
         );
     }
 
+    // Verify CSRF state parameter
+    const stateParam = request.nextUrl.searchParams.get("state");
+    const stateCookie = request.cookies.get("oauth_state")?.value;
+    if (!stateParam || !stateCookie || stateParam !== stateCookie) {
+        const redirectUri = env.GOOGLE_REDIRECT_URI;
+        const baseUrl = redirectUri
+            ? new URL(redirectUri).origin
+            : request.nextUrl.origin;
+        return NextResponse.redirect(
+            new URL("/login?error=invalid_state", baseUrl)
+        );
+    }
+
     const clientId = env.GOOGLE_CLIENT_ID;
     const clientSecret = env.GOOGLE_CLIENT_SECRET;
     const redirectUri = env.GOOGLE_REDIRECT_URI;
@@ -100,6 +113,14 @@ export async function GET(request: NextRequest) {
     // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
     const baseUrl = new URL(redirectUri).origin;
     const response = NextResponse.redirect(new URL("/", baseUrl));
+    // Clear the OAuth state cookie
+    response.cookies.set("oauth_state", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 0,
+        path: "/",
+    });
     response.cookies.set(SESSION_COOKIE_NAME, jwt, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
+import { logger } from "@/lib/logger";
 
 async function verifyWorldObjectAccess(worldObjectId: string, userId: string | null) {
     const wo = await prisma.worldObject.findUnique({
@@ -27,7 +28,8 @@ export async function GET(
         const worldObject = await UniversesController.getWorldObject(id);
         return NextResponse.json(worldObject);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -45,7 +47,8 @@ export async function PATCH(
         const worldObject = await UniversesController.updateWorldObject(id, body);
         return NextResponse.json(worldObject);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -62,6 +65,7 @@ export async function DELETE(
         await UniversesController.deleteWorldObject(id);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
