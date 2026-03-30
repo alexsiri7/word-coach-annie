@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
     try {
@@ -34,7 +35,8 @@ export async function GET(request: NextRequest) {
         const universes = await UniversesController.listUniverses();
         return NextResponse.json(universes);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -65,6 +67,7 @@ export async function POST(request: NextRequest) {
         const universe = await UniversesController.createUniverse(body);
         return NextResponse.json(universe);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

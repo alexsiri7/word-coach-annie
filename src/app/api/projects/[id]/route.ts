@@ -65,12 +65,20 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(id, userId);
-  if (!access.authorized) return access.response;
+  try {
+    const { id } = await params;
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(id, userId);
+    if (!access.authorized) return access.response;
 
-  await prisma.project.delete({ where: { id } });
+    await prisma.project.delete({ where: { id } });
 
-  return NextResponse.json({ status: "deleted" });
+    return NextResponse.json({ status: "deleted" });
+  } catch (error) {
+    logger.error("DELETE /api/projects/[id] error", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
 }

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Annie | Manuscript Progress</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&amp;family=Manrope:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed-variant": "#36485b",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#ba1a1a",
+                        "surface": "#faf9f5",
+                        "on-tertiary-fixed-variant": "#910807",
+                        "outline-variant": "#c4c6cd",
+                        "primary-container": "#2c3e50",
+                        "on-primary-container": "#96a9be",
+                        "tertiary-fixed-dim": "#ffb4a9",
+                        "background": "#faf9f5",
+                        "primary-fixed": "#d1e4fb",
+                        "primary": "#162839",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#f2f1ed",
+                        "on-surface-variant": "#43474c",
+                        "surface-tint": "#4e6073",
+                        "on-background": "#1b1c1a",
+                        "on-tertiary-container": "#ff8372",
+                        "surface-container": "#efeeea",
+                        "outline": "#74777d",
+                        "tertiary-fixed": "#ffdad5",
+                        "surface-variant": "#e3e2df",
+                        "surface-dim": "#dbdad6",
+                        "inverse-primary": "#b5c8df",
+                        "on-secondary-container": "#007239",
+                        "on-tertiary-fixed": "#410000",
+                        "surface-container-high": "#e9e8e4",
+                        "secondary-fixed": "#7efba4",
+                        "tertiary-container": "#800002",
+                        "surface-bright": "#faf9f5",
+                        "on-secondary-fixed-variant": "#005228",
+                        "primary-fixed-dim": "#b5c8df",
+                        "on-primary-fixed": "#091d2e",
+                        "secondary-container": "#7bf8a1",
+                        "on-surface": "#1b1c1a",
+                        "on-error-container": "#93000a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#006d37",
+                        "secondary-fixed-dim": "#61de8a",
+                        "surface-container-highest": "#e3e2df",
+                        "tertiary": "#570001",
+                        "surface-container-low": "#f4f4f0",
+                        "inverse-surface": "#2f312e",
+                        "on-secondary-fixed": "#00210c",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader"],
+                        "body": ["Manrope"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.writing-grid {
+    display: grid;
+    grid-template-columns: repeat(15, 1fr);
+    gap: 4px
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCpiPpGCjGFeYKdlwFC8R_MNfMz8Y4OLooHi5Ndv2ewdLfn8F7EWfVd9vmwnWhZqxbb3gBqcA0ux_PphSkRfiV6xNBDcallU_CmubgMiHtF4gUCqOWAc1YEqEm1Ah-DwKAAMvdaxEOpYYGKI2d7IWqb9Kvyguw2SiRMFC07Tbw1Apo-W8frorIXZzAUfXKKvdYdj9SDTXOKyfVxqRikm-nV3Y-hK_K1xcZP_HYhL3kv50I9lXC6a5wIBXZFXFVCPVZFT_c8Vfrm2s26);
+    opacity: 0.02;
+    pointer-events: none
+    }</style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary/20 min-h-screen">
+<div class="fixed inset-0 grain-overlay z-50"></div>
+<!-- Navigation Shell: TopAppBar -->
+<header class="bg-[#faf9f5] dark:bg-slate-900 text-[#162839] dark:text-slate-100 full-width top-0 sticky no-border space-y-4 flat no shadows z-40">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-full mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-serif italic font-bold text-[#162839] dark:text-slate-100">Annie</span>
+<nav class="hidden md:flex items-center space-y-0 space-x-6 font-serif italic tracking-tight leading-relaxed">
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Drafts</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Library</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#162839] transition-colors duration-200" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined p-2 text-primary hover:bg-surface-container-high transition-all active:scale-95">speed</button>
+<button class="material-symbols-outlined p-2 text-primary hover:bg-surface-container-high transition-all active:scale-95">face_6</button>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-2 ring-1 ring-outline-variant">
+<img alt="Annie's expressive avatar" data-alt="Close-up portrait of a woman with an expressive, thoughtful face in soft natural lighting against a muted background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCct1-VJkmX6FLSG_UKPM-v7XTDRzVHwmanr4vCfOCrnOHn7872ZsFyfHWK_xJxAbMOJrBBhJQiHfKNSIOcu-tkqWL98sxLs_yh5AZcrN_59XmlmRyffreEdmSBm0VkjvLagjYGhLGt0Gf-_NRhNNL88dzb6IAEBnpWtKWrSuvPrBVnS_TIiYbX8cCe0Go_dOWAyrCm_600xMNDzM8wYrDPzN9M7ZZk3ACV0WGSFTursXVowlfKhE73xn9sjKAbBkMewQIjPIsaUfGD"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-full p-6 space-y-8 bg-[#f4f2ed] dark:bg-slate-800/50 text-[#162839] dark:text-slate-200 h-screen w-64 border-r-0 tonal-shift bg-[#f4f2ed] flat">
+<div class="space-y-1">
+<h2 class="text-lg font-serif italic text-[#162839] dark:text-white">Scene-Aware Sidebar</h2>
+<p class="text-[10px] uppercase tracking-widest font-semibold opacity-60">Contextual Story Elements</p>
+</div>
+<nav class="flex-1 space-y-2">
+<button class="w-full flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 font-sans text-xs uppercase tracking-widest font-semibold transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="groups">groups</span>
+                    Characters
+                </button>
+<button class="w-full flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 font-sans text-xs uppercase tracking-widest font-semibold transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="map">map</span>
+                    Locations
+                </button>
+<button class="w-full flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 font-sans text-xs uppercase tracking-widest font-semibold transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="edit_note">edit_note</span>
+                    Beats
+                </button>
+<button class="w-full flex items-center gap-3 px-3 py-2 bg-[#162839] text-white rounded-sm shadow-[2px_2px_0px_#000] font-sans text-xs uppercase tracking-widest font-semibold translate-y-[1px]">
+<span class="material-symbols-outlined text-lg" data-icon="psychology_alt">psychology_alt</span>
+                    Annie's Tips
+                </button>
+</nav>
+<div class="pt-6 border-t border-outline-variant/20">
+<button class="w-full bg-primary text-on-primary py-3 font-label text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-sm">
+                    New Scene
+                </button>
+<button class="w-full flex items-center gap-3 px-3 py-2 mt-4 text-slate-600 font-sans text-xs uppercase tracking-widest font-semibold hover:bg-slate-200/50 transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+                    Settings
+                </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto px-8 py-12 md:px-16 lg:px-24">
+<header class="mb-16 space-y-4">
+<h1 class="font-headline text-5xl md:text-6xl font-bold tracking-tight text-primary italic">Manuscript Progress</h1>
+<p class="font-label text-xs uppercase tracking-[0.2em] text-outline font-semibold">Project Code: Obsidian_Heart</p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-14 items-start">
+<!-- Left Column: Progress & Heatmap -->
+<div class="lg:col-span-8 space-y-16">
+<!-- Manuscript Progress Section -->
+<section class="space-y-8">
+<div class="flex justify-between items-end border-b border-outline-variant/20 pb-4">
+<h3 class="font-headline text-2xl font-semibold italic text-primary">Parts &amp; Chapters</h3>
+<span class="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">64% Overall Completion</span>
+</div>
+<div class="space-y-10">
+<div class="space-y-3">
+<div class="flex justify-between items-center font-label text-[11px] font-bold uppercase tracking-wider text-primary">
+<span>Part I: The Inevitable Fall</span>
+<span>100%</span>
+</div>
+<div class="h-3 bg-surface-container-high relative overflow-hidden">
+<div class="absolute inset-y-0 left-0 bg-secondary w-full"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center font-label text-[11px] font-bold uppercase tracking-wider text-primary">
+<span>Part II: Shadows of the Mesa</span>
+<span>72%</span>
+</div>
+<div class="h-3 bg-surface-container-high relative overflow-hidden">
+<div class="absolute inset-y-0 left-0 bg-secondary w-[72%]"></div>
+</div>
+<div class="grid grid-cols-4 gap-4 pt-2">
+<div class="h-1 bg-secondary"></div>
+<div class="h-1 bg-secondary"></div>
+<div class="h-1 bg-secondary opacity-40"></div>
+<div class="h-1 bg-surface-container-highest"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center font-label text-[11px] font-bold uppercase tracking-wider text-primary">
+<span>Part III: The Clockwork Heart</span>
+<span>12%</span>
+</div>
+<div class="h-3 bg-surface-container-high relative overflow-hidden">
+<div class="absolute inset-y-0 left-0 bg-primary w-[12%]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Writing Heatmap Section -->
+<section class="space-y-8">
+<div class="flex justify-between items-end border-b border-outline-variant/20 pb-4">
+<h3 class="font-headline text-2xl font-semibold italic text-primary">Writing Consistency</h3>
+<div class="flex gap-2 items-center">
+<span class="font-label text-[9px] uppercase tracking-widest text-outline">Less</span>
+<div class="flex gap-1">
+<div class="w-3 h-3 bg-surface-container-high"></div>
+<div class="w-3 h-3 bg-secondary opacity-30"></div>
+<div class="w-3 h-3 bg-secondary opacity-60"></div>
+<div class="w-3 h-3 bg-secondary"></div>
+</div>
+<span class="font-label text-[9px] uppercase tracking-widest text-outline">More</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-8 rounded-sm">
+<div class="writing-grid">
+<!-- Generated blocks for heatmap -->
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<!-- Row 2 -->
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+<!-- Row 3 -->
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-30"></div>
+<div class="aspect-square bg-surface-container-high"></div>
+<div class="aspect-square bg-secondary"></div>
+<div class="aspect-square bg-secondary opacity-60"></div>
+<div class="aspect-square bg-secondary"></div>
+</div>
+<div class="mt-6 flex justify-between font-label text-[10px] uppercase tracking-widest text-outline">
+<span>September</span>
+<span>October</span>
+<span>November</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Annie's Report -->
+<div class="lg:col-span-4 sticky top-28">
+<section class="bg-surface-container-low p-8 border-l-4 border-secondary/20 relative">
+<div class="absolute -top-6 -right-2">
+<span class="material-symbols-outlined text-5xl text-primary opacity-10">format_quote</span>
+</div>
+<div class="flex items-center gap-4 mb-8">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-primary-container ring-2 ring-surface border-2 border-primary">
+<img alt="Annie AI Portrait" data-alt="Abstract minimalist portrait of a woman with intelligent eyes, stylized in an ink-wash and watercolor digital painting style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAu8zb5pTe1WMHWeJ_jibxwd3fkS4l-vMQmrkP_CzsKj3q-53rCdEvrptgypQCzO0O5ciy9qZJ4AKmsuBf_1LXLAlB5NxHJsOGx5u1JLR6v3ASIzD3bSSTPpqiOH6jtGheSPucJ2hp8q1j7lRb6xT8b-w9qavfQfrPXnw_eIe6BjhUkWUwN-R_Y8XVPGqCE2fw-Y23mqHpgDjiJmwxKWuYl094e-GP1BcYnGiOtB7xjjUJscsZ18InIR7ttS0Vz8KUFr1o2ZABSH5iu"/>
+</div>
+<div>
+<h4 class="font-headline text-xl font-bold italic text-primary">Annie's Report</h4>
+<p class="font-label text-[10px] uppercase tracking-widest text-outline">Project Health: Robust</p>
+</div>
+</div>
+<div class="space-y-6">
+<div class="p-5 bg-surface-container-lowest shadow-sm">
+<p class="font-headline text-lg leading-relaxed text-primary italic">
+                                    "You've been consistent for 5 days. I'm... almost proud. Don't let the momentum die in Part III; it's where the ink usually dries up."
+                                </p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 bg-secondary-container/30">
+<p class="font-label text-[9px] uppercase font-bold tracking-widest text-on-secondary-container opacity-60 mb-1">Words Today</p>
+<p class="font-headline text-2xl font-bold text-on-secondary-container">1,420</p>
+</div>
+<div class="p-4 bg-surface-container-highest">
+<p class="font-label text-[9px] uppercase font-bold tracking-widest text-primary opacity-60 mb-1">Weekly Streak</p>
+<p class="font-headline text-2xl font-bold text-primary">5 Days</p>
+</div>
+</div>
+<div class="pt-6">
+<button class="w-full flex items-center justify-center gap-2 py-4 bg-primary text-on-primary font-label text-[11px] font-bold uppercase tracking-[0.2em] shadow-[4px_4px_0px_#006d37] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#006d37] transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">history_edu</span>
+                                    Resume Writing
+                                </button>
+</div>
+</div>
+</section>
+<!-- Stamp Chips (Metadata) -->
+<div class="mt-8 flex flex-wrap gap-2">
+<div class="px-3 py-1 bg-transparent border border-outline-variant text-[10px] font-bold uppercase tracking-widest font-label text-primary">Draft v2.4</div>
+<div class="px-3 py-1 bg-transparent border border-outline-variant text-[10px] font-bold uppercase tracking-widest font-label text-primary">Total: 42,801 words</div>
+<div class="px-3 py-1 bg-transparent border border-outline-variant text-[10px] font-bold uppercase tracking-widest font-label text-primary">Last Edit: 2h ago</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-3 bg-[#faf9f5]/80 backdrop-blur-md dark:bg-slate-900/80 text-[#162839] dark:text-slate-300 border-t border-[#162839]/10 shadow-inner z-50">
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-xl group-hover:text-[#162839]" data-icon="history_edu">history_edu</span>
+<span class="font-sans text-[10px] uppercase font-bold tracking-wider opacity-60">Word Count</span>
+</button>
+<button class="flex flex-col items-center gap-1 group text-[#006d37]">
+<span class="material-symbols-outlined text-xl" data-icon="schedule" style="font-variation-settings: 'FILL' 1;">schedule</span>
+<span class="font-sans text-[10px] uppercase font-black tracking-wider">Reading Time</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<span class="material-symbols-outlined text-xl group-hover:text-[#162839]" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+<span class="font-sans text-[10px] uppercase font-bold tracking-wider opacity-60">Annie's Mood</span>
+</button>
+</nav>
+</body></html>

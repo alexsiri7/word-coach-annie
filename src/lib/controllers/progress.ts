@@ -20,6 +20,13 @@ export interface NextScene {
   parentTitle: string | null;
 }
 
+export interface WritingPaceStats {
+  avgDailyWords: number;
+  activeDays: number;
+  totalSessionWords: number;
+  estimatedDaysRemaining: number | null;
+}
+
 export interface ProjectProgress {
   totalWords: number;
   totalScenes: number;
@@ -29,6 +36,7 @@ export interface ProjectProgress {
   outlineScenes: number;
   parts: PartProgress[];
   nextScene: NextScene | null;
+  pace: WritingPaceStats | null;
 }
 
 export class ProgressController {
@@ -165,6 +173,50 @@ export class ProgressController {
       }
     }
 
+    // Calculate writing pace from sessions in the last 28 days
+    let pace: WritingPaceStats | null = null;
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - 28);
+      const sinceDate = since.toISOString().slice(0, 10);
+
+      const sessions = await prisma.writingSession.findMany({
+        where: {
+          projectId,
+          date: { gte: sinceDate },
+        },
+        select: { date: true, wordsWritten: true },
+      });
+
+      if (sessions.length > 0) {
+        // Group by date and sum
+        const dayMap = new Map<string, number>();
+        let totalSessionWords = 0;
+        for (const s of sessions) {
+          dayMap.set(s.date, (dayMap.get(s.date) ?? 0) + s.wordsWritten);
+          totalSessionWords += s.wordsWritten;
+        }
+        const activeDays = dayMap.size;
+        const avgDailyWords = activeDays > 0 ? Math.round(totalSessionWords / activeDays) : 0;
+
+        // Estimate remaining words based on average words per scene
+        // Use completed scenes (DRAFT+REVISED+FINAL) to calculate avg words/scene
+        const completedScenes = draftedScenes + revisedScenes + finalScenes;
+        const remainingScenes = outlineScenes;
+        let estimatedDaysRemaining: number | null = null;
+
+        if (avgDailyWords > 0 && remainingScenes > 0 && completedScenes > 0) {
+          const avgWordsPerScene = totalWords / completedScenes;
+          const estimatedRemainingWords = avgWordsPerScene * remainingScenes;
+          estimatedDaysRemaining = Math.ceil(estimatedRemainingWords / avgDailyWords);
+        }
+
+        pace = { avgDailyWords, activeDays, totalSessionWords, estimatedDaysRemaining };
+      }
+    } catch {
+      // best-effort: don't fail progress on pace calculation error
+    }
+
     return {
       totalWords,
       totalScenes,
@@ -174,6 +226,7 @@ export class ProgressController {
       outlineScenes,
       parts,
       nextScene,
+      pace,
     };
   }
 }

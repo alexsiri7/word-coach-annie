@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 interface FeedbackBody {
   type: "bug" | "feature" | "other";
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      console.error("GitHub API error:", res.status, errorData);
+      logger.error("GitHub API error", { status: res.status, ...errorData });
       return NextResponse.json(
         { error: "Failed to submit feedback. Please try again later." },
         { status: 502 }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (err) {
-    console.error("Feedback submission error:", err);
+    logger.error("Feedback submission error", err);
     return NextResponse.json(
       { error: "Failed to submit feedback. Please try again later." },
       { status: 502 }

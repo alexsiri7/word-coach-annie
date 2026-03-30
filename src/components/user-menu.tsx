@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus } from "lucide-react";
+import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus, Plug } from "lucide-react";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 
 export function UserMenu() {
+    const router = useRouter();
     const { authenticated, user, loading, logout } = useAuth();
     const { setTheme, theme } = useTheme();
     const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -46,6 +48,10 @@ export function UserMenu() {
                         </div>
                     )}
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push("/setup")} className="cursor-pointer">
+                        <Plug className="h-4 w-4 mr-2" />
+                        Connect AI
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setFeedbackOpen(true)} className="cursor-pointer">
                         <MessageSquarePlus className="h-4 w-4 mr-2" />
                         Send Feedback

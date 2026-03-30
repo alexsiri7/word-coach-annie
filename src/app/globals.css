@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,141 +6,141 @@
 
 @layer base {
   :root {
-    /* Light Theme Palette (Default) */
+    /* Light Theme Palette — Editorial Cabin */
 
     /* Custom Surface Colors */
-    --surface: 220 20% 97%;
-    --surface-raised: 0 0% 100%;
-    --surface-overlay: 220 15% 95%;
-    --surface-sunken: 220 20% 94%;
+    --surface: 45 20% 97%;          /* #faf9f5 warm vellum */
+    --surface-raised: 0 0% 100%;    /* pure white — "the paper" */
+    --surface-overlay: 50 11% 95%;  /* #f4f4f0 — "the desk" */
+    --surface-sunken: 45 15% 93%;
 
-    /* Custom Borders */
-    --border: 220 13% 87%;
-    --border-subtle: 220 13% 91%;
+    /* Custom Borders — ghost-only philosophy */
+    --border: 43 7% 89%;            /* #e3e2df at full, use with opacity */
+    --border-subtle: 43 7% 93%;
 
     /* Custom Text Colors */
-    --text-primary: 225 15% 12%;
-    --text-secondary: 225 10% 40%;
-    --text-muted: 225 8% 58%;
+    --text-primary: 207 44% 15%;    /* #162839 deep ink */
+    --text-secondary: 207 20% 38%;
+    --text-muted: 207 12% 55%;
 
     /* Custom Status Colors */
-    --status-outline: 225 8% 58%;
+    --status-outline: 207 12% 55%;
     --status-draft: 38 92% 50%;
-    --status-revised: 230 80% 55%;
-    --status-final: 145 65% 40%;
+    --status-revised: 153 100% 21%; /* forest green */
+    --status-final: 153 100% 21%;
 
     /* Functional Colors */
-    --danger: 0 72% 51%;
-    --danger-hover: 0 72% 45%;
-    --success: 145 65% 40%;
+    --danger: 0 100% 17%;           /* #570001 dried-blood red */
+    --danger-hover: 0 100% 24%;
+    --success: 153 100% 21%;        /* #006d37 forest green */
     --warning: 38 92% 50%;
 
     /* Shadcn/Base Variables (Mapped to Light Theme) */
-    --background: 0 0% 100%;
-    --foreground: 225 15% 12%;
+    --background: 45 20% 97%;       /* matches surface — warm vellum */
+    --foreground: 207 44% 15%;      /* matches text-primary — deep ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 225 15% 12%;
+    --card-foreground: 207 44% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 225 15% 12%;
+    --popover-foreground: 207 44% 15%;
 
-    --primary: 225 15% 12%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 207 44% 15%;         /* deep ink */
+    --primary-foreground: 45 20% 97%;
 
-    --secondary: 220 15% 95%;
-    --secondary-foreground: 225 15% 12%;
+    --secondary: 50 11% 95%;
+    --secondary-foreground: 207 44% 15%;
 
-    --muted: 220 15% 95%;
-    --muted-foreground: 225 10% 40%;
+    --muted: 50 11% 95%;
+    --muted-foreground: 207 20% 38%;
 
-    /* Accent - Blue/Purple */
-    --accent: 230 80% 55%;
+    /* Accent — Forest Green */
+    --accent: 153 100% 21%;         /* #006d37 */
     --accent-foreground: 0 0% 100%;
-    --accent-hover: 230 80% 48%;
-    --accent-muted: 230 40% 92%;
+    --accent-hover: 153 100% 17%;
+    --accent-muted: 153 30% 92%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 100% 17%;      /* #570001 */
     --destructive-foreground: 0 0% 98%;
 
-    --input: 220 13% 87%;
-    --ring: 230 80% 55%;
+    --input: 43 7% 89%;
+    --ring: 153 100% 21%;
 
     --radius: 0.5rem;
 
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 153 100% 21%;
+    --chart-2: 207 44% 15%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 100% 17%;
+    --chart-5: 45 20% 60%;
   }
 
   .dark {
-    /* Dark Theme Palette */
+    /* Dark Theme Palette — Editorial Cabin (warm dark) */
 
     /* Custom Surface Colors */
-    --surface: 225 15% 10%;
-    --surface-raised: 225 15% 13%;
-    --surface-overlay: 225 15% 16%;
-    --surface-sunken: 225 15% 7%;
+    --surface: 60 4% 10%;           /* #1a1a18 warm near-black */
+    --surface-raised: 60 4% 13%;
+    --surface-overlay: 60 4% 16%;
+    --surface-sunken: 60 4% 7%;
 
-    /* Custom Borders */
-    --border: 225 12% 16%;
-    --border-subtle: 225 12% 16%;
+    /* Custom Borders — ghost-only philosophy */
+    --border: 60 4% 20%;
+    --border-subtle: 60 4% 18%;
 
     /* Custom Text Colors */
-    --text-primary: 225 10% 93%;
-    --text-secondary: 225 10% 65%;
-    --text-muted: 225 10% 45%;
+    --text-primary: 40 10% 90%;     /* #e8e6e1 warm off-white */
+    --text-secondary: 40 8% 65%;
+    --text-muted: 40 6% 45%;
 
     /* Custom Status Colors */
-    --status-outline: 225 10% 45%;
+    --status-outline: 40 6% 45%;
     --status-draft: 38 90% 60%;
-    --status-revised: 230 80% 65%;
-    --status-final: 145 60% 50%;
+    --status-revised: 153 80% 40%;
+    --status-final: 153 80% 40%;
 
     /* Functional Colors */
-    --danger: 0 72% 60%;
-    --danger-hover: 0 72% 68%;
-    --success: 145 60% 50%;
+    --danger: 0 80% 55%;
+    --danger-hover: 0 80% 62%;
+    --success: 153 80% 40%;
     --warning: 38 90% 60%;
 
     /* Shadcn/Base Variables (Mapped to Dark Theme) */
-    --background: 225 15% 7%;
-    --foreground: 225 10% 93%;
+    --background: 60 4% 7%;         /* warm near-black */
+    --foreground: 40 10% 90%;       /* warm off-white */
 
-    --card: 225 15% 10%;
-    --card-foreground: 225 10% 93%;
+    --card: 60 4% 10%;
+    --card-foreground: 40 10% 90%;
 
-    --popover: 225 15% 13%;
-    --popover-foreground: 225 10% 93%;
+    --popover: 60 4% 13%;
+    --popover-foreground: 40 10% 90%;
 
-    --primary: 225 10% 93%;
-    --primary-foreground: 225 15% 7%;
+    --primary: 40 10% 90%;
+    --primary-foreground: 60 4% 7%;
 
-    --secondary: 225 15% 13%;
-    --secondary-foreground: 225 10% 93%;
+    --secondary: 60 4% 13%;
+    --secondary-foreground: 40 10% 90%;
 
-    --muted: 225 15% 16%;
-    --muted-foreground: 225 10% 65%;
+    --muted: 60 4% 16%;
+    --muted-foreground: 40 8% 65%;
 
-    /* Accent - Blue/Purple to pop against dark background */
-    --accent: 230 80% 65%;
-    --accent-foreground: 225 10% 93%;
-    --accent-hover: 230 80% 72%;
-    --accent-muted: 230 40% 20%;
+    /* Accent — Forest Green (stays green in dark) */
+    --accent: 153 80% 40%;
+    --accent-foreground: 40 10% 90%;
+    --accent-hover: 153 80% 48%;
+    --accent-muted: 153 30% 18%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 98%;
 
-    --input: 225 12% 16%;
-    --ring: 230 80% 65%;
+    --input: 60 4% 20%;
+    --ring: 153 80% 40%;
 
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 153 80% 40%;
+    --chart-2: 207 44% 40%;
+    --chart-3: 38 90% 60%;
+    --chart-4: 0 80% 55%;
+    --chart-5: 40 30% 50%;
   }
 
   * {
@@ -153,6 +153,10 @@
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Subtle grain texture — 2% opacity noise overlay */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
   }
 
   /* Custom scrollbar */
@@ -183,39 +187,88 @@
 
 @layer components {
 
-  /* Glass card */
+  /* Glass card — no-line rule: tonal shift, not borders */
   .glass-card {
-    background: hsl(var(--surface-raised));
-    border: 1px solid hsl(var(--border));
-    border-radius: 1rem;
+    background: hsl(var(--surface-raised) / 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.15);
+    border-radius: 0.25rem;
     transition: all 0.2s ease;
   }
 
   .glass-card:hover {
-    border-color: hsl(var(--border) / 0.8);
-    box-shadow: 0 8px 32px hsl(0 0% 0% / 0.08);
+    box-shadow: 0 24px 40px hsl(var(--text-primary) / 0.05);
+  }
+
+  .dark .glass-card {
+    background: hsl(var(--surface-raised) / 0.7);
+    border-color: hsl(var(--border) / 0.15);
   }
 
   .dark .glass-card:hover {
-    box-shadow: 0 8px 32px hsl(0 0% 0% / 0.2);
+    box-shadow: 0 24px 40px hsl(0 0% 0% / 0.12);
   }
 
-  /* Gradient accent line */
+  /* Ghost border — accessibility boundary at 15% opacity */
+  .ghost-border {
+    border: 1px solid hsl(var(--border) / 0.15);
+  }
+
+  /* Gradient accent line — primary to primary-container for "soul" */
   .accent-gradient {
     background: linear-gradient(135deg,
         hsl(var(--accent)),
-        hsl(260 70% 65%),
+        hsl(var(--primary)),
         hsl(var(--accent)));
   }
 
-  /* Tag pill */
+  /* Tag pill — stamp chip style (square, not rounded pills) */
   .tag-pill {
     background: hsl(var(--surface-overlay));
     color: hsl(var(--text-secondary));
     padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
+    border-radius: 0;
     font-size: 0.75rem;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid hsl(var(--border) / 0.15);
+  }
+
+  /* Stamp chip — square metadata tags */
+  .stamp-chip {
+    display: inline-flex;
+    align-items: center;
+    background: hsl(var(--surface-overlay));
+    color: hsl(var(--text-secondary));
+    padding: 0.125rem 0.5rem;
+    border-radius: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid hsl(var(--border) / 0.15);
+  }
+
+  /* Annie's coaching cards — no dividers, tonal differentiation */
+  .coaching-card-intense {
+    background: hsl(var(--surface-sunken));
+    border: none;
+    border-radius: 0.25rem;
+    padding: 1.5rem;
+  }
+
+  .coaching-card-positive {
+    background: hsl(var(--accent-muted));
+    border: none;
+    border-radius: 0.25rem;
+    padding: 1.5rem;
+  }
+
+  .coaching-card-intense > * + *,
+  .coaching-card-positive > * + * {
+    margin-top: 1.5rem;
   }
 
   /* Status dots */
@@ -236,12 +289,34 @@
   }
 }
 
+@layer components {
+  /* Editorial typography classes */
+  .font-editorial {
+    font-family: 'Newsreader', Georgia, Cambria, serif;
+  }
+
+  .display-lg {
+    font-family: 'Newsreader', Georgia, Cambria, serif;
+    font-size: 3.5rem;
+    line-height: 1.4;
+    font-weight: 400;
+  }
+
+  .label-md {
+    font-family: 'Inter', system-ui, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+}
+
 /* Tiptap editor styling */
 .tiptap-editor .ProseMirror {
   outline: none;
   min-height: 100%;
   padding: 2rem 3rem;
-  font-family: Georgia, Cambria, serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.0625rem;
   line-height: 1.8;
   color: hsl(var(--text-primary));
@@ -252,27 +327,27 @@
 }
 
 .tiptap-editor .ProseMirror h1 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 1rem;
   margin-top: 2rem;
   color: hsl(var(--text-primary));
 }
 
 .tiptap-editor .ProseMirror h2 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.375rem;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 0.75rem;
   margin-top: 1.5rem;
   color: hsl(var(--text-primary));
 }
 
 .tiptap-editor .ProseMirror h3 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 0.5rem;
   margin-top: 1.25rem;
   color: hsl(var(--text-primary));
@@ -310,16 +385,17 @@
   pointer-events: none;
 }
 
-/* Reader view prose */
+/* Reader view prose — Editorial Cabin manuscript feel */
 .reader-prose {
-  font-family: Georgia, Cambria, serif;
-  font-size: 1.125rem;
-  line-height: 1.75;
-  color: hsl(var(--text-primary));
+  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-size: 1.25rem;
+  line-height: 1.7;
+  font-weight: 300;
+  color: hsl(var(--text-primary) / 0.9);
 }
 
 .reader-prose p {
-  margin-bottom: 0.875rem;
+  margin-bottom: 1.5rem;
   text-indent: 1.5em;
 }
 
@@ -328,38 +404,39 @@
 }
 
 .reader-prose h1 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 1rem;
   margin-top: 2rem;
   text-indent: 0;
 }
 
 .reader-prose h2 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.375rem;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 0.75rem;
   margin-top: 1.5rem;
   text-indent: 0;
 }
 
 .reader-prose h3 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 0.5rem;
   margin-top: 1.25rem;
   text-indent: 0;
 }
 
 .reader-prose blockquote {
-  border-left: 3px solid hsl(var(--accent) / 0.4);
-  padding-left: 1.25rem;
-  margin: 1.25rem 0;
-  color: hsl(var(--text-secondary));
+  border-left: 2px solid hsl(var(--accent) / 0.2);
+  padding-left: 2rem;
+  margin: 2.5rem 0;
+  color: hsl(var(--text-primary) / 0.7);
   font-style: italic;
+  font-weight: 400;
 }
 
 .reader-prose blockquote p {
@@ -399,8 +476,15 @@
 
 @media (min-width: 640px) {
   .reader-prose {
-    font-size: 1.1875rem;
-    line-height: 1.8;
+    font-size: 1.375rem;
+    line-height: 1.7;
+  }
+}
+
+@media (min-width: 768px) {
+  .reader-prose {
+    font-size: 1.5rem;
+    line-height: 1.7;
   }
 }
 
@@ -421,8 +505,8 @@
 .prose-preview h1,
 .prose-preview h2,
 .prose-preview h3 {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
+  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-weight: 500;
   margin-bottom: 0.5rem;
   margin-top: 0.75rem;
   color: hsl(var(--text-primary));

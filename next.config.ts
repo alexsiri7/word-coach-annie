@@ -23,6 +23,7 @@ const buildVersion = generateVersionFile();
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@prisma/adapter-pg"],
   experimental: {
     optimizePackageImports: [
       "lucide-react",
@@ -152,6 +153,7 @@ export default withSentryConfig(withAnalyzer(pwaConfig), {
   // Upload source maps only when SENTRY_AUTH_TOKEN is set
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
 
   // Automatically tree-shake Sentry logger statements for smaller bundles
   disableLogger: true,

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import crypto from "crypto";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/auth/google — Redirect to Google OAuth consent screen.
@@ -18,17 +20,37 @@ export async function GET() {
         );
     }
 
-    const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    try {
+        const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
-    const authUrl = client.generateAuthUrl({
-        access_type: "offline",
-        scope: [
-            "openid",
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-        ],
-        prompt: "consent",
-    });
+        const state = crypto.randomUUID();
 
-    return NextResponse.redirect(authUrl);
+        const authUrl = client.generateAuthUrl({
+            access_type: "offline",
+            scope: [
+                "openid",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+            ],
+            prompt: "consent",
+            state,
+        });
+
+        const response = NextResponse.redirect(authUrl);
+        response.cookies.set("oauth_state", state, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 600, // 10 minutes
+            path: "/",
+        });
+
+        return response;
+    } catch (error) {
+        logger.error("GET /api/auth/google error", error);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500 }
+        );
+    }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
+import { logger } from "@/lib/logger";
 
 export async function GET(
     request: Request,
@@ -12,7 +13,8 @@ export async function GET(
         const worldObjects = await UniversesController.listWorldObjects(id, type);
         return NextResponse.json(worldObjects);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
@@ -29,6 +31,7 @@ export async function POST(
         });
         return NextResponse.json(worldObject);
     } catch (error: unknown) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        logger.error("Route error", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
