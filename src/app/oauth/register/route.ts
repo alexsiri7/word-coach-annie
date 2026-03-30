@@ -53,14 +53,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Only allow localhost redirect URIs (standard for MCP clients)
+    // Allow localhost (CLI tools) and HTTPS (web connectors like Claude.ai)
     const host = parsed.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1") {
+    const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+    const isHttps = parsed.protocol === "https:";
+    if (!isLocalhost && !isHttps) {
       return NextResponse.json(
         {
           error: "invalid_client_metadata",
           error_description:
-            "redirect_uris must use localhost (localhost, 127.0.0.1, or ::1)",
+            "redirect_uris must use localhost or HTTPS",
         },
         { status: 400 }
       );

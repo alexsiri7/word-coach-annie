@@ -500,6 +500,7 @@ export function SceneEditor({
             lastSaved={lastSaved}
             sessionWordsWritten={session.wordsWritten}
             sessionDurationSeconds={session.durationSeconds}
+            sessionWordsPerHour={session.wordsPerHour}
             sessionActive={session.active}
           />
         </div>
