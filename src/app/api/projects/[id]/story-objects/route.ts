@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess, verifyProjectReadAccess } from "@/lib/api-auth";
 
 export async function GET(
   request: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {

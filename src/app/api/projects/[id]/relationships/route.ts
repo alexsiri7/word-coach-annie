@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess, verifyProjectReadAccess } from "@/lib/api-auth";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -20,7 +20,7 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
