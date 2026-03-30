@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { List, X as XIcon } from "lucide-react";
+import { List, X as XIcon, BookOpen, Clock, ArrowLeft } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +44,11 @@ function countWords(outline: OutlineNode[]): number {
     count += countWords(node.children);
   }
   return count;
+}
+
+/** Estimate reading time in minutes (~250 wpm) */
+function estimateReadingTime(words: number): number {
+  return Math.max(1, Math.round(words / 250));
 }
 
 /** Collect chapters for TOC */
@@ -93,24 +98,29 @@ function SceneContent({ content }: { content: string }) {
 function ManuscriptNode({
   node,
   chapterCounter,
+  isFirst,
 }: {
   node: OutlineNode;
   chapterCounter: { value: number };
+  isFirst?: boolean;
 }) {
   if (node.type === "PART") {
     return (
-      <section id={node.id} className="mt-16 mb-8 first:mt-8">
-        <h2 className="font-sans text-3xl sm:text-4xl font-bold text-text-primary text-center tracking-tight mb-2">
+      <section id={node.id} className="mt-24 mb-12 first:mt-8">
+        <h2 className="font-editorial text-3xl sm:text-4xl font-bold text-text-primary text-center tracking-tight mb-2">
           {node.title}
         </h2>
-        <div className="flex justify-center my-6">
-          <div className="w-16 h-px bg-border" />
+        <div className="flex justify-center items-center gap-3 my-8">
+          <div className="h-px w-8 bg-border/40" />
+          <BookOpen className="h-3.5 w-3.5 text-text-muted/40" />
+          <div className="h-px w-8 bg-border/40" />
         </div>
-        {node.children.map((child) => (
+        {node.children.map((child, i) => (
           <ManuscriptNode
             key={child.id}
             node={child}
             chapterCounter={chapterCounter}
+            isFirst={i === 0 && isFirst}
           />
         ))}
       </section>
@@ -125,21 +135,26 @@ function ManuscriptNode({
     );
 
     return (
-      <section id={node.id} className="mt-12 mb-8">
-        <h3 className="font-sans text-xl sm:text-2xl font-semibold text-text-primary text-center tracking-tight mb-1">
-          <span className="block text-sm font-normal text-text-muted uppercase tracking-widest mb-1">
+      <section id={node.id} className="mt-20 mb-12">
+        {/* Chapter start typography */}
+        <div className="text-center mb-16">
+          <span className="label-md text-text-muted tracking-[0.3em] block mb-4">
             Chapter {chapterCounter.value}
           </span>
-          {node.title}
-        </h3>
-        <div className="flex justify-center my-6">
-          <div className="w-8 h-px bg-border" />
+          <h3 className="display-lg italic font-extralight tracking-tight text-text-primary leading-tight">
+            {node.title}
+          </h3>
+          <div className="flex justify-center items-center gap-3 mt-10">
+            <div className="h-px w-8 bg-border/40" />
+            <BookOpen className="h-3.5 w-3.5 text-text-muted/40" />
+            <div className="h-px w-8 bg-border/40" />
+          </div>
         </div>
         {hasAnyContent ? (
           scenes.map((scene, i) => (
             <div key={scene.id}>
               {i > 0 && scene.content && scene.content !== "<p></p>" && (
-                <div className="flex justify-center my-8">
+                <div className="flex justify-center my-10">
                   <span className="text-text-muted tracking-[0.5em] text-sm select-none">
                     * * *
                   </span>
@@ -173,6 +188,7 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
   const [tocOpen, setTocOpen] = useState(false);
   const tocEntries = collectTocEntries(outline);
   const wordCount = countWords(outline);
+  const readingTime = estimateReadingTime(wordCount);
   const chapterCounter = { value: 0 };
 
   const handleTocClick = (id: string) => {
@@ -184,31 +200,50 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top accent line */}
-      <div className="h-0.5 accent-gradient" />
-
-      {/* Floating controls */}
-      <div className="fixed top-3 right-3 z-50 flex items-center gap-1.5">
-        <ThemeToggle />
-        {tocEntries.length > 0 && (
-          <button
-            onClick={() => setTocOpen(!tocOpen)}
-            className={cn(
-              "h-9 w-9 rounded-lg flex items-center justify-center transition-colors",
-              "bg-surface-raised border border-border shadow-sm",
-              "hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
+    <div className="min-h-screen bg-surface">
+      {/* Translucent top bar */}
+      <header className="fixed top-0 left-0 w-full z-40 bg-surface/40 backdrop-blur-sm transition-all duration-300">
+        <div className="flex justify-between items-center w-full px-6 md:px-8 py-4 max-w-full mx-auto">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 text-text-primary hover:bg-surface-overlay rounded-full transition-colors duration-150 active:scale-95"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="hidden md:block">
+              <h1 className="text-lg font-editorial italic font-bold text-text-primary leading-none tracking-tight">Annie</h1>
+              <p className="label-md text-[10px] text-text-muted opacity-60">Reader Mode</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 md:gap-6">
+            {wordCount > 0 && (
+              <div className="flex items-center gap-2 label-md text-[10px] font-bold tracking-wider text-text-muted">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{readingTime}m read</span>
+              </div>
             )}
-            aria-label="Table of contents"
-          >
-            {tocOpen ? (
-              <XIcon className="h-4 w-4" />
-            ) : (
-              <List className="h-4 w-4" />
+            <ThemeToggle />
+            {tocEntries.length > 0 && (
+              <button
+                onClick={() => setTocOpen(!tocOpen)}
+                className={cn(
+                  "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
+                  "hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
+                )}
+                aria-label="Table of contents"
+              >
+                {tocOpen ? (
+                  <XIcon className="h-4 w-4" />
+                ) : (
+                  <List className="h-4 w-4" />
+                )}
+              </button>
             )}
-          </button>
-        )}
-      </div>
+          </div>
+        </div>
+      </header>
 
       {/* Table of contents drawer */}
       {tocOpen && (
@@ -217,10 +252,10 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
             className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-fade-in"
             onClick={() => setTocOpen(false)}
           />
-          <nav className="fixed top-0 right-0 z-50 h-full w-80 max-w-[85vw] bg-surface-raised border-l border-border shadow-2xl overflow-y-auto animate-slide-in-right">
+          <nav className="fixed top-0 right-0 z-50 h-full w-80 max-w-[85vw] bg-surface-raised border-l border-border/15 shadow-2xl overflow-y-auto animate-slide-in-right">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-sans text-sm font-semibold uppercase tracking-wider text-text-muted">
+                <h2 className="label-md text-text-muted">
                   Contents
                 </h2>
                 <button
@@ -253,65 +288,101 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
         </>
       )}
 
-      {/* Title page */}
-      <header className="pt-16 pb-12 sm:pt-24 sm:pb-16 px-4">
-        <div className="max-w-[700px] mx-auto text-center">
-          <h1 className="font-serif text-4xl sm:text-5xl font-bold text-text-primary leading-tight tracking-tight mb-4">
+      {/* Main manuscript canvas */}
+      <main className="relative pt-32 pb-64 px-6 md:px-0 max-w-2xl mx-auto">
+        {/* Title page */}
+        <section className="mb-24 text-center">
+          <span className="label-md text-[10px] tracking-[0.3em] text-text-muted block mb-4">
+            {project.author ? `by ${project.author}` : "A Manuscript"}
+          </span>
+          <h2 className="font-editorial text-5xl md:text-6xl italic font-extralight tracking-tight text-text-primary leading-tight">
             {project.title}
-          </h1>
-          {project.author && (
-            <p className="text-lg text-text-secondary mb-2">
-              by {project.author}
-            </p>
-          )}
-          {project.genre && (
-            <span className="tag-pill">{project.genre}</span>
-          )}
-          {wordCount > 0 && (
-            <p className="text-sm text-text-muted mt-4">
-              {wordCount.toLocaleString()} words
-            </p>
-          )}
-        </div>
-      </header>
+          </h2>
+          <div className="mt-12 flex justify-center items-center gap-3">
+            <div className="h-px w-8 bg-border/40" />
+            <BookOpen className="h-3.5 w-3.5 text-text-muted/40" />
+            <div className="h-px w-8 bg-border/40" />
+          </div>
+        </section>
 
-      {/* Divider */}
-      <div className="flex justify-center mb-8">
-        <div className="w-24 h-px bg-border" />
-      </div>
-
-      {/* Manuscript body */}
-      <main id="main-content" className="px-4 pb-16">
-        <article className="max-w-[700px] mx-auto">
+        {/* Manuscript body */}
+        <article className="space-y-10">
           {outline.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-text-muted italic">
+              <p className="text-text-muted italic font-editorial text-lg">
                 This manuscript has no content yet.
               </p>
             </div>
           ) : (
-            outline.map((node) => (
+            outline.map((node, i) => (
               <ManuscriptNode
                 key={node.id}
                 node={node}
                 chapterCounter={chapterCounter}
+                isFirst={i === 0}
               />
             ))
           )}
-
-          {/* End of manuscript */}
-          {outline.length > 0 && (
-            <footer className="mt-16 mb-8 text-center">
-              <div className="flex justify-center mb-6">
-                <div className="w-16 h-px bg-border" />
-              </div>
-              <p className="text-sm text-text-muted italic tracking-wide">
-                End of manuscript
-              </p>
-            </footer>
-          )}
         </article>
+
+        {/* Stamp chip footer */}
+        {outline.length > 0 && (
+          <footer className="mt-32 pt-16 border-t border-border/10 flex flex-wrap gap-4 justify-center">
+            {wordCount > 0 && (
+              <span className="stamp-chip gap-2">
+                <BookOpen className="h-3 w-3" />
+                <span>{wordCount.toLocaleString()} Words</span>
+              </span>
+            )}
+            {project.genre && (
+              <span className="stamp-chip gap-2">
+                {project.genre}
+              </span>
+            )}
+            <span className="stamp-chip gap-2 text-accent">
+              <Clock className="h-3 w-3" />
+              <span>{readingTime} min read</span>
+            </span>
+          </footer>
+        )}
       </main>
+
+      {/* Bottom navigation bar */}
+      <nav className="fixed bottom-0 left-0 w-full flex justify-between items-center px-8 md:px-12 py-3 bg-surface/80 backdrop-blur-md border-t border-border/5 z-40">
+        <div className="flex items-center gap-6 md:gap-8">
+          {tocEntries.length > 0 && (
+            <button
+              onClick={() => setTocOpen(!tocOpen)}
+              className="flex flex-col items-center gap-1 group"
+            >
+              <List className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
+              <span className="label-md text-[10px] font-bold tracking-wider text-text-muted">Outline</span>
+            </button>
+          )}
+        </div>
+        {/* Progress bar (desktop) */}
+        <div className="hidden md:flex items-center gap-4">
+          {wordCount > 0 && (
+            <>
+              <div className="w-48 h-1 bg-surface-overlay rounded-full overflow-hidden">
+                <div className="w-full h-full bg-accent rounded-full" />
+              </div>
+              <span className="label-md text-[10px] font-bold text-text-muted">
+                {wordCount.toLocaleString()} words
+              </span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-6 md:gap-8">
+          <button
+            onClick={() => window.history.back()}
+            className="flex flex-col items-center gap-1 group"
+          >
+            <ArrowLeft className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
+            <span className="label-md text-[10px] font-bold tracking-wider text-text-muted">Back</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
