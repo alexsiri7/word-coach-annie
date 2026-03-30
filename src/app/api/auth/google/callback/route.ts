@@ -50,8 +50,17 @@ export async function GET(request: NextRequest) {
     try {
         const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
-        // Exchange code for tokens
-        const { tokens } = await client.getToken(code);
+        // Exchange code for tokens — catch invalid_grant separately
+        let tokens;
+        try {
+            const result = await client.getToken(code);
+            tokens = result.tokens;
+        } catch {
+            const baseUrl = new URL(redirectUri).origin;
+            return NextResponse.redirect(
+                new URL("/login?error=invalid_code", baseUrl)
+            );
+        }
         client.setCredentials(tokens);
 
         // Fetch user info from Google
