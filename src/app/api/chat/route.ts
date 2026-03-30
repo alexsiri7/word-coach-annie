@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAiConfig } from "@/lib/ai/settings";
-import { getCurrentUserId } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent } from "@/lib/ai/adk-agent";
@@ -78,6 +78,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     }
 
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access.response;
+
     const messages = await prisma.chatMessage.findMany({
       where: { projectId },
       orderBy: { createdAt: "asc" },
@@ -108,6 +112,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access.response;
+
     // Sanitize user input to prevent stored XSS
     const sanitizedMessage = sanitizeInput(message);
 
@@ -131,7 +139,6 @@ export async function POST(request: NextRequest) {
     recentMessages.reverse();
 
     // Load AI provider config (user DB > global DB > env vars > defaults)
-    const userId = getCurrentUserId(request);
     const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       return NextResponse.json(
@@ -241,6 +248,10 @@ export async function DELETE(request: NextRequest) {
     if (!projectId) {
       return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     }
+
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access.response;
 
     await prisma.chatMessage.deleteMany({ where: { projectId } });
     return NextResponse.json({ success: true });

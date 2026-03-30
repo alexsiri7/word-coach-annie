@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -34,6 +35,10 @@ export async function GET(
       );
     }
 
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(storyObject.projectId, userId);
+    if (!access.authorized) return access.response;
+
     return NextResponse.json(storyObject);
   } catch (error) {
     logger.error("GET /api/story-objects/[id] error", error);
@@ -54,7 +59,7 @@ export async function PATCH(
     // Verify story object exists
     const existing = await prisma.storyObject.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
 
     if (!existing) {
@@ -63,6 +68,10 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(existing.projectId, userId);
+    if (!access.authorized) return access.response;
 
     let body: Record<string, unknown>;
     try {
@@ -120,7 +129,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -128,7 +137,7 @@ export async function DELETE(
 
     const existing = await prisma.storyObject.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
 
     if (!existing) {
@@ -137,6 +146,10 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(existing.projectId, userId);
+    if (!access.authorized) return access.response;
 
     await prisma.storyObject.delete({ where: { id } });
 

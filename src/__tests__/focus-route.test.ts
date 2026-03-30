@@ -13,8 +13,13 @@ vi.mock("next/server", () => {
             return { data, status: init?.status || 200, async json() { return data; } };
         }
     };
-    return { NextResponse: nr };
+    return { NextResponse: nr, NextRequest: class {} };
 });
+
+vi.mock("@/lib/api-auth", () => ({
+    getCurrentUserId: vi.fn().mockReturnValue(null),
+    verifyProjectAccessByNode: vi.fn().mockResolvedValue({ authorized: true, projectId: "test" }),
+}));
 
 function mockParams<T>(params: T): { params: Promise<T> } {
     return { params: Promise.resolve(params) };
@@ -36,7 +41,7 @@ describe("Focus API route", () => {
         const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1", parentId: ch.id });
 
         const { GET } = await import("@/app/api/focus/[sceneId]/route");
-        const res = await GET(new Request("http://localhost"), mockParams({ sceneId: scene.id }));
+        const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: scene.id }));
 
         expect((res as any).status || 200).toBe(200);
         const body = await (res as any).json();
@@ -47,7 +52,7 @@ describe("Focus API route", () => {
 
     it("GET returns 500 for non-existent scene", async () => {
         const { GET } = await import("@/app/api/focus/[sceneId]/route");
-        const res = await GET(new Request("http://localhost"), mockParams({ sceneId: "nonexistent" }));
+        const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: "nonexistent" }));
 
         expect((res as any).status).toBe(500);
     });
