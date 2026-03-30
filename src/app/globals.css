@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -28,6 +28,27 @@
     --status-draft: 38 92% 50%;
     --status-revised: 153 100% 21%; /* forest green */
     --status-final: 153 100% 21%;
+
+    /* Ink & Timber — Tertiary (Annie's intense coaching) */
+    --tertiary: 0 100% 17%;          /* #570001 dried-blood red */
+    --tertiary-container: 0 100% 25%; /* #800002 deep red container */
+    --on-tertiary-container: 16 100% 72%; /* #ff8372 light coral text on red */
+
+    /* Ink & Timber — Secondary Container */
+    --secondary-container: 140 94% 73%; /* #7bf8a1 mint green container */
+    --on-secondary-container: 153 100% 22%; /* #007239 dark green text */
+
+    /* Ink & Timber — Surface Container Hierarchy */
+    --surface-container-lowest: 0 0% 100%;     /* #ffffff pure white — "the paper" */
+    --surface-container-low: 40 18% 95%;       /* #f4f2ed warm sidebar */
+    --surface-container: 40 7% 93%;            /* #efeeea */
+    --surface-container-high: 40 7% 91%;       /* #e9e8e4 hover state */
+    --surface-container-highest: 43 5% 88%;    /* #e3e2df intense Annie tips */
+
+    /* Ink & Timber — On-Surface tokens */
+    --on-surface: 72 5% 11%;          /* #1b1c1a near-black text */
+    --on-surface-variant: 216 6% 28%; /* #43474c muted text */
+    --outline-variant: 220 5% 79%;    /* #c4c6cd ghost boundaries */
 
     /* Functional Colors */
     --danger: 0 100% 17%;           /* #570001 dried-blood red */
@@ -99,6 +120,27 @@
     --status-revised: 153 80% 40%;
     --status-final: 153 80% 40%;
 
+    /* Ink & Timber — Tertiary (Annie's intense coaching) — Dark */
+    --tertiary: 0 70% 50%;
+    --tertiary-container: 0 60% 20%;
+    --on-tertiary-container: 16 100% 80%;
+
+    /* Ink & Timber — Secondary Container — Dark */
+    --secondary-container: 153 40% 18%;
+    --on-secondary-container: 153 80% 60%;
+
+    /* Ink & Timber — Surface Container Hierarchy — Dark */
+    --surface-container-lowest: 60 4% 8%;
+    --surface-container-low: 60 4% 11%;
+    --surface-container: 60 4% 14%;
+    --surface-container-high: 60 4% 17%;
+    --surface-container-highest: 60 4% 20%;
+
+    /* Ink & Timber — On-Surface tokens — Dark */
+    --on-surface: 40 10% 90%;
+    --on-surface-variant: 40 8% 65%;
+    --outline-variant: 60 4% 25%;
+
     /* Functional Colors */
     --danger: 0 80% 55%;
     --danger-hover: 0 80% 62%;
@@ -150,7 +192,7 @@
   body {
     background: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Manrope', 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Subtle grain texture — 2% opacity noise overlay */
@@ -223,44 +265,46 @@
         hsl(var(--accent)));
   }
 
-  /* Tag pill — stamp chip style (square, not rounded pills) */
+  /* Tag pill — stamp chip style (0px roundedness per Ink & Timber) */
   .tag-pill {
-    background: hsl(var(--surface-overlay));
+    background: hsl(var(--surface-container-highest));
     color: hsl(var(--text-secondary));
     padding: 0.125rem 0.5rem;
     border-radius: 0;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.5625rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid hsl(var(--border) / 0.15);
+    letter-spacing: -0.025em;
+    box-shadow: 0 0 0 1px hsl(var(--text-primary) / 0.1);
   }
 
-  /* Stamp chip — square metadata tags */
+  /* Stamp chip — square metadata tags (0px roundedness per Ink & Timber) */
   .stamp-chip {
     display: inline-flex;
     align-items: center;
-    background: hsl(var(--surface-overlay));
+    background: hsl(var(--surface-container-highest));
     color: hsl(var(--text-secondary));
     padding: 0.125rem 0.5rem;
     border-radius: 0;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.5625rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid hsl(var(--border) / 0.15);
+    letter-spacing: -0.025em;
+    box-shadow: 0 0 0 1px hsl(var(--text-primary) / 0.1);
   }
 
   /* Annie's coaching cards — no dividers, tonal differentiation */
   .coaching-card-intense {
-    background: hsl(var(--surface-sunken));
+    background: hsl(var(--tertiary-container));
+    color: hsl(var(--on-tertiary-container));
     border: none;
     border-radius: 0.25rem;
     padding: 1.5rem;
   }
 
   .coaching-card-positive {
-    background: hsl(var(--accent-muted));
+    background: hsl(var(--secondary-container));
+    color: hsl(var(--on-secondary-container));
     border: none;
     border-radius: 0.25rem;
     padding: 1.5rem;
