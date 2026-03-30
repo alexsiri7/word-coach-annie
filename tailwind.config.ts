@@ -73,10 +73,21 @@ const config: Config = {
   				'sans-serif'
   			],
   			serif: [
+  				'Newsreader',
+  				'Georgia',
+  				'Cambria',
+  				'serif'
+  			],
+  			editorial: [
+  				'Newsreader',
   				'Georgia',
   				'Cambria',
   				'serif'
   			]
+  		},
+  		spacing: {
+  			'14': '3.5rem',
+  			'22': '5.5rem'
   		},
   		borderRadius: {
   			xl: '1rem',

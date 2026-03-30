@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeAuthCode, clients } from "@/lib/oauth-store";
+import { consumeAuthCode, getClient } from "@/lib/oauth-store";
 import {
   createMcpToken,
   verifyMcpToken,
@@ -76,7 +76,8 @@ async function handleAuthorizationCode(body: Record<string, string>) {
   }
 
   // Validate client exists
-  if (!clients.has(client_id)) {
+  const client = await getClient(client_id);
+  if (!client) {
     return errorResponse("invalid_client", "Unknown client_id");
   }
 
@@ -134,7 +135,8 @@ async function handleRefreshToken(body: Record<string, string>) {
   }
 
   // Validate client exists
-  if (!clients.has(client_id)) {
+  const client = await getClient(client_id);
+  if (!client) {
     return errorResponse("invalid_client", "Unknown client_id");
   }
 

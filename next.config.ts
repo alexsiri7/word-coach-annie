@@ -23,6 +23,7 @@ const buildVersion = generateVersionFile();
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@prisma/adapter-pg"],
   experimental: {
     optimizePackageImports: [
       "lucide-react",

@@ -1,10 +1,11 @@
 /**
- * In-memory OAuth 2.0 storage for MCP remote access.
+ * OAuth 2.0 storage for MCP remote access.
  *
- * Stores dynamic client registrations and pending authorization codes.
- * Suitable for a single Railway instance. Data is lost on restart,
- * which is acceptable — clients will re-register automatically.
+ * Client registrations are persisted to the database so they survive
+ * Railway deploys. Auth codes remain in-memory (short-lived, 5 min).
  */
+
+import { prisma } from "@/lib/db";
 
 export interface ClientRegistration {
   client_id: string;
@@ -25,8 +26,36 @@ export interface AuthCode {
   expiresAt: number;
 }
 
-/** Registered OAuth clients (client_id -> registration). */
-export const clients = new Map<string, ClientRegistration>();
+/** Register an OAuth client (persisted to database). */
+export async function registerClient(
+  registration: ClientRegistration
+): Promise<void> {
+  await prisma.oAuthClient.create({
+    data: {
+      id: registration.client_id,
+      clientName: registration.client_name,
+      redirectUris: JSON.stringify(registration.redirect_uris),
+      grantTypes: JSON.stringify(registration.grant_types),
+    },
+  });
+}
+
+/** Look up a registered OAuth client by ID. Returns null if not found. */
+export async function getClient(
+  clientId: string
+): Promise<ClientRegistration | null> {
+  const row = await prisma.oAuthClient.findUnique({
+    where: { id: clientId },
+  });
+  if (!row) return null;
+  return {
+    client_id: row.id,
+    client_name: row.clientName,
+    redirect_uris: JSON.parse(row.redirectUris) as string[],
+    grant_types: JSON.parse(row.grantTypes) as string[],
+    registered_at: row.createdAt.getTime(),
+  };
+}
 
 /** Pending authorization codes (code -> auth code details). Expire after 5 min. */
 export const authCodes = new Map<string, AuthCode>();
