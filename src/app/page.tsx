@@ -2,7 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, MoreVertical, Trash2, Pencil, PenLine, Sparkles, Globe } from "lucide-react";
+import {
+  Plus,
+  MoreVertical,
+  Trash2,
+  Pencil,
+  PenLine,
+  Sparkles,
+  Globe,
+  Users,
+  MapPin,
+  ListChecks,
+  Lightbulb,
+  Settings,
+  ArrowRight,
+  BookText,
+  CirclePlus,
+} from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -57,6 +73,47 @@ interface Project {
   updatedAt: string;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Sidebar nav items                                                  */
+/* ------------------------------------------------------------------ */
+const sidebarItems = [
+  { icon: Users, label: "Characters", active: true },
+  { icon: MapPin, label: "Locations", active: false },
+  { icon: ListChecks, label: "Beats", active: false },
+  { icon: Lightbulb, label: "Annie\u2019s Tips", active: false },
+] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatRelativeDate(dateStr: string) {
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diffMs = now.getTime() - d.getTime();
+  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffH < 1) return "Modified just now";
+  if (diffH < 24) return `Modified ${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD === 1) return "Modified yesterday";
+  return `Modified ${formatDate(dateStr)}`;
+}
+
+function formatWordCount(count: number) {
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+  return count.toString();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
 export default function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -68,6 +125,7 @@ export default function Dashboard() {
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
+  const [activeSidebarItem, setActiveSidebarItem] = useState("Characters");
 
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
@@ -112,221 +170,424 @@ export default function Dashboard() {
     fetchProjects();
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const formatWordCount = (count: number) => {
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
-    return count.toString();
-  };
-
   const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
+
+  /* Most recently updated project = hero candidate */
+  const heroProject = projects.length > 0
+    ? [...projects].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )[0]
+    : null;
+
+  /* Remaining projects (for Recent Projects grid) */
+  const recentProjects = heroProject
+    ? projects.filter((p) => p.id !== heroProject.id)
+    : [];
 
   return (
     <main id="main-content" className="min-h-screen">
       <SetupWizard />
-      {/* Accent gradient line at top */}
-      <div className="h-1 accent-gradient" />
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                <PenLine className="h-5 w-5 text-accent" />
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-text-primary">
-                Word Coach Annie
-              </h1>
-            </div>
-            <p className="text-text-muted ml-[52px]">
-              {projects.length > 0
-                ? `${projects.length} project${projects.length !== 1 ? "s" : ""} · ${formatWordCount(totalWords)} words total`
-                : "Your writing projects"}
-            </p>
+      {/* ── Top App Bar ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-surface">
+        <div className="flex items-center justify-between w-full max-w-[1600px] mx-auto px-8 py-4">
+          <div className="flex items-center gap-8">
+            <span className="text-2xl font-serif italic font-bold text-text-primary">
+              Annie
+            </span>
+            <nav className="hidden md:flex items-center space-x-6">
+              <a
+                href="#"
+                className="font-serif italic text-text-primary font-bold border-b-2 border-text-primary tracking-tight leading-relaxed transition-all duration-200"
+              >
+                Drafts
+              </a>
+              <button
+                onClick={() => router.push("/universe")}
+                className="font-serif italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200"
+              >
+                Library
+              </button>
+              <span className="font-serif italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200 cursor-pointer">
+                Archive
+              </span>
+            </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => router.push("/universe")} className="gap-2">
-              <Globe className="h-4 w-4" />
-              Universes
-            </Button>
-            <Button onClick={() => setCreateOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Project
-            </Button>
+          <div className="flex items-center gap-4">
             <ThemeToggle />
             <UserMenu />
           </div>
         </div>
+      </header>
 
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="glass-card p-5 animate-pulse">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="h-5 w-32 bg-surface-overlay rounded" />
-                    <div className="h-3.5 w-20 bg-surface-overlay rounded mt-1.5" />
-                  </div>
-                </div>
-                <div className="space-y-2 mt-1">
-                  <div className="h-3.5 w-full bg-surface-overlay rounded" />
-                  <div className="h-3.5 w-3/4 bg-surface-overlay rounded" />
-                </div>
-                <div className="flex items-center gap-3 mt-4">
-                  <div className="h-5 w-16 bg-surface-overlay rounded-full" />
-                  <div className="h-3.5 w-20 bg-surface-overlay rounded" />
-                  <div className="h-3.5 w-16 bg-surface-overlay rounded ml-auto" />
-                </div>
-              </div>
-            ))}
+      {/* ── Main Layout: Sidebar + Content ─────────────────── */}
+      <div className="flex max-w-[1600px] mx-auto">
+        {/* ── Scene-Aware Sidebar ──────────────────────────── */}
+        <aside className="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-6 space-y-8 bg-surface-overlay sticky top-16">
+          <div>
+            <h3 className="font-serif italic text-lg text-text-primary mb-1">
+              Scene-Aware Sidebar
+            </h3>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-text-muted">
+              Contextual Story Elements
+            </p>
           </div>
-        ) : projects.length === 0 ? (
-          <div className="animate-fade-in max-w-2xl mx-auto py-16">
-            {/* Welcome hero */}
-            <div className="text-center mb-12">
-              <div className="h-20 w-20 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto mb-6">
-                <Sparkles className="h-9 w-9 text-accent" />
-              </div>
-              <h2 className="text-2xl font-bold text-text-primary mb-3">
-                Welcome to Annie!
-              </h2>
-              <p className="text-text-secondary max-w-md mx-auto leading-relaxed">
-                Your AI-powered writing assistant. Organize your stories, articles, and ideas
-                with smart tools that help you write better.
-              </p>
-            </div>
-
-            {/* Create project CTA card */}
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="w-full glass-card p-6 mb-10 group cursor-pointer text-left border-2 border-dashed border-accent/30 hover:border-accent/60 transition-all"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-accent/15 flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
-                  <Plus className="h-6 w-6 text-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-text-primary group-hover:text-accent transition-colors">
-                    Create Your First Project
-                  </h3>
-                  <p className="text-sm text-text-muted mt-0.5">
-                    Start writing — it only takes a few seconds to set up.
-                  </p>
-                </div>
-              </div>
+          <nav className="flex-grow space-y-2">
+            {sidebarItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSidebarItem === item.label;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => setActiveSidebarItem(item.label)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-[2px_2px_0px_hsl(var(--text-primary))]"
+                      : "text-text-muted hover:bg-surface-sunken"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-xs uppercase tracking-widest font-semibold">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="pt-6 border-t border-border/15">
+            <button className="w-full flex items-center gap-3 px-4 py-3 text-text-muted hover:bg-surface-sunken transition-colors">
+              <Settings className="h-5 w-5" />
+              <span className="text-xs uppercase tracking-widest font-semibold">
+                Settings
+              </span>
             </button>
+          </div>
+        </aside>
 
-            {/* Project type explanations */}
-            <div>
-              <h3 className="text-sm font-medium text-text-muted uppercase tracking-wider mb-4 text-center">
-                What can you create?
-              </h3>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="glass-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <PenLine className="h-4 w-4 text-accent" />
-                    <h4 className="font-medium text-text-primary text-sm">Fiction</h4>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Novels, short stories, and screenplays. Organize chapters, track characters, and plot threads.
-                  </p>
+        {/* ── Content Area ─────────────────────────────────── */}
+        <div className="flex-grow p-8 md:p-12 lg:p-16 max-w-5xl mx-auto">
+          {loading ? (
+            /* ── Loading skeleton ─────────────────────────── */
+            <div className="space-y-14">
+              <div className="glass-card p-12 animate-pulse">
+                <div className="h-4 w-32 bg-surface-overlay rounded mb-4" />
+                <div className="h-10 w-64 bg-surface-overlay rounded mb-6" />
+                <div className="h-5 w-80 bg-surface-overlay rounded mb-8" />
+                <div className="h-12 w-48 bg-surface-overlay rounded" />
+              </div>
+              <div className="grid lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 glass-card p-8 animate-pulse">
+                  <div className="h-6 w-60 bg-surface-overlay rounded mb-4" />
+                  <div className="h-12 w-full bg-surface-overlay rounded" />
                 </div>
-                <div className="glass-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Globe className="h-4 w-4 text-accent" />
-                    <h4 className="font-medium text-text-primary text-sm">Article Collection</h4>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Blog posts, essays, and non-fiction. Group related pieces and maintain a consistent voice.
-                  </p>
-                </div>
-                <div className="glass-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-accent" />
-                    <h4 className="font-medium text-text-primary text-sm">General</h4>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Notes, journals, and freeform writing. A flexible workspace for any kind of project.
-                  </p>
+                <div className="glass-card p-8 animate-pulse">
+                  <div className="h-6 w-40 bg-surface-overlay rounded mb-4" />
+                  <div className="h-24 w-full bg-surface-overlay rounded" />
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
-            {projects.map((project, i) => (
-              <div
-                key={project.id}
-                className="group glass-card p-5 cursor-pointer animate-slide-up"
-                style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}
-                onClick={() => router.push(`/project/${project.id}`)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-text-primary truncate group-hover:text-accent transition-colors">
-                      {project.title}
-                    </h3>
-                    {project.author && (
-                      <p className="text-sm text-text-muted mt-0.5">by {project.author}</p>
-                    )}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem onClick={() => router.push(`/project/${project.id}/settings`)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Settings
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-danger"
-                        onClick={() => setDeleteTarget(project)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+          ) : projects.length === 0 ? (
+            /* ── Empty State ──────────────────────────────── */
+            <div className="animate-fade-in max-w-2xl mx-auto py-16">
+              <div className="text-center mb-12">
+                <div className="h-20 w-20 bg-accent-muted flex items-center justify-center mx-auto mb-6">
+                  <Sparkles className="h-9 w-9 text-accent" />
                 </div>
+                <h2 className="font-serif text-3xl text-text-primary mb-3">
+                  Welcome to Annie!
+                </h2>
+                <p className="text-text-secondary max-w-md mx-auto leading-relaxed">
+                  Your AI-powered writing assistant. Organize your stories, articles, and ideas
+                  with smart tools that help you write better.
+                </p>
+              </div>
 
-                {project.synopsis && (
-                  <p className="text-sm text-text-secondary mt-1 line-clamp-2 leading-relaxed">
-                    {project.synopsis}
-                  </p>
-                )}
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="w-full glass-card p-6 mb-10 group cursor-pointer text-left border-2 border-dashed border-accent/30 hover:border-accent/60 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-accent-muted flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
+                    <Plus className="h-6 w-6 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-text-primary group-hover:text-accent transition-colors">
+                      Create Your First Project
+                    </h3>
+                    <p className="text-sm text-text-muted mt-0.5">
+                      Start writing -- it only takes a few seconds to set up.
+                    </p>
+                  </div>
+                </div>
+              </button>
 
-                <div className="flex items-center gap-3 mt-4 text-xs text-text-muted">
-                  {project.genre && (
-                    <span className="tag-pill">{project.genre}</span>
-                  )}
-                  <span className="tabular-nums">{formatWordCount(project.wordCount)} words</span>
-                  <span className="ml-auto">{formatDate(project.updatedAt)}</span>
+              <div>
+                <h3 className="label-md text-text-muted mb-4 text-center">
+                  What can you create?
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="glass-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <PenLine className="h-4 w-4 text-accent" />
+                      <h4 className="font-medium text-text-primary text-sm">Fiction</h4>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      Novels, short stories, and screenplays. Organize chapters, track characters, and plot threads.
+                    </p>
+                  </div>
+                  <div className="glass-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe className="h-4 w-4 text-accent" />
+                      <h4 className="font-medium text-text-primary text-sm">Article Collection</h4>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      Blog posts, essays, and non-fiction. Group related pieces and maintain a consistent voice.
+                    </p>
+                  </div>
+                  <div className="glass-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="h-4 w-4 text-accent" />
+                      <h4 className="font-medium text-text-primary text-sm">General</h4>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      Notes, journals, and freeform writing. A flexible workspace for any kind of project.
+                    </p>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-          <WritingHeatmap />
-          </>
-        )}
+            </div>
+          ) : (
+            /* ── Dashboard Content ────────────────────────── */
+            <div className="animate-fade-in">
+              {/* ── Hero: Current Manuscript ────────────────── */}
+              {heroProject && (
+                <section className="mb-14">
+                  <div
+                    className="grid md:grid-cols-2 gap-12 items-center bg-surface-overlay p-8 md:p-12 relative overflow-hidden group cursor-pointer"
+                    onClick={() => router.push(`/project/${heroProject.id}`)}
+                  >
+                    <div className="relative z-10">
+                      <span className="label-md text-accent mb-4 block">
+                        Current Manuscript
+                      </span>
+                      <h1 className="font-serif text-4xl md:text-5xl mb-6 leading-tight text-text-primary">
+                        {heroProject.title}
+                      </h1>
+                      {heroProject.synopsis && (
+                        <p className="font-serif italic text-xl text-text-secondary mb-8 max-w-md line-clamp-3">
+                          &ldquo;{heroProject.synopsis}&rdquo;
+                        </p>
+                      )}
+                      <Button
+                        size="lg"
+                        className="gap-3 shadow-[4px_4px_0px_hsl(var(--accent-hover))] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/project/${heroProject.id}`);
+                        }}
+                      >
+                        <span className="font-bold uppercase tracking-widest text-sm">
+                          Continue Writing
+                        </span>
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {/* Manuscript page preview decoration */}
+                    <div className="hidden md:block relative h-64">
+                      <div className="absolute inset-0 bg-surface-raised border-l-8 border-primary rotate-3 shadow-xl p-8 transition-transform group-hover:rotate-0 duration-500">
+                        <div className="space-y-4 opacity-40">
+                          <div className="h-2 bg-text-primary w-full" />
+                          <div className="h-2 bg-text-primary w-3/4" />
+                          <div className="h-2 bg-text-primary w-5/6" />
+                          <div className="h-2 bg-text-primary w-2/3" />
+                          <div className="h-2 bg-text-primary w-full" />
+                          <div className="h-2 bg-text-primary w-1/2" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* ── Bento Grid: Session + Annie's Edge ───────── */}
+              <div className="grid lg:grid-cols-3 gap-8 mb-14">
+                {/* Today's Writing Session */}
+                <div className="lg:col-span-2 bg-surface-raised p-8 ghost-border">
+                  <div className="flex justify-between items-end mb-8">
+                    <div>
+                      <h2 className="font-serif text-3xl mb-1 text-text-primary">
+                        Today&apos;s Writing Session
+                      </h2>
+                      <p className="label-md text-text-muted">
+                        Momentum is your only friend
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-serif text-4xl block text-text-primary">
+                        {formatWordCount(totalWords)}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-tighter opacity-50">
+                        Words total
+                      </span>
+                    </div>
+                  </div>
+                  {/* Typewriter-style progress bar */}
+                  <div className="relative h-12 bg-surface-overlay mb-4 flex items-center px-1 overflow-hidden">
+                    <div
+                      className="absolute left-0 top-0 bottom-0 bg-accent/10 transition-all duration-700"
+                      style={{ width: `${Math.min(100, (totalWords / 10000) * 100)}%` }}
+                    />
+                    <div className="flex gap-1 flex-wrap relative">
+                      {Array.from({ length: Math.min(10, Math.ceil(totalWords / 1000)) }).map((_, i, arr) => (
+                        <div
+                          key={i}
+                          className={`h-6 bg-primary ${
+                            i === arr.length - 1 ? "w-1 animate-pulse" : i % 3 === 0 ? "w-1.5" : "w-2"
+                          } ${i >= arr.length - 2 ? "opacity-40" : "opacity-80"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-between label-md text-text-muted">
+                    <span>{projects.length} project{projects.length !== 1 ? "s" : ""}</span>
+                    <span className="text-accent">
+                      {formatWordCount(totalWords)} words written
+                    </span>
+                  </div>
+                </div>
+
+                {/* Annie's Edge coaching card */}
+                <div className="coaching-card-intense flex flex-col justify-between relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Lightbulb className="h-4 w-4 text-text-primary" />
+                      <span className="text-xs uppercase font-extrabold tracking-widest text-text-primary">
+                        Annie&apos;s Edge
+                      </span>
+                    </div>
+                    <blockquote className="font-serif italic text-2xl leading-tight text-text-primary">
+                      &ldquo;If you don&apos;t write 200 words in the next 10 minutes, I might have to&hellip; remind you again!&rdquo;
+                    </blockquote>
+                  </div>
+                  <div className="mt-8 flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      Accept Challenge
+                    </Button>
+                  </div>
+                  {/* Decorative ink splash */}
+                  <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-text-primary opacity-5 rounded-full blur-3xl" />
+                </div>
+              </div>
+
+              {/* ── Recent Projects ──────────────────────────── */}
+              <div className="mb-14">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="font-serif text-3xl text-text-primary">Recent Projects</h2>
+                  <button
+                    onClick={() => router.push("/universe")}
+                    className="label-md text-text-primary border-b border-primary pb-1 hover:text-accent transition-colors"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Project cards */}
+                  {(recentProjects.length > 0 ? recentProjects : projects).map((project) => (
+                    <div
+                      key={project.id}
+                      className="bg-surface-overlay p-6 group hover:bg-surface-sunken transition-colors cursor-pointer border-l-2 border-transparent hover:border-accent"
+                      onClick={() => router.push(`/project/${project.id}`)}
+                    >
+                      <div className="flex justify-between items-start mb-6">
+                        <BookText className="h-5 w-5 text-text-muted/40 group-hover:text-accent transition-colors" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold tracking-widest text-text-muted/40">
+                            {formatRelativeDate(project.updatedAt)}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-overlay rounded"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4 text-text-muted" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem onClick={() => router.push(`/project/${project.id}/settings`)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-danger"
+                                onClick={() => setDeleteTarget(project)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      <h3 className="font-serif text-2xl mb-2 text-text-primary group-hover:text-accent transition-colors">
+                        {project.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mb-4 flex-wrap">
+                        {project.genre && (
+                          <span className="stamp-chip">{project.genre}</span>
+                        )}
+                        <span className="stamp-chip">
+                          {formatWordCount(project.wordCount)} Words
+                        </span>
+                      </div>
+                      {project.synopsis && (
+                        <p className="text-sm text-text-secondary line-clamp-2">
+                          {project.synopsis}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Start a New Journey card */}
+                  <div
+                    className="border-2 border-dashed border-border/40 flex flex-col items-center justify-center p-6 hover:bg-surface-overlay transition-colors group cursor-pointer min-h-[220px]"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <CirclePlus className="h-10 w-10 text-text-muted mb-4 group-hover:scale-110 transition-transform" />
+                    <span className="label-md text-text-muted">
+                      Start a New Journey
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Writing Heatmap ──────────────────────────── */}
+              <WritingHeatmap />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Create Project Dialog */}
+      {/* ── Floating Action Button ────────────────────────── */}
+      <div className="fixed bottom-8 right-8 hidden lg:block">
+        <button
+          onClick={() => {
+            if (heroProject) router.push(`/project/${heroProject.id}`);
+            else setCreateOpen(true);
+          }}
+          className="bg-accent text-accent-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform group"
+        >
+          <PenLine className="h-5 w-5" />
+          <div className="absolute right-full mr-4 bg-primary text-primary-foreground px-3 py-1 text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            Open Editor
+          </div>
+        </button>
+      </div>
+
+      {/* ── Create Project Dialog ──────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
@@ -394,7 +655,7 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* ── Delete Confirmation ────────────────────────────── */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
