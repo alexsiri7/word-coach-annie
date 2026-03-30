@@ -308,11 +308,19 @@ test.describe('Integration tests — real server, real data', () => {
     await page.goto('/')
     await page.waitForSelector('main', { timeout: 20_000 })
 
-    // Dashboard should render — either the empty state ("Welcome to Annie!")
-    // or project cards ("Recent Projects" / "Current Manuscript")
-    await expect(
-      page.locator('text=Welcome to Annie!, text=Recent Projects, text=Current Manuscript').first(),
-    ).toBeVisible({ timeout: 10_000 })
+    // Wait for loading skeleton to disappear (page shows animate-pulse while loading)
+    await page.waitForFunction(
+      () => !document.querySelector('.animate-pulse'),
+      { timeout: 20_000 },
+    )
+
+    // Dashboard should now show either empty state or project cards
+    const dashboard = page.getByText('Welcome to Annie!').or(
+      page.getByText('Recent Projects'),
+    ).or(
+      page.getByText('Current Manuscript'),
+    ).first()
+    await expect(dashboard).toBeVisible({ timeout: 10_000 })
 
     // Verify no critical console errors (filter out benign ones)
     const criticalErrors = consoleErrors.filter(
