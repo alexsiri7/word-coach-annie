@@ -24,6 +24,23 @@ const config: Config = {
   				secondary: 'hsl(var(--text-secondary))',
   				muted: 'hsl(var(--text-muted))'
   			},
+  			'tertiary': {
+  				DEFAULT: 'hsl(var(--tertiary))',
+  				container: 'hsl(var(--tertiary-container))'
+  			},
+  			'on-tertiary-container': 'hsl(var(--on-tertiary-container))',
+  			'secondary-container': 'hsl(var(--secondary-container))',
+  			'on-secondary-container': 'hsl(var(--on-secondary-container))',
+  			'surface-container': {
+  				lowest: 'hsl(var(--surface-container-lowest))',
+  				low: 'hsl(var(--surface-container-low))',
+  				DEFAULT: 'hsl(var(--surface-container))',
+  				high: 'hsl(var(--surface-container-high))',
+  				highest: 'hsl(var(--surface-container-highest))'
+  			},
+  			'on-surface': 'hsl(var(--on-surface))',
+  			'on-surface-variant': 'hsl(var(--on-surface-variant))',
+  			'outline-variant': 'hsl(var(--outline-variant))',
   			danger: {
   				DEFAULT: 'hsl(var(--danger))',
   				hover: 'hsl(var(--danger-hover))'
@@ -83,6 +100,23 @@ const config: Config = {
   				'Georgia',
   				'Cambria',
   				'serif'
+  			],
+  			headline: [
+  				'Newsreader',
+  				'Georgia',
+  				'Cambria',
+  				'serif'
+  			],
+  			body: [
+  				'Manrope',
+  				'Inter',
+  				'system-ui',
+  				'sans-serif'
+  			],
+  			label: [
+  				'Inter',
+  				'system-ui',
+  				'sans-serif'
   			]
   		},
   		spacing: {

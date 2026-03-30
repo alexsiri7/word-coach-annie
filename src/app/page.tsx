@@ -192,23 +192,23 @@ export default function Dashboard() {
       <header className="sticky top-0 z-40 bg-surface">
         <div className="flex items-center justify-between w-full max-w-[1600px] mx-auto px-8 py-4">
           <div className="flex items-center gap-8">
-            <span className="text-2xl font-serif italic font-bold text-text-primary">
+            <span className="text-2xl font-headline italic font-bold text-text-primary">
               Annie
             </span>
             <nav className="hidden md:flex items-center space-x-6">
               <a
                 href="#"
-                className="font-serif italic text-text-primary font-bold border-b-2 border-text-primary tracking-tight leading-relaxed transition-all duration-200"
+                className="font-headline italic text-text-primary font-bold border-b-2 border-text-primary tracking-tight leading-relaxed transition-all duration-200"
               >
                 Drafts
               </a>
               <button
                 onClick={() => router.push("/universe")}
-                className="font-serif italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200"
+                className="font-headline italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200"
               >
                 Library
               </button>
-              <span className="font-serif italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200 cursor-pointer">
+              <span className="font-headline italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200 cursor-pointer">
                 Archive
               </span>
             </nav>
@@ -223,9 +223,9 @@ export default function Dashboard() {
       {/* ── Main Layout: Sidebar + Content ─────────────────── */}
       <div className="flex max-w-[1600px] mx-auto">
         {/* ── Scene-Aware Sidebar ──────────────────────────── */}
-        <aside className="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-6 space-y-8 bg-surface-overlay sticky top-16">
+        <aside className="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-6 space-y-8 bg-surface-container-low sticky top-16">
           <div>
-            <h3 className="font-serif italic text-lg text-text-primary mb-1">
+            <h3 className="font-headline italic text-lg text-text-primary mb-1">
               Scene-Aware Sidebar
             </h3>
             <p className="text-[10px] uppercase tracking-widest font-semibold text-text-muted">
@@ -240,24 +240,24 @@ export default function Dashboard() {
                 <button
                   key={item.label}
                   onClick={() => setActiveSidebarItem(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-[2px_2px_0px_hsl(var(--text-primary))]"
-                      : "text-text-muted hover:bg-surface-sunken"
+                      ? "bg-primary text-primary-foreground shadow-[2px_2px_0px_#000] translate-y-[1px]"
+                      : "text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
-                  <span className="text-xs uppercase tracking-widest font-semibold">
+                  <span className="font-label text-xs uppercase tracking-widest font-semibold">
                     {item.label}
                   </span>
                 </button>
               );
             })}
           </nav>
-          <div className="pt-6 border-t border-border/15">
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-text-muted hover:bg-surface-sunken transition-colors">
+          <div className="pt-6 border-t border-outline-variant/20">
+            <button className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors">
               <Settings className="h-5 w-5" />
-              <span className="text-xs uppercase tracking-widest font-semibold">
+              <span className="font-label text-xs uppercase tracking-widest font-semibold">
                 Settings
               </span>
             </button>
@@ -293,7 +293,7 @@ export default function Dashboard() {
                 <div className="h-20 w-20 bg-accent-muted flex items-center justify-center mx-auto mb-6">
                   <Sparkles className="h-9 w-9 text-accent" />
                 </div>
-                <h2 className="font-serif text-3xl text-text-primary mb-3">
+                <h2 className="font-headline text-3xl text-text-primary mb-3">
                   Welcome to Annie!
                 </h2>
                 <p className="text-text-secondary max-w-md mx-auto leading-relaxed">
@@ -363,45 +363,44 @@ export default function Dashboard() {
               {heroProject && (
                 <section className="mb-14">
                   <div
-                    className="grid md:grid-cols-2 gap-12 items-center bg-surface-overlay p-8 md:p-12 relative overflow-hidden group cursor-pointer"
+                    className="grid md:grid-cols-2 gap-12 items-center bg-surface-container-low p-8 md:p-12 rounded-lg relative overflow-hidden group cursor-pointer"
                     onClick={() => router.push(`/project/${heroProject.id}`)}
                   >
                     <div className="relative z-10">
-                      <span className="label-md text-accent mb-4 block">
+                      <span className="font-label text-xs uppercase tracking-[0.2em] text-accent mb-4 block">
                         Current Manuscript
                       </span>
-                      <h1 className="font-serif text-4xl md:text-5xl mb-6 leading-tight text-text-primary">
+                      <h1 className="font-headline text-4xl md:text-5xl mb-6 leading-tight text-text-primary">
                         {heroProject.title}
                       </h1>
                       {heroProject.synopsis && (
-                        <p className="font-serif italic text-xl text-text-secondary mb-8 max-w-md line-clamp-3">
+                        <p className="font-headline italic text-xl text-on-surface-variant mb-8 max-w-md line-clamp-3">
                           &ldquo;{heroProject.synopsis}&rdquo;
                         </p>
                       )}
-                      <Button
-                        size="lg"
-                        className="gap-3 shadow-[4px_4px_0px_hsl(var(--accent-hover))] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all duration-200"
+                      <button
+                        className="bg-primary text-primary-foreground px-10 py-4 flex items-center gap-3 shadow-[4px_4px_0px_hsl(var(--text-secondary))] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all duration-200"
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/project/${heroProject.id}`);
                         }}
                       >
-                        <span className="font-bold uppercase tracking-widest text-sm">
+                        <span className="font-label font-bold uppercase tracking-widest text-sm">
                           Continue Writing
                         </span>
                         <ArrowRight className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                     {/* Manuscript page preview decoration */}
                     <div className="hidden md:block relative h-64">
-                      <div className="absolute inset-0 bg-surface-raised border-l-8 border-primary rotate-3 shadow-xl p-8 transition-transform group-hover:rotate-0 duration-500">
+                      <div className="absolute inset-0 bg-surface-container-highest rounded-sm border-l-8 border-primary rotate-3 shadow-xl p-8 transition-transform group-hover:rotate-0 duration-500">
                         <div className="space-y-4 opacity-40">
-                          <div className="h-2 bg-text-primary w-full" />
-                          <div className="h-2 bg-text-primary w-3/4" />
-                          <div className="h-2 bg-text-primary w-5/6" />
-                          <div className="h-2 bg-text-primary w-2/3" />
-                          <div className="h-2 bg-text-primary w-full" />
-                          <div className="h-2 bg-text-primary w-1/2" />
+                          <div className="h-2 bg-on-surface w-full" />
+                          <div className="h-2 bg-on-surface w-3/4" />
+                          <div className="h-2 bg-on-surface w-5/6" />
+                          <div className="h-2 bg-on-surface w-2/3" />
+                          <div className="h-2 bg-on-surface w-full" />
+                          <div className="h-2 bg-on-surface w-1/2" />
                         </div>
                       </div>
                     </div>
@@ -412,27 +411,27 @@ export default function Dashboard() {
               {/* ── Bento Grid: Session + Annie's Edge ───────── */}
               <div className="grid lg:grid-cols-3 gap-8 mb-14">
                 {/* Today's Writing Session */}
-                <div className="lg:col-span-2 bg-surface-raised p-8 ghost-border">
+                <div className="lg:col-span-2 bg-surface-container-lowest p-8 border border-outline-variant/10 shadow-sm">
                   <div className="flex justify-between items-end mb-8">
                     <div>
-                      <h2 className="font-serif text-3xl mb-1 text-text-primary">
+                      <h2 className="font-headline text-3xl mb-1 text-text-primary">
                         Today&apos;s Writing Session
                       </h2>
-                      <p className="label-md text-text-muted">
+                      <p className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
                         Momentum is your only friend
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="font-serif text-4xl block text-text-primary">
+                      <span className="font-headline text-4xl block text-text-primary">
                         {formatWordCount(totalWords)}
                       </span>
-                      <span className="text-[10px] uppercase tracking-tighter opacity-50">
+                      <span className="font-label text-[10px] uppercase tracking-tighter opacity-50">
                         Words total
                       </span>
                     </div>
                   </div>
                   {/* Typewriter-style progress bar */}
-                  <div className="relative h-12 bg-surface-overlay mb-4 flex items-center px-1 overflow-hidden">
+                  <div className="relative h-12 bg-surface-container mb-4 flex items-center px-1 overflow-hidden">
                     <div
                       className="absolute left-0 top-0 bottom-0 bg-accent/10 transition-all duration-700"
                       style={{ width: `${Math.min(100, (totalWords / 10000) * 100)}%` }}
@@ -448,7 +447,7 @@ export default function Dashboard() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex justify-between label-md text-text-muted">
+                  <div className="flex justify-between font-label text-[10px] uppercase font-bold tracking-tighter text-on-surface-variant">
                     <span>{projects.length} project{projects.length !== 1 ? "s" : ""}</span>
                     <span className="text-accent">
                       {formatWordCount(totalWords)} words written
@@ -457,38 +456,35 @@ export default function Dashboard() {
                 </div>
 
                 {/* Annie's Edge coaching card */}
-                <div className="coaching-card-intense flex flex-col justify-between relative overflow-hidden">
+                <div className="coaching-card-intense flex flex-col justify-between relative overflow-hidden p-8">
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-4">
-                      <Lightbulb className="h-4 w-4 text-text-primary" />
-                      <span className="text-xs uppercase font-extrabold tracking-widest text-text-primary">
+                      <Lightbulb className="h-4 w-4" />
+                      <span className="font-label text-xs uppercase font-extrabold tracking-widest">
                         Annie&apos;s Edge
                       </span>
                     </div>
-                    <blockquote className="font-serif italic text-2xl leading-tight text-text-primary">
+                    <blockquote className="font-headline italic text-2xl leading-tight">
                       &ldquo;If you don&apos;t write 200 words in the next 10 minutes, I might have to&hellip; remind you again!&rdquo;
                     </blockquote>
                   </div>
                   <div className="mt-8 flex items-center gap-3">
-                    <Button
-                      size="sm"
-                      className="text-[10px] font-bold uppercase tracking-widest"
-                    >
+                    <button className="bg-on-tertiary-container text-tertiary-container px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:opacity-80 transition-all">
                       Accept Challenge
-                    </Button>
+                    </button>
                   </div>
                   {/* Decorative ink splash */}
-                  <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-text-primary opacity-5 rounded-full blur-3xl" />
+                  <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-on-tertiary-container opacity-5 rounded-full blur-3xl" />
                 </div>
               </div>
 
               {/* ── Recent Projects ──────────────────────────── */}
               <div className="mb-14">
                 <div className="flex items-center justify-between mb-8">
-                  <h2 className="font-serif text-3xl text-text-primary">Recent Projects</h2>
+                  <h2 className="font-headline text-3xl text-text-primary">Recent Projects</h2>
                   <button
                     onClick={() => router.push("/universe")}
-                    className="label-md text-text-primary border-b border-primary pb-1 hover:text-accent transition-colors"
+                    className="font-label text-xs uppercase font-bold tracking-widest text-text-primary border-b border-primary pb-1 hover:text-accent transition-colors"
                   >
                     View All
                   </button>
@@ -498,19 +494,19 @@ export default function Dashboard() {
                   {(recentProjects.length > 0 ? recentProjects : projects).map((project) => (
                     <div
                       key={project.id}
-                      className="bg-surface-overlay p-6 group hover:bg-surface-sunken transition-colors cursor-pointer border-l-2 border-transparent hover:border-accent"
+                      className="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-colors cursor-pointer border-l-2 border-transparent hover:border-primary"
                       onClick={() => router.push(`/project/${project.id}`)}
                     >
                       <div className="flex justify-between items-start mb-6">
-                        <BookText className="h-5 w-5 text-text-muted/40 group-hover:text-accent transition-colors" />
+                        <BookText className="h-5 w-5 text-primary/40 group-hover:text-primary transition-colors" />
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold tracking-widest text-text-muted/40">
+                          <span className="font-label text-[10px] uppercase font-bold tracking-widest opacity-40">
                             {formatRelativeDate(project.updatedAt)}
                           </span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-overlay rounded"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-container rounded"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <MoreVertical className="h-4 w-4 text-text-muted" />
@@ -532,7 +528,7 @@ export default function Dashboard() {
                           </DropdownMenu>
                         </div>
                       </div>
-                      <h3 className="font-serif text-2xl mb-2 text-text-primary group-hover:text-accent transition-colors">
+                      <h3 className="font-headline text-2xl mb-2 text-text-primary group-hover:text-primary transition-colors">
                         {project.title}
                       </h3>
                       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -544,7 +540,7 @@ export default function Dashboard() {
                         </span>
                       </div>
                       {project.synopsis && (
-                        <p className="text-sm text-text-secondary line-clamp-2">
+                        <p className="font-body text-sm text-on-surface-variant line-clamp-2">
                           {project.synopsis}
                         </p>
                       )}
@@ -553,11 +549,11 @@ export default function Dashboard() {
 
                   {/* Start a New Journey card */}
                   <div
-                    className="border-2 border-dashed border-border/40 flex flex-col items-center justify-center p-6 hover:bg-surface-overlay transition-colors group cursor-pointer min-h-[220px]"
+                    className="border-2 border-dashed border-outline-variant flex flex-col items-center justify-center p-6 hover:bg-surface-container transition-colors group cursor-pointer min-h-[220px]"
                     onClick={() => setCreateOpen(true)}
                   >
-                    <CirclePlus className="h-10 w-10 text-text-muted mb-4 group-hover:scale-110 transition-transform" />
-                    <span className="label-md text-text-muted">
+                    <CirclePlus className="h-10 w-10 text-on-surface-variant mb-4 group-hover:scale-110 transition-transform" />
+                    <span className="font-label text-xs uppercase font-extrabold tracking-widest text-on-surface-variant">
                       Start a New Journey
                     </span>
                   </div>
@@ -581,7 +577,7 @@ export default function Dashboard() {
           className="bg-accent text-accent-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform group"
         >
           <PenLine className="h-5 w-5" />
-          <div className="absolute right-full mr-4 bg-primary text-primary-foreground px-3 py-1 text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <div className="absolute right-full mr-4 bg-primary text-primary-foreground px-3 py-1 font-label text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
             Open Editor
           </div>
         </button>
