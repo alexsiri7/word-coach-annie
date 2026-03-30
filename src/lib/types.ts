@@ -81,6 +81,7 @@ export interface PlotlineIndicator {
 export interface OutlineNode extends StructureNode {
   children: OutlineNode[];
   plotIndicators?: PlotlineIndicator[];
+  beats?: string[];
 }
 
 export type StoryObjectType = "CHARACTER" | "LOCATION" | "PLOTLINE" | "WORLD_ELEMENT" | "NOTE";

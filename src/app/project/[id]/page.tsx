@@ -20,6 +20,7 @@ import {
   BookOpen,
   TrendingUp,
   Eye,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
   loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
 });
+const SceneContextPanel = dynamic(() => import("@/components/scene-context-panel").then(m => m.SceneContextPanel));
 const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
@@ -62,7 +64,7 @@ import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
 
-type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
+type SidebarTab = "outline" | "context" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
 
 function mergeIndicators(
   nodes: OutlineNode[],
@@ -72,6 +74,17 @@ function mergeIndicators(
     ...node,
     plotIndicators: node.type === "SCENE" ? (plotMap.get(node.id) ?? []) : undefined,
     children: mergeIndicators(node.children, plotMap),
+  }));
+}
+
+function mergeBeats(
+  nodes: OutlineNode[],
+  beatMap: Map<string, string[]>
+): OutlineNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    beats: node.type === "SCENE" ? (beatMap.get(node.id) ?? []) : undefined,
+    children: mergeBeats(node.children, beatMap),
   }));
 }
 
@@ -117,6 +130,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
+  const [sceneBeats, setSceneBeats] = useState<{ sceneId: string; beats: string[] }[]>([]);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -150,11 +164,20 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }, [projectId]);
 
+  const fetchSceneBeats = useCallback(async () => {
+    const res = await fetch(`/api/projects/${projectId}/scene-beats`);
+    if (res.ok) {
+      const data = await res.json();
+      setSceneBeats(Array.isArray(data) ? data : []);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     fetchProject();
     fetchOutline();
     fetchStoryObjects();
-  }, [fetchProject, fetchOutline, fetchStoryObjects]);
+    fetchSceneBeats();
+  }, [fetchProject, fetchOutline, fetchStoryObjects, fetchSceneBeats]);
 
   // Handle ?scene= query param (e.g., from next-scene prompt)
   useEffect(() => {
@@ -257,6 +280,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   };
 
   const selectedNode = selectedNodeId ? findNode(outline, selectedNodeId) : null;
+
+  // Merge beats into outline for display
+  const outlineWithBeats = useMemo(() => {
+    if (sceneBeats.length === 0) return outline;
+    const beatMap = new Map(sceneBeats.map((s) => [s.sceneId, s.beats]));
+    return mergeBeats(outline, beatMap);
+  }, [outline, sceneBeats]);
 
   // Build flat scene list for the timeline strip (derived from outline)
   const timelineScenes = useMemo(() => {
@@ -480,6 +510,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             >
               Outline
             </button>
+            {selectedNode?.type === "SCENE" && (
+              <button
+                role="tab"
+                aria-selected={activeTab === "context"}
+                onClick={() => { setActiveTab("context"); setSelectedObjectId(null); }}
+                className={cn(
+                  "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
+                  activeTab === "context"
+                    ? "bg-accent/15 text-accent"
+                    : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50"
+                )}
+                aria-label="Scene Context"
+              >
+                <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="text-xs font-medium hidden lg:inline">Context</span>
+              </button>
+            )}
             {STORY_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -517,7 +564,32 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
           {/* Sidebar content */}
           <div className="flex-1 overflow-y-auto flex flex-col">
-            {activeTab === "ai-chat" ? (
+            {activeTab === "context" && selectedNode?.type === "SCENE" ? (
+              <ErrorBoundary fallbackTitle="Context panel crashed">
+                <SceneContextPanel
+                  projectId={projectId}
+                  sceneId={selectedNode.id}
+                  storyObjects={storyObjects}
+                  onSelectObject={(objectId, source) => {
+                    setSelectedObjectId(objectId);
+                    setSelectedObjectSource(source || "project");
+                    setSelectedNodeId(null);
+                    setSidebarOpen(false);
+                  }}
+                  onAddRelationship={async (objectId, type) => {
+                    await fetch(`/api/projects/${projectId}/relationships`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        type,
+                        fromNodeId: selectedNode.id,
+                        toObjectId: objectId,
+                      }),
+                    });
+                  }}
+                />
+              </ErrorBoundary>
+            ) : activeTab === "ai-chat" ? (
               <ErrorBoundary fallbackTitle="Chat panel crashed">
                 <SceneAwareChatPanel
                   projectId={projectId}
@@ -543,7 +615,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </div>
                 <ErrorBoundary fallbackTitle="Outline crashed">
                   <OutlineTree
-                    nodes={outline}
+                    nodes={outlineWithBeats}
                     projectType={project.projectType}
                     selectedNodeId={selectedNodeId}
                     onSelectNode={(id) => { setSelectedNodeId(id); setSelectedObjectId(null); setSidebarOpen(false); }}
@@ -651,9 +723,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   key={selectedNode.id}
                   node={selectedNode}
                   projectId={projectId}
-                  onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
+                  onNodeUpdated={() => { fetchOutline(); fetchProject(); fetchSceneBeats(); }}
                   timelineScenes={timelineScenes}
                   linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
+                  storyObjects={storyObjects}
                 />
               </ErrorBoundary>
             ) : (

@@ -356,6 +356,20 @@ function SortableTreeNode({
           onDeleteNode={onDeleteNode}
           dragHandleProps={listeners}
         />
+        {/* Beat annotations below scene nodes */}
+        {node.type === "SCENE" && node.beats && node.beats.length > 0 && !isDragging && (
+          <div
+            className="pb-1"
+            style={{ paddingLeft: `${depth * 16 + 28}px` }}
+          >
+            {node.beats.map((beat, i) => (
+              <div key={i} className="flex items-start gap-1.5 py-0.5">
+                <span className="text-accent/60 mt-0.5 flex-shrink-0">→</span>
+                <span className="text-xs text-text-muted leading-snug">{beat}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Drop indicator: after */}

@@ -2,6 +2,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
+import type { Extensions } from "@tiptap/core";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
 
 // Custom Highlight extension to support IDs
@@ -26,7 +27,7 @@ export const AnnotationMark = Highlight.extend({
   },
 });
 
-export function getEditorExtensions() {
+export function getEditorExtensions(extraExtensions: Extensions = []) {
   return [
     StarterKit,
     Underline,
@@ -40,6 +41,7 @@ export function getEditorExtensions() {
       placeholder: "Start writing your scene...",
     }),
     BeatAnnotation,
+    ...extraExtensions,
   ];
 }
 

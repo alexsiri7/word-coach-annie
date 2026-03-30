@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { StructureNode, SceneStatus, ContentVersion, Annotation, StoryObject } from "@/lib/types";
 import { getEditorExtensions, commentsToBeats } from "@/components/editor/editor-config";
+import { buildMentionExtension } from "@/components/editor/extensions/mention";
 import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
@@ -40,6 +41,7 @@ interface SceneEditorProps {
   showFocusButton?: boolean;
   timelineScenes?: TimelineSceneItem[];
   linkedCharacters?: StoryObject[];
+  storyObjects?: StoryObject[];
 }
 
 export function SceneEditor({
@@ -49,6 +51,7 @@ export function SceneEditor({
   showFocusButton = true,
   timelineScenes,
   linkedCharacters = [],
+  storyObjects = [],
 }: SceneEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -74,6 +77,8 @@ export function SceneEditor({
   } | null>(null);
 
   const session = useWritingSession({ projectId, nodeId: node.id });
+  const storyObjectsRef = useRef(storyObjects);
+  storyObjectsRef.current = storyObjects;
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
@@ -143,9 +148,36 @@ export function SceneEditor({
   // Cleanup save timeout on unmount
   useEffect(() => cleanup, [cleanup]);
 
+  const mentionExtension = useRef(
+    buildMentionExtension(
+      () => storyObjectsRef.current,
+      async (objectId, objectType) => {
+        const relType =
+          objectType === "CHARACTER"
+            ? "APPEARS_IN"
+            : objectType === "LOCATION"
+            ? "LOCATED_AT"
+            : "PART_OF_PLOTLINE";
+        try {
+          await fetch(`/api/projects/${projectId}/relationships`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: relType,
+              fromNodeId: node.id,
+              toObjectId: objectId,
+            }),
+          });
+        } catch {
+          // best-effort: mention still renders even if relationship fails
+        }
+      }
+    )
+  ).current;
+
   const editor = useEditor(
     {
-      extensions: getEditorExtensions(),
+      extensions: getEditorExtensions([mentionExtension]),
       content: initialContent || "",
       editorProps: {
         attributes: {
