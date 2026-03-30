@@ -480,6 +480,11 @@ export function SceneEditor({
                   {session.durationSeconds < 60
                     ? `${session.durationSeconds}s`
                     : `${Math.round(session.durationSeconds / 60)} min`}
+                  {session.wordsPerHour > 0 && session.durationSeconds >= 60 && (
+                    <span className="text-text-muted ml-1">
+                      ({session.wordsPerHour.toLocaleString()} wph)
+                    </span>
+                  )}
                 </span>
               )}
               {lastSaved && (
