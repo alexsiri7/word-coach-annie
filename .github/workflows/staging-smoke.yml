@@ -1,0 +1,49 @@
+name: Staging Smoke Test
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Staging Smoke Test
+    runs-on: ubuntu-latest
+    # Give Railway time to deploy after master push
+    steps:
+      - name: Wait for Railway deploy
+        run: |
+          echo "Waiting 120s for Railway staging deploy..."
+          sleep 120
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/api/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Health check passed (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS, retrying in 30s..."
+            sleep 30
+          done
+          echo "::error::Staging health check failed after 5 attempts"
+          exit 1
+
+      - name: Check login page loads
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/login)
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Login page returned HTTP $STATUS"
+            exit 1
+          fi
+          echo "✓ Login page loads (HTTP $STATUS)"
+
+      - name: Check API token auth works
+        run: |
+          # Unauthenticated request to a protected route should return 401
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/api/projects)
+          if [ "$STATUS" != "401" ]; then
+            echo "::warning::Expected 401 for unauthenticated /api/projects, got $STATUS"
+          fi
+          echo "✓ Auth check complete (HTTP $STATUS)"
