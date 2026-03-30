@@ -14,9 +14,9 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 
-// Use DIRECT_DATABASE_URL for migrations (bypasses PgBouncer transaction mode
-// which doesn't support multi-statement operations or advisory locks)
-const connectionString = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL;
+// Use DATABASE_URL (pooler) — our script splits SQL into single statements
+// which work fine through PgBouncer transaction mode
+const connectionString = process.env.DATABASE_URL;
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
