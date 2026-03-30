@@ -8,7 +8,9 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL environment variable is not set");
+    // During next build (page data collection), DATABASE_URL may not be set.
+    // Return a client that will fail on first query rather than at construction.
+    return new PrismaClient();
   }
   const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({ adapter });
