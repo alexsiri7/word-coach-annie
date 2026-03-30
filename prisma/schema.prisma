@@ -270,3 +270,11 @@ model WritingSession {
   @@index([projectId, date])
   @@index([date])
 }
+
+model OAuthClient {
+  id           String   @id
+  clientName   String   @default("")
+  redirectUris String   // JSON array stored as string
+  grantTypes   String   @default("[\"authorization_code\",\"refresh_token\"]")
+  createdAt    DateTime @default(now())
+}
