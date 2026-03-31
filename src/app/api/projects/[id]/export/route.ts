@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { exportProjectJson } from "@/lib/export-json";
 import { logger } from "@/lib/logger";
 
@@ -314,7 +314,7 @@ export async function GET(
   try {
     const { id } = await params;
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectReadAccess(id, userId, request.headers.get("x-user-email"));
+    const access = await verifyProjectAccess(id, userId);
     if (!access.authorized) return access.response;
 
     const searchParams = request.nextUrl.searchParams;
