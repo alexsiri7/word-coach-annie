@@ -1162,6 +1162,77 @@ Structure your response as:
     }
 );
 
+// ─── Review Routing (Status-Aware Skill Dispatch) ──────────────────────────
+
+const REVIEW_SKILL_BY_STATUS: Record<string, string> = {
+    OUTLINE: "outline-review",
+    DRAFT: "developmental-edit",
+    REVISED: "line-edit",
+    FINAL: "consistency-check",
+};
+
+server.prompt(
+    "review",
+    "Context-aware scene review — automatically routes to the right skill based on scene status (OUTLINE→outline review, DRAFT→developmental edit, REVISED→line edit, FINAL→consistency check).",
+    {
+        sceneId: z.string().describe("The scene node ID to review"),
+        projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
+    },
+    async (args) => {
+        const focus = await getSceneFocus(args.sceneId);
+        const status = focus.scene.status as string;
+        const projectId = args.projectId || focus.scene.projectId;
+        const skillName = REVIEW_SKILL_BY_STATUS[status] || REVIEW_SKILL_BY_STATUS["DRAFT"];
+        const skill = loadSkill(skillName);
+
+        if (!skill) {
+            return {
+                messages: [{
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `Error: Could not load skill "${skillName}" for scene status "${status}". Available skills: ${listSkills().map(s => s.name).join(", ")}`,
+                    },
+                }],
+            };
+        }
+
+        const contextHeader = `## Context
+Project ID: ${projectId}
+Target Node ID: ${args.sceneId}
+Scene: ${focus.scene.title}
+Status: ${status} → Using skill: **${skill.metadata.name}** (${skill.metadata.description})
+Chapter: ${focus.scene.chapterTitle || "N/A"}
+Word Count: ${focus.scene.wordCount}
+${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
+${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
+
+### Linked Elements
+${focus.relatedElements.length > 0
+    ? focus.relatedElements.map(e => `- ${e.type}: ${e.name}${e.role ? ` (${e.role})` : ""}`).join("\n")
+    : "(none)"}
+
+### Open Annotations
+${focus.annotations.filter(a => !a.resolved).length > 0
+    ? focus.annotations.filter(a => !a.resolved).map(a => `- ${a.content}${a.selectedText ? ` [on: "${a.selectedText.slice(0, 60)}..."]` : ""}`).join("\n")
+    : "(none)"}
+
+---
+
+`;
+
+        return {
+            messages: [{
+                role: "user",
+                content: {
+                    type: "text",
+                    text: contextHeader + skill.instructions,
+                },
+            }],
+        };
+    }
+);
+
 server.prompt(
     "inline-edit",
     "Inline text editing operations: rewrite tighter, more vivid, simpler; continue writing; expand; voice check; or custom prompt on selected text.",
