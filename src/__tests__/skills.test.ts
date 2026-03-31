@@ -95,7 +95,9 @@ describe("MCP Skills", () => {
 
             expect(skill).not.toBeNull();
             expect(skill!.metadata.name).toBe("scene-drafting-assistant");
-            expect(skill!.instructions).toContain("# Scene Drafting Assistant");
+            expect(skill!.instructions).toContain("# Scene Beat Planner");
+            expect(skill!.instructions).toContain("BEAT");
+            expect(skill!.instructions).toContain("Never use `type: \"CONTENT\"`");
             expect(skill!.metadata.required_tools).toContain("write_scene_content");
         });
 

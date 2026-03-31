@@ -1,6 +1,6 @@
 ---
 name: scene-drafting-assistant
-description: Help draft a scene given the outline, characters, setting, and story context
+description: Help plan a scene by drafting structural BEAT blocks (not prose)
 required_tools:
   - get_outline
   - read_scene_content
@@ -10,22 +10,36 @@ required_tools:
   - write_scene_content
 triggers:
   - "draft scene"
-  - "write scene"
+  - "plan scene"
+  - "scene beats"
+  - "beat planning"
+  - "plan beats"
   - "scene drafting"
   - "help me write"
 ---
 
-# Scene Drafting Assistant
+# Scene Beat Planner
+
+## Hard Rule
+
+**Annie NEVER writes prose or CONTENT blocks.** This skill produces BEAT blocks
+only. Beats are structural directions — short descriptions of what happens in
+each moment. The writer turns beats into prose.
+
+Good beat: `Marcus enters the tavern, scans for the informant`
+Bad (prose): `Marcus pushed open the heavy oak door, his eyes sweeping the dimly lit tavern...`
 
 ## When to Use
 
-Use this skill when the author wants help drafting a scene. This is a collaborative process — the assistant gathers context, proposes a draft, and the author reviews/revises.
+Use this skill when the author wants help planning the structure of a scene.
+Annie gathers context, proposes a sequence of beats, and the author reviews,
+reorders, and refines them before writing the prose themselves.
 
 ## Prerequisites
 
 - A project with an outline that includes the target scene.
 - The scene should have a synopsis (even brief) describing what should happen.
-- Characters, locations, and other story objects linked to the project help produce better results.
+- Characters, locations, and other story objects linked to the project help produce better beats.
 
 ## Steps
 
@@ -47,67 +61,72 @@ Use this skill when the author wants help drafting a scene. This is a collaborat
    - **Conflict:** What opposes them?
    - **Outcome:** Does the scene end in success, failure, or complication?
    - **Tone:** What emotional tone should the scene carry?
-   - **Key Moments:** Any specific beats that must happen?
 
-6. **Draft the scene.** Write the scene following these principles:
+6. **Draft the beat sequence.** Plan the scene as a series of BEAT blocks. Each beat is a short structural direction describing one discrete narrative moment:
 
-   ### 6a. Opening
-   - Ground the reader in time, place, and POV immediately (first 2–3 sentences).
-   - Start with action or a compelling hook — avoid throat-clearing.
+   ### Beat Principles
+   - **One action per beat** — each beat describes a single moment or turn
+   - **Structural, not narrative** — describe what happens, not how it reads
+   - **Character-driven** — name who does what, don't use passive voice
+   - **Include emotional beats** — internal shifts matter (e.g., "Elena realizes he's lying")
+   - **Mark turning points** — flag the moment where the scene pivots
+   - **Typical scene: 5-15 beats** — enough structure without over-constraining
 
-   ### 6b. Body
-   - Alternate between action, dialogue, and internalization.
-   - Use sensory details to make the setting vivid.
-   - Maintain consistent POV and narrative distance.
-   - Ensure dialogue reveals character and advances the plot simultaneously.
-   - Include physical action beats between dialogue lines (avoid talking heads).
+   ### Scene Structure via Beats
+   - **Opening beats:** Ground the reader — who, where, when, what's the immediate situation
+   - **Rising beats:** Build tension, introduce conflict, advance the goal
+   - **Pivot beat:** The moment of change, revelation, or decision
+   - **Closing beats:** Show the consequence, leave tension unresolved for non-final scenes
 
-   ### 6c. Closing
-   - End on a moment of change, revelation, or decision.
-   - Create forward momentum — the reader should want to turn the page.
-   - Avoid neat, tidy endings for non-final scenes. Leave a question or tension unresolved.
+7. **Write the beats.** Use `write_scene_content` with the `blocks` parameter. Every block must have `type: "BEAT"`. **Never use `type: "CONTENT"`**. Never pass the `content` parameter with HTML prose.
 
-7. **Write the draft.** Use `write_scene_content` to save the draft to the scene. Format as clean HTML (the editor uses Tiptap/ProseMirror):
-   - Use `<p>` for paragraphs
-   - Use `<em>` for italics, `<strong>` for bold
-   - Use `<h2>`, `<h3>` for section headers if needed
-   - Use `<blockquote>` for internal thoughts or quoted text
+   Example:
+   ```json
+   {
+     "nodeId": "<scene-id>",
+     "blocks": [
+       { "type": "BEAT", "content": "Marcus arrives at the tavern, peers through the rain-streaked window" },
+       { "type": "BEAT", "content": "He spots Lena at the back table, disguised but recognizable" },
+       { "type": "BEAT", "content": "Marcus sits down — tense greeting, both aware they're being watched" },
+       { "type": "BEAT", "content": "Lena slides the envelope across the table, warns him not to open it here" },
+       { "type": "BEAT", "content": "A stranger at the bar stands and leaves — Marcus realizes they've been made" },
+       { "type": "BEAT", "content": "Marcus pockets the envelope, they split up — he exits through the kitchen" }
+     ]
+   }
+   ```
 
-8. **Provide a drafting note** to the author explaining:
-   - Choices made in the draft and why
-   - Areas that might need the author's voice/style applied
-   - Any questions or decision points left open
+8. **Provide a planning note** to the author explaining:
+   - Why you chose this beat sequence
+   - Which beats are load-bearing (removing them breaks the scene logic)
+   - Where the author has the most creative freedom
+   - Any alternative structures you considered
 
 ## Output Format
 
 ```markdown
-# Scene Draft: [Scene Title]
+# Beat Plan: [Scene Title]
 
-## Context Used
-- **Previous Scene:** [title] — [brief summary of where we left off]
+## Context
+- **Previous Scene:** [title] — [where we left off]
 - **Characters Present:** [list]
 - **Location:** [setting]
-- **Scene Goal:** [what happens in this scene]
+- **Scene Goal:** [what this scene accomplishes]
 
-## Draft
-[The scene content is saved directly to the scene via write_scene_content]
+## Beats
+[Written to the scene via write_scene_content blocks parameter]
 
-## Drafting Notes
-- **POV:** [character and why]
-- **Tone:** [what we went for]
-- **Choices Made:**
-  - [Choice 1 and rationale]
-  - [Choice 2 and rationale]
-- **For Author Review:**
-  - [Areas where the author should apply their unique voice]
-  - [Decision points left open]
-  - [Facts/details that need verification]
+## Planning Notes
+- **Structure:** [why this sequence works]
+- **Pivot Point:** [which beat is the turning point and why]
+- **Load-Bearing Beats:** [which beats can't be removed]
+- **Creative Freedom:** [where the author should make it their own]
+- **Alternatives Considered:** [other structures that could work]
 ```
 
 ## Tips
 
-- This produces a FIRST DRAFT. Set expectations accordingly — it's a starting point, not finished prose.
-- Match the established voice if previous scenes exist. Read them carefully to absorb the style.
-- When in doubt about a detail, use a placeholder and flag it for the author: `[CHECK: character's eye color]`.
-- Aim for the project's typical scene length. Check word counts of existing scenes via the outline.
-- Don't info-dump character backstory. Reveal it naturally through action and dialogue.
+- This produces a BEAT PLAN, not a draft. Set expectations: the author writes the prose.
+- If the scene already has CONTENT blocks (prose the author wrote), preserve them. Only add/modify BEAT blocks.
+- Match the level of detail to the author's preference. Some want sparse beats, others want granular moment-by-moment planning.
+- When in doubt about a story detail, flag it in the beat: `[CHECK: does Marcus know about the letter at this point?]`
+- If the author asks you to "write the scene" or "draft prose," remind them that you plan beats and they write the prose. Offer to make the beats more detailed if they want more guidance.
