@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
+import { getConsistencyContext } from "@/mcp/tools/coaching";
 import OpenAI from "openai";
 
 export interface ConsistencyAlert {
@@ -10,13 +10,10 @@ export interface ConsistencyAlert {
   type: "CHARACTER_ATTRIBUTE" | "PLOT_CONTRADICTION" | "TIMELINE" | "OTHER";
   severity: "high" | "medium" | "low";
   description: string;
-  /** Scene where contradiction was found */
   sceneId: string;
   sceneTitle: string;
-  /** Scene where the original (conflicting) information lives */
   sourceSceneId?: string;
   sourceSceneTitle?: string;
-  /** The object (character, location, etc.) involved */
   objectName?: string;
   dismissed?: boolean;
 }
@@ -25,8 +22,7 @@ export interface ConsistencyAlert {
  * POST /api/projects/[id]/consistency-check
  *
  * Runs an AI consistency analysis on the project.
- * Body: { sceneId?: string }  — if provided, focus on that scene
- * Returns: { alerts: ConsistencyAlert[] }
+ * Uses shared context from MCP coaching module.
  */
 export async function POST(
   request: NextRequest,
@@ -46,66 +42,9 @@ export async function POST(
   }
 
   try {
-    // Load project data for analysis
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { title: true },
-    });
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+    const ctx = await getConsistencyContext(projectId, focusSceneId);
 
-    // Load characters with their descriptions
-    const characters = await prisma.storyObject.findMany({
-      where: { projectId, type: "CHARACTER" },
-      select: { id: true, name: true, description: true, notes: true, role: true },
-    });
-
-    if (characters.length === 0) {
-      return NextResponse.json({ alerts: [] });
-    }
-
-    // Load scenes with content (limited for token efficiency)
-    const sceneQuery: Parameters<typeof prisma.structureNode.findMany>[0] = {
-      where: { projectId, type: "SCENE" },
-      orderBy: { orderIndex: "asc" },
-      select: { id: true, title: true, parentId: true },
-    };
-    const scenes = await prisma.structureNode.findMany(sceneQuery);
-
-    // Load latest content for each relevant scene
-    const scenesWithContent: { id: string; title: string; content: string }[] = [];
-
-    const targetSceneIds = focusSceneId
-      ? [focusSceneId]
-      : scenes.slice(0, 20).map((s) => s.id); // limit to 20 scenes
-
-    for (const sceneId of targetSceneIds) {
-      const version = await prisma.contentVersion.findFirst({
-        where: { nodeId: sceneId },
-        orderBy: { createdAt: "desc" },
-        select: { content: true },
-      });
-      const scene = scenes.find((s) => s.id === sceneId);
-      if (scene && version?.content) {
-        // Strip HTML and beat comments for analysis
-        const textContent = version.content
-          .replace(/<!--[\s\S]*?-->/g, "")
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 800); // limit per scene
-        if (textContent.length > 50) {
-          scenesWithContent.push({
-            id: sceneId,
-            title: scene.title,
-            content: textContent,
-          });
-        }
-      }
-    }
-
-    if (scenesWithContent.length === 0) {
+    if (ctx.characters.length === 0 || ctx.scenes.length === 0) {
       return NextResponse.json({ alerts: [] });
     }
 
@@ -114,21 +53,20 @@ export async function POST(
       return NextResponse.json({ alerts: [], warning: "AI not configured" });
     }
 
-    // Build prompt for consistency analysis
-    const characterSummary = characters
+    const characterSummary = ctx.characters
       .map((c) => {
         const parts = [`${c.name}${c.role ? ` (${c.role})` : ""}`];
-        if (c.description) parts.push(`Description: ${c.description.slice(0, 300)}`);
-        if (c.notes) parts.push(`Notes: ${c.notes.slice(0, 200)}`);
+        if (c.description) parts.push(`Description: ${c.description}`);
+        if (c.notes) parts.push(`Notes: ${c.notes}`);
         return parts.join(". ");
       })
       .join("\n");
 
-    const scenesSummary = scenesWithContent
+    const scenesSummary = ctx.scenes
       .map((s) => `SCENE "${s.title}" (id:${s.id}):\n${s.content}`)
       .join("\n\n---\n\n");
 
-    const prompt = `You are a manuscript consistency checker for the story "${project.title}".
+    const prompt = `You are a manuscript consistency checker for the story "${ctx.project.title}".
 
 CHARACTER PROFILES:
 ${characterSummary}
@@ -187,8 +125,7 @@ Only report clear, specific contradictions. Do not report vague impressions.`;
       parsed = [];
     }
 
-    // Map parsed results to alerts, resolving scene IDs
-    const sceneByTitle = new Map(scenesWithContent.map((s) => [s.title, s.id]));
+    const sceneByTitle = new Map(ctx.scenes.map((s) => [s.title, s.id]));
 
     const alerts: ConsistencyAlert[] = parsed.slice(0, 20).map((item, idx) => ({
       id: `alert-${Date.now()}-${idx}`,
@@ -199,7 +136,7 @@ Only report clear, specific contradictions. Do not report vague impressions.`;
         ? item.severity
         : "medium") as ConsistencyAlert["severity"],
       description: String(item.description ?? "").slice(0, 500),
-      sceneId: sceneByTitle.get(item.sceneTitle) ?? scenesWithContent[0]?.id ?? "",
+      sceneId: sceneByTitle.get(item.sceneTitle) ?? ctx.scenes[0]?.id ?? "",
       sceneTitle: String(item.sceneTitle ?? ""),
       sourceSceneId: item.sourceSceneTitle ? sceneByTitle.get(item.sourceSceneTitle) : undefined,
       sourceSceneTitle: item.sourceSceneTitle ? String(item.sourceSceneTitle) : undefined,

@@ -71,6 +71,13 @@ import {
     linkProjectToUniverse,
     unlinkProjectFromUniverse,
 } from "./tools/universes";
+import {
+    getPlotThreadStatus,
+    getSceneFocus,
+    getManuscriptContext,
+    getConsistencyContext,
+    getVoiceContext,
+} from "./tools/coaching";
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
 
@@ -1021,6 +1028,232 @@ server.tool(
         } catch (e) {
             return { content: [{ type: "text", text: `Export failed: ${e}` }], isError: true };
         }
+    }
+);
+
+// ─── Coaching & Analysis Tools ───────────────────────────────────────────────
+
+server.tool(
+    "get_plot_thread_status",
+    "Track plotline engagement across scenes. Shows which plot threads are advancing, newly mentioned, or dormant in each scene — essential for spotting dropped threads.",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async ({ projectId }) => {
+        const result = await getPlotThreadStatus(projectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_scene_focus",
+    "Get complete context for coaching on a single scene: scene metadata, status, word count, adjacent scenes, linked characters/locations/plotlines, and open annotations.",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+    },
+    async ({ sceneId }) => {
+        const result = await getSceneFocus(sceneId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_manuscript_context",
+    "Get the full manuscript context for analysis: outline with scene previews, character profiles, plotline summaries, and relationships. Use this before running manuscript-level analysis.",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async ({ projectId }) => {
+        const result = await getManuscriptContext(projectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_consistency_context",
+    "Gather character profiles and scene text for consistency analysis. Optionally focus on a single scene. Returns structured data ready for identifying contradictions.",
+    {
+        projectId: z.string().describe("The project ID"),
+        sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 20 scenes)"),
+    },
+    async ({ projectId, sceneId }) => {
+        const result = await getConsistencyContext(projectId, sceneId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_voice_context",
+    "Gather character profiles and scene dialogue for voice consistency analysis. Returns characters linked to the scene with their descriptions and the scene text.",
+    {
+        projectId: z.string().describe("The project ID"),
+        sceneId: z.string().describe("The scene to analyze"),
+    },
+    async ({ projectId, sceneId }) => {
+        const result = await getVoiceContext(projectId, sceneId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Coaching Prompts ───────────────────────────────────────────────────────
+
+server.prompt(
+    "scene-coaching",
+    "Status-aware coaching for a scene. Adapts review approach based on whether the scene is OUTLINE, DRAFT, REVISED, or FINAL — each stage gets different coaching focus.",
+    {
+        sceneId: z.string().describe("The scene node ID to coach on"),
+        projectId: z.string().optional().describe("The project ID (for broader context)"),
+    },
+    async (args) => {
+        let contextNote = "";
+        if (args.projectId) contextNote += `Project ID: ${args.projectId}\n`;
+        if (args.sceneId) contextNote += `Scene ID: ${args.sceneId}\n`;
+
+        return {
+            messages: [{
+                role: "user",
+                content: {
+                    type: "text",
+                    text: `${contextNote ? `## Context\n${contextNote}\n---\n\n` : ""}## Scene Coaching (Status-Aware)
+
+You are Annie, a writing coach. Your job is to coach the writer on this scene.
+
+**Step 1: Load scene context**
+Use the \`get_scene_focus\` tool with the scene ID to get the scene's status, synopsis, linked characters, locations, plotlines, and open annotations.
+
+**Step 2: Adapt your coaching to the scene's status**
+
+### If status is OUTLINE:
+- Focus on **story structure and planning**: Does the synopsis convey a clear scene goal? What's the conflict? What changes by the end?
+- Suggest beat-by-beat structure. Identify which characters should appear and what each wants.
+- Ask: "What is the ONE thing this scene must accomplish for the story?"
+- Do NOT critique prose (there is none yet).
+
+### If status is DRAFT:
+- Focus on **big-picture feedback**: Does the scene deliver on its synopsis? Is the conflict clear? Do characters behave consistently?
+- Check pacing: Is the opening too slow? Does the ending land?
+- Flag missing elements: Are all linked characters present? Is the setting grounded?
+- Light prose notes only if something actively confuses the reader.
+
+### If status is REVISED:
+- Focus on **craft-level polish**: Prose rhythm, word choice, voice consistency, dialogue authenticity.
+- Use \`get_voice_context\` to check character voice if dialogue is present.
+- Check for: filler words, passive voice overuse, telling vs showing, cliché.
+- Verify continuity with adjacent scenes (prev/next from focus data).
+
+### If status is FINAL:
+- Focus on **proofreading and consistency**: Typos, grammar, formatting, factual consistency.
+- Use \`get_consistency_context\` to cross-check character details and timeline.
+- Flag only concrete errors. This is not the time for subjective style feedback.
+- If the scene is genuinely polished, say so — don't manufacture issues.
+
+**Step 3: Check annotations**
+Review any open annotations on the scene. Address them in your feedback if relevant.
+
+**Step 4: Deliver coaching**
+Structure your response as:
+1. **Scene snapshot** — one-sentence summary of what the scene does
+2. **Status-appropriate feedback** — 3-5 specific, actionable points
+3. **Annotation responses** — if any open annotations relate to your feedback
+4. **Next step** — one concrete suggestion for the writer's next action`,
+                },
+            }],
+        };
+    }
+);
+
+server.prompt(
+    "inline-edit",
+    "Inline text editing operations: rewrite tighter, more vivid, simpler; continue writing; expand; voice check; or custom prompt on selected text.",
+    {
+        action: z.enum(["rewrite-tighter", "rewrite-vivid", "rewrite-simpler", "continue", "expand", "voice-check", "ask"]).describe("The editing action to perform"),
+        selectedText: z.string().describe("The text to edit or analyze"),
+        sceneContext: z.string().optional().describe("Surrounding text for context (a few paragraphs around the selection)"),
+        askPrompt: z.string().optional().describe("Custom prompt (required when action is 'ask')"),
+    },
+    async (args) => {
+        const actionInstructions: Record<string, string> = {
+            "rewrite-tighter": "Rewrite this passage to be tighter and more concise — cut any filler words, redundant phrases, or unnecessary detail. Keep the same meaning and voice.",
+            "rewrite-vivid": "Rewrite this passage to be more vivid and evocative — stronger verbs, sensory detail, concrete imagery. Keep the same meaning and approximate length.",
+            "rewrite-simpler": "Rewrite this passage in simpler, clearer language. Replace complex words with everyday ones, shorten sentences, keep it direct.",
+            "continue": "Continue the story naturally from where this passage ends. Match the existing voice, pacing, and style. Write 1-3 short paragraphs.",
+            "expand": "Expand this passage with more detail, texture, and depth. Add sensory details, internality, or action beats where appropriate. Stay true to the voice.",
+            "voice-check": "Analyze this passage for voice consistency and effectiveness. Comment on: sentence rhythm, word choice, point of view consistency, and any jarring shifts. Be specific and brief (2-4 sentences).",
+            "ask": args.askPrompt || "What do you think about this passage?",
+        };
+
+        const instruction = actionInstructions[args.action] || actionInstructions["ask"];
+        const contextBlock = args.sceneContext ? `\nContext (surrounding text):\n${args.sceneContext}\n` : "";
+        const textLabel = args.action === "continue" ? "End of passage (continue from here)" : args.action === "voice-check" ? "Passage to review" : "Selected text";
+
+        return {
+            messages: [{
+                role: "user",
+                content: {
+                    type: "text",
+                    text: `${instruction}${contextBlock}\n${textLabel}:\n${args.selectedText}\n\n${args.action !== "voice-check" && args.action !== "ask" ? "Return ONLY the rewritten/new text, no explanation." : ""}`,
+                },
+            }],
+        };
+    }
+);
+
+server.prompt(
+    "manuscript-analysis",
+    "Deep manuscript-level analysis: plot thread tracking, character arc evaluation, or consistency checking across the full project.",
+    {
+        projectId: z.string().describe("The project ID to analyze"),
+        analysisType: z.enum(["plot-threads", "character-arcs", "consistency-check"]).describe("Type of analysis to perform"),
+    },
+    async (args) => {
+        const instructions: Record<string, string> = {
+            "plot-threads": `## Plot Thread Analysis
+
+Use the \`get_manuscript_context\` tool to load the project outline, characters, and plotlines.
+Then use \`get_plot_thread_status\` to see which threads are active, dormant, or newly introduced in each scene.
+
+Analyze:
+1. **Active threads** — which plot lines are being developed consistently
+2. **Dormant threads** — threads introduced but not recently advanced (risk of being dropped)
+3. **Unresolved threads** — threads that need payoff before the story ends
+4. **Suggested connections** — opportunities to weave threads together for richer storytelling
+
+Be specific about which scenes/chapters contain each thread. Keep it concise and actionable.`,
+
+            "character-arcs": `## Character Arc Analysis
+
+Use the \`get_manuscript_context\` tool to load the project outline, characters, and relationships.
+
+For each major character, analyze:
+1. **Arc type** — transformation, revelation, flat/steadfast, or fallen
+2. **Current position** — where they are in their arc based on the manuscript
+3. **Missing beats** — what arc beats are absent or underdeveloped
+4. **Key relationships** — how relationships drive or reflect the arc
+
+Be specific about which scenes show arc development. Format as one section per major character.`,
+
+            "consistency-check": `## Consistency Check
+
+Use the \`get_consistency_context\` tool to load character profiles and scene content.
+
+Look for specific contradictions:
+1. **Character details** — appearance, backstory, traits mentioned differently across scenes
+2. **Timeline** — events out of chronological order, impossible timing
+3. **World/setting** — location descriptions that contradict each other
+4. **Plot logic** — cause-effect gaps, character motivations that don't hold
+
+Only report clear, specific contradictions with scene references. Do not report vague impressions. If no issues found in a category, say so briefly.`,
+        };
+
+        return {
+            messages: [{
+                role: "user",
+                content: {
+                    type: "text",
+                    text: `Project ID: ${args.projectId}\n\n${instructions[args.analysisType]}`,
+                },
+            }],
+        };
     }
 );
 
