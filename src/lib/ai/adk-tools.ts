@@ -107,6 +107,48 @@ const tools: ToolDefinition[] = [
         category: "core",
         parameters: z.object({}),
     },
+    {
+        name: "get_plot_thread_status",
+        description: "Track plotline engagement across scenes. Shows which plot threads are advancing, newly mentioned, or dormant in each scene.",
+        category: "core",
+        parameters: z.object({
+            projectId: z.string().describe("The project ID"),
+        }),
+    },
+    {
+        name: "get_scene_focus",
+        description: "Get complete context for coaching on a single scene: metadata, status, word count, adjacent scenes, linked characters/locations/plotlines, and open annotations.",
+        category: "core",
+        parameters: z.object({
+            sceneId: z.string().describe("The scene node ID"),
+        }),
+    },
+    {
+        name: "get_manuscript_context",
+        description: "Get the full manuscript context for analysis: outline with scene previews, character profiles, plotline summaries, and relationships.",
+        category: "core",
+        parameters: z.object({
+            projectId: z.string().describe("The project ID"),
+        }),
+    },
+    {
+        name: "get_consistency_context",
+        description: "Gather character profiles and scene text for consistency analysis. Optionally focus on a single scene.",
+        category: "core",
+        parameters: z.object({
+            projectId: z.string().describe("The project ID"),
+            sceneId: z.string().optional().describe("Focus on a specific scene"),
+        }),
+    },
+    {
+        name: "get_voice_context",
+        description: "Gather character profiles and scene dialogue for voice consistency analysis.",
+        category: "core",
+        parameters: z.object({
+            projectId: z.string().describe("The project ID"),
+            sceneId: z.string().describe("The scene to analyze"),
+        }),
+    },
 
     // ─── Structure ──────────────────────────────────────────────────────────
     {
@@ -634,6 +676,13 @@ import {
   unlinkProjectFromUniverse,
 } from "@/mcp/tools/universes";
 import { listSkills } from "@/mcp/skills";
+import {
+  getPlotThreadStatus,
+  getSceneFocus,
+  getManuscriptContext,
+  getConsistencyContext,
+  getVoiceContext,
+} from "@/mcp/tools/coaching";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
 
@@ -652,6 +701,11 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   get_project_summary: async (a) => getProjectSummary(a.projectId as string),
   get_open_annotations: async (a) => getOpenAnnotations(a.projectId as string | undefined),
   list_skills: async () => listSkills(),
+  get_plot_thread_status: async (a) => getPlotThreadStatus(a.projectId as string),
+  get_scene_focus: async (a) => getSceneFocus(a.sceneId as string),
+  get_manuscript_context: async (a) => getManuscriptContext(a.projectId as string),
+  get_consistency_context: async (a) => getConsistencyContext(a.projectId as string, a.sceneId as string | undefined),
+  get_voice_context: async (a) => getVoiceContext(a.projectId as string, a.sceneId as string),
 
   // Structure
   create_node: async (a) => createNode(a as Parameters<typeof createNode>[0]),

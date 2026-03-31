@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FocusController } from "@/lib/controllers/focus";
 import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { getSceneFocus } from "@/mcp/tools/coaching";
 
+/**
+ * GET /api/focus/[sceneId]
+ *
+ * Returns scene context, related elements, and annotations.
+ * Thin wrapper around MCP tool implementation.
+ */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ sceneId: string }> }
@@ -15,13 +21,30 @@ export async function GET(
         const access = await verifyProjectAccessByNode(sceneId, userId);
         if (!access.authorized) return access.response;
 
-        const context = await FocusController.getSceneContext(sceneId);
-        const related = await FocusController.getRelatedElements(sceneId);
-        const annotations = await FocusController.getAnnotations(sceneId);
+        const result = await getSceneFocus(sceneId);
 
-        return NextResponse.json({ context, related, annotations });
+        // Reshape to match the original API contract
+        return NextResponse.json({
+            context: result.scene,
+            related: groupByType(result.relatedElements),
+            annotations: result.annotations,
+        });
     } catch (error) {
         logger.error("Focus API error", error);
         return new NextResponse("Internal Server Error", { status: 500 });
     }
+}
+
+function groupByType(elements: { type: string }[]): Record<string, typeof elements> {
+    const grouped: Record<string, typeof elements> = {
+        CHARACTER: [],
+        LOCATION: [],
+        PLOTLINE: [],
+        WORLD_ELEMENT: [],
+        NOTE: [],
+    };
+    for (const el of elements) {
+        if (grouped[el.type]) grouped[el.type].push(el);
+    }
+    return grouped;
 }
