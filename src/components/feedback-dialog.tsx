@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquarePlus, Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScreenshotAnnotation } from "@/components/screenshot-annotation";
 
 type FeedbackType = "bug" | "feature" | "other";
 
@@ -42,16 +43,22 @@ export function FeedbackDialog({
     issueUrl?: string;
   } | null>(null);
 
+  // Screenshot state
+  const [showScreenshotCapture, setShowScreenshotCapture] = useState(false);
+  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
+
   const reset = () => {
     setType("bug");
     setMessage("");
     setResult(null);
     setSubmitting(false);
+    setShowScreenshotCapture(false);
+    setScreenshotDataUrl(null);
   };
 
-  const handleClose = (open: boolean) => {
-    if (!open) reset();
-    onOpenChange(open);
+  const handleClose = (nextOpen: boolean) => {
+    if (!nextOpen) reset();
+    onOpenChange(nextOpen);
   };
 
   const handleSubmit = async () => {
@@ -67,6 +74,7 @@ export function FeedbackDialog({
           type,
           message: message.trim(),
           email: userEmail,
+          screenshot: screenshotDataUrl ?? undefined,
           context: {
             url: window.location.href,
             userAgent: navigator.userAgent,
@@ -76,15 +84,16 @@ export function FeedbackDialog({
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data: { issueUrl?: string } = await res.json();
         setResult({
           success: true,
           message: "Feedback submitted! Thank you.",
           issueUrl: data.issueUrl,
         });
         setMessage("");
+        setScreenshotDataUrl(null);
       } else {
-        const data = await res.json().catch(() => ({}));
+        const data: { error?: string } = await res.json().catch(() => ({}));
         setResult({
           success: false,
           message: data.error || "Failed to submit feedback. Please try again.",
@@ -102,7 +111,7 @@ export function FeedbackDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquarePlus className="h-5 w-5" />
@@ -141,7 +150,7 @@ export function FeedbackDialog({
                 </label>
                 <Select
                   value={type}
-                  onValueChange={(v) => setType(v as FeedbackType)}
+                  onValueChange={(v: string) => setType(v as FeedbackType)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -171,6 +180,63 @@ export function FeedbackDialog({
                   autoFocus
                 />
               </div>
+
+              {/* Screenshot section - shown for bug reports */}
+              {type === "bug" && (
+                <div>
+                  <label className="text-sm font-medium text-text-secondary block mb-2">
+                    Screenshot (optional)
+                  </label>
+
+                  {screenshotDataUrl && !showScreenshotCapture ? (
+                    <div className="relative border border-border/20 rounded overflow-hidden bg-surface-raised">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={screenshotDataUrl}
+                        alt="Bug report screenshot"
+                        className="w-full rounded"
+                      />
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowScreenshotCapture(true)}
+                          title="Re-annotate"
+                        >
+                          <Camera className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setScreenshotDataUrl(null)}
+                          title="Remove screenshot"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : showScreenshotCapture ? (
+                    <ScreenshotAnnotation
+                      onCapture={(dataUrl: string) => {
+                        setScreenshotDataUrl(dataUrl);
+                        setShowScreenshotCapture(false);
+                      }}
+                      onCancel={() => setShowScreenshotCapture(false)}
+                    />
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowScreenshotCapture(true)}
+                    >
+                      <Camera className="h-4 w-4 mr-1" />
+                      Capture Screenshot
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {result && !result.success && (
                 <p className="text-sm text-danger">{result.message}</p>
               )}
