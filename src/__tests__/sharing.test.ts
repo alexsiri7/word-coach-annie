@@ -278,7 +278,7 @@ describe("Manuscript API — GET /api/projects/[id]/manuscript", () => {
         expect(body.title).toBe("Shared Novel");
     });
 
-    it("shared reader can access", async () => {
+    it("shared reader gets 403 (manuscript is owner-only)", async () => {
         const reader = await createOtherUser();
         await testPrisma.projectShare.create({
             data: { projectId, email: reader.email, role: "READER" },
@@ -291,9 +291,7 @@ describe("Manuscript API — GET /api/projects/[id]/manuscript", () => {
         });
         const res = await GET(req as never, mockParams({ id: projectId }));
 
-        expect((res as any).status).toBe(200);
-        const body = await (res as any).json();
-        expect(body.title).toBe("Shared Novel");
+        expect((res as any).status).toBe(403);
     });
 
     it("non-shared user gets 403", async () => {
