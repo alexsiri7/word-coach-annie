@@ -19,7 +19,9 @@ jobs:
       - name: Health check
         run: |
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/api/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+              -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+              https://word-coach-annie-staging.up.railway.app/api/health)
             if [ "$STATUS" = "200" ]; then
               echo "✓ Health check passed (HTTP $STATUS)"
               exit 0
@@ -32,7 +34,7 @@ jobs:
 
       - name: Check login page loads
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/login)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://word-coach-annie-staging.up.railway.app/login)
           if [ "$STATUS" != "200" ]; then
             echo "::error::Login page returned HTTP $STATUS"
             exit 1
@@ -42,7 +44,7 @@ jobs:
       - name: Check API token auth works
         run: |
           # Unauthenticated request to a protected route should return 401
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://amusing-blessing-staging.up.railway.app/api/projects)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://word-coach-annie-staging.up.railway.app/api/projects)
           if [ "$STATUS" != "401" ]; then
             echo "::warning::Expected 401 for unauthenticated /api/projects, got $STATUS"
           fi
@@ -66,5 +68,5 @@ jobs:
       - name: Run E2E integration tests
         run: npx playwright test e2e/integration.spec.ts --project=integration
         env:
-          BASE_URL: https://amusing-blessing-staging.up.railway.app
+          BASE_URL: https://word-coach-annie-staging.up.railway.app
           API_TOKEN: ${{ secrets.API_TOKEN }}
