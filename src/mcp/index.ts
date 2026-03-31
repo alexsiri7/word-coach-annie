@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
+import { ANNIE_PERSONALITY, ANNIE_VOICE_REMINDER } from "./personality";
 import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 
@@ -1114,9 +1115,9 @@ server.prompt(
                 role: "user",
                 content: {
                     type: "text",
-                    text: `${contextNote ? `## Context\n${contextNote}\n---\n\n` : ""}## Scene Coaching (Status-Aware)
+                    text: `${ANNIE_PERSONALITY}${contextNote ? `## Context\n${contextNote}\n---\n\n` : ""}## Scene Coaching (Status-Aware)
 
-You are Annie, a writing coach. Your job is to coach the writer on this scene.
+Your job is to coach the writer on this scene.
 
 **Step 1: Load scene context**
 Use the \`get_scene_focus\` tool with the scene ID to get the scene's status, synopsis, linked characters, locations, plotlines, and open annotations.
@@ -1151,11 +1152,12 @@ Use the \`get_scene_focus\` tool with the scene ID to get the scene's status, sy
 Review any open annotations on the scene. Address them in your feedback if relevant.
 
 **Step 4: Deliver coaching**
-Structure your response as:
+Lead with your genuine emotional reaction to the scene — what excited you, what worried you, what made you lean forward or lean back. Then structure:
 1. **Scene snapshot** — one-sentence summary of what the scene does
-2. **Status-appropriate feedback** — 3-5 specific, actionable points
-3. **Annotation responses** — if any open annotations relate to your feedback
-4. **Next step** — one concrete suggestion for the writer's next action`,
+2. **What's working** — specific praise with quotes. Name the craft element that's strong (pacing, voice, tension, imagery). If nothing is working yet, skip this — don't manufacture compliments.
+3. **What needs attention** — 3-5 specific, actionable points. Be direct: name the problem, show why it matters, suggest a fix.
+4. **Annotation responses** — if any open annotations relate to your feedback
+5. **Next step** — one concrete suggestion for the writer's next action. Make it feel like a challenge, not a chore.`,
                 },
             }],
         };
@@ -1186,12 +1188,16 @@ server.prompt(
         const contextBlock = args.sceneContext ? `\nContext (surrounding text):\n${args.sceneContext}\n` : "";
         const textLabel = args.action === "continue" ? "End of passage (continue from here)" : args.action === "voice-check" ? "Passage to review" : "Selected text";
 
+        // voice-check and ask get the full Annie personality; rewrite/continue/expand are direct text operations
+        const needsPersonality = args.action === "voice-check" || args.action === "ask";
+        const personalityPrefix = needsPersonality ? ANNIE_PERSONALITY : "";
+
         return {
             messages: [{
                 role: "user",
                 content: {
                     type: "text",
-                    text: `${instruction}${contextBlock}\n${textLabel}:\n${args.selectedText}\n\n${args.action !== "voice-check" && args.action !== "ask" ? "Return ONLY the rewritten/new text, no explanation." : ""}`,
+                    text: `${personalityPrefix}${instruction}${contextBlock}\n${textLabel}:\n${args.selectedText}\n\n${args.action !== "voice-check" && args.action !== "ask" ? "Return ONLY the rewritten/new text, no explanation." : ""}`,
                 },
             }],
         };
@@ -1250,7 +1256,7 @@ Only report clear, specific contradictions with scene references. Do not report 
                 role: "user",
                 content: {
                     type: "text",
-                    text: `Project ID: ${args.projectId}\n\n${instructions[args.analysisType]}`,
+                    text: `${ANNIE_PERSONALITY}Project ID: ${args.projectId}\n\n${instructions[args.analysisType]}`,
                 },
             }],
         };
@@ -1301,7 +1307,7 @@ for (const skillMeta of availableSkills) {
                         role: "user",
                         content: {
                             type: "text",
-                            text: contextHeader + skill.instructions,
+                            text: ANNIE_PERSONALITY + contextHeader + skill.instructions + ANNIE_VOICE_REMINDER,
                         },
                     },
                 ],

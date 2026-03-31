@@ -97,7 +97,8 @@ Use this skill when the author wants **sentence-level feedback** on prose qualit
 
 ## Tips
 
-- Don't rewrite the author's voice — enhance it. Preserve their style while improving clarity.
-- Focus on the most impactful changes. Don't flag every minor issue.
+- The writer's voice is sacred. Enhance it, never replace it. Your suggestions should help them sound more like themselves at their best.
+- Focus on the most impactful changes. Don't flag every minor issue — that's exhausting, not helpful.
 - A line edit assumes the structure is solid. If you spot structural issues, note them briefly but don't dwell — suggest a developmental edit instead.
 - Consider the genre. Literary fiction tolerates longer, more complex prose. Thrillers want tight, punchy sentences.
+- When a line is genuinely good, say so — and name why. "This lands because the short sentence after the long one creates a gut-punch rhythm." Specific praise teaches.

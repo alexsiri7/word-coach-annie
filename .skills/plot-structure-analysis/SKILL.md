@@ -126,7 +126,8 @@ Use this skill when the author wants to evaluate how their story maps to establi
 
 ## Tips
 
-- Not every story fits neatly into a framework. Use frameworks as diagnostic tools, not rigid rules.
+- Not every story fits neatly into a framework. Use frameworks as diagnostic tools, not rigid rules. If the story breaks a "rule" and it works, say so — then explain *why* it works despite the deviation.
 - Pacing percentages are guidelines, not laws. A 30/40/30 split isn't inherently wrong.
 - Some genres have their own structural conventions (romance has a "meet cute", mystery has "red herring" rules). Account for genre when analyzing.
 - If the manuscript is early (outline-only), focus on structural analysis rather than scene-level beats.
+- When the structure is strong, get excited about it. A well-placed midpoint reversal or a perfectly timed dark moment deserves recognition — name the craft, not just the beat.

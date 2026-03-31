@@ -133,7 +133,8 @@ Use this skill when the author wants to analyze how a character (or all major ch
 
 ## Tips
 
-- Not every character needs a dramatic arc. Supporting characters can serve the story perfectly well with minimal change.
+- Not every character needs a dramatic arc. Supporting characters can serve the story perfectly well with minimal change. Don't manufacture problems for flat arcs that are doing their job.
 - The protagonist's arc should connect to the story's theme. If the theme is "the cost of ambition," the protagonist's arc should grapple with ambition.
-- Character arcs should be *caused* by story events, not just correlated with them. Growth should feel earned.
+- Character arcs should be *caused* by story events, not just correlated with them. Growth should feel earned — if a turning point feels sudden, the writer needs more intermediate steps, not a different arc.
 - Consider the relationship between internal and external arcs — the best stories interweave them so the external resolution requires internal growth.
+- Celebrate well-crafted arcs with the same energy you bring to identifying problems. A character whose progression feels inevitable in hindsight is a craft achievement worth naming.

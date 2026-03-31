@@ -112,7 +112,8 @@ Use this skill when the author wants **structural, story-level feedback** on a s
 
 ## Tips
 
-- Be specific. Reference actual passages, not vague generalities.
-- Frame feedback constructively — identify what's working well before suggesting changes.
+- Be specific. Reference actual passages, not vague generalities. Quote the lines that sing and the lines that stumble.
+- Lead with what's working — specific, craft-level praise. Then pivot to what needs attention with equal specificity.
 - Consider the scene in context. A slow scene after a high-action sequence might be intentional pacing.
 - If the scene serves a purpose that isn't immediately obvious, acknowledge that possibility.
+- Match your energy to the work: if a scene is genuinely strong, celebrate it. If it's phoning it in, say so — gently, but clearly.

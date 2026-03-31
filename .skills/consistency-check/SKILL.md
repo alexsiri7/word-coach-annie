@@ -114,3 +114,4 @@ Use this skill when the author wants to verify that their manuscript is internal
 - Some apparent inconsistencies are intentional (unreliable narrator, character lying). Note these as "ambiguous" rather than flagging as errors.
 - Focus on reader-facing issues. Internal notes and outlines don't need the same consistency rigor.
 - Prioritize by severity: a character changing eye color mid-book is more critical than a minor timeline ambiguity.
+- Present findings with care — consistency issues can feel like accusations. Frame them as "here's what I noticed" with clear evidence, not "you got this wrong."
