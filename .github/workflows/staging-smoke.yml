@@ -16,25 +16,23 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: Wait for Railway staging deploy
+      - name: Wait for healthy staging deploy
         run: |
-          echo "Waiting 120s for Railway staging deploy..."
-          sleep 120
-
-      - name: Health check (staging)
-        run: |
-          for i in 1 2 3 4 5; do
+          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
+          INTERVAL=30
+          echo "Polling staging health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
+          for i in $(seq 1 $MAX_ATTEMPTS); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
               https://word-coach-annie-staging.up.railway.app/api/health)
             if [ "$STATUS" = "200" ]; then
-              echo "✓ Staging health check passed (HTTP $STATUS)"
+              echo "✓ Staging health check passed after $((i * INTERVAL))s"
               break
             fi
-            echo "Attempt $i: HTTP $STATUS, retrying in 30s..."
-            sleep 30
-            if [ "$i" = "5" ]; then
-              echo "::error::Staging health check failed after 5 attempts"
+            echo "Attempt $i/$MAX_ATTEMPTS: HTTP $STATUS, retrying in ${INTERVAL}s..."
+            sleep $INTERVAL
+            if [ "$i" = "$MAX_ATTEMPTS" ]; then
+              echo "::error::Staging health check failed after $MAX_ATTEMPTS attempts"
               exit 1
             fi
           done
@@ -72,13 +70,11 @@ jobs:
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN not set — cannot deploy to production"
+            echo "::error::Create one at https://railway.com/account/tokens and save as RAILWAY_TOKEN secret"
             exit 1
           fi
 
-          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-          echo "Deploying $SHA to production..."
-
-          # Trigger a redeploy on the production environment
+          echo "Triggering production redeploy..."
           RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
@@ -86,11 +82,11 @@ jobs:
               "query": "mutation { serviceInstanceRedeploy(environmentId: \"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\", serviceId: \"${{ secrets.RAILWAY_SERVICE_ID }}\") }"
             }')
 
-          echo "Deploy response: $RESPONSE"
+          echo "Response: $RESPONSE"
 
           ERRORS=$(echo "$RESPONSE" | jq -r '.errors // empty')
           if [ -n "$ERRORS" ] && [ "$ERRORS" != "null" ]; then
-            echo "::error::Railway deploy API returned errors: $ERRORS"
+            echo "::error::Railway API error: $ERRORS"
             exit 1
           fi
 
@@ -105,36 +101,32 @@ jobs:
       healthy: ${{ steps.check.outputs.healthy }}
       status: ${{ steps.check.outputs.status }}
     steps:
-      - name: Wait for Railway production deploy
-        run: |
-          echo "Waiting 180s for Railway production deploy..."
-          sleep 180
-
-      - name: Health check with retries
+      - name: Poll for healthy production deploy
         id: check
         run: |
           HEALTH_URL="https://annie.interstellarai.net/api/health"
-          for i in 1 2 3 4 5; do
+          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
+          INTERVAL=30
+
+          echo "Polling production health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
+          for i in $(seq 1 $MAX_ATTEMPTS); do
             BODY=$(curl -s --max-time 15 "$HEALTH_URL" || echo '{"status":"unreachable"}')
             STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
-            echo "Attempt $i: status=$STATUS body=$BODY"
+            echo "Attempt $i/$MAX_ATTEMPTS: status=$STATUS"
 
             if [ "$STATUS" = "ok" ]; then
               echo "healthy=true" >> "$GITHUB_OUTPUT"
               echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-              echo "✓ Production health check passed"
+              echo "✓ Production health check passed after $((i * INTERVAL))s"
               exit 0
             fi
 
-            if [ "$i" -lt 5 ]; then
-              echo "Retrying in 30s..."
-              sleep 30
-            fi
+            sleep $INTERVAL
           done
 
           echo "healthy=false" >> "$GITHUB_OUTPUT"
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          echo "::error::Production health check failed after 5 attempts (status: $STATUS)"
+          echo "::error::Production health check failed after $MAX_ATTEMPTS attempts (status: $STATUS)"
 
   # ── Stage 4: Rollback if unhealthy ────────────────────────────────────
   rollback:
