@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { testPrisma } from "./setup";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import "./setup";
 
 // Must import after setup sets DATABASE_URL
 import {
