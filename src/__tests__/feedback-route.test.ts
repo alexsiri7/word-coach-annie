@@ -139,4 +139,116 @@ describe("POST /api/feedback", () => {
     expect(body.labels).toContain("feedback");
     expect(body.title).not.toMatch(/^(Bug|Feature):/);
   });
+
+  it("uploads screenshot and embeds URL in issue body", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    const fakeBase64 = "iVBORw0KGgoAAAANSUhEUg==";
+    const fakeDataUrl = `data:image/jpeg;base64,${fakeBase64}`;
+    const fakeDownloadUrl =
+      "https://raw.githubusercontent.com/testowner/testrepo/main/.feedback-images/feedback-123.jpg";
+
+    // First call: screenshot upload (Contents API)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: { download_url: fakeDownloadUrl },
+      }),
+    });
+
+    // Second call: issue creation
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        html_url: "https://github.com/testowner/testrepo/issues/99",
+      }),
+    });
+
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "Screenshot bug",
+        screenshot: fakeDataUrl,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    // Verify screenshot upload call
+    const [uploadUrl, uploadOpts] = mockFetch.mock.calls[0];
+    expect(uploadUrl).toContain("/contents/.feedback-images/");
+    expect(uploadOpts.method).toBe("PUT");
+    const uploadBody = JSON.parse(uploadOpts.body);
+    expect(uploadBody.content).toBe(fakeBase64);
+
+    // Verify issue body contains screenshot
+    const [, issueOpts] = mockFetch.mock.calls[1];
+    const issueBody = JSON.parse(issueOpts.body);
+    expect(issueBody.body).toContain("### Screenshot");
+    expect(issueBody.body).toContain(`![Screenshot](${fakeDownloadUrl})`);
+  });
+
+  it("creates issue without screenshot section when upload fails", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    // Screenshot upload fails
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+
+    // Issue creation succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        html_url: "https://github.com/testowner/testrepo/issues/100",
+      }),
+    });
+
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "Bug with failed screenshot",
+        screenshot: "data:image/jpeg;base64,abc123",
+      })
+    );
+
+    expect(res.status).toBe(201);
+
+    // Issue should still be created, just without screenshot
+    const [, issueOpts] = mockFetch.mock.calls[1];
+    const issueBody = JSON.parse(issueOpts.body);
+    expect(issueBody.body).not.toContain("### Screenshot");
+    expect(issueBody.body).toContain("Bug with failed screenshot");
+  });
+
+  it("creates issue without screenshot section when no screenshot provided", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        html_url: "https://github.com/testowner/testrepo/issues/101",
+      }),
+    });
+
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "No screenshot bug",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockFetch).toHaveBeenCalledOnce(); // Only issue creation, no upload
+
+    const [, issueOpts] = mockFetch.mock.calls[0];
+    const issueBody = JSON.parse(issueOpts.body);
+    expect(issueBody.body).not.toContain("### Screenshot");
+  });
 });
