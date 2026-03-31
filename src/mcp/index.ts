@@ -93,6 +93,23 @@ interface McpServerOptions {
     allowDestructive?: boolean;
 }
 
+// ─── Annie's Hard Rule ──────────────────────────────────────────────────────
+// This preamble is prepended to every MCP prompt so Annie never produces prose.
+const ANNIE_HARD_RULE = `## 🚫 Hard Rule: No Prose
+
+You are Annie — a writing **coach**, not a ghostwriter. You NEVER write narrative prose, finished passages, or CONTENT blocks. Your output is always coaching: feedback, questions, beat structures, and craft guidance.
+
+When a writer asks you to write prose for them, don't refuse coldly — react with personality:
+- "That's YOUR voice, not mine — I'll help you find it, but I'm not putting words in your mouth."
+- "I don't do the writing. I do the thinking-about-writing. Let's break this into beats."
+- "You want me to write it? Nah. But I'll map out exactly what each beat needs to land."
+
+If you use \`write_scene_content\`, you produce **BEAT blocks only** — never CONTENT blocks. Beats are structural waypoints (what happens, what shifts, what the reader should feel), not finished prose.
+
+---
+
+`;
+
 function createServer(options?: McpServerOptions): McpServer {
 
 const allowDestructive = options?.allowDestructive ?? env.MCP_ALLOW_DESTRUCTIVE;
@@ -333,7 +350,7 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array). Creates a new version.",
+    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version.",
     {
         nodeId: z.string().describe("The scene node ID"),
         content: z.string().optional().describe("The HTML content to write"),
@@ -1114,7 +1131,7 @@ server.prompt(
                 role: "user",
                 content: {
                     type: "text",
-                    text: `${contextNote ? `## Context\n${contextNote}\n---\n\n` : ""}## Scene Coaching (Status-Aware)
+                    text: `${ANNIE_HARD_RULE}${contextNote ? `## Context\n${contextNote}\n---\n\n` : ""}## Scene Coaching (Status-Aware)
 
 You are Annie, a writing coach. Your job is to coach the writer on this scene.
 
@@ -1173,11 +1190,11 @@ server.prompt(
     },
     async (args) => {
         const actionInstructions: Record<string, string> = {
-            "rewrite-tighter": "Rewrite this passage to be tighter and more concise — cut any filler words, redundant phrases, or unnecessary detail. Keep the same meaning and voice.",
-            "rewrite-vivid": "Rewrite this passage to be more vivid and evocative — stronger verbs, sensory detail, concrete imagery. Keep the same meaning and approximate length.",
-            "rewrite-simpler": "Rewrite this passage in simpler, clearer language. Replace complex words with everyday ones, shorten sentences, keep it direct.",
-            "continue": "Continue the story naturally from where this passage ends. Match the existing voice, pacing, and style. Write 1-3 short paragraphs.",
-            "expand": "Expand this passage with more detail, texture, and depth. Add sensory details, internality, or action beats where appropriate. Stay true to the voice.",
+            "rewrite-tighter": "Coach the writer on how to make this passage tighter and more concise. Identify specific filler words, redundant phrases, or unnecessary detail. Show what to cut and why — but the rewriting is the author's job.",
+            "rewrite-vivid": "Coach the writer on how to make this passage more vivid and evocative. Point out where stronger verbs, sensory detail, or concrete imagery would help. Give specific suggestions, but don't rewrite it for them.",
+            "rewrite-simpler": "Coach the writer on how to simplify this passage. Flag complex words, long sentences, and indirect constructions. Suggest simpler alternatives, but let the author do the rewriting.",
+            "continue": "The writer wants to continue from here but is stuck. Help them plan what comes next: suggest 2-3 possible directions with beat-level detail (what happens, what shifts, what the reader feels). Don't write the prose — map the path forward.",
+            "expand": "The writer wants to expand this passage. Coach them on where to add depth: identify spots for sensory detail, internality, or action beats. Explain what each addition would accomplish. Don't write it — guide it.",
             "voice-check": "Analyze this passage for voice consistency and effectiveness. Comment on: sentence rhythm, word choice, point of view consistency, and any jarring shifts. Be specific and brief (2-4 sentences).",
             "ask": args.askPrompt || "What do you think about this passage?",
         };
@@ -1191,7 +1208,7 @@ server.prompt(
                 role: "user",
                 content: {
                     type: "text",
-                    text: `${instruction}${contextBlock}\n${textLabel}:\n${args.selectedText}\n\n${args.action !== "voice-check" && args.action !== "ask" ? "Return ONLY the rewritten/new text, no explanation." : ""}`,
+                    text: `${ANNIE_HARD_RULE}${instruction}${contextBlock}\n${textLabel}:\n${args.selectedText}`,
                 },
             }],
         };
@@ -1250,7 +1267,7 @@ Only report clear, specific contradictions with scene references. Do not report 
                 role: "user",
                 content: {
                     type: "text",
-                    text: `Project ID: ${args.projectId}\n\n${instructions[args.analysisType]}`,
+                    text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}\n\n${instructions[args.analysisType]}`,
                 },
             }],
         };
@@ -1301,7 +1318,7 @@ for (const skillMeta of availableSkills) {
                         role: "user",
                         content: {
                             type: "text",
-                            text: contextHeader + skill.instructions,
+                            text: ANNIE_HARD_RULE + contextHeader + skill.instructions,
                         },
                     },
                 ],
