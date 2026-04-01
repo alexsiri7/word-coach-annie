@@ -275,6 +275,34 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Limit")).toBe("10");
         });
 
+        it("returns 429 when feedback submission limit exceeded (5/hour)", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "feedback-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+
+            // 5 feedback submissions should pass
+            for (let i = 0; i < 5; i++) {
+                const req = createRequest("/api/feedback", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                });
+                const res = await middleware(req);
+                expect(res.status).toBe(200);
+            }
+
+            // 6th should be rate limited
+            const req = createRequest("/api/feedback", {
+                method: "POST",
+                cookies: { annie_session: "valid-jwt" },
+            });
+            const res = await middleware(req);
+            expect(res.status).toBe(429);
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
         it("project create limit does not affect other POST routes", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
