@@ -100,6 +100,22 @@ function applyRateLimit(
         }
     }
 
+    // Feedback submission: POST /api/feedback
+    const isFeedback = method === "POST" && pathname === "/api/feedback";
+    if (isFeedback) {
+        const result = checkRateLimit(
+            `feedback:${userKey}`,
+            RATE_LIMITS.feedback
+        );
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.feedback,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+    }
+
     // Read vs write rate limit
     const isRead = method === "GET" || method === "HEAD";
     const config = isRead ? RATE_LIMITS.read : RATE_LIMITS.write;

@@ -60,6 +60,8 @@ describe("rate-limit", () => {
         expect(RATE_LIMITS.write.windowMs).toBe(60_000);
         expect(RATE_LIMITS.projectCreate.limit).toBe(10);
         expect(RATE_LIMITS.projectCreate.windowMs).toBe(3_600_000);
+        expect(RATE_LIMITS.feedback.limit).toBe(5);
+        expect(RATE_LIMITS.feedback.windowMs).toBe(3_600_000);
     });
 
     it("provides retryAfterMs on rejection", () => {
