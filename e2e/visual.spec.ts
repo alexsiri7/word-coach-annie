@@ -341,28 +341,27 @@ test.describe('Visual regression – Annie', () => {
     await page.goto('/project/proj-1')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
-    await page.waitForTimeout(500)
 
     // On mobile, open the sidebar menu first
     const menuButton = page.locator('button[aria-label="Open sidebar menu"], button:has-text("Open sidebar")')
     if (await menuButton.isVisible().catch(() => false)) {
       await menuButton.click()
-      await page.waitForTimeout(300)
     }
 
-    // Wait for outline to fully render, then ensure Throne Room scene is visible
-    await page.waitForTimeout(500)
-    const sceneItem = page.locator('text=Throne Room').first()
+    // Wait for outline to fully render
+    const chapterItem = page.getByRole('treeitem', { name: 'The Summons' })
+    await chapterItem.waitFor({ state: 'visible', timeout: 5_000 })
+
+    // Ensure Throne Room scene is visible
+    const sceneItem = page.getByRole('treeitem', { name: 'Throne Room' })
     if (!(await sceneItem.isVisible().catch(() => false))) {
       // Chapter is collapsed — expand it
-      const chapter = page.locator('text=The Summons').first()
-      await chapter.click()
+      await chapterItem.click()
       await sceneItem.waitFor({ state: 'visible', timeout: 5_000 })
     }
     await sceneItem.click()
     // Wait for the editor to load the scene (breadcrumb updates)
-    await page.locator('text=Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
-    await page.waitForTimeout(500)
+    await page.getByText('Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
 
     await expect(page).toHaveScreenshot('project-editor.png', {
       animations: 'disabled',
@@ -375,7 +374,8 @@ test.describe('Visual regression – Annie', () => {
     await page.goto('/project/proj-1/scene/sc-1/focus')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
-    await page.waitForTimeout(500)
+    // Wait for focus mode content to load
+    await page.getByText('Throne Room').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('focus-mode.png', {
       animations: 'disabled',
@@ -387,7 +387,8 @@ test.describe('Visual regression – Annie', () => {
     await page.goto('/universe')
     await page.waitForSelector('main', { timeout: 20_000 })
     await disableAnimations(page)
-    await page.waitForTimeout(500)
+    // Wait for universe cards to render
+    await page.getByTestId('universe-card').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('universe-list.png', {
       animations: 'disabled',

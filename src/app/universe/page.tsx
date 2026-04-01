@@ -183,6 +183,7 @@ export default function UniversesPage() {
                         {universes.map((universe, i) => (
                             <div
                                 key={universe.id}
+                                data-testid="universe-card"
                                 className="group glass-card p-5 cursor-pointer animate-slide-up"
                                 style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}
                                 onClick={() => router.push(`/universe/${universe.id}`)}

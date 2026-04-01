@@ -94,7 +94,7 @@ test.describe('Integration tests — real server, real data', () => {
       await page.goto('/')
       await page.waitForSelector('main', { timeout: 20_000 })
       await expect(
-        page.locator(`text=${project.title}`).first(),
+        page.getByText(project.title).first(),
       ).toBeVisible({ timeout: 10_000 })
 
       // 4. Update the title
@@ -228,16 +228,15 @@ test.describe('Integration tests — real server, real data', () => {
 
       // Chapter should be visible in outline
       await expect(
-        page.locator('text=Chapter One').first(),
+        page.getByRole('treeitem', { name: 'Chapter One' }),
       ).toBeVisible({ timeout: 10_000 })
 
       // Click the chapter to expand, then look for the scene
-      await page.locator('text=Chapter One').first().click()
-      await page.waitForTimeout(500)
+      await page.getByRole('treeitem', { name: 'Chapter One' }).click()
 
       // The scene should be visible (may already be visible if outline auto-expands)
       await expect(
-        page.locator('text=Opening Scene').first(),
+        page.getByRole('treeitem', { name: 'Opening Scene' }),
       ).toBeVisible({ timeout: 5_000 })
     } finally {
       if (projectId) await deleteProject(request, projectId)
@@ -309,7 +308,7 @@ test.describe('Integration tests — real server, real data', () => {
 
       // Character should appear in the sidebar list
       await expect(
-        page.locator('text=Captain Aria').first(),
+        page.getByText('Captain Aria').first(),
       ).toBeVisible({ timeout: 10_000 })
     } finally {
       if (projectId) await deleteProject(request, projectId)
