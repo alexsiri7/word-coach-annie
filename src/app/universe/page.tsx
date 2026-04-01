@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Globe, MoreVertical, Trash2, Sparkles, Link, ArrowLeft } from "lucide-react";
+import { Plus, Globe, MoreVertical, Pencil, Trash2, Sparkles, Link, ArrowLeft } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,9 @@ export default function UniversesPage() {
     const [deleteTarget, setDeleteTarget] = useState<Universe | null>(null);
     const [newTitle, setNewTitle] = useState("");
     const [newDescription, setNewDescription] = useState("");
+    const [editTarget, setEditTarget] = useState<Universe | null>(null);
+    const [editTitle, setEditTitle] = useState("");
+    const [editDescription, setEditDescription] = useState("");
 
     const fetchUniverses = async () => {
         const res = await fetch("/api/universes");
@@ -78,6 +81,28 @@ export default function UniversesPage() {
             setNewTitle("");
             setNewDescription("");
             router.push(`/universe/${universe.id}`);
+        }
+    };
+
+    const openEdit = (universe: Universe) => {
+        setEditTarget(universe);
+        setEditTitle(universe.title);
+        setEditDescription(universe.description);
+    };
+
+    const handleEdit = async () => {
+        if (!editTarget || !editTitle.trim()) return;
+        const res = await offlineFetch(`/api/universes/${editTarget.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                title: editTitle,
+                description: editDescription,
+            }),
+        });
+        if (res.ok) {
+            setEditTarget(null);
+            fetchUniverses();
         }
     };
 
@@ -180,6 +205,10 @@ export default function UniversesPage() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenuItem onClick={() => openEdit(universe)}>
+                                                <Pencil className="h-4 w-4 mr-2" />
+                                                Edit
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => setDeleteTarget(universe)} className="text-danger">
                                                 <Trash2 className="h-4 w-4 mr-2" />
                                                 Delete
@@ -243,6 +272,43 @@ export default function UniversesPage() {
                         </Button>
                         <Button onClick={handleCreate} disabled={!newTitle.trim()}>
                             Create
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Universe</DialogTitle>
+                        <DialogDescription>Update your universe details.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <label className="text-sm font-medium text-text-secondary">Title *</label>
+                            <Input
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                placeholder="The Forgotten Realms"
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-text-secondary">Description</label>
+                            <Textarea
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder="Briefly describe your world..."
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditTarget(null)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleEdit} disabled={!editTitle.trim()}>
+                            Save
                         </Button>
                     </DialogFooter>
                 </DialogContent>
