@@ -85,8 +85,12 @@ export function checkRateLimit(
 export const RATE_LIMITS = {
     /** AI chat endpoint: 30 requests per minute per user */
     chat: { limit: 30, windowMs: 60_000 } satisfies RateLimitConfig,
-    /** General API: 100 requests per minute per user */
-    api: { limit: 100, windowMs: 60_000 } satisfies RateLimitConfig,
+    /** Read operations (GET): 120 requests per minute per user */
+    read: { limit: 120, windowMs: 60_000 } satisfies RateLimitConfig,
+    /** Write operations (POST/PATCH/DELETE): 60 requests per minute per user */
+    write: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
+    /** Project creation (POST /api/projects): 10 per hour per user */
+    projectCreate: { limit: 10, windowMs: 3_600_000 } satisfies RateLimitConfig,
 };
 
 /** Clear all entries (for testing) */
