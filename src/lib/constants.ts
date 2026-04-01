@@ -1,6 +1,13 @@
 // Shared constants used across the app
 import type { ProjectType, SceneStatus, StoryObjectType } from "./types";
 
+export const PLAN_LIMITS = {
+    FREE: { maxProjects: 3 },
+    PRO: { maxProjects: Infinity },
+} as const;
+
+export type SubscriptionTier = keyof typeof PLAN_LIMITS;
+
 export const SCENE_STATUS_COLORS: Record<SceneStatus, string> = {
     OUTLINE: "bg-surface-overlay text-text-muted",
     DRAFT: "bg-warning/15 text-warning",

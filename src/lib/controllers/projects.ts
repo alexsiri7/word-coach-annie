@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { PLAN_LIMITS, type SubscriptionTier } from "@/lib/constants";
 
 export class ProjectsController {
     static async listProjects(limit: number = 20, offset: number = 0) {
@@ -120,17 +121,49 @@ export class ProjectsController {
         };
     }
 
+    static async checkProjectLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { subscriptionTier: true, maxProjects: true },
+        });
+
+        const tier = (user?.subscriptionTier ?? "FREE") as SubscriptionTier;
+        const limit = user?.maxProjects ?? PLAN_LIMITS[tier]?.maxProjects ?? PLAN_LIMITS.FREE.maxProjects;
+
+        if (!Number.isFinite(limit)) {
+            return { allowed: true, current: 0, limit };
+        }
+
+        const current = await prisma.project.count({
+            where: { userId, archivedAt: null },
+        });
+
+        return { allowed: current < limit, current, limit };
+    }
+
     static async createProject(params: {
         title: string;
         author?: string;
         synopsis?: string;
         genre?: string;
         projectType?: string;
+        userId?: string;
     }) {
-        const { title, author, synopsis, genre, projectType } = params;
+        const { title, author, synopsis, genre, projectType, userId } = params;
 
         if (!title || title.trim().length === 0) {
             throw new Error("Title is required");
+        }
+
+        if (userId) {
+            const { allowed, current, limit } = await ProjectsController.checkProjectLimit(userId);
+            if (!allowed) {
+                const err = new Error(
+                    `Project limit reached (${current}/${limit}). Archive a project to create a new one.`
+                );
+                (err as Error & { status: number }).status = 403;
+                throw err;
+            }
         }
 
         const project = await prisma.project.create({
@@ -140,6 +173,7 @@ export class ProjectsController {
                 ...(synopsis && { synopsis: synopsis.trim() }),
                 ...(genre && { genre: genre.trim() }),
                 ...(projectType && { projectType }),
+                ...(userId && { userId }),
             },
         });
 

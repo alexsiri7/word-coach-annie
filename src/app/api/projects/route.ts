@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { ProjectsController } from "@/lib/controllers/projects";
+
+const { checkProjectLimit } = ProjectsController;
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
 export async function GET(request: NextRequest) {
@@ -96,6 +99,22 @@ export async function POST(request: NextRequest) {
         { error: "Title is required" },
         { status: 400 }
       );
+    }
+
+    // Check project limit for authenticated users
+    if (userId) {
+      const { allowed, current, limit } = await checkProjectLimit(userId);
+      if (!allowed) {
+        return NextResponse.json(
+          {
+            error: `Project limit reached (${current}/${limit}). Archive a project to create a new one.`,
+            code: "PROJECT_LIMIT_REACHED",
+            current,
+            limit,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const project = await prisma.project.create({

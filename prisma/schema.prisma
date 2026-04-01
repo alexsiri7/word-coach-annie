@@ -32,16 +32,18 @@ model ContentVersion {
 }
 
 model User {
-  id            String          @id @default(cuid())
-  email         String          @unique
-  googleId      String          @unique
-  name          String          @default("")
-  picture       String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  projects      Project[]
-  universes     Universe[]
-  aiSettings    UserAiSettings?
+  id               String          @id @default(cuid())
+  email            String          @unique
+  googleId         String          @unique
+  name             String          @default("")
+  picture          String?
+  subscriptionTier String          @default("FREE") // FREE, PRO
+  maxProjects      Int             @default(3)      // per-user override
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  projects         Project[]
+  universes        Universe[]
+  aiSettings       UserAiSettings?
 }
 
 model Project {

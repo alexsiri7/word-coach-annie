@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
+import { testPrisma } from "./setup";
 
 describe("ProjectsController", () => {
     describe("createProject", () => {
@@ -119,6 +120,107 @@ describe("ProjectsController", () => {
             await expect(
                 ProjectsController.updateProject(p.id, {})
             ).rejects.toThrow("No fields to update");
+        });
+    });
+
+    describe("project limit for free users", () => {
+        async function createTestUser(overrides: { subscriptionTier?: string; maxProjects?: number } = {}) {
+            return testPrisma.user.create({
+                data: {
+                    email: `test-${Date.now()}@example.com`,
+                    googleId: `google-${Date.now()}`,
+                    name: "Test User",
+                    ...overrides,
+                },
+            });
+        }
+
+        it("allows creating projects up to the limit", async () => {
+            const user = await createTestUser({ maxProjects: 2 });
+
+            const p1 = await ProjectsController.createProject({ title: "Project 1", userId: user.id });
+            expect(p1.id).toBeDefined();
+
+            const p2 = await ProjectsController.createProject({ title: "Project 2", userId: user.id });
+            expect(p2.id).toBeDefined();
+        });
+
+        it("rejects project creation when limit is reached", async () => {
+            const user = await createTestUser({ maxProjects: 2 });
+
+            await ProjectsController.createProject({ title: "Project 1", userId: user.id });
+            await ProjectsController.createProject({ title: "Project 2", userId: user.id });
+
+            await expect(
+                ProjectsController.createProject({ title: "Project 3", userId: user.id })
+            ).rejects.toThrow("Project limit reached (2/2)");
+        });
+
+        it("does not count archived projects toward limit", async () => {
+            const user = await createTestUser({ maxProjects: 2 });
+
+            const p1 = await ProjectsController.createProject({ title: "Project 1", userId: user.id });
+            await ProjectsController.createProject({ title: "Project 2", userId: user.id });
+
+            // Archive one project
+            await testPrisma.project.update({
+                where: { id: p1.id },
+                data: { archivedAt: new Date() },
+            });
+
+            // Should now be allowed since only 1 active project
+            const p3 = await ProjectsController.createProject({ title: "Project 3", userId: user.id });
+            expect(p3.id).toBeDefined();
+        });
+
+        it("does not enforce limit when no userId is provided", async () => {
+            // Dev/API_TOKEN mode — no user scoping
+            for (let i = 0; i < 5; i++) {
+                const p = await ProjectsController.createProject({ title: `Project ${i}` });
+                expect(p.id).toBeDefined();
+            }
+        });
+
+        it("uses default FREE limit (3) for new users", async () => {
+            const user = await createTestUser();
+
+            const { allowed, limit } = await ProjectsController.checkProjectLimit(user.id);
+            expect(allowed).toBe(true);
+            expect(limit).toBe(3);
+        });
+
+        it("PRO users have no project limit", async () => {
+            const user = await createTestUser({ subscriptionTier: "PRO", maxProjects: 999999 });
+
+            for (let i = 0; i < 5; i++) {
+                await ProjectsController.createProject({ title: `Project ${i}`, userId: user.id });
+            }
+
+            const { allowed } = await ProjectsController.checkProjectLimit(user.id);
+            expect(allowed).toBe(true);
+        });
+
+        it("checkProjectLimit returns correct counts", async () => {
+            const user = await createTestUser({ maxProjects: 3 });
+
+            await ProjectsController.createProject({ title: "P1", userId: user.id });
+            await ProjectsController.createProject({ title: "P2", userId: user.id });
+
+            const result = await ProjectsController.checkProjectLimit(user.id);
+            expect(result).toEqual({ allowed: true, current: 2, limit: 3 });
+        });
+
+        it("per-user maxProjects overrides tier default", async () => {
+            const user = await createTestUser({ subscriptionTier: "FREE", maxProjects: 5 });
+
+            for (let i = 0; i < 5; i++) {
+                await ProjectsController.createProject({ title: `P${i}`, userId: user.id });
+            }
+
+            const { allowed, current, limit } = await ProjectsController.checkProjectLimit(user.id);
+            expect(allowed).toBe(false);
+            expect(current).toBe(5);
+            expect(limit).toBe(5);
         });
     });
 });
