@@ -890,6 +890,7 @@ test.describe('Integration tests — real server, real data', () => {
           data: { type: 'CHAPTER', title: 'Round Trip Chapter', orderIndex: 0 },
         },
       )
+      expect(chapterRes.status()).toBe(201)
       const chapter = await chapterRes.json()
 
       const sceneRes = await request.post(
@@ -904,15 +905,17 @@ test.describe('Integration tests — real server, real data', () => {
           },
         },
       )
+      expect(sceneRes.status()).toBe(201)
       const scene = await sceneRes.json()
 
-      await request.post(`/api/nodes/${scene.id}/content`, {
+      const contentRes = await request.post(`/api/nodes/${scene.id}/content`, {
         headers: AUTH_HEADERS,
         data: { content: '<p>Round-trip test content that must survive.</p>' },
       })
+      expect(contentRes.status()).toBe(201)
 
       // Add story object
-      await request.post(
+      const storyObjRes = await request.post(
         `/api/projects/${sourceProjectId}/story-objects`,
         {
           headers: AUTH_HEADERS,
@@ -923,6 +926,7 @@ test.describe('Integration tests — real server, real data', () => {
           },
         },
       )
+      expect(storyObjRes.status()).toBe(201)
 
       // 2. Export the project as JSON
       const exportRes = await request.get(
