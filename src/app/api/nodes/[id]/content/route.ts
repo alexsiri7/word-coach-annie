@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeHtml } from "@/lib/sanitize-server";
 
 export async function GET(
   request: NextRequest,
@@ -78,7 +79,8 @@ export async function POST(
       );
     }
 
-    const result = await StructureController.writeSceneContent(nodeId, content);
+    const sanitizedContent = sanitizeHtml(content);
+    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     logger.error("Failed to save content", error);

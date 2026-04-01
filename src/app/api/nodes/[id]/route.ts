@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function GET(
   request: NextRequest,
@@ -93,8 +94,8 @@ export async function PATCH(
     }
 
     const data: Record<string, unknown> = {};
-    if (title !== undefined) data.title = title;
-    if (synopsis !== undefined) data.synopsis = synopsis;
+    if (title !== undefined) data.title = sanitizeInput(title);
+    if (synopsis !== undefined) data.synopsis = sanitizeInput(synopsis);
     if (status !== undefined) data.status = status;
     if (orderIndex !== undefined) data.orderIndex = orderIndex;
     if (parentId !== undefined) data.parentId = parentId;

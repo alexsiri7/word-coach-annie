@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function GET(
   request: NextRequest,
@@ -85,11 +86,11 @@ export async function POST(
     const storyObject = await StoryObjectController.createStoryObject({
       projectId,
       type: body.type as string,
-      name: body.name as string,
-      description: body.description as string | undefined,
-      notes: body.notes as string | undefined,
-      role: body.role as string | undefined,
-      tags: body.tags as string | undefined,
+      name: sanitizeInput(body.name as string),
+      description: body.description ? sanitizeInput(body.description as string) : undefined,
+      notes: body.notes ? sanitizeInput(body.notes as string) : undefined,
+      role: body.role ? sanitizeInput(body.role as string) : undefined,
+      tags: body.tags ? sanitizeInput(body.tags as string) : undefined,
     });
 
     return NextResponse.json(storyObject, { status: 201 });

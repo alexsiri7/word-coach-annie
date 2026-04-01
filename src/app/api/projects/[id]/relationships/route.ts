@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -226,7 +227,7 @@ export async function POST(
     const relationship = await prisma.relationship.create({
       data: {
         type,
-        ...(label !== undefined && { label }),
+        ...(label !== undefined && { label: sanitizeInput(label) }),
         ...(fromNodeId && { fromNodeId }),
         ...(fromObjectId && { fromObjectId }),
         ...(toNodeId && { toNodeId }),
