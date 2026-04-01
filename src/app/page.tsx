@@ -111,6 +111,7 @@ export default function Dashboard() {
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
+  const [todayWords, setTodayWords] = useState(0);
 
   const fetchProjects = async () => {
     const res = await fetch("/api/projects");
@@ -119,8 +120,23 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const fetchTodayWords = async () => {
+    try {
+      const res = await fetch("/api/sessions/heatmap");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const today = new Date().toISOString().slice(0, 10);
+        const todayEntry = data.find((d: { date: string }) => d.date === today);
+        setTodayWords(todayEntry?.wordsWritten ?? 0);
+      }
+    } catch {
+      // Heatmap fetch failed — leave todayWords at 0
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchTodayWords();
   }, []);
 
   const handleCreate = async () => {
@@ -154,8 +170,6 @@ export default function Dashboard() {
     setDeleteTarget(null);
     fetchProjects();
   };
-
-  const totalWords = projects.reduce((sum, p) => sum + p.wordCount, 0);
 
   /* Most recently updated project = hero candidate */
   const heroProject = projects.length > 0
@@ -356,10 +370,10 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <span className="font-headline text-4xl block text-text-primary">
-                        {formatWordCount(totalWords)}
+                        {formatWordCount(todayWords)}
                       </span>
                       <span className="font-label text-[10px] uppercase tracking-tighter opacity-50">
-                        Words total
+                        Words today
                       </span>
                     </div>
                   </div>
@@ -367,10 +381,10 @@ export default function Dashboard() {
                   <div className="relative h-12 bg-surface-container mb-4 flex items-center px-1 overflow-hidden">
                     <div
                       className="absolute left-0 top-0 bottom-0 bg-accent/10 transition-all duration-700"
-                      style={{ width: `${Math.min(100, (totalWords / 10000) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (todayWords / 2000) * 100)}%` }}
                     />
                     <div className="flex gap-1 flex-wrap relative">
-                      {Array.from({ length: Math.min(10, Math.ceil(totalWords / 1000)) }).map((_, i, arr) => (
+                      {Array.from({ length: Math.min(10, Math.ceil(todayWords / 200)) }).map((_, i, arr) => (
                         <div
                           key={i}
                           className={`h-6 bg-primary ${
@@ -383,7 +397,7 @@ export default function Dashboard() {
                   <div className="flex justify-between font-label text-[10px] uppercase font-bold tracking-tighter text-on-surface-variant">
                     <span>{projects.length} project{projects.length !== 1 ? "s" : ""}</span>
                     <span className="text-accent">
-                      {formatWordCount(totalWords)} words written
+                      {formatWordCount(todayWords)} words today
                     </span>
                   </div>
                 </div>
