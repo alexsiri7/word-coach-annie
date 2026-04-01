@@ -64,61 +64,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: staging-e2e
     steps:
-      - name: Get staging deployment image
-        id: staging-image
+      - name: Deploy to production from commit
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          RAILWAY_STAGING_SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
-          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN not set — cannot deploy to production"
-            echo "::error::Create one at https://railway.com/account/tokens and save as RAILWAY_TOKEN secret"
             exit 1
           fi
 
-          echo "Fetching latest staging deployment..."
-          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+          # Get the commit SHA that triggered this pipeline
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "Deploying commit $COMMIT_SHA to production..."
+
+          RESPONSE=$(curl -s -X POST https://backboard.railway.com/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
-            }")
-
-          echo "Staging deployments response: $RESPONSE"
-
-          STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
-          if [ "$STAGING_STATUS" != "SUCCESS" ]; then
-            echo "::error::Latest staging deployment status is '$STAGING_STATUS', expected 'SUCCESS'"
-            exit 1
-          fi
-
-          IMAGE=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.image // empty')
-          if [ -z "$IMAGE" ]; then
-            echo "::error::Could not extract image from staging deployment metadata"
-            echo "Full meta: $(echo "$RESPONSE" | jq '.data.deployments.edges[0].node.meta')"
-            exit 1
-          fi
-
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-          echo "✓ Staging image: $IMAGE"
-
-      - name: Deploy staging image to production
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
-          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
-        run: |
-          IMAGE="${{ steps.staging-image.outputs.image }}"
-          echo "Deploying staging image to production: $IMAGE"
-
-          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"query\": \"mutation { serviceInstanceDeploy(input: { serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", image: \\\"$IMAGE\\\" }) }\"
+              \"query\": \"mutation { serviceInstanceDeployV2(commitSha: \\\"$COMMIT_SHA\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\") }\"
             }")
 
           echo "Response: $RESPONSE"
@@ -129,7 +94,7 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Production deploy triggered with staging image"
+          echo "✓ Production deploy triggered for commit $COMMIT_SHA"
 
   # ── Stage 3: Verify production ────────────────────────────────────────
   health-check:
