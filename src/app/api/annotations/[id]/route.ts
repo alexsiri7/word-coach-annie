@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function PATCH(
     request: NextRequest,
@@ -26,7 +27,7 @@ export async function PATCH(
         const { content, resolved } = body;
 
         const updateData: Record<string, unknown> = {};
-        if (content !== undefined) updateData.content = content;
+        if (content !== undefined) updateData.content = sanitizeInput(content);
         if (resolved !== undefined) updateData.resolved = resolved;
 
         if (Object.keys(updateData).length === 0) {

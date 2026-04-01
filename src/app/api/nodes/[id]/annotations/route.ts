@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function GET(
     request: NextRequest,
@@ -46,9 +47,9 @@ export async function POST(
 
         const annotation = await StructureController.addAnnotation(
             nodeId,
-            content,
+            sanitizeInput(content),
             range,
-            selectedText
+            selectedText ? sanitizeInput(selectedText) : selectedText
         );
 
         return NextResponse.json(annotation, { status: 201 });

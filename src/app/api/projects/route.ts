@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
 export async function GET(request: NextRequest) {
@@ -99,10 +100,10 @@ export async function POST(request: NextRequest) {
 
     const project = await prisma.project.create({
       data: {
-        title: title.trim(),
-        author: author?.trim() || "",
-        synopsis: synopsis?.trim() || "",
-        genre: genre?.trim() || "",
+        title: sanitizeInput(title.trim()),
+        author: author ? sanitizeInput(author.trim()) : "",
+        synopsis: synopsis ? sanitizeInput(synopsis.trim()) : "",
+        genre: genre ? sanitizeInput(genre.trim()) : "",
         projectType: projectType || "FICTION",
         ...(userId && { userId }),
       },

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class ProjectsController {
     static async listProjects(limit: number = 20, offset: number = 0) {
@@ -161,10 +162,10 @@ export class ProjectsController {
         if (!existing) throw new Error(`Project not found: ${projectId}`);
 
         const updateData: Record<string, string> = {};
-        if (data.title !== undefined) updateData.title = data.title.trim();
-        if (data.author !== undefined) updateData.author = data.author.trim();
-        if (data.synopsis !== undefined) updateData.synopsis = data.synopsis.trim();
-        if (data.genre !== undefined) updateData.genre = data.genre.trim();
+        if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());
+        if (data.author !== undefined) updateData.author = sanitizeInput(data.author.trim());
+        if (data.synopsis !== undefined) updateData.synopsis = sanitizeInput(data.synopsis.trim());
+        if (data.genre !== undefined) updateData.genre = sanitizeInput(data.genre.trim());
         if (data.projectType !== undefined) updateData.projectType = data.projectType;
         if (data.universeId !== undefined) (updateData as Record<string, unknown>).universeId = data.universeId;
 
