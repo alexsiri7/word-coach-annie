@@ -487,6 +487,7 @@ export default function Dashboard() {
                   {(recentProjects.length > 0 ? recentProjects : projects).map((project) => (
                     <div
                       key={project.id}
+                      data-testid="project-card"
                       className="bg-surface-container-low p-6 group hover:bg-surface-container-high transition-colors cursor-pointer border-l-2 border-transparent hover:border-primary"
                       onClick={() => router.push(`/project/${project.id}`)}
                     >

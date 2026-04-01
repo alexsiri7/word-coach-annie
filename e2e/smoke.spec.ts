@@ -345,7 +345,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await page.waitForSelector('main', { timeout: 20_000 })
 
     // Click on "The Amber Throne" project card
-    const projectCard = page.locator('text=The Amber Throne').first()
+    const projectCard = page.getByTestId('project-card').filter({ hasText: 'The Amber Throne' }).first()
     await projectCard.waitFor({ state: 'visible' })
     await projectCard.click()
 
@@ -356,21 +356,19 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect(page.locator('h1')).toContainText('The Amber Throne')
 
     // The outline should show chapter "The Summons"
-    const chapter = page.locator('text=The Summons').first()
+    const chapter = page.getByRole('treeitem', { name: 'The Summons' })
     await chapter.waitFor({ state: 'visible', timeout: 5_000 })
 
     // Click the chapter to expand it (may be collapsed on initial render)
     await chapter.click()
-    // Wait a moment for children to render
-    await page.waitForTimeout(500)
 
     // If clicking selected the chapter rather than expanding it, look for
     // an expand toggle (chevron) or try clicking again
-    const scene = page.locator('text=Throne Room').first()
-    if (!(await scene.isVisible())) {
+    const scene = page.getByRole('treeitem', { name: 'Throne Room' })
+    if (!(await scene.isVisible().catch(() => false))) {
       // Click the chapter text again to toggle expansion
       await chapter.click()
-      await page.waitForTimeout(500)
+      await scene.waitFor({ state: 'visible', timeout: 5_000 })
     }
 
     await scene.waitFor({ state: 'visible', timeout: 5_000 })
@@ -378,7 +376,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
 
     // The scene editor should load with content
     await expect(
-      page.locator('text=The heavy oak doors groaned open').first(),
+      page.getByText('The heavy oak doors groaned open').first(),
     ).toBeVisible({ timeout: 10_000 })
   })
 
@@ -402,12 +400,12 @@ test.describe('E2E smoke tests – critical user flows', () => {
 
     // Verify scene title is visible
     await expect(
-      page.locator('text=Throne Room').first(),
+      page.getByText('Throne Room').first(),
     ).toBeVisible({ timeout: 5_000 })
 
     // Verify initial content loaded
     await expect(
-      page.locator('text=The heavy oak doors groaned open').first(),
+      page.getByText('The heavy oak doors groaned open').first(),
     ).toBeVisible({ timeout: 5_000 })
 
     // Find the tiptap editor and type into it
@@ -417,11 +415,8 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await page.keyboard.press('End')
     await page.keyboard.type(' The cold air bit at her cheeks.')
 
-    // Wait for debounced auto-save (usually 1-2 seconds)
-    await page.waitForTimeout(3000)
-
-    // Verify at least one auto-save POST was made
-    expect(saveRequests.length).toBeGreaterThan(0)
+    // Wait for debounced auto-save to fire
+    await expect.poll(() => saveRequests.length, { timeout: 5_000 }).toBeGreaterThan(0)
   })
 
   test('4. Story objects panel – create a character and verify it appears', async ({
@@ -497,7 +492,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
 
     // Should show "No characters yet." empty state
     await expect(
-      page.locator('text=No characters yet').first(),
+      page.getByText('No characters yet').first(),
     ).toBeVisible({ timeout: 5_000 })
 
     // Click the "+" button to add a character (in the Characters header area)
@@ -518,7 +513,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
 
     // The new character should appear in the sidebar list
     await expect(
-      page.locator('text=Lord Ashford').first(),
+      page.getByText('Lord Ashford').first(),
     ).toBeVisible({ timeout: 5_000 })
   })
 
@@ -533,10 +528,10 @@ test.describe('E2E smoke tests – critical user flows', () => {
 
     // Verify project card shows key info
     await expect(
-      page.locator('text=The Amber Throne').first(),
+      page.getByText('The Amber Throne').first(),
     ).toBeVisible()
     await expect(
-      page.locator('text=Fantasy').first(),
+      page.getByText('Fantasy').first(),
     ).toBeVisible()
 
     // Click the project card
@@ -547,7 +542,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect(page.locator('h1')).toContainText('The Amber Throne')
 
     // Verify sidebar tabs are present
-    await expect(page.locator('text=Outline').first()).toBeVisible()
+    await expect(page.getByText('Outline').first()).toBeVisible()
     await expect(
       page.locator('button[title="Characters"]').first(),
     ).toBeVisible()
