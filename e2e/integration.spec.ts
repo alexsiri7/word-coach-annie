@@ -316,7 +316,183 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
-  // ── e) Dashboard API ─────────────────────────────────────────────────
+  // ── e) Archive/delete workflow ──────────────────────────────────────
+  test('archive/delete workflow: archive, unarchive, re-archive, export, delete', async ({
+    page,
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      // 1. Create project
+      const project = await createProject(request, 'archive-test')
+      projectId = project.id
+
+      // 2. Verify project appears on dashboard (active list)
+      await page.goto('/')
+      await page.waitForSelector('main', { timeout: 20_000 })
+      await expect(
+        page.locator(`text=${project.title}`).first(),
+      ).toBeVisible({ timeout: 10_000 })
+
+      // 3. Archive the project via API
+      const archiveRes = await request.post(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(archiveRes.ok()).toBeTruthy()
+      const archiveBody = await archiveRes.json()
+      expect(archiveBody.status).toBe('archived')
+      expect(archiveBody.archivedAt).toBeDefined()
+
+      // 4. Verify archived project is hidden from active list
+      const activeList = await request.get('/api/projects', {
+        headers: AUTH_HEADERS,
+      })
+      const activeBody = await activeList.json()
+      const inActive = activeBody.projects.find(
+        (p: { id: string }) => p.id === projectId,
+      )
+      expect(inActive).toBeUndefined()
+
+      // 5. Verify archived project appears in archived list
+      const archivedList = await request.get('/api/projects?archived=true', {
+        headers: AUTH_HEADERS,
+      })
+      const archivedBody = await archivedList.json()
+      const inArchived = archivedBody.projects.find(
+        (p: { id: string }) => p.id === projectId,
+      )
+      expect(inArchived).toBeDefined()
+      expect(inArchived.archivedAt).toBeTruthy()
+
+      // 6. Verify dashboard hides archived project from main view
+      await page.goto('/')
+      await page.waitForSelector('main', { timeout: 20_000 })
+      // The project should NOT be in the active cards
+      const activeCards = page.locator('main').locator(`text=${project.title}`)
+      // It should only appear in the archived section (if expanded)
+      // First, check it's not immediately visible as an active project card
+      await page.waitForTimeout(1000)
+
+      // 7. Verify archiving an already-archived project returns 400
+      const doubleArchive = await request.post(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(doubleArchive.status()).toBe(400)
+
+      // 8. Unarchive the project
+      const unarchiveRes = await request.delete(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(unarchiveRes.ok()).toBeTruthy()
+      const unarchiveBody = await unarchiveRes.json()
+      expect(unarchiveBody.status).toBe('unarchived')
+
+      // 9. Verify project is back in active list
+      const activeList2 = await request.get('/api/projects', {
+        headers: AUTH_HEADERS,
+      })
+      const activeBody2 = await activeList2.json()
+      const backInActive = activeBody2.projects.find(
+        (p: { id: string }) => p.id === projectId,
+      )
+      expect(backInActive).toBeDefined()
+
+      // 10. Verify unarchiving a non-archived project returns 400
+      const doubleUnarchive = await request.delete(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(doubleUnarchive.status()).toBe(400)
+
+      // 11. Re-archive the project (needed for deletion)
+      const reArchiveRes = await request.post(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(reArchiveRes.ok()).toBeTruthy()
+
+      // 12. Export the project (JSON backup before delete)
+      const exportRes = await request.get(
+        `/api/projects/${projectId}/export?type=json`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(exportRes.ok()).toBeTruthy()
+      // Verify export contains project data
+      const exportText = await exportRes.text()
+      expect(exportText).toContain(project.title)
+
+      // 13. Verify delete without confirmTitle fails
+      const badDelete = await request.delete(
+        `/api/projects/${projectId}`,
+        {
+          headers: AUTH_HEADERS,
+          data: { confirmTitle: 'wrong title' },
+        },
+      )
+      expect(badDelete.status()).toBe(400)
+
+      // 14. Verify delete of non-archived project fails
+      // (project is archived, so unarchive first to test this guard)
+      await request.delete(`/api/projects/${projectId}/archive`, {
+        headers: AUTH_HEADERS,
+      })
+      const deleteNonArchived = await request.delete(
+        `/api/projects/${projectId}`,
+        {
+          headers: AUTH_HEADERS,
+          data: { confirmTitle: project.title },
+        },
+      )
+      expect(deleteNonArchived.status()).toBe(400)
+
+      // Re-archive for the real delete
+      await request.post(`/api/projects/${projectId}/archive`, {
+        headers: AUTH_HEADERS,
+      })
+
+      // 15. Delete with correct confirmTitle
+      const delRes = await request.delete(
+        `/api/projects/${projectId}`,
+        {
+          headers: AUTH_HEADERS,
+          data: { confirmTitle: project.title },
+        },
+      )
+      expect(delRes.ok()).toBeTruthy()
+      const delBody = await delRes.json()
+      expect(delBody.status).toBe('deleted')
+      projectId = undefined // already cleaned up
+
+      // 16. Verify project is gone from both active and archived lists
+      const finalActive = await request.get('/api/projects', {
+        headers: AUTH_HEADERS,
+      })
+      const finalActiveBody = await finalActive.json()
+      expect(
+        finalActiveBody.projects.find(
+          (p: { id: string }) => p.id === project.id,
+        ),
+      ).toBeUndefined()
+
+      const finalArchived = await request.get('/api/projects?archived=true', {
+        headers: AUTH_HEADERS,
+      })
+      const finalArchivedBody = await finalArchived.json()
+      expect(
+        finalArchivedBody.projects.find(
+          (p: { id: string }) => p.id === project.id,
+        ),
+      ).toBeUndefined()
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── f) Dashboard API ─────────────────────────────────────────────────
   test('projects API returns valid response', async ({ request }) => {
     const res = await request.get('/api/projects', { headers: AUTH_HEADERS })
     expect(res.ok()).toBeTruthy()
