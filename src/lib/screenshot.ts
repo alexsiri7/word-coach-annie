@@ -1,18 +1,17 @@
+import { toCanvas } from "html-to-image";
+
 /**
- * Captures the current page as a canvas using html2canvas.
+ * Captures the current page as a canvas using html-to-image.
  * Returns a canvas element that can be used for annotation.
  */
 export async function captureScreenshot(): Promise<HTMLCanvasElement> {
-  const html2canvas = (await import("html2canvas")).default;
-  const canvas = await html2canvas(document.body, {
-    useCORS: true,
-    logging: false,
-    // Scale down to keep file sizes reasonable
-    scale: Math.min(window.devicePixelRatio, 2),
-    // Ignore the feedback dialog itself
-    ignoreElements: (el) => {
-      return el.getAttribute("role") === "dialog" ||
-        el.getAttribute("data-radix-portal") !== null;
+  const canvas = await toCanvas(document.body, {
+    pixelRatio: Math.min(window.devicePixelRatio, 2),
+    filter: (el: Element) => {
+      // Ignore the feedback dialog and Radix portals
+      if (el.getAttribute?.("role") === "dialog") return false;
+      if (el.getAttribute?.("data-radix-portal") !== null && el.hasAttribute?.("data-radix-portal")) return false;
+      return true;
     },
   });
   return canvas;

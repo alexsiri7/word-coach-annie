@@ -21,8 +21,9 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 /**
- * Upload a screenshot to the GitHub repo and return the raw URL.
- * Uses the Contents API to store images in .feedback-images/
+ * Upload a screenshot via GitHub's issue image upload endpoint.
+ * Returns a markdown image URL (https://github.com/user-attachments/assets/...).
+ * Only requires issues:write scope — no contents:write needed.
  */
 async function uploadScreenshot(
   token: string,
@@ -33,37 +34,63 @@ async function uploadScreenshot(
     const base64 = dataUrl.split(",")[1];
     if (!base64) return null;
 
-    const filename = `feedback-${Date.now()}.jpg`;
-    const path = `.feedback-images/${filename}`;
+    // Convert base64 to binary
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "image/jpeg" });
 
+    // 2MB limit
+    if (blob.size > 2 * 1024 * 1024) {
+      logger.error("Screenshot too large", { size: blob.size });
+      return null;
+    }
+
+    const filename = `feedback-${Date.now()}.jpg`;
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    formData.append("repository_id", await getRepoId(token, repo));
+    formData.append("authenticity_token", token);
+
+    // Use GitHub's issue image upload endpoint
     const res = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${path}`,
+      `https://uploads.github.com/repos/${repo}/issues/uploads`,
       {
-        method: "PUT",
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: "application/json",
         },
-        body: JSON.stringify({
-          message: `feedback: screenshot attachment`,
-          content: base64,
-        }),
+        body: formData,
       }
     );
 
     if (!res.ok) {
-      logger.error("GitHub screenshot upload failed", { status: res.status });
+      const errText = await res.text().catch(() => "");
+      logger.error("GitHub screenshot upload failed", { status: res.status, body: errText });
       return null;
     }
 
     const data = await res.json();
-    return data.content?.download_url || null;
+    // Response includes href with the permanent asset URL
+    return data.href || data.asset?.href || null;
   } catch (err) {
     logger.error("Screenshot upload error", err);
     return null;
   }
+}
+
+async function getRepoId(token: string, repo: string): Promise<string> {
+  const res = await fetch(`https://api.github.com/repos/${repo}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  const data = await res.json();
+  return String(data.id);
 }
 
 export async function POST(request: NextRequest) {

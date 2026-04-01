@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
               "font-src 'self' https://fonts.gstatic.com",
               "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://fonts.googleapis.com https://fonts.gstatic.com",
               "object-src 'none'",
