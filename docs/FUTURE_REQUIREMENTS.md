@@ -802,9 +802,11 @@ Create `src/__tests__/timeline.test.ts`:
 Manual prerequisite (not code):
 1. Create a Google Cloud project at https://console.cloud.google.com
 2. Enable **Google Docs API** and **Google Drive API**
-3. Create **OAuth 2.0 Client ID** (type: Web Application)
-4. Set authorized redirect URI to `http://localhost:3000/api/auth/google/callback` (local) and the cloud URL equivalent
-5. Save the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env`
+3. Configure the **OAuth consent screen**: set app name, support email, homepage URL, privacy policy URL (`https://yourdomain.com/privacy`), and authorized domains
+4. **Publish the consent screen** (click "PUBLISH APP") to allow any Google user to sign in — see `docs/SETUP.md` for details
+5. Create **OAuth 2.0 Client ID** (type: Web Application)
+6. Set authorized redirect URI to `http://localhost:3000/api/auth/google/callback` (local) and the cloud URL equivalent
+7. Save the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env`
 
 #### Step 2: Environment Variables
 
