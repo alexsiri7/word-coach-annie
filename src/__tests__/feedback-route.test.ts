@@ -146,18 +146,22 @@ describe("POST /api/feedback", () => {
 
     const fakeBase64 = "iVBORw0KGgoAAAANSUhEUg==";
     const fakeDataUrl = `data:image/jpeg;base64,${fakeBase64}`;
-    const fakeDownloadUrl =
-      "https://raw.githubusercontent.com/testowner/testrepo/main/.feedback-images/feedback-123.jpg";
+    const fakeAssetUrl =
+      "https://github.com/user-attachments/assets/abc-123/feedback.jpg";
 
-    // First call: screenshot upload (Contents API)
+    // First call: getRepoId
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        content: { download_url: fakeDownloadUrl },
-      }),
+      json: async () => ({ id: 12345 }),
     });
 
-    // Second call: issue creation
+    // Second call: screenshot upload (issue image upload endpoint)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ href: fakeAssetUrl }),
+    });
+
+    // Third call: issue creation
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -174,31 +178,38 @@ describe("POST /api/feedback", () => {
     );
 
     expect(res.status).toBe(201);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+
+    // Verify getRepoId call
+    const [repoUrl] = mockFetch.mock.calls[0];
+    expect(repoUrl).toContain("/repos/testowner/testrepo");
 
     // Verify screenshot upload call
-    const [uploadUrl, uploadOpts] = mockFetch.mock.calls[0];
-    expect(uploadUrl).toContain("/contents/.feedback-images/");
-    expect(uploadOpts.method).toBe("PUT");
-    const uploadBody = JSON.parse(uploadOpts.body);
-    expect(uploadBody.content).toBe(fakeBase64);
+    const [uploadUrl] = mockFetch.mock.calls[1];
+    expect(uploadUrl).toContain("/issues/uploads");
 
     // Verify issue body contains screenshot
-    const [, issueOpts] = mockFetch.mock.calls[1];
+    const [, issueOpts] = mockFetch.mock.calls[2];
     const issueBody = JSON.parse(issueOpts.body);
     expect(issueBody.body).toContain("### Screenshot");
-    expect(issueBody.body).toContain(`![Screenshot](${fakeDownloadUrl})`);
+    expect(issueBody.body).toContain(`![Screenshot](${fakeAssetUrl})`);
   });
 
   it("creates issue without screenshot section when upload fails", async () => {
     process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
     process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
 
+    // getRepoId succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 12345 }),
+    });
+
     // Screenshot upload fails
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 500,
-      json: async () => ({}),
+      text: async () => "Internal Server Error",
     });
 
     // Issue creation succeeds
@@ -220,8 +231,9 @@ describe("POST /api/feedback", () => {
     expect(res.status).toBe(201);
 
     // Issue should still be created, just without screenshot
-    const [, issueOpts] = mockFetch.mock.calls[1];
-    const issueBody = JSON.parse(issueOpts.body);
+    // Last fetch call is the issue creation
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+    const issueBody = JSON.parse(lastCall[1].body);
     expect(issueBody.body).not.toContain("### Screenshot");
     expect(issueBody.body).toContain("Bug with failed screenshot");
   });
