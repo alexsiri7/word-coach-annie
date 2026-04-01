@@ -61,6 +61,7 @@ export async function PATCH(
 }
 
 // DELETE /api/projects/[id] - Delete a project (cascades to all children)
+// Requires: project must be archived, request body must include confirmTitle matching project title
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -70,6 +71,26 @@ export async function DELETE(
     const userId = getCurrentUserId(request);
     const access = await verifyProjectAccess(id, userId);
     if (!access.authorized) return access.response;
+
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    if (!project.archivedAt) {
+      return NextResponse.json(
+        { error: "Project must be archived before it can be deleted" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    if (!body.confirmTitle || body.confirmTitle !== project.title) {
+      return NextResponse.json(
+        { error: "You must type the project title to confirm deletion" },
+        { status: 400 }
+      );
+    }
 
     await prisma.project.delete({ where: { id } });
 

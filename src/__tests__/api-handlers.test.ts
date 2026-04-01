@@ -109,9 +109,27 @@ describe("API Route Handlers", () => {
             expect(data.title).toBe("Updated Title");
         });
 
-        it("DELETE removes a project", async () => {
+        it("DELETE rejects non-archived project", async () => {
             const { DELETE } = await import("@/app/api/projects/[id]/route");
-            const req = mockReq(`http://localhost/api/projects/${projectId}`);
+            const req = mockReq(`http://localhost/api/projects/${projectId}`, {
+                confirmTitle: "Test Project",
+            });
+            const res = await DELETE(req as any, mockParams({ id: projectId }));
+            expect(res.status).toBe(400);
+            const data = await res.json();
+            expect(data.error).toContain("archived");
+        });
+
+        it("DELETE removes an archived project with confirmation", async () => {
+            // Archive first
+            await testPrisma.project.update({
+                where: { id: projectId },
+                data: { archivedAt: new Date() },
+            });
+            const { DELETE } = await import("@/app/api/projects/[id]/route");
+            const req = mockReq(`http://localhost/api/projects/${projectId}`, {
+                confirmTitle: "Test Project",
+            });
             const res = await DELETE(req as any, mockParams({ id: projectId }));
             expect(res.status).toBe(200);
         });
