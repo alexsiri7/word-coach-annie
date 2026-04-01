@@ -54,8 +54,12 @@ describe("rate-limit", () => {
     it("has correct default configs", () => {
         expect(RATE_LIMITS.chat.limit).toBe(30);
         expect(RATE_LIMITS.chat.windowMs).toBe(60_000);
-        expect(RATE_LIMITS.api.limit).toBe(100);
-        expect(RATE_LIMITS.api.windowMs).toBe(60_000);
+        expect(RATE_LIMITS.read.limit).toBe(120);
+        expect(RATE_LIMITS.read.windowMs).toBe(60_000);
+        expect(RATE_LIMITS.write.limit).toBe(60);
+        expect(RATE_LIMITS.write.windowMs).toBe(60_000);
+        expect(RATE_LIMITS.projectCreate.limit).toBe(10);
+        expect(RATE_LIMITS.projectCreate.windowMs).toBe(3_600_000);
     });
 
     it("provides retryAfterMs on rejection", () => {
