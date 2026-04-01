@@ -68,7 +68,7 @@ export async function verifyProjectReadAccess(
     userId: string | null,
     userEmail?: string | null
 ): Promise<
-    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "READER" | null }
+    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "READER" | "EDITOR" | null }
     | { authorized: false; response: NextResponse }
 > {
     const project = await prisma.project.findUnique({
@@ -104,7 +104,8 @@ export async function verifyProjectReadAccess(
             },
         });
         if (share) {
-            return { authorized: true, project, role: "READER" };
+            const shareRole = share.role === "EDITOR" ? "EDITOR" : "READER";
+            return { authorized: true, project, role: shareRole as "READER" | "EDITOR" };
         }
     }
 
