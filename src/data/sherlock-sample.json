@@ -1,0 +1,215 @@
+{
+  "exportVersion": 1,
+  "project": {
+    "title": "A Study in Baker Street",
+    "author": "Arthur Conan Doyle",
+    "synopsis": "A reimagining of the classic Holmes tales, following the world's greatest detective and his loyal companion through the fog-shrouded streets of Victorian London.",
+    "genre": "Mystery",
+    "projectType": "FICTION"
+  },
+  "structureNodes": [
+    {
+      "id": "chapter-1",
+      "parentId": null,
+      "type": "CHAPTER",
+      "title": "The Reichenbach Problem",
+      "synopsis": "Holmes confronts a web of intrigue spun by his greatest nemesis, leading to a fateful encounter at the falls.",
+      "status": "DRAFT",
+      "orderIndex": 0
+    },
+    {
+      "id": "scene-1-1",
+      "parentId": "chapter-1",
+      "type": "SCENE",
+      "title": "A Visitor at Baker Street",
+      "synopsis": "Watson arrives at 221B to find Holmes in a state of agitation, the walls covered in a web of red thread connecting newspaper clippings.",
+      "status": "DRAFT",
+      "orderIndex": 0
+    },
+    {
+      "id": "scene-1-2",
+      "parentId": "chapter-1",
+      "type": "SCENE",
+      "title": "The Professor's Warning",
+      "synopsis": "Moriarty pays a chilling visit, offering Holmes a choice: abandon the case or face the consequences.",
+      "status": "OUTLINE",
+      "orderIndex": 1
+    },
+    {
+      "id": "scene-1-3",
+      "parentId": "chapter-1",
+      "type": "SCENE",
+      "title": "Flight to the Continent",
+      "synopsis": "Holmes and Watson flee London as Moriarty's network closes in around them.",
+      "status": "OUTLINE",
+      "orderIndex": 2
+    },
+    {
+      "id": "chapter-2",
+      "parentId": null,
+      "type": "CHAPTER",
+      "title": "The Empty House",
+      "synopsis": "Three years after the fall, a familiar figure returns to Baker Street.",
+      "status": "OUTLINE",
+      "orderIndex": 1
+    },
+    {
+      "id": "scene-2-1",
+      "parentId": "chapter-2",
+      "type": "SCENE",
+      "title": "Watson's Grief",
+      "synopsis": "Watson visits the falls on the third anniversary, unable to let go of his friend's memory.",
+      "status": "OUTLINE",
+      "orderIndex": 0
+    }
+  ],
+  "contentVersions": [
+    {
+      "id": "cv-1",
+      "nodeId": "scene-1-1",
+      "content": "<p>The fog had settled over London like a threadbare blanket, muffling the clatter of hansom cabs on Baker Street. I had not visited Holmes in a fortnight\u2014my practice on Paddington Street had kept me occupied with a particularly stubborn case of rheumatic fever\u2014and I confess I felt a pang of guilt as I mounted the familiar seventeen steps to our old sitting room.</p><p>What greeted me at the top was not the comfortable disorder I expected but something altogether more alarming. Every wall of the room had been transformed into a vast spider's web of red thread, connecting newspaper cuttings, telegrams, and what appeared to be pages torn from continental police gazettes. In the centre of this extraordinary display, cross-legged upon the Persian slipper rug, sat Sherlock Holmes.</p><p>\"Ah, Watson!\" he cried, without turning his head. \"You have come from your surgery, where you treated no fewer than three patients this morning, the last of whom paid you in coins rather than notes. You considered stopping at the tobacconist but thought better of it. Excellent\u2014I need your revolver.\"</p><p>I had long since ceased to be astonished by these demonstrations, though I still could not resist asking: \"How on earth\u2014\"</p><p>\"The ink stain on your right cuff is fresh\u2014prescription ink, not correspondence. Three distinct smudges suggest three scripts written in haste. The faint impression of a half-crown on your left trouser pocket is unmistakable\u2014the milled edge leaves a pattern that paper currency does not. As for the tobacconist, you carry the scent of Latakia mixed with longing, yet your pipe is cold and unfilled.\"</p><p>He rose in a single fluid motion and turned to face me. His eyes were bright with the peculiar intensity that I had learned to associate with a case of the first magnitude.</p><p>\"But the revolver, Holmes\u2014\"</p><p>\"Professor Moriarty,\" he said, and the name fell into the room like a stone into still water. \"The Napoleon of crime. The organiser of half that is evil and nearly all that is undetected in this great city. And he is coming here, Watson. Tonight.\"</p>",
+      "wordCount": 330
+    }
+  ],
+  "storyObjects": [
+    {
+      "id": "char-holmes",
+      "type": "CHARACTER",
+      "name": "Sherlock Holmes",
+      "description": "The world's only consulting detective. Brilliant, eccentric, and utterly devoted to the science of deduction. Plays the violin at odd hours and keeps his tobacco in a Persian slipper.",
+      "notes": "Key traits: razor-sharp observation, encyclopedic knowledge of crime, prone to melancholy between cases. Weaknesses: arrogance, emotional detachment, occasional cocaine use.",
+      "role": "Protagonist",
+      "tags": "detective,genius,221B"
+    },
+    {
+      "id": "char-watson",
+      "type": "CHARACTER",
+      "name": "Dr. John Watson",
+      "description": "Army surgeon returned from Afghanistan. Holmes's steadfast friend, biographer, and moral compass. A brave and loyal man who brings warmth to Holmes's cold logic.",
+      "notes": "Voice of the reader. Former military (wounded in action). Married to Mary Morstan. Practices medicine on Paddington Street.",
+      "role": "Narrator / Deuteragonist",
+      "tags": "doctor,narrator,veteran,221B"
+    },
+    {
+      "id": "char-moriarty",
+      "type": "CHARACTER",
+      "name": "Professor James Moriarty",
+      "description": "The Napoleon of crime. A mathematical genius who sits at the centre of a vast criminal web, controlling half the evil in London from the shadows of academia.",
+      "notes": "Never directly commits crimes. Mirror image of Holmes\u2014equal intellect applied to opposite ends. Former professor of mathematics. Authored 'The Dynamics of an Asteroid.'",
+      "role": "Antagonist",
+      "tags": "villain,genius,professor"
+    },
+    {
+      "id": "char-hudson",
+      "type": "CHARACTER",
+      "name": "Mrs. Hudson",
+      "description": "The long-suffering landlady of 221B Baker Street. Patient, resourceful, and far more perceptive than Holmes gives her credit for.",
+      "notes": "Tolerates bullet holes in the walls, chemical experiments on her kitchen table, and visitors at all hours. Quietly indispensable.",
+      "role": "Supporting",
+      "tags": "landlady,221B"
+    },
+    {
+      "id": "loc-baker-street",
+      "type": "LOCATION",
+      "name": "221B Baker Street",
+      "description": "The famous flat shared by Holmes and Watson. A cluttered sanctuary of books, chemical apparatus, case files, and the occasional firearm. The sitting room overlooks Baker Street through two broad windows.",
+      "notes": "Features: coal fire, chemistry bench, deal table, Holmes's armchair, Watson's armchair, the Persian slipper (tobacco), the jack-knife in the mantelpiece (correspondence), bullet holes in the wall spelling 'VR'.",
+      "role": null,
+      "tags": "residence,London,headquarters"
+    },
+    {
+      "id": "loc-scotland-yard",
+      "type": "LOCATION",
+      "name": "Scotland Yard",
+      "description": "Headquarters of the Metropolitan Police. Holmes maintains an uneasy alliance with its inspectors, who grudgingly seek his help on cases that defeat their methods.",
+      "notes": "Key contacts: Inspector Lestrade (competent but unimaginative), Inspector Gregson (ambitious). Holmes is both their greatest asset and greatest irritant.",
+      "role": null,
+      "tags": "police,London,institution"
+    },
+    {
+      "id": "plot-reichenbach",
+      "type": "PLOTLINE",
+      "name": "The Reichenbach Problem",
+      "description": "Holmes's final confrontation with Moriarty. A chess game between London's greatest mind and its most dangerous criminal, building toward an inevitable reckoning at the Reichenbach Falls.",
+      "notes": "Arc: Discovery of Moriarty's network \u2192 Moriarty's warning \u2192 Flight across Europe \u2192 The Falls \u2192 Aftermath. Themes: sacrifice, obsession, the cost of genius.",
+      "role": null,
+      "tags": "main-plot,moriarty,falls"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "ann-1",
+      "nodeId": "scene-1-1",
+      "content": "Consider adding Mrs. Hudson's reaction to the state of the room\u2014she would not approve of thread pinned into the wallpaper.",
+      "resolved": false,
+      "range": "",
+      "selectedText": null
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel-1",
+      "type": "PARTNER",
+      "label": "Investigative partner and biographer",
+      "fromObjectId": "char-holmes",
+      "fromNodeId": null,
+      "toObjectId": "char-watson",
+      "toNodeId": null
+    },
+    {
+      "id": "rel-2",
+      "type": "NEMESIS",
+      "label": "Arch-enemy and intellectual equal",
+      "fromObjectId": "char-holmes",
+      "fromNodeId": null,
+      "toObjectId": "char-moriarty",
+      "toNodeId": null
+    },
+    {
+      "id": "rel-3",
+      "type": "RESIDES",
+      "label": "Lives at",
+      "fromObjectId": "char-holmes",
+      "fromNodeId": null,
+      "toObjectId": "loc-baker-street",
+      "toNodeId": null
+    },
+    {
+      "id": "rel-4",
+      "type": "RESIDES",
+      "label": "Lives at",
+      "fromObjectId": "char-watson",
+      "fromNodeId": null,
+      "toObjectId": "loc-baker-street",
+      "toNodeId": null
+    },
+    {
+      "id": "rel-5",
+      "type": "ORCHESTRATES",
+      "label": "Orchestrates the final confrontation",
+      "fromObjectId": "char-moriarty",
+      "fromNodeId": null,
+      "toObjectId": "plot-reichenbach",
+      "toNodeId": null
+    },
+    {
+      "id": "rel-6",
+      "type": "APPEARS_IN",
+      "label": "Opening scene",
+      "fromObjectId": "char-holmes",
+      "fromNodeId": null,
+      "toObjectId": null,
+      "toNodeId": "scene-1-1"
+    },
+    {
+      "id": "rel-7",
+      "type": "APPEARS_IN",
+      "label": "Opening scene",
+      "fromObjectId": "char-watson",
+      "fromNodeId": null,
+      "toObjectId": null,
+      "toNodeId": "scene-1-1"
+    }
+  ],
+  "chatHistory": []
+}

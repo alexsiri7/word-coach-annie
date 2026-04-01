@@ -60,6 +60,7 @@ model Project {
   universe       Universe?       @relation(fields: [universeId], references: [id])
   user           User?           @relation(fields: [userId], references: [id])
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
+  isSample       Boolean         @default(false)
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
   writingSessions WritingSession[]
