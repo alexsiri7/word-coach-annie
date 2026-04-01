@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -217,7 +217,7 @@ jobs:
               `### Manual rollback steps`,
               `1. Go to [Railway Dashboard](https://railway.app) > Annie project > Deployments`,
               `2. Find the last known-good deployment and click "Rollback"`,
-              `3. Or revert the commit: \`git revert ${shortSha} && git push origin master\``,
+              `3. Or revert the commit: \`git revert ${shortSha} && git push origin main\``,
               ``,
               `### Investigation`,
               `- Check [production health](https://annie.interstellarai.net/api/health)`,
