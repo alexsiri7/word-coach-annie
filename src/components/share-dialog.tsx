@@ -11,6 +11,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const ROLES = [
+  { value: "READER", label: "Reader" },
+  { value: "EDITOR", label: "Editor" },
+] as const;
 
 interface ShareEntry {
   id: string;
@@ -35,9 +47,11 @@ export function ShareDialog({
   const [shares, setShares] = useState<ShareEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<string>("READER");
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const fetchShares = useCallback(async () => {
@@ -57,6 +71,7 @@ export function ShareDialog({
     if (open) {
       fetchShares();
       setEmail("");
+      setRole("READER");
       setError("");
       setCopied(false);
     }
@@ -78,7 +93,7 @@ export function ShareDialog({
       const res = await fetch(`/api/projects/${projectId}/share`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
+        body: JSON.stringify({ email: trimmed, role }),
       });
       if (res.status === 409) {
         setError("This email already has access");
@@ -89,10 +104,25 @@ export function ShareDialog({
         return;
       }
       setEmail("");
+      setRole("READER");
       setError("");
       fetchShares();
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleRoleChange = async (shareEmail: string, shareId: string, newRole: string) => {
+    setUpdatingId(shareId);
+    try {
+      await fetch(`/api/projects/${projectId}/share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: shareEmail, role: newRole }),
+      });
+      fetchShares();
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -135,10 +165,10 @@ export function ShareDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Add reader */}
+        {/* Add share */}
         <div className="space-y-2">
           <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-            Add Reader
+            Add Person
           </label>
           <div className="flex gap-2">
             <Input
@@ -151,7 +181,20 @@ export function ShareDialog({
               type="email"
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               disabled={adding}
+              className="min-w-0"
             />
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger className="w-[110px] shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               onClick={handleAdd}
               disabled={adding || !email.trim()}
@@ -170,10 +213,10 @@ export function ShareDialog({
           )}
         </div>
 
-        {/* Current readers */}
+        {/* Current shares */}
         <div className="space-y-2">
           <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-            Readers
+            People with access
           </label>
           {loading ? (
             <div className="flex items-center justify-center py-4">
@@ -181,18 +224,36 @@ export function ShareDialog({
             </div>
           ) : shares.length === 0 ? (
             <p className="text-sm text-text-muted py-3 text-center">
-              No readers yet
+              No one added yet
             </p>
           ) : (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {shares.map((share) => (
                 <div
                   key={share.id}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-overlay/50"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-overlay/50"
                 >
-                  <span className="text-sm text-text-secondary truncate">
+                  <span className="text-sm text-text-secondary truncate min-w-0 flex-1">
                     {share.email}
                   </span>
+                  <Select
+                    value={share.role}
+                    onValueChange={(newRole) =>
+                      handleRoleChange(share.email, share.id, newRole)
+                    }
+                    disabled={updatingId === share.id}
+                  >
+                    <SelectTrigger className="w-[100px] h-7 text-xs shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="ghost"
                     size="icon"
