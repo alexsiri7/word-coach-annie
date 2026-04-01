@@ -14,6 +14,11 @@ import {
   ArrowRight,
   BookText,
   CirclePlus,
+  Archive,
+  ArchiveRestore,
+  Download,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
@@ -36,16 +41,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -67,6 +62,7 @@ interface Project {
   nodeCount: number;
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,9 +99,14 @@ function formatWordCount(count: number) {
 export default function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
+  const [deleteExported, setDeleteExported] = useState(false);
+  const [deleteCooldown, setDeleteCooldown] = useState(0);
   const [newTitle, setNewTitle] = useState("");
   const [newAuthor, setNewAuthor] = useState("");
   const [newSynopsis, setNewSynopsis] = useState("");
@@ -114,9 +115,14 @@ export default function Dashboard() {
   const [todayWords, setTodayWords] = useState(0);
 
   const fetchProjects = async () => {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    setProjects(data.projects);
+    const [activeRes, archivedRes] = await Promise.all([
+      fetch("/api/projects"),
+      fetch("/api/projects?archived=true"),
+    ]);
+    const activeData = await activeRes.json();
+    const archivedData = await archivedRes.json();
+    setProjects(activeData.projects);
+    setArchivedProjects(archivedData.projects);
     setLoading(false);
   };
 
@@ -164,12 +170,57 @@ export default function Dashboard() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    await offlineFetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" });
-    setDeleteTarget(null);
+  const handleArchive = async (project: Project) => {
+    await offlineFetch(`/api/projects/${project.id}/archive`, { method: "POST" });
     fetchProjects();
   };
+
+  const handleUnarchive = async (project: Project) => {
+    await offlineFetch(`/api/projects/${project.id}/archive`, { method: "DELETE" });
+    fetchProjects();
+  };
+
+  const handleExportAndDelete = async () => {
+    if (!deleteTarget) return;
+    // Trigger JSON export download
+    const res = await fetch(`/api/projects/${deleteTarget.id}/export?type=json`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${deleteTarget.title.replace(/[^a-z0-9]/gi, "_")}_backup.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setDeleteExported(true);
+      // Start 30s cooldown
+      setDeleteCooldown(30);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || !deleteExported || deleteCooldown > 0) return;
+    if (deleteConfirmTitle !== deleteTarget.title) return;
+    await offlineFetch(`/api/projects/${deleteTarget.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmTitle: deleteConfirmTitle }),
+    });
+    setDeleteTarget(null);
+    setDeleteConfirmTitle("");
+    setDeleteExported(false);
+    setDeleteCooldown(0);
+    fetchProjects();
+  };
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (deleteCooldown <= 0) return;
+    const timer = setTimeout(() => setDeleteCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [deleteCooldown]);
 
   /* Most recently updated project = hero candidate */
   const heroProject = projects.length > 0
@@ -461,10 +512,10 @@ export default function Dashboard() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-danger"
-                                onClick={() => setDeleteTarget(project)}
+                                onClick={() => handleArchive(project)}
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -501,6 +552,86 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Archived Projects ───────────────────────── */}
+              {archivedProjects.length > 0 && (
+                <div className="mb-14">
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className="flex items-center gap-2 mb-6 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    {showArchived ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <span className="font-label text-xs uppercase font-bold tracking-widest">
+                      Archived ({archivedProjects.length})
+                    </span>
+                  </button>
+                  {showArchived && (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {archivedProjects.map((project) => (
+                        <div
+                          key={project.id}
+                          className="bg-surface-container-low p-6 group opacity-60 hover:opacity-100 transition-all border-l-2 border-transparent hover:border-outline-variant"
+                        >
+                          <div className="flex justify-between items-start mb-6">
+                            <BookText className="h-5 w-5 text-text-muted/40" />
+                            <div className="flex items-center gap-2">
+                              <span className="stamp-chip text-[10px]">Archived</span>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-container rounded"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-4 w-4 text-text-muted" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem onClick={() => handleUnarchive(project)}>
+                                    <ArchiveRestore className="h-4 w-4 mr-2" />
+                                    Restore
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-danger"
+                                    onClick={() => {
+                                      setDeleteTarget(project);
+                                      setDeleteConfirmTitle("");
+                                      setDeleteExported(false);
+                                      setDeleteCooldown(0);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Permanently
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                          <h3 className="font-headline text-2xl mb-2 text-text-primary">
+                            {project.title}
+                          </h3>
+                          <div className="flex items-center gap-2 mb-4 flex-wrap">
+                            {project.genre && (
+                              <span className="stamp-chip">{project.genre}</span>
+                            )}
+                            <span className="stamp-chip">
+                              {formatWordCount(project.wordCount)} Words
+                            </span>
+                          </div>
+                          {project.synopsis && (
+                            <p className="font-body text-sm text-on-surface-variant line-clamp-2">
+                              {project.synopsis}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── Writing Heatmap ──────────────────────────── */}
               <WritingHeatmap />
@@ -593,27 +724,102 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirmation ────────────────────────────── */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{deleteTarget?.title}&rdquo;?</AlertDialogTitle>
-            <AlertDialogDescription>
+      {/* ── Safe Delete Dialog ─────────────────────────────── */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteConfirmTitle("");
+            setDeleteExported(false);
+            setDeleteCooldown(0);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently Delete &ldquo;{deleteTarget?.title}&rdquo;?</DialogTitle>
+            <DialogDescription>
               This will permanently delete the project and all its chapters, scenes, characters,
               and other data. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-danger hover:bg-danger-hover"
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteTarget && (
+            <div className="space-y-4 py-2">
+              {/* Stats */}
+              <div className="bg-surface-container p-4 rounded-md space-y-1">
+                <p className="text-sm text-text-secondary">
+                  <strong>{formatWordCount(deleteTarget.wordCount)}</strong> words across{" "}
+                  <strong>{deleteTarget.nodeCount}</strong> scenes
+                </p>
+              </div>
+
+              {/* Step 1: Export */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-text-primary">
+                  Step 1: Export a backup
+                </p>
+                {!deleteExported ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleExportAndDelete}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export JSON Backup
+                  </Button>
+                ) : (
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    Backup exported successfully.
+                  </p>
+                )}
+              </div>
+
+              {/* Step 2: Type name */}
+              {deleteExported && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-text-primary">
+                    Step 2: Type <strong>{deleteTarget.title}</strong> to confirm
+                  </p>
+                  <Input
+                    value={deleteConfirmTitle}
+                    onChange={(e) => setDeleteConfirmTitle(e.target.value)}
+                    placeholder="Type the project title..."
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteConfirmTitle("");
+                setDeleteExported(false);
+                setDeleteCooldown(0);
+              }}
             >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                !deleteExported ||
+                deleteConfirmTitle !== deleteTarget?.title ||
+                deleteCooldown > 0
+              }
+              onClick={handleDelete}
+            >
+              {deleteCooldown > 0
+                ? `Delete (${deleteCooldown}s)`
+                : "Delete Forever"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
