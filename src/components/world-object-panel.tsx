@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown } from "lucide-react";
+import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, FolderInput } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,16 +17,25 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import type { WorldObject, WorldObjectTimelineEntry } from "@/lib/types";
 
 interface WorldObjectPanelProps {
     objectId: string;
+    universeId?: string;
     onClose: () => void;
     onDeleted: () => void;
     onUpdated: () => void;
 }
 
-export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: WorldObjectPanelProps) {
+export function WorldObjectPanel({ objectId, universeId, onClose, onDeleted, onUpdated }: WorldObjectPanelProps) {
+    const { error: toastError } = useToast();
     const [wo, setWo] = useState<WorldObject | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -35,6 +45,11 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+
+    // Copy to project state
+    const [copyOpen, setCopyOpen] = useState(false);
+    const [copying, setCopying] = useState(false);
+    const [linkedProjects, setLinkedProjects] = useState<{ id: string; title: string }[]>([]);
 
     // Timeline state
     const [timeline, setTimeline] = useState<WorldObjectTimelineEntry[]>([]);
@@ -120,6 +135,42 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
             body: JSON.stringify({ orderedIds: newTimeline.map(t => t.id) }),
         });
         fetchWo();
+    };
+
+    const handleOpenCopy = async () => {
+        if (!universeId) return;
+        try {
+            const res = await fetch(`/api/universes/${universeId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setLinkedProjects(data.projects || []);
+            }
+        } catch {
+            setLinkedProjects([]);
+        }
+        setCopyOpen(true);
+    };
+
+    const handleCopyToProject = async (projectId: string) => {
+        setCopying(true);
+        try {
+            const res = await offlineFetch("/api/universes/copy-to-project", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ worldObjectId: objectId, projectId }),
+            });
+            if (res.ok) {
+                setCopyOpen(false);
+                onUpdated();
+            } else {
+                const errorData = await res.json();
+                toastError(`Copy failed: ${errorData.error}`);
+            }
+        } catch {
+            toastError("An unexpected error occurred during copy.");
+        } finally {
+            setCopying(false);
+        }
     };
 
     if (!wo) {
@@ -265,6 +316,17 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     Delete
                 </Button>
                 <div className="flex items-center gap-2">
+                    {universeId && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={handleOpenCopy}
+                        >
+                            <FolderInput className="h-4 w-4" />
+                            Copy to Project
+                        </Button>
+                    )}
                     {saved && <span className="text-xs text-success">Saved!</span>}
                     <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
                         <Save className="h-4 w-4 mr-1.5" />
@@ -272,6 +334,38 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     </Button>
                 </div>
             </div>
+
+            {/* Copy to Project dialog */}
+            <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Copy to Project</DialogTitle>
+                        <DialogDescription>
+                            Copy &ldquo;{wo.name}&rdquo; into a linked project as a story object.
+                            The original world object will remain in the universe.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2 max-h-[300px] overflow-y-auto space-y-1">
+                        {linkedProjects.length === 0 ? (
+                            <p className="text-sm text-text-muted text-center py-4">
+                                No linked projects. Link a project to this universe first.
+                            </p>
+                        ) : (
+                            linkedProjects.map(p => (
+                                <button
+                                    key={p.id}
+                                    className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between disabled:opacity-50"
+                                    onClick={() => handleCopyToProject(p.id)}
+                                    disabled={copying}
+                                >
+                                    {p.title}
+                                    <FolderInput className="h-3 w-3" />
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Delete confirmation */}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

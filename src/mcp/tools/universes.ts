@@ -91,6 +91,10 @@ export async function transferStoryObjectToUniverse(storyObjectId: string, unive
     return UniversesController.transferStoryObjectToUniverse(storyObjectId, universeId);
 }
 
+export async function copyWorldObjectToProject(worldObjectId: string, projectId: string) {
+    return UniversesController.copyWorldObjectToProject(worldObjectId, projectId);
+}
+
 export async function linkProjectToUniverse(projectId: string, universeId: string) {
     return UniversesController.linkProjectToUniverse(projectId, universeId);
 }

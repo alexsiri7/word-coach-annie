@@ -68,6 +68,7 @@ import {
     deleteTimelineEntry,
     reorderTimelineEntries,
     transferStoryObjectToUniverse,
+    copyWorldObjectToProject,
     linkProjectToUniverse,
     unlinkProjectFromUniverse,
 } from "./tools/universes";
@@ -244,6 +245,19 @@ server.tool(
     },
     async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
         const result = await transferStoryObjectToUniverse(storyObjectId, universeId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "copy_world_object_to_project",
+    "Copy a world object (from a universe) into a project as a story object",
+    {
+        worldObjectId: z.string(),
+        projectId: z.string(),
+    },
+    async ({ worldObjectId, projectId }: { worldObjectId: string; projectId: string }) => {
+        const result = await copyWorldObjectToProject(worldObjectId, projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

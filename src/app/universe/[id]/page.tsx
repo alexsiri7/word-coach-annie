@@ -204,6 +204,7 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                     {selectedObjectId ? (
                         <WorldObjectPanel
                             objectId={selectedObjectId}
+                            universeId={universeId}
                             onClose={() => setSelectedObjectId(null)}
                             onDeleted={() => { setSelectedObjectId(null); fetchUniverse(); }}
                             onUpdated={fetchUniverse}

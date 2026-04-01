@@ -293,6 +293,34 @@ export class UniversesController {
         });
     }
 
+    static async copyWorldObjectToProject(worldObjectId: string, projectId: string) {
+        return prisma.$transaction(async (tx) => {
+            // 1. Fetch world object
+            const wo = await tx.worldObject.findUnique({
+                where: { id: worldObjectId },
+            });
+            if (!wo) throw new Error(`World object not found: ${worldObjectId}`);
+
+            // 2. Create StoryObject in the project (copy, not move)
+            const storyObj = await tx.storyObject.create({
+                data: {
+                    projectId,
+                    type: wo.type,
+                    name: wo.name,
+                    description: wo.description,
+                    notes: wo.notes,
+                    tags: wo.tags,
+                },
+            });
+
+            return {
+                ...storyObj,
+                createdAt: storyObj.createdAt.toISOString(),
+                updatedAt: storyObj.updatedAt.toISOString(),
+            };
+        });
+    }
+
     static async transferStoryObjectToUniverse(storyObjectId: string, universeId: string) {
         return prisma.$transaction(async (tx) => {
             // 1. Fetch story object
