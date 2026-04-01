@@ -16,13 +16,8 @@ Sentry.init({
     Sentry.browserTracingIntegration(),
   ],
 
-  // Filter out noisy errors
+  // Only filter out browser extension noise, not real errors
   ignoreErrors: [
-    // Browser extensions
     "ResizeObserver loop",
-    // Network errors from offline PWA usage
-    "Failed to fetch",
-    "NetworkError",
-    "Load failed",
   ],
 });

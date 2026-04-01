@@ -84,6 +84,7 @@ export function FeedbackDialog({
       setShowEditor(true);
     } catch (err) {
       console.error("Screenshot capture failed:", err);
+      import("@sentry/nextjs").then((Sentry) => Sentry.captureException(err, { tags: { feature: "screenshot-capture" } }));
       // Re-open dialog with error
       onOpenChange(true);
       setResult({
@@ -163,7 +164,8 @@ export function FeedbackDialog({
           message: data.error || "Failed to submit feedback. Please try again.",
         });
       }
-    } catch {
+    } catch (err) {
+      import("@sentry/nextjs").then((Sentry) => Sentry.captureException(err, { tags: { feature: "feedback-submit" } }));
       setResult({
         success: false,
         message: "Network error. Please check your connection and try again.",
