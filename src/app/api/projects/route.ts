@@ -9,10 +9,15 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = parseInt(searchParams.get("offset") || "0");
+    const showArchived = searchParams.get("archived") === "true";
     const userId = getCurrentUserId(request);
 
     // Scope by userId when authenticated; show all in API_TOKEN/dev mode
-    const where = userId ? { userId } : {};
+    // Filter by archive status: by default show non-archived, ?archived=true shows archived
+    const where = {
+      ...(userId ? { userId } : {}),
+      archivedAt: showArchived ? { not: null } : null,
+    };
 
     const [projects, total] = await Promise.all([
       prisma.project.findMany({
