@@ -63,6 +63,7 @@ interface Project {
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+  isSample?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,6 +122,25 @@ export default function Dashboard() {
     ]);
     const activeData = await activeRes.json();
     const archivedData = await archivedRes.json();
+
+    // If user has no projects at all, seed the sample project
+    if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
+      const seedRes = await fetch("/api/onboarding/sample", { method: "POST" });
+      if (seedRes.status === 201) {
+        // Re-fetch to include the newly created sample
+        const [newActive, newArchived] = await Promise.all([
+          fetch("/api/projects"),
+          fetch("/api/projects?archived=true"),
+        ]);
+        const newActiveData = await newActive.json();
+        const newArchivedData = await newArchived.json();
+        setProjects(newActiveData.projects);
+        setArchivedProjects(newArchivedData.projects);
+        setLoading(false);
+        return;
+      }
+    }
+
     setProjects(activeData.projects);
     setArchivedProjects(archivedData.projects);
     setLoading(false);
@@ -357,6 +377,22 @@ export default function Dashboard() {
           ) : (
             /* ── Dashboard Content ────────────────────────── */
             <div className="animate-fade-in">
+              {/* ── Sample Project Banner ─────────────────── */}
+              {projects.some((p) => p.isSample) && (
+                <div className="mb-6 bg-accent/10 border border-accent/20 p-4 rounded-lg flex items-center justify-between">
+                  <p className="text-sm text-text-secondary">
+                    <span className="font-semibold text-text-primary">This is a sample project to show you around.</span>{" "}
+                    Edit it or delete it when you&apos;re ready.
+                  </p>
+                  <button
+                    onClick={() => setCreateOpen(true)}
+                    className="text-sm font-medium text-accent hover:text-accent/80 transition-colors whitespace-nowrap ml-4"
+                  >
+                    Create your own project
+                  </button>
+                </div>
+              )}
+
               {/* ── Hero: Current Manuscript ────────────────── */}
               {heroProject && (
                 <section className="mb-14">
