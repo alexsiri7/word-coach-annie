@@ -18,6 +18,8 @@ const PUBLIC_PATHS = [
     "/api/auth/google",
     "/api/auth/me",
     "/login",
+    "/privacy",
+    "/terms",
     "/.well-known/oauth-authorization-server",
     "/oauth/register",
     "/oauth/token",
