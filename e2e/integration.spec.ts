@@ -21,14 +21,30 @@ async function createProject(
   return { id: body.id, title }
 }
 
-/** Delete a project via API (best-effort, never throws). */
+/** Delete a project via API (best-effort, never throws).
+ *  The delete endpoint requires the project to be archived first
+ *  and a confirmTitle matching the project title. */
 async function deleteProject(
   request: APIRequestContext,
   projectId: string,
 ): Promise<void> {
   try {
+    // Fetch the project to get its title
+    const getRes = await request.get(`/api/projects/${projectId}`, {
+      headers: AUTH_HEADERS,
+    })
+    if (!getRes.ok()) return
+    const project = await getRes.json()
+
+    // Archive the project first (ignore if already archived)
+    await request.post(`/api/projects/${projectId}/archive`, {
+      headers: AUTH_HEADERS,
+    })
+
+    // Delete with title confirmation
     await request.delete(`/api/projects/${projectId}`, {
       headers: AUTH_HEADERS,
+      data: { confirmTitle: project.title },
     })
   } catch {
     // Cleanup is best-effort
@@ -97,14 +113,22 @@ test.describe('Integration tests — real server, real data', () => {
         timeout: 10_000,
       })
 
-      // 6. Delete the project
+      // 6. Archive the project (required before deletion)
+      const archiveRes = await request.post(
+        `/api/projects/${projectId}/archive`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(archiveRes.ok()).toBeTruthy()
+
+      // 7. Delete the project (requires confirmTitle)
       const delRes = await request.delete(`/api/projects/${projectId}`, {
         headers: AUTH_HEADERS,
+        data: { confirmTitle: updatedTitle },
       })
       expect(delRes.ok()).toBeTruthy()
       projectId = undefined // already cleaned up
 
-      // 7. Verify it's gone from the list
+      // 8. Verify it's gone from the list
       const listRes2 = await request.get('/api/projects', {
         headers: AUTH_HEADERS,
       })
