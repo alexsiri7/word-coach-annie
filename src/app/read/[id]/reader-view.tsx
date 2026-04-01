@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { List, X as XIcon, BookOpen, Clock, ArrowLeft } from "lucide-react";
+import { List, X as XIcon, BookOpen, Clock, ArrowLeft, Flag } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ReportContentDialog } from "@/components/report-content-dialog";
 import { cn } from "@/lib/utils";
 
 interface OutlineNode {
@@ -186,6 +187,7 @@ function ManuscriptNode({
 
 export function ReaderView({ project, outline }: ReaderViewProps) {
   const [tocOpen, setTocOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const tocEntries = collectTocEntries(outline);
   const wordCount = countWords(outline);
   const readingTime = estimateReadingTime(wordCount);
@@ -375,6 +377,13 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
         </div>
         <div className="flex items-center gap-6 md:gap-8">
           <button
+            onClick={() => setReportOpen(true)}
+            className="flex flex-col items-center gap-1 group"
+          >
+            <Flag className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
+            <span className="label-md text-[10px] font-bold tracking-wider text-text-muted">Report</span>
+          </button>
+          <button
             onClick={() => window.history.back()}
             className="flex flex-col items-center gap-1 group"
           >
@@ -383,6 +392,13 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
           </button>
         </div>
       </nav>
+
+      <ReportContentDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        projectId={project.id}
+        projectTitle={project.title}
+      />
     </div>
   );
 }
