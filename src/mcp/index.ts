@@ -77,6 +77,7 @@ import {
     getManuscriptContext,
     getConsistencyContext,
     getVoiceContext,
+    getStoryBibleCrossReference,
 } from "./tools/coaching";
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
@@ -1100,6 +1101,19 @@ server.tool(
 );
 
 server.tool(
+    "cross_reference_story_bible",
+    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says. Includes instructions for presenting mismatches and confirmation flow.",
+    {
+        projectId: z.string().describe("The project ID"),
+        sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),
+    },
+    async ({ projectId, sceneId }) => {
+        const result = await getStoryBibleCrossReference(projectId, sceneId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
     "get_voice_context",
     "Gather character profiles and scene dialogue for voice consistency analysis. Returns characters linked to the scene with their descriptions and the scene text.",
     {
@@ -1322,6 +1336,12 @@ Be specific about which scenes show arc development. Format as one section per m
 
             "consistency-check": `## Consistency Check
 
+**Step 1: Cross-reference story bible against prose.**
+Use the \`cross_reference_story_bible\` tool to load all story objects alongside scene content.
+Compare each story object's defined attributes against how they appear in the prose.
+Follow the instructions included in the tool response for structuring mismatches.
+
+**Step 2: Check for scene-to-scene contradictions.**
 Use the \`get_consistency_context\` tool to load character profiles and scene content.
 
 Look for specific contradictions:
@@ -1330,7 +1350,14 @@ Look for specific contradictions:
 3. **World/setting** — location descriptions that contradict each other
 4. **Plot logic** — cause-effect gaps, character motivations that don't hold
 
-Only report clear, specific contradictions with scene references. Do not report vague impressions. If no issues found in a category, say so briefly.`,
+**Step 3: Present findings with confirmation flow.**
+For each story bible vs prose mismatch, present both versions and ask which is the source of truth:
+- **A) Update story object** → use \`update_story_object\` to sync bible to prose
+- **B) Flag scene** → use \`add_annotation\` to mark prose for revision
+- **C) Keep both** → intentional difference, no action needed
+
+IMPORTANT: Never silently overwrite. Always ask before making changes.
+Only report clear, specific contradictions with scene references. Do not report vague impressions.`,
         };
 
         return {
