@@ -31,8 +31,14 @@ vi.mock("next/server", () => ({
     NextResponse: MockNextResponse,
 }));
 
-function mockReq(url: string, body?: unknown) {
-    return new MockNextRequest(url, body ? { body: JSON.stringify(body) } : undefined);
+function mockReq(url: string, body?: unknown, headers?: Record<string, string>) {
+    const req = new MockNextRequest(url, body ? { body: JSON.stringify(body) } : undefined);
+    if (headers) {
+        for (const [k, v] of Object.entries(headers)) {
+            req.headers.set(k, v);
+        }
+    }
+    return req;
 }
 
 function mockParams<T>(params: T): { params: Promise<T> } {
@@ -247,6 +253,97 @@ describe("API Route Handlers", () => {
             const req = mockReq(`http://localhost/api/story-objects/${objectId}`);
             const res = await DELETE(req as any, mockParams({ id: objectId }));
             expect(res.status).toBe(200);
+        });
+    });
+
+    describe("Project count limit", () => {
+        let userId: string;
+
+        beforeEach(async () => {
+            const user = await testPrisma.user.create({
+                data: { email: "test@example.com", googleId: "google-123", name: "Test" },
+            });
+            userId = user.id;
+        });
+
+        it("POST /api/projects returns 403 when user has 3 active projects", async () => {
+            // Create 3 active projects for the user
+            for (let i = 0; i < 3; i++) {
+                await testPrisma.project.create({
+                    data: { title: `Project ${i}`, userId },
+                });
+            }
+
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq(
+                "http://localhost/api/projects",
+                { title: "Fourth Project" },
+                { "x-user-id": userId }
+            );
+            const res = await POST(req as any);
+            expect(res.status).toBe(403);
+            const data = await res.json();
+            expect(data.code).toBe("PROJECT_LIMIT_REACHED");
+        });
+
+        it("POST /api/projects allows creation when under limit", async () => {
+            await testPrisma.project.create({
+                data: { title: "Project 1", userId },
+            });
+
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq(
+                "http://localhost/api/projects",
+                { title: "Second Project" },
+                { "x-user-id": userId }
+            );
+            const res = await POST(req as any);
+            expect(res.status).toBe(201);
+        });
+
+        it("POST /api/projects does not count archived projects toward limit", async () => {
+            // Create 2 active + 1 archived = only 2 count toward limit
+            for (let i = 0; i < 2; i++) {
+                await testPrisma.project.create({
+                    data: { title: `Active ${i}`, userId },
+                });
+            }
+            await testPrisma.project.create({
+                data: { title: "Archived", userId, archivedAt: new Date() },
+            });
+
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq(
+                "http://localhost/api/projects",
+                { title: "Third Project" },
+                { "x-user-id": userId }
+            );
+            const res = await POST(req as any);
+            expect(res.status).toBe(201);
+        });
+
+        it("DELETE /api/projects/[id]/archive returns 403 when unarchiving would exceed limit", async () => {
+            // Create 3 active projects
+            for (let i = 0; i < 3; i++) {
+                await testPrisma.project.create({
+                    data: { title: `Active ${i}`, userId },
+                });
+            }
+            // Create 1 archived project to try to unarchive
+            const archived = await testPrisma.project.create({
+                data: { title: "Archived", userId, archivedAt: new Date() },
+            });
+
+            const { DELETE } = await import("@/app/api/projects/[id]/archive/route");
+            const req = mockReq(
+                `http://localhost/api/projects/${archived.id}/archive`,
+                undefined,
+                { "x-user-id": userId }
+            );
+            const res = await DELETE(req as any, mockParams({ id: archived.id }));
+            expect(res.status).toBe(403);
+            const data = await res.json();
+            expect(data.code).toBe("PROJECT_LIMIT_REACHED");
         });
     });
 });

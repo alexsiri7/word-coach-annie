@@ -83,6 +83,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const FREE_PROJECT_LIMIT = 3;
+
 // POST /api/projects - Create a new project (owned by current user)
 export async function POST(request: NextRequest) {
   try {
@@ -95,6 +97,21 @@ export async function POST(request: NextRequest) {
         { error: "Title is required" },
         { status: 400 }
       );
+    }
+
+    if (userId) {
+      const activeCount = await prisma.project.count({
+        where: { userId, archivedAt: null },
+      });
+      if (activeCount >= FREE_PROJECT_LIMIT) {
+        return NextResponse.json(
+          {
+            error: `Free accounts are limited to ${FREE_PROJECT_LIMIT} active projects. Archive or delete an existing project to create a new one.`,
+            code: "PROJECT_LIMIT_REACHED",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const project = await prisma.project.create({

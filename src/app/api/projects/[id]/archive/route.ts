@@ -53,6 +53,21 @@ export async function DELETE(
       return NextResponse.json({ error: "Project is not archived" }, { status: 400 });
     }
 
+    if (userId) {
+      const activeCount = await prisma.project.count({
+        where: { userId, archivedAt: null },
+      });
+      if (activeCount >= 3) {
+        return NextResponse.json(
+          {
+            error: "Free accounts are limited to 3 active projects. Archive or delete an existing project before restoring this one.",
+            code: "PROJECT_LIMIT_REACHED",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     await prisma.project.update({
       where: { id },
       data: { archivedAt: null },

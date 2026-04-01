@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
 import { WritingHeatmap } from "@/components/writing-heatmap";
+import { useToast } from "@/components/ui/toast";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -98,6 +99,7 @@ function formatWordCount(count: number) {
 /* ------------------------------------------------------------------ */
 export default function Dashboard() {
   const router = useRouter();
+  const { error: toastError } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -167,6 +169,10 @@ export default function Dashboard() {
       setNewGenre("");
       setNewProjectType("FICTION");
       router.push(`/project/${project.id}`);
+    } else if (res.status === 403) {
+      const data = await res.json();
+      setCreateOpen(false);
+      toastError(data.error);
     }
   };
 
@@ -176,7 +182,11 @@ export default function Dashboard() {
   };
 
   const handleUnarchive = async (project: Project) => {
-    await offlineFetch(`/api/projects/${project.id}/archive`, { method: "DELETE" });
+    const res = await offlineFetch(`/api/projects/${project.id}/archive`, { method: "DELETE" });
+    if (res.status === 403) {
+      const data = await res.json();
+      toastError(data.error);
+    }
     fetchProjects();
   };
 
