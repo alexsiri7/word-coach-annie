@@ -185,7 +185,7 @@ export default function Dashboard() {
                 onClick={() => router.push("/universe")}
                 className="font-headline italic text-text-muted font-medium tracking-tight leading-relaxed hover:text-text-primary transition-colors duration-200"
               >
-                Library
+                Universes
               </button>
             </nav>
           </div>
