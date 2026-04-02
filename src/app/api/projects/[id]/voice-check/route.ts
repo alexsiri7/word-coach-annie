@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getVoiceContext } from "@/mcp/tools/coaching";
 import OpenAI from "openai";
@@ -32,7 +32,7 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   let sceneId: string | undefined;

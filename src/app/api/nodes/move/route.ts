@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 /**
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccessByNode(nodeId, userId);
+    const access = await verifyProjectWriteAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const node = await prisma.structureNode.findUnique({

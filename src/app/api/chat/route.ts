@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAiConfig } from "@/lib/ai/settings";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent } from "@/lib/ai/adk-agent";
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(projectId, userId);
+    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const messages = await prisma.chatMessage.findMany({
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(projectId, userId);
+    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     // Sanitize user input to prevent stored XSS
@@ -263,7 +263,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(projectId, userId);
+    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     await prisma.chatMessage.deleteMany({ where: { projectId } });
