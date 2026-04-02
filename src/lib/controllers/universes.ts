@@ -119,6 +119,20 @@ export class UniversesController {
                 timeline: {
                     orderBy: { orderIndex: "asc" },
                 },
+                relationships: {
+                    include: {
+                        toNode: { select: { id: true, title: true, type: true } },
+                        toObject: { select: { id: true, name: true, type: true } },
+                        toWorldObject: { select: { id: true, name: true, type: true } },
+                    },
+                },
+                relatedBy: {
+                    include: {
+                        fromNode: { select: { id: true, title: true, type: true } },
+                        fromObject: { select: { id: true, name: true, type: true } },
+                        fromWorldObject: { select: { id: true, name: true, type: true } },
+                    },
+                },
             },
         });
 
