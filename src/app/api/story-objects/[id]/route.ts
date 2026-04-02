@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
@@ -37,7 +37,7 @@ export async function GET(
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(storyObject.projectId, userId);
+    const access = await verifyProjectReadAccess(storyObject.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     return NextResponse.json(storyObject);
@@ -71,7 +71,7 @@ export async function PATCH(
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(existing.projectId, userId);
+    const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     let body: Record<string, unknown>;
@@ -149,7 +149,7 @@ export async function DELETE(
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(existing.projectId, userId);
+    const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     await prisma.storyObject.delete({ where: { id } });

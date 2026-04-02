@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SessionsController } from "@/lib/controllers/sessions";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function POST(
@@ -10,7 +10,7 @@ export async function POST(
   const { id: projectId } = await params;
   try {
     const userId = getCurrentUserId(req);
-    const access = await verifyProjectAccess(projectId, userId);
+    const access = await verifyProjectWriteAccess(projectId, userId, req.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const body = await req.json();
