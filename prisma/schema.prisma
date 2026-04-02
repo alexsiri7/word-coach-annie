@@ -207,6 +207,15 @@ model GoogleCredential {
   updatedAt    DateTime @updatedAt
 }
 
+model MediumCredential {
+  id               String   @id @default(cuid())
+  integrationToken String   // Encrypted
+  authorId         String
+  username         String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model ChatMessage {
   id        String   @id @default(cuid())
   projectId String
