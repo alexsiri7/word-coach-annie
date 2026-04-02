@@ -388,7 +388,7 @@ describe("Manuscript API — GET /api/projects/[id]/manuscript", () => {
         expect(body.title).toBe("Shared Novel");
     });
 
-    it("shared reader gets 403 (manuscript is owner-only)", async () => {
+    it("shared reader can access manuscript", async () => {
         const reader = await createOtherUser();
         await testPrisma.projectShare.create({
             data: { projectId, email: reader.email, role: "READER" },
@@ -401,7 +401,9 @@ describe("Manuscript API — GET /api/projects/[id]/manuscript", () => {
         });
         const res = await GET(req as never, mockParams({ id: projectId }));
 
-        expect((res as any).status).toBe(403);
+        expect((res as any).status).toBe(200);
+        const body = await (res as any).json();
+        expect(body.title).toBe("Shared Novel");
     });
 
     it("non-shared user gets 403", async () => {
@@ -598,6 +600,58 @@ describe("Access control — verifyProjectAccess / verifyProjectReadAccess", () 
 
         const { verifyProjectReadAccess } = await import("@/lib/api-auth");
         const result = await verifyProjectReadAccess(projectId, stranger.id, stranger.email);
+
+        expect(result.authorized).toBe(false);
+        if (!result.authorized) {
+            expect(result.response.status).toBe(403);
+        }
+    });
+
+    it("verifyProjectWriteAccess — owner gets authorized with role OWNER", async () => {
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, ownerId, "owner@example.com");
+
+        expect(result.authorized).toBe(true);
+        if (result.authorized) {
+            expect(result.role).toBe("OWNER");
+        }
+    });
+
+    it("verifyProjectWriteAccess — shared editor gets authorized with role EDITOR", async () => {
+        const editor = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: editor.email, role: "EDITOR" },
+        });
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, editor.id, editor.email);
+
+        expect(result.authorized).toBe(true);
+        if (result.authorized) {
+            expect(result.role).toBe("EDITOR");
+        }
+    });
+
+    it("verifyProjectWriteAccess — shared reader gets 403", async () => {
+        const reader = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: reader.email, role: "READER" },
+        });
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, reader.id, reader.email);
+
+        expect(result.authorized).toBe(false);
+        if (!result.authorized) {
+            expect(result.response.status).toBe(403);
+        }
+    });
+
+    it("verifyProjectWriteAccess — non-shared user gets 403", async () => {
+        const stranger = await createOtherUser();
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, stranger.id, stranger.email);
 
         expect(result.authorized).toBe(false);
         if (!result.authorized) {
