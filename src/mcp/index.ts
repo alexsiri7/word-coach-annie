@@ -937,11 +937,11 @@ server.tool(
 
 server.tool(
     "add_timeline_entry",
-    "Add a timeline entry to a world object",
+    "Add a state-history entry to a world object's timeline. Timeline entries track how an object changes over story time (e.g. 'Year 12 — apprenticed to the blacksmith'). Use this to record key life events, status changes, or turning points so Annie can check consistency across scenes set at different points in the story.",
     {
         worldObjectId: z.string().describe("The world object ID"),
-        label: z.string().describe("Entry label (e.g. 'Birth')"),
-        description: z.string().optional().describe("Detailed description"),
+        label: z.string().describe("Period or event label (e.g. 'Year 12', 'Post-War', 'Age 20')"),
+        description: z.string().optional().describe("What is true about this object at this point in story time"),
         attributes: z.string().optional().describe("JSON blob for structured data"),
         projectId: z.string().optional().describe("Optional project ID this entry relates to"),
         orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
@@ -954,11 +954,11 @@ server.tool(
 
 server.tool(
     "update_timeline_entry",
-    "Update a timeline entry",
+    "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period.",
     {
         entryId: z.string().describe("The entry ID"),
-        label: z.string().optional().describe("New label"),
-        description: z.string().optional().describe("New description"),
+        label: z.string().optional().describe("New period or event label"),
+        description: z.string().optional().describe("Updated description of what is true at this point"),
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
@@ -970,7 +970,7 @@ server.tool(
 
 server.tool(
     "delete_timeline_entry",
-    "Delete a timeline entry",
+    "Delete a state-history entry from a world object's timeline",
     {
         entryId: z.string().describe("The entry ID"),
     },

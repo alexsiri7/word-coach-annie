@@ -11,6 +11,8 @@ required_tools:
   - create_story_object
   - create_relationship
   - read_scene_content
+  - list_world_objects
+  - add_timeline_entry
 triggers:
   - "I'm stuck"
   - "story development"
@@ -139,6 +141,7 @@ When the conversation produces a clear insight — a character motivation that c
 - **Update existing story object notes/description:** Use `update_story_object` to add the insight to the relevant character, plotline, or world element. Append to existing notes rather than overwriting.
 - **Create a new story object:** If the conversation revealed a new character, plotline, or world element that doesn't exist yet, use `create_story_object` to add it.
 - **Create relationships:** If the conversation revealed a connection between elements (character ↔ plotline, character ↔ character), use `create_relationship` to capture it.
+- **Add timeline entries:** If the conversation established how a character or world element changes over story time — key life events, status changes, turning points — offer to add these as timeline entries on the corresponding world object using `add_timeline_entry`. Timeline entries track an object's state history (e.g. "Year 12 — apprenticed to the blacksmith", "Post-war — walks with a cane"). This helps Annie check consistency across scenes set at different periods. Use `list_world_objects` to find the matching world object if the conversation is about a story-level character.
 
 **Crystallization format for notes:**
 ```
@@ -189,6 +192,10 @@ I'd like to capture what we figured out:
 **New Relationship: [From] → [To]** (if connecting)
 - Type: [relationship type]
 - Label: "[description of connection]"
+
+**Timeline Entry: [World Object Name]** (if tracking state over time)
+- Label: "[Period or event, e.g. 'Year 12', 'Post-War']"
+- Description: "[What is true about this object at this point in story time]"
 
 Want me to save these?
 ```
