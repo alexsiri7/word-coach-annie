@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/select";
 
 const ROLES = [
-  { value: "READER", label: "Reader" },
-  { value: "EDITOR", label: "Editor" },
+  { value: "READER", label: "Reader", description: "Can view content" },
+  { value: "EDITOR", label: "Editor", description: "Can view and edit content" },
 ] as const;
 
 interface ShareEntry {
@@ -190,7 +190,8 @@ export function ShareDialog({
               <SelectContent>
                 {ROLES.map((r) => (
                   <SelectItem key={r.value} value={r.value}>
-                    {r.label}
+                    <span>{r.label}</span>
+                    <span className="text-text-muted text-[10px] ml-1">{r.description}</span>
                   </SelectItem>
                 ))}
               </SelectContent>

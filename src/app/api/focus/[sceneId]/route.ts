@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 
@@ -18,7 +18,7 @@ export async function GET(
         if (!sceneId) return new NextResponse("Scene ID required", { status: 400 });
 
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectAccessByNode(sceneId, userId);
+        const access = await verifyProjectReadAccessByNode(sceneId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         const result = await getSceneFocus(sceneId);
