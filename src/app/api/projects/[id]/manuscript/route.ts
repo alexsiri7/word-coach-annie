@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccess(id, userId);
+    const access = await verifyProjectReadAccess(id, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const project = await prisma.project.findUnique({
