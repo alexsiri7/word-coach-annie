@@ -185,6 +185,9 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                             Add Entry
                         </Button>
                     </div>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                        Track how this {wo.type.toLowerCase()} changes over story time. Annie uses this to check consistency across scenes.
+                    </p>
 
                     {newEntryOpen && (
                         <div className="glass-card p-4 space-y-3 bg-surface-overlay border-accent/20">

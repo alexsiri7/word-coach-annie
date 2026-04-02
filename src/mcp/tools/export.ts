@@ -473,7 +473,7 @@ export async function exportUniverse(universeId: string): Promise<string> {
             if (obj.notes) lines.push(`*Notes:* ${obj.notes}\n`);
 
             if (obj.timeline.length > 0) {
-                lines.push(`\n**Timeline:**\n`);
+                lines.push(`\n**Timeline (state history):**\n`);
                 for (const entry of obj.timeline) {
                     lines.push(`- **${entry.label}**: ${entry.description}`);
                 }
