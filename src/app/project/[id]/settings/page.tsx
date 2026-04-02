@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,12 @@ interface ProjectSettings {
   author: string;
   synopsis: string;
   genre: string;
+  archivedAt: string | null;
+  wordCount: number;
+  sceneCount: number;
+  characterCount: number;
+  storyObjectCount: number;
+  nodeCount: number;
 }
 
 export default function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +33,14 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [genre, setGenre] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Archive & delete
+  const [archiving, setArchiving] = useState(false);
+  const [showDeleteSection, setShowDeleteSection] = useState(false);
+  const [deleteExported, setDeleteExported] = useState(false);
+  const [deleteCooldown, setDeleteCooldown] = useState(0);
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // Export options
   const [includeSynopsis, setIncludeSynopsis] = useState(true);
@@ -154,6 +168,63 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       setExporting(null);
     }
   };
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    await offlineFetch(`/api/projects/${projectId}/archive`, { method: "POST" });
+    const res = await fetch(`/api/projects/${projectId}`);
+    const data = await res.json();
+    setProject(data);
+    setArchiving(false);
+  };
+
+  const handleUnarchive = async () => {
+    setArchiving(true);
+    await offlineFetch(`/api/projects/${projectId}/archive`, { method: "DELETE" });
+    const res = await fetch(`/api/projects/${projectId}`);
+    const data = await res.json();
+    setProject(data);
+    setArchiving(false);
+    setShowDeleteSection(false);
+    setDeleteExported(false);
+    setDeleteCooldown(0);
+    setDeleteConfirmTitle("");
+  };
+
+  const handleDeleteExport = async () => {
+    const res = await fetch(`/api/projects/${projectId}/export?type=json`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title.replace(/[^a-z0-9]/gi, "_")}_backup.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setDeleteExported(true);
+      setDeleteCooldown(30);
+    }
+  };
+
+  const handleDeleteForever = async () => {
+    if (!deleteExported || deleteCooldown > 0 || deleteConfirmTitle !== title) return;
+    setDeleting(true);
+    await offlineFetch(`/api/projects/${projectId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmTitle: deleteConfirmTitle }),
+    });
+    router.push("/");
+  };
+
+  // Cooldown timer
+  useEffect(() => {
+    if (deleteCooldown <= 0) return;
+    const timer = setTimeout(() => setDeleteCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [deleteCooldown]);
 
   if (!project) {
     return (
@@ -349,6 +420,163 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <span className="text-xs">Export All Projects (ZIP)</span>
             </Button>
           </div>
+        </div>
+
+        {/* Archive & Danger Zone */}
+        <div className="glass-card p-6 mt-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Archive & Delete</h2>
+
+          {!project.archivedAt ? (
+            <div className="space-y-3">
+              <p className="text-sm text-text-secondary">
+                Archiving hides this project from your dashboard. You can restore it any time from
+                the Archived Projects section.
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleArchive}
+                disabled={archiving}
+                className="gap-1.5"
+              >
+                {archiving ? (
+                  <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+                Archive Project
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="stamp-chip text-xs">Archived</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUnarchive}
+                  disabled={archiving}
+                  className="gap-1.5"
+                >
+                  {archiving ? (
+                    <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ArchiveRestore className="h-4 w-4" />
+                  )}
+                  Restore Project
+                </Button>
+              </div>
+
+              {/* Danger zone: delete permanently */}
+              <div className="border border-danger/30 rounded-md p-4 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-danger" />
+                  <h3 className="text-sm font-semibold text-danger">Danger Zone</h3>
+                </div>
+
+                {!showDeleteSection ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-text-secondary">
+                      Permanently delete this project and all its data. This cannot be undone.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteSection(true)}
+                      className="gap-1.5"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Permanently
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Stats */}
+                    <div className="bg-danger/5 border border-danger/20 p-3 rounded-md">
+                      <p className="text-sm font-medium text-danger mb-1">
+                        You are about to permanently delete:
+                      </p>
+                      <p className="text-sm text-text-secondary">
+                        <strong>{(project.wordCount ?? 0).toLocaleString()}</strong> words across{" "}
+                        <strong>{project.sceneCount ?? project.nodeCount ?? 0}</strong> scene{(project.sceneCount ?? project.nodeCount ?? 0) !== 1 ? "s" : ""}
+                        {(project.characterCount ?? project.storyObjectCount ?? 0) > 0 && (
+                          <> with <strong>{project.characterCount ?? project.storyObjectCount ?? 0}</strong> character{(project.characterCount ?? project.storyObjectCount ?? 0) !== 1 ? "s" : ""}</>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Step 1: Export */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-text-primary">
+                        Step 1: Export a backup
+                      </p>
+                      {!deleteExported ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeleteExport}
+                          className="gap-1.5"
+                        >
+                          <Download className="h-4 w-4" />
+                          Export JSON Backup
+                        </Button>
+                      ) : (
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          Backup exported successfully.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Step 2: Confirm */}
+                    {deleteExported && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-text-primary">
+                          Step 2: Type <strong>{title}</strong> to confirm
+                        </p>
+                        <Input
+                          value={deleteConfirmTitle}
+                          onChange={(e) => setDeleteConfirmTitle(e.target.value)}
+                          placeholder="Type the project title..."
+                        />
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setShowDeleteSection(false);
+                          setDeleteExported(false);
+                          setDeleteCooldown(0);
+                          setDeleteConfirmTitle("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={
+                          !deleteExported ||
+                          deleteConfirmTitle !== title ||
+                          deleteCooldown > 0 ||
+                          deleting
+                        }
+                        onClick={handleDeleteForever}
+                      >
+                        {deleting
+                          ? "Deleting..."
+                          : deleteCooldown > 0
+                            ? `Delete Forever (${deleteCooldown}s)`
+                            : "Delete Forever"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>
