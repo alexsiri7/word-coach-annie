@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, Link } from "lucide-react";
+import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, Link, Copy } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import type { WorldObject, WorldObjectTimelineEntry, Relationship } from "@/lib/types";
 
 const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
@@ -87,6 +95,9 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [copyOpen, setCopyOpen] = useState(false);
+    const [copying, setCopying] = useState(false);
+    const [linkedProjects, setLinkedProjects] = useState<{ id: string; title: string }[]>([]);
 
     // Timeline state
     const [timeline, setTimeline] = useState<WorldObjectTimelineEntry[]>([]);
@@ -156,6 +167,33 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
             method: "DELETE",
         });
         if (res.ok) fetchWo();
+    };
+
+    const handleOpenCopy = async () => {
+        if (!wo) return;
+        const res = await fetch(`/api/universes/${wo.universeId}`);
+        if (res.ok) {
+            const data = await res.json();
+            setLinkedProjects(data.projects || []);
+        }
+        setCopyOpen(true);
+    };
+
+    const handleCopyToProject = async (projectId: string) => {
+        setCopying(true);
+        try {
+            const res = await offlineFetch(`/api/projects/${projectId}/copy-world-object`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ worldObjectId: objectId }),
+            });
+            if (res.ok) {
+                setCopyOpen(false);
+                onUpdated();
+            }
+        } finally {
+            setCopying(false);
+        }
     };
 
     const handleReorder = async (startIndex: number, direction: 'up' | 'down') => {
@@ -356,6 +394,15 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     Delete
                 </Button>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={handleOpenCopy}
+                    >
+                        <Copy className="h-4 w-4" />
+                        Copy to Project
+                    </Button>
                     {saved && <span className="text-xs text-success">Saved!</span>}
                     <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
                         <Save className="h-4 w-4 mr-1.5" />
@@ -381,6 +428,40 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Copy to Project dialog */}
+            <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Copy to Project</DialogTitle>
+                        <DialogDescription>
+                            Import &ldquo;{wo.name}&rdquo; into a linked project as a story object. The original stays in the universe.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2 max-h-[300px] overflow-y-auto space-y-1">
+                        {linkedProjects.length === 0 ? (
+                            <p className="text-sm text-text-muted text-center py-4">
+                                No projects are linked to this universe yet.
+                            </p>
+                        ) : (
+                            linkedProjects.map((p) => (
+                                <button
+                                    key={p.id}
+                                    className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between"
+                                    onClick={() => handleCopyToProject(p.id)}
+                                    disabled={copying}
+                                >
+                                    {p.title}
+                                    <Copy className="h-3 w-3 text-text-muted" />
+                                </button>
+                            ))
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCopyOpen(false)}>Cancel</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

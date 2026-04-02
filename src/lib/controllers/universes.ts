@@ -308,6 +308,61 @@ export class UniversesController {
         });
     }
 
+    static async copyWorldObjectToProject(worldObjectId: string, projectId: string) {
+        return prisma.$transaction(async (tx) => {
+            // 1. Fetch world object
+            const wo = await tx.worldObject.findUnique({
+                where: { id: worldObjectId },
+                include: { relationships: true, relatedBy: true },
+            });
+            if (!wo) throw new Error(`World object not found: ${worldObjectId}`);
+
+            // 2. Create StoryObject (copy — original stays in universe)
+            const so = await tx.storyObject.create({
+                data: {
+                    projectId,
+                    type: wo.type,
+                    name: wo.name,
+                    description: wo.description,
+                    notes: wo.notes,
+                    tags: wo.tags,
+                },
+            });
+
+            // 3. Copy relationships: world object refs → story object refs
+            for (const rel of wo.relationships) {
+                await tx.relationship.create({
+                    data: {
+                        type: rel.type,
+                        label: rel.label,
+                        fromObjectId: so.id,
+                        toNodeId: rel.toNodeId,
+                        toObjectId: rel.toObjectId,
+                        toWorldObjectId: rel.toWorldObjectId,
+                    },
+                });
+            }
+            for (const rel of wo.relatedBy) {
+                await tx.relationship.create({
+                    data: {
+                        type: rel.type,
+                        label: rel.label,
+                        fromNodeId: rel.fromNodeId,
+                        fromObjectId: rel.fromObjectId,
+                        fromWorldObjectId: rel.fromWorldObjectId,
+                        toObjectId: so.id,
+                    },
+                });
+            }
+
+            return {
+                ...so,
+                createdAt: so.createdAt.toISOString(),
+                updatedAt: so.updatedAt.toISOString(),
+            };
+        });
+    }
+
     static async transferStoryObjectToUniverse(storyObjectId: string, universeId: string) {
         return prisma.$transaction(async (tx) => {
             // 1. Fetch story object
