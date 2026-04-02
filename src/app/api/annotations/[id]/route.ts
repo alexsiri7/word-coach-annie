@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
@@ -20,7 +20,7 @@ export async function PATCH(
             return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
         }
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectAccessByNode(annotation.nodeId, userId);
+        const access = await verifyProjectWriteAccessByNode(annotation.nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         const body = await request.json();
@@ -68,7 +68,7 @@ export async function DELETE(
             return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
         }
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectAccessByNode(annotation.nodeId, userId);
+        const access = await verifyProjectWriteAccessByNode(annotation.nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         await prisma.annotation.delete({

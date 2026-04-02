@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
@@ -13,7 +13,7 @@ export async function GET(
 
     try {
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectAccessByNode(nodeId, userId);
+        const access = await verifyProjectReadAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         const annotations = await prisma.annotation.findMany({
@@ -39,7 +39,7 @@ export async function POST(
 
     try {
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectAccessByNode(nodeId, userId);
+        const access = await verifyProjectWriteAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         const body = await request.json();
