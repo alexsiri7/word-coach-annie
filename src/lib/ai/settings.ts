@@ -8,6 +8,21 @@ export interface AiProviderConfig {
   model: string;
 }
 
+export type CoachingStyle = "gentle" | "balanced" | "direct";
+export type ResponseLength = "concise" | "moderate" | "detailed";
+
+export interface AiPreferences {
+  customInstructions: string;
+  coachingStyle: CoachingStyle;
+  responseLength: ResponseLength;
+}
+
+const DEFAULT_PREFERENCES: AiPreferences = {
+  customInstructions: "",
+  coachingStyle: "balanced",
+  responseLength: "moderate",
+};
+
 function getEnvDefaults(): AiProviderConfig {
   // Support new generic env vars, fall back to legacy REQUESTY_ vars
   const apiKey = env.AI_API_KEY || env.REQUESTY_API_KEY || "";
@@ -59,4 +74,54 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
     // Table may not exist yet — fall through to env defaults
   }
   return envDefaults;
+}
+
+/**
+ * Get per-user AI behavior preferences.
+ * Returns defaults if no user settings exist.
+ */
+export async function getAiPreferences(userId?: string | null): Promise<AiPreferences> {
+  if (!userId) return DEFAULT_PREFERENCES;
+
+  try {
+    const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
+    if (userSettings) {
+      return {
+        customInstructions: userSettings.customInstructions,
+        coachingStyle: (userSettings.coachingStyle as CoachingStyle) || "balanced",
+        responseLength: (userSettings.responseLength as ResponseLength) || "moderate",
+      };
+    }
+  } catch {
+    // Table may not exist yet
+  }
+  return DEFAULT_PREFERENCES;
+}
+
+const COACHING_STYLE_INSTRUCTIONS: Record<CoachingStyle, string> = {
+  gentle: "Be encouraging and supportive. Frame suggestions positively. Focus on what works well before mentioning areas for improvement.",
+  balanced: "Be encouraging but honest — like a good writing partner. Balance praise with constructive feedback.",
+  direct: "Be direct and candid. Prioritize actionable feedback over encouragement. Point out weaknesses clearly and suggest specific fixes.",
+};
+
+const RESPONSE_LENGTH_INSTRUCTIONS: Record<ResponseLength, string> = {
+  concise: "Keep responses brief and to the point. Use short paragraphs. Aim for 2-4 sentences unless the user asks for more detail.",
+  moderate: "Keep responses concise unless asked to elaborate.",
+  detailed: "Provide thorough, detailed responses. Explain your reasoning. Include examples and alternatives where helpful.",
+};
+
+/**
+ * Build system prompt additions from user AI preferences.
+ */
+export function buildPreferenceInstructions(prefs: AiPreferences): string {
+  const parts: string[] = [];
+
+  parts.push(COACHING_STYLE_INSTRUCTIONS[prefs.coachingStyle]);
+  parts.push(RESPONSE_LENGTH_INSTRUCTIONS[prefs.responseLength]);
+
+  if (prefs.customInstructions.trim()) {
+    parts.push(`Additional user instructions: ${prefs.customInstructions.trim()}`);
+  }
+
+  return parts.join("\n");
 }

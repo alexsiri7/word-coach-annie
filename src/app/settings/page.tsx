@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AiSettingsData {
   baseUrl: string;
@@ -13,6 +15,9 @@ interface AiSettingsData {
   model: string;
   hasApiKey?: boolean;
   scope?: "user" | "global";
+  customInstructions?: string;
+  coachingStyle?: string;
+  responseLength?: string;
 }
 
 export default function SettingsPage() {
@@ -29,6 +34,11 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"user" | "global">("global");
 
+  // AI behavior preferences
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [coachingStyle, setCoachingStyle] = useState("balanced");
+  const [responseLength, setResponseLength] = useState("moderate");
+
   useEffect(() => {
     fetch("/api/ai-settings")
       .then((res) => res.json())
@@ -38,6 +48,9 @@ export default function SettingsPage() {
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
         setApiKey("");
+        setCustomInstructions(data.customInstructions || "");
+        setCoachingStyle(data.coachingStyle || "balanced");
+        setResponseLength(data.responseLength || "moderate");
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -49,6 +62,9 @@ export default function SettingsPage() {
     const body: Record<string, string> = {
       baseUrl,
       model,
+      customInstructions,
+      coachingStyle,
+      responseLength,
     };
     if (apiKey) {
       body.apiKey = apiKey;
@@ -65,6 +81,9 @@ export default function SettingsPage() {
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
         setApiKey("");
+        setCustomInstructions(data.customInstructions || "");
+        setCoachingStyle(data.coachingStyle || "balanced");
+        setResponseLength(data.responseLength || "moderate");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
@@ -171,22 +190,89 @@ export default function SettingsPage() {
                   placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."
                 />
               </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving} className="gap-1.5">
-                  {saving ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : saved ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {saving ? "Saving..." : saved ? "Saved!" : "Save"}
-                </Button>
-              </div>
             </div>
           )}
         </div>
+
+        {/* AI Behavior Preferences */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="h-4 w-4 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">AI Behavior</h2>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-text-muted">
+                Customize how the AI writing coach interacts with you. These preferences apply to chat, inline suggestions, and manuscript analysis.
+              </p>
+
+              <div>
+                <label htmlFor="settings-coaching-style" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Coaching Style
+                </label>
+                <Select value={coachingStyle} onValueChange={setCoachingStyle}>
+                  <SelectTrigger id="settings-coaching-style">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gentle">Gentle &mdash; encouraging, supportive feedback</SelectItem>
+                    <SelectItem value="balanced">Balanced &mdash; honest but encouraging</SelectItem>
+                    <SelectItem value="direct">Direct &mdash; candid, actionable feedback</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="settings-response-length" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Response Length
+                </label>
+                <Select value={responseLength} onValueChange={setResponseLength}>
+                  <SelectTrigger id="settings-response-length">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="concise">Concise &mdash; brief, to the point</SelectItem>
+                    <SelectItem value="moderate">Moderate &mdash; balanced detail</SelectItem>
+                    <SelectItem value="detailed">Detailed &mdash; thorough explanations</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="settings-custom-instructions" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Custom Instructions
+                </label>
+                <Textarea
+                  id="settings-custom-instructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder="e.g., Focus on dialogue quality. I write literary fiction. Avoid clich&eacute;s..."
+                  rows={3}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Additional instructions the AI will follow in all interactions. Be specific about your writing goals or preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Save Button */}
+        {!loading && (
+          <div className="flex items-center gap-2 pt-2 mt-6">
+            <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? (
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : saved ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {saving ? "Saving..." : saved ? "Saved!" : "Save"}
+            </Button>
+          </div>
+        )}
       </div>
     </main>
   );
