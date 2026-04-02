@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getAiConfig } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -143,6 +143,10 @@ export async function POST(request: NextRequest) {
       ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
       : "";
 
+    // Load user preferences and add to system prompt
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
+
     // Get recent chat history for context
     const recentMessages = await prisma.chatMessage.findMany({
       where: { projectId },
@@ -162,7 +166,7 @@ export async function POST(request: NextRequest) {
 
     // Run ADK agent (handles tool loop, dynamic tool loading internally)
     const { finalContent, toolLog } = await runChatAgent({
-      systemPrompt: systemPrompt + sceneNote,
+      systemPrompt: systemPrompt + sceneNote + "\n\n" + prefInstructions,
       chatHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,

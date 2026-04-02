@@ -17,7 +17,8 @@ vi.mock("@/lib/crypto", () => ({
     decrypt: vi.fn((val: string) => val),
 }));
 
-import { getAiConfig } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
+import type { AiPreferences } from "@/lib/ai/settings";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 
@@ -219,6 +220,87 @@ describe("AI settings", () => {
 
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("env-key");
+        });
+    });
+
+    describe("getAiPreferences", () => {
+        it("returns defaults when no userId", async () => {
+            const prefs = await getAiPreferences();
+            expect(prefs.customInstructions).toBe("");
+            expect(prefs.coachingStyle).toBe("balanced");
+            expect(prefs.responseLength).toBe("moderate");
+        });
+
+        it("returns defaults when user has no settings", async () => {
+            vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue(null);
+            const prefs = await getAiPreferences("user-1");
+            expect(prefs.coachingStyle).toBe("balanced");
+        });
+
+        it("returns user preferences when set", async () => {
+            vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue({
+                id: "settings-1",
+                userId: "user-1",
+                baseUrl: "",
+                apiKey: "",
+                model: "",
+                customInstructions: "Focus on dialogue",
+                coachingStyle: "direct",
+                responseLength: "concise",
+            } as never);
+
+            const prefs = await getAiPreferences("user-1");
+            expect(prefs.customInstructions).toBe("Focus on dialogue");
+            expect(prefs.coachingStyle).toBe("direct");
+            expect(prefs.responseLength).toBe("concise");
+        });
+
+        it("falls through on DB error", async () => {
+            vi.mocked(prisma.userAiSettings.findUnique).mockRejectedValue(new Error("table error"));
+            const prefs = await getAiPreferences("user-1");
+            expect(prefs.coachingStyle).toBe("balanced");
+        });
+    });
+
+    describe("buildPreferenceInstructions", () => {
+        it("includes coaching style instructions", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "",
+                coachingStyle: "gentle",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("encouraging and supportive");
+        });
+
+        it("includes response length instructions", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "",
+                coachingStyle: "balanced",
+                responseLength: "detailed",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("thorough, detailed");
+        });
+
+        it("includes custom instructions when provided", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "Focus on dialogue quality",
+                coachingStyle: "balanced",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("Focus on dialogue quality");
+        });
+
+        it("omits custom instructions when empty", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "   ",
+                coachingStyle: "balanced",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).not.toContain("Additional user instructions");
         });
     });
 });
