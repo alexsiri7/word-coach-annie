@@ -228,14 +228,17 @@ model AiSettings {
 }
 
 model UserAiSettings {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  baseUrl   String   @default("")
-  apiKey    String   @default("")
-  model     String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  baseUrl            String   @default("")
+  apiKey             String   @default("")
+  model              String   @default("")
+  customInstructions String   @default("")
+  coachingStyle      String   @default("balanced")
+  responseLength     String   @default("moderate")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GoogleDocExport {

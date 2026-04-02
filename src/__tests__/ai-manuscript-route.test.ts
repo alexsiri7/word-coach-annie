@@ -38,6 +38,12 @@ vi.mock("@/lib/ai/settings", () => ({
     apiKey: "test-key",
     model: "test-model",
   }),
+  getAiPreferences: vi.fn().mockResolvedValue({
+    customInstructions: "",
+    coachingStyle: "balanced",
+    responseLength: "moderate",
+  }),
+  buildPreferenceInstructions: vi.fn().mockReturnValue(""),
 }));
 
 vi.mock("@/lib/api-auth", () => ({

@@ -21,6 +21,9 @@ export async function GET(request: NextRequest) {
             model: userSettings.model,
             hasApiKey: !!decryptedKey,
             scope: "user",
+            customInstructions: userSettings.customInstructions,
+            coachingStyle: userSettings.coachingStyle,
+            responseLength: userSettings.responseLength,
           });
         }
       } catch {
@@ -52,10 +55,13 @@ export async function PUT(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
     const body = await request.json();
-    const { baseUrl, apiKey, model } = body as {
+    const { baseUrl, apiKey, model, customInstructions, coachingStyle, responseLength } = body as {
       baseUrl?: string;
       apiKey?: string;
       model?: string;
+      customInstructions?: string;
+      coachingStyle?: string;
+      responseLength?: string;
     };
 
     // Build update data — only include fields that were actually sent
@@ -63,6 +69,9 @@ export async function PUT(request: NextRequest) {
     if (baseUrl !== undefined) data.baseUrl = baseUrl.trim();
     if (apiKey !== undefined) data.apiKey = encrypt(apiKey.trim());
     if (model !== undefined) data.model = model.trim();
+    if (customInstructions !== undefined) data.customInstructions = customInstructions;
+    if (coachingStyle !== undefined) data.coachingStyle = coachingStyle;
+    if (responseLength !== undefined) data.responseLength = responseLength;
 
     // Save to user-level settings if authenticated
     if (userId) {
@@ -85,6 +94,9 @@ export async function PUT(request: NextRequest) {
           model: settings.model,
           hasApiKey: !!decryptedKey,
           scope: "user",
+          customInstructions: settings.customInstructions,
+          coachingStyle: settings.coachingStyle,
+          responseLength: settings.responseLength,
         });
       } catch (userSettingsError) {
         // Table may not exist yet — fall through to global settings
