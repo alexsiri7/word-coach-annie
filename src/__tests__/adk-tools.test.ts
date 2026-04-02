@@ -155,4 +155,56 @@ describe("ADK tools", () => {
       expect(toolset.getLoadedCategories()).toEqual(new Set(["core", "export"]));
     });
   });
+
+  describe("write_scene_content enforcement", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const exec = (args: Record<string, unknown>) =>
+      (getAdkToolByName("write_scene_content") as any).execute(args);
+
+    it("should reject CONTENT blocks", async () => {
+      expect(getAdkToolByName("write_scene_content")).toBeDefined();
+
+      await expect(
+        exec({
+          nodeId: "fake-node",
+          blocks: [
+            { type: "CONTENT", content: "<p>Some prose Annie should not write</p>" },
+          ],
+        })
+      ).rejects.toThrow("REJECTED: Annie does not write CONTENT blocks");
+    });
+
+    it("should reject mixed blocks containing CONTENT", async () => {
+      await expect(
+        exec({
+          nodeId: "fake-node",
+          blocks: [
+            { type: "BEAT", content: "Opening — character enters" },
+            { type: "CONTENT", content: "<p>She walked into the room.</p>" },
+            { type: "BEAT", content: "Closing — tension rises" },
+          ],
+        })
+      ).rejects.toThrow("REJECTED: Annie does not write CONTENT blocks");
+    });
+
+    it("should reject when blocks are missing", async () => {
+      await expect(
+        exec({ nodeId: "fake-node" })
+      ).rejects.toThrow("Annie must use structured BEAT blocks");
+    });
+
+    it("should reject empty blocks array", async () => {
+      await expect(
+        exec({ nodeId: "fake-node", blocks: [] })
+      ).rejects.toThrow("Annie must use structured BEAT blocks");
+    });
+
+    it("should only accept BEAT in the schema", () => {
+      const tool = getAdkToolByName("write_scene_content");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const decl = (tool as any)._getDeclaration();
+      expect(decl.description).toContain("BEAT blocks only");
+      expect(decl.description).not.toContain("HTML string");
+    });
+  });
 });

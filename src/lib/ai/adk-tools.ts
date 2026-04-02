@@ -188,15 +188,14 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "write_scene_content",
-        description: "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array)",
+        description: "Write content to a scene using structured BEAT blocks only. CONTENT blocks are rejected — Annie is a coach, not a ghostwriter. Beats are structural waypoints (what happens, what shifts, what the reader should feel).",
         category: "structure",
         parameters: z.object({
             nodeId: z.string().describe("The scene node ID"),
-            content: z.string().optional().describe("The HTML content to write"),
             blocks: z.array(z.object({
-                type: z.enum(["CONTENT", "BEAT"]),
+                type: z.enum(["BEAT"]).describe("Block type — only BEAT is allowed"),
                 content: z.string(),
-            })).optional().describe("Structured content blocks"),
+            })).describe("Structured BEAT blocks — structural waypoints, not prose"),
         }),
     },
     {
@@ -623,7 +622,6 @@ import {
   updateNode,
   deleteNode,
   readSceneContent,
-  writeSceneContent,
   writeSceneContentFromBlocks,
   getSceneVersions,
   restoreSceneVersion,
@@ -715,13 +713,18 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   },
   delete_node: async (a) => deleteNode(a.nodeId as string),
   write_scene_content: async (a) => {
-    if (a.blocks) {
-      return writeSceneContentFromBlocks(
-        a.nodeId as string,
-        a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
-      );
+    const blocks = a.blocks as { type: string; content: string }[] | undefined;
+    if (!blocks || blocks.length === 0) {
+      throw new Error("Annie must use structured BEAT blocks. The 'blocks' parameter is required with type BEAT.");
     }
-    return writeSceneContent(a.nodeId as string, a.content as string);
+    const contentBlocks = blocks.filter((b) => b.type === "CONTENT");
+    if (contentBlocks.length > 0) {
+      throw new Error("REJECTED: Annie does not write CONTENT blocks. Use only BEAT blocks — structural waypoints describing what happens, not finished prose.");
+    }
+    return writeSceneContentFromBlocks(
+      a.nodeId as string,
+      blocks as { type: "CONTENT" | "BEAT"; content: string }[],
+    );
   },
   get_scene_versions: async (a) => getSceneVersions(a.nodeId as string, a.limit as number),
   restore_scene_version: async (a) => restoreSceneVersion(a.nodeId as string, a.versionId as string),

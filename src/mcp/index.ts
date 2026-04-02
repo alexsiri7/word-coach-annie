@@ -365,17 +365,24 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version.",
+    "Write content to a scene using structured blocks. Use 'blocks' with type BEAT only — CONTENT blocks are rejected. Beats are structural waypoints, not finished prose. Creates a new version.",
     {
         nodeId: z.string().describe("The scene node ID"),
-        content: z.string().optional().describe("The HTML content to write"),
+        content: z.string().optional().describe("Raw HTML content (for web UI only — AI callers must use blocks)"),
         blocks: z.array(z.object({
             type: z.enum(["CONTENT", "BEAT"]),
             content: z.string()
-        })).optional().describe("Structured content blocks")
+        })).optional().describe("Structured blocks — only BEAT type is allowed")
     },
     async ({ nodeId, content, blocks }) => {
         if (blocks) {
+            const contentBlocks = blocks.filter((b: { type: string }) => b.type === "CONTENT");
+            if (contentBlocks.length > 0) {
+                return {
+                    content: [{ type: "text", text: "REJECTED: Annie does not write CONTENT blocks. Use only BEAT blocks — structural waypoints describing what happens, not finished prose. Rewrite your blocks with type BEAT." }],
+                    isError: true,
+                };
+            }
             const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[]);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
