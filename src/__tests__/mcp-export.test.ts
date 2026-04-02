@@ -229,7 +229,7 @@ describe("MCP Export Tools", () => {
             expect(md).toContain("The main character");
             expect(md).toContain("**Tags:** main");
             expect(md).toContain("*Notes:* Very brave");
-            expect(md).toContain("**Timeline:**");
+            expect(md).toContain("**Timeline (state history):**");
             expect(md).toContain("**Birth**: Born in a village");
         });
 
