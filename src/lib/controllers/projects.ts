@@ -114,7 +114,10 @@ export class ProjectsController {
             projectType: project.projectType,
             wordCount,
             nodeCount: project._count.structureNodes,
+            sceneCount: scenes.length,
             storyObjectCount: project._count.storyObjects,
+            characterCount: project._count.storyObjects,
+            archivedAt: project.archivedAt?.toISOString() ?? null,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
         };

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         take: limit,
         include: {
           _count: {
-            select: { structureNodes: true },
+            select: { structureNodes: true, storyObjects: true },
           },
         },
       }),
@@ -61,17 +61,21 @@ export async function GET(request: NextRequest) {
       latestWordCounts.set(v.nodeId, v.wordCount ?? 0);
     }
 
-    // Calculate word counts per project
+    // Calculate word counts and scene counts per project
     const projectWordCounts = new Map<string, number>();
+    const projectSceneCounts = new Map<string, number>();
     for (const scene of allScenes) {
       const current = projectWordCounts.get(scene.projectId) || 0;
       projectWordCounts.set(scene.projectId, current + (latestWordCounts.get(scene.id) || 0));
+      projectSceneCounts.set(scene.projectId, (projectSceneCounts.get(scene.projectId) || 0) + 1);
     }
 
     const projectsWithWordCount = projects.map((project) => ({
       ...project,
       wordCount: projectWordCounts.get(project.id) || 0,
       nodeCount: project._count.structureNodes,
+      sceneCount: projectSceneCounts.get(project.id) || 0,
+      characterCount: project._count.storyObjects,
     }));
 
     return NextResponse.json({ projects: projectsWithWordCount, total });
