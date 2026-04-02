@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAiConfig } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -75,6 +75,10 @@ export async function POST(request: NextRequest) {
 
     const prompt = promptFn(sanitizedText, sanitizedContext, sanitizedAsk);
 
+    // Load user preferences for system-level behavior guidance
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
+
     const client = new OpenAI({
       apiKey: aiConfig.apiKey,
       baseURL: aiConfig.baseUrl || undefined,
@@ -82,7 +86,10 @@ export async function POST(request: NextRequest) {
 
     const response = await client.chat.completions.create({
       model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: prefInstructions },
+        { role: "user", content: prompt },
+      ],
       max_tokens: 1000,
       temperature: 0.7,
     });
