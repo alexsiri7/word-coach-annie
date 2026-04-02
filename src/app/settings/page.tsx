@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,56 @@ export default function SettingsPage() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [coachingStyle, setCoachingStyle] = useState("balanced");
   const [responseLength, setResponseLength] = useState("moderate");
+
+  // Medium integration
+  const [mediumConnected, setMediumConnected] = useState(false);
+  const [mediumUsername, setMediumUsername] = useState("");
+  const [mediumToken, setMediumToken] = useState("");
+  const [mediumConnecting, setMediumConnecting] = useState(false);
+  const [mediumError, setMediumError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/integrations/medium")
+      .then((r) => r.json())
+      .then((d) => {
+        setMediumConnected(d.connected ?? false);
+        setMediumUsername(d.username ?? "");
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleMediumConnect = async () => {
+    setMediumConnecting(true);
+    setMediumError("");
+    try {
+      const res = await fetch("/api/integrations/medium", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: mediumToken.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMediumError(data.error || "Connection failed");
+        return;
+      }
+      setMediumConnected(true);
+      setMediumUsername(data.username || "");
+      setMediumToken("");
+    } finally {
+      setMediumConnecting(false);
+    }
+  };
+
+  const handleMediumDisconnect = async () => {
+    setMediumConnecting(true);
+    try {
+      await fetch("/api/integrations/medium", { method: "DELETE" });
+      setMediumConnected(false);
+      setMediumUsername("");
+    } finally {
+      setMediumConnecting(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/ai-settings")
@@ -271,6 +321,94 @@ export default function SettingsPage() {
               )}
               {saving ? "Saving..." : saved ? "Saved!" : "Save"}
             </Button>
+          </div>
+        )}
+
+        {/* Medium Integration */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <svg
+                role="img"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 fill-current text-accent"
+                aria-hidden="true"
+              >
+                <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+              </svg>
+              <h2 className="text-lg font-semibold text-text-primary">Medium</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-4">
+              Publish your stories directly to Medium. Uses a self-issued integration token from your{" "}
+              <a
+                href="https://medium.com/me/settings/security"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                Medium security settings
+              </a>
+              .
+            </p>
+
+            {mediumConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Link2 className="h-4 w-4 text-green-500" />
+                  <span className="text-text-secondary">
+                    Connected{mediumUsername ? ` as @${mediumUsername}` : ""}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMediumDisconnect}
+                  disabled={mediumConnecting}
+                  className="gap-1.5"
+                >
+                  {mediumConnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2Off className="h-4 w-4" />
+                  )}
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                    Integration Token
+                  </label>
+                  <Input
+                    type="password"
+                    value={mediumToken}
+                    onChange={(e) => setMediumToken(e.target.value)}
+                    placeholder="Paste your Medium integration token"
+                  />
+                  <p className="text-xs text-text-muted mt-1">
+                    Get it from medium.com/me/settings/security → Integration tokens
+                  </p>
+                </div>
+                {mediumError && <p className="text-sm text-danger">{mediumError}</p>}
+                <Button
+                  onClick={handleMediumConnect}
+                  disabled={mediumConnecting || !mediumToken.trim()}
+                  className="gap-1.5"
+                >
+                  {mediumConnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                  Connect Medium
+                </Button>
+                <p className="text-xs text-text-muted">
+                  Note: The Medium API is deprecated as of Jan 2025 but continues to work for existing integration tokens.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

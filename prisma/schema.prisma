@@ -64,9 +64,9 @@ model Project {
   isSample       Boolean         @default(false)
   chatMessages   ChatMessage[]
   googleDocExports GoogleDocExport[]
+  mediumExports  MediumExport[]
   writingSessions WritingSession[]
   shares         ProjectShare[]
-  mediumExports  MediumExport[]
 
   @@index([userId])
 }
@@ -312,4 +312,5 @@ model MediumExport {
   credential    MediumCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, nodeId, credentialId])
+  @@index([projectId])
 }

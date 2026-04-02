@@ -7,6 +7,7 @@ import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MediumPublishDialog } from "@/components/medium-publish-dialog";
 
 interface ProjectSettings {
   id: string;
@@ -47,6 +48,17 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [includeSceneBreaks, setIncludeSceneBreaks] = useState(true);
   const [chapterNumbering, setChapterNumbering] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
+
+  // Medium integration
+  const [mediumConnected, setMediumConnected] = useState(false);
+  const [mediumDialogOpen, setMediumDialogOpen] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/integrations/medium")
+      .then((r) => r.json())
+      .then((d) => setMediumConnected(d.connected ?? false))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -420,7 +432,50 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <span className="text-xs">Export All Projects (ZIP)</span>
             </Button>
           </div>
+
+          {mediumConnected && (
+            <>
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Publish</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setMediumDialogOpen(true)}
+                  className="gap-1.5 h-auto py-3 flex-col"
+                >
+                  <svg
+                    role="img"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 fill-current"
+                    aria-hidden="true"
+                  >
+                    <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+                  </svg>
+                  <span className="text-xs">Publish to Medium</span>
+                </Button>
+              </div>
+            </>
+          )}
+
+          {!mediumConnected && (
+            <p className="text-xs text-text-muted mt-4">
+              Connect Medium in{" "}
+              <a href="/settings" className="text-accent hover:underline">
+                Settings
+              </a>{" "}
+              to publish directly to Medium.
+            </p>
+          )}
         </div>
+
+        {project && (
+          <MediumPublishDialog
+            projectId={projectId}
+            projectTitle={title || project.title}
+            open={mediumDialogOpen}
+            onOpenChange={setMediumDialogOpen}
+          />
+        )}
 
         {/* Archive & Danger Zone */}
         <div className="glass-card p-6 mt-6">
