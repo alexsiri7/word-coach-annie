@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, Link, Copy } from "lucide-react";
+import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, Link, Unlink, Copy } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -24,7 +31,19 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import type { WorldObject, WorldObjectTimelineEntry, Relationship } from "@/lib/types";
+
+const RELATIONSHIP_TYPES = [
+    "APPEARS_IN",
+    "LOCATED_AT",
+    "PART_OF_PLOTLINE",
+    "RELATED_TO",
+    "INTERACTS_WITH",
+    "CONTAINS",
+    "PRECEDES",
+    "FOLLOWS",
+] as const;
 
 const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
     APPEARS_IN: "Appears in",
@@ -86,6 +105,7 @@ interface WorldObjectPanelProps {
 }
 
 export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: WorldObjectPanelProps) {
+    const { error: toastError } = useToast();
     const [wo, setWo] = useState<WorldObject | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -105,6 +125,15 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const [newEntryLabel, setNewEntryLabel] = useState("");
     const [newEntryDesc, setNewEntryDesc] = useState("");
     const [relationships, setRelationships] = useState<NormalizedRelationship[]>([]);
+
+    // Relationship management state
+    const [addRelOpen, setAddRelOpen] = useState(false);
+    const [relType, setRelType] = useState("");
+    const [relTargetId, setRelTargetId] = useState("");
+    const [relLabel, setRelLabel] = useState("");
+    const [availableTargets, setAvailableTargets] = useState<Array<{ id: string; name: string; type: string }>>([]);
+    const [addingRel, setAddingRel] = useState(false);
+    const [deleteRelId, setDeleteRelId] = useState<string | null>(null);
 
     const fetchWo = async () => {
         const res = await fetch(`/api/world-objects/${objectId}`);
@@ -212,6 +241,67 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
             body: JSON.stringify({ orderedIds: newTimeline.map(t => t.id) }),
         });
         fetchWo();
+    };
+
+    const fetchAvailableTargets = async () => {
+        if (!wo?.universeId) return;
+        try {
+            const res = await fetch(`/api/universes/${wo.universeId}/world-objects`);
+            if (res.ok) {
+                const data = await res.json();
+                const objects = (data || []) as Array<{ id: string; name: string; type: string }>;
+                setAvailableTargets(objects.filter((o) => o.id !== objectId));
+            }
+        } catch {
+            setAvailableTargets([]);
+        }
+    };
+
+    const handleOpenAddRel = () => {
+        setRelType("");
+        setRelTargetId("");
+        setRelLabel("");
+        fetchAvailableTargets();
+        setAddRelOpen(true);
+    };
+
+    const handleAddRelationship = async () => {
+        if (!relType || !relTargetId) return;
+        setAddingRel(true);
+        try {
+            const res = await offlineFetch(`/api/world-objects/${objectId}/relationships`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: relType,
+                    toWorldObjectId: relTargetId,
+                    ...(relLabel && { label: relLabel }),
+                }),
+            });
+            if (res.ok) {
+                setAddRelOpen(false);
+                fetchWo();
+                onUpdated();
+            } else {
+                const err = await res.json();
+                toastError(err.error || "Failed to create relationship");
+            }
+        } catch {
+            toastError("Failed to create relationship");
+        } finally {
+            setAddingRel(false);
+        }
+    };
+
+    const handleDeleteRelationship = async (relationshipId: string) => {
+        try {
+            await offlineFetch(`/api/relationships/${relationshipId}`, { method: "DELETE" });
+            setRelationships(prev => prev.filter(r => r.relationshipId !== relationshipId));
+            setDeleteRelId(null);
+            onUpdated();
+        } catch {
+            toastError("Failed to delete relationship");
+        }
     };
 
     if (!wo) {
@@ -338,17 +428,25 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                 </div>
 
                 {/* Relationships Section */}
-                {relationships.length > 0 && (
-                    <div className="space-y-4 border-t border-border pt-6">
+                <div className="space-y-4 border-t border-border pt-6">
+                    <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Link className="h-4 w-4 text-accent" />
                             <h3 className="text-sm font-semibold text-text-primary tracking-tight">Relationships</h3>
                         </div>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={handleOpenAddRel}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                        </Button>
+                    </div>
+                    {relationships.length === 0 ? (
+                        <p className="text-xs text-text-muted italic">No relationships yet.</p>
+                    ) : (
                         <div className="space-y-1.5">
                             {relationships.map((rel) => (
                                 <div
                                     key={rel.relationshipId}
-                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-surface-overlay/50 hover:bg-surface-overlay transition-colors"
+                                    className="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-surface-overlay/50 hover:bg-surface-overlay transition-colors"
                                 >
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-1.5 text-xs">
@@ -365,11 +463,20 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                                             <p className="text-[11px] text-text-muted mt-0.5 truncate">{rel.label}</p>
                                         )}
                                     </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-danger"
+                                        onClick={() => setDeleteRelId(rel.relationshipId)}
+                                        aria-label="Remove relationship"
+                                    >
+                                        <Unlink className="h-3 w-3" />
+                                    </Button>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Tags */}
                 <div className="border-t border-border pt-6">
@@ -462,6 +569,89 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Add Relationship dialog */}
+            <Dialog open={addRelOpen} onOpenChange={setAddRelOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Relationship</DialogTitle>
+                        <DialogDescription>
+                            Create a relationship from &ldquo;{wo.name}&rdquo; to another world object.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <label htmlFor="wo-rel-type" className="block text-xs font-medium text-text-muted mb-1.5">Type</label>
+                            <Select value={relType} onValueChange={setRelType}>
+                                <SelectTrigger id="wo-rel-type">
+                                    <SelectValue placeholder="Select relationship type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {RELATIONSHIP_TYPES.map((t) => (
+                                        <SelectItem key={t} value={t}>
+                                            {RELATIONSHIP_TYPE_LABELS[t]}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label htmlFor="wo-rel-target" className="block text-xs font-medium text-text-muted mb-1.5">Target</label>
+                            <Select value={relTargetId} onValueChange={setRelTargetId}>
+                                <SelectTrigger id="wo-rel-target">
+                                    <SelectValue placeholder="Select target..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableTargets.map((t) => (
+                                        <SelectItem key={t.id} value={t.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span className="text-[10px] uppercase text-text-muted">{t.type}</span>
+                                                {t.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label htmlFor="wo-rel-label" className="block text-xs font-medium text-text-muted mb-1.5">Label (optional)</label>
+                            <Input
+                                id="wo-rel-label"
+                                value={relLabel}
+                                onChange={(e) => setRelLabel(e.target.value)}
+                                placeholder="e.g., mentor, rival, birthplace..."
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddRelOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddRelationship} disabled={addingRel || !relType || !relTargetId}>
+                            {addingRel ? "Adding..." : "Add Relationship"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Relationship confirmation */}
+            <AlertDialog open={!!deleteRelId} onOpenChange={(open) => { if (!open) setDeleteRelId(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Relationship?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently remove this relationship. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => deleteRelId && handleDeleteRelationship(deleteRelId)}
+                            className="bg-danger hover:bg-danger-hover"
+                        >
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
