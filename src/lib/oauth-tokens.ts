@@ -5,7 +5,6 @@
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
 import { SignJWT, jwtVerify } from "jose";
-import { env } from "@/lib/env";
 import { resolveJwtSecret } from "@/lib/auth";
 
 // Access token: 1 hour
