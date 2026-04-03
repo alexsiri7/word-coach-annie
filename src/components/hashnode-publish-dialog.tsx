@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface MediumPublishDialogProps {
+interface HashnodePublishDialogProps {
   projectId: string;
   projectTitle: string;
   open: boolean;
@@ -28,29 +28,20 @@ interface MediumPublishDialogProps {
   nodeId?: string;
 }
 
-interface MediumExport {
-  mediumPostId: string;
-  mediumPostUrl: string;
-  publishStatus: string;
-  nodeId: string | null;
-  lastSyncedAt: string;
-}
-
-export function MediumPublishDialog({
+export function HashnodePublishDialog({
   projectId,
   projectTitle,
   open,
   onOpenChange,
   nodeId,
-}: MediumPublishDialogProps) {
+}: HashnodePublishDialogProps) {
   const [title, setTitle] = useState(projectTitle);
   const [publishStatus, setPublishStatus] = useState<"draft" | "public" | "unlisted">("draft");
   const [tagsInput, setTagsInput] = useState("");
   const [canonicalUrl, setCanonicalUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
-  const [result, setResult] = useState<{ url: string } | null>(null);
+  const [result, setResult] = useState<{ url: string; isDraft: boolean } | null>(null);
   const [error, setError] = useState("");
-  const [existingExport, setExistingExport] = useState<MediumExport | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -60,40 +51,22 @@ export function MediumPublishDialog({
     setCanonicalUrl("");
     setError("");
     setResult(null);
-
-    // Check for existing exports
-    fetch(`/api/projects/${projectId}/publish-to-medium`)
-      .then((r) => r.json())
-      .then((data) => {
-        const exports: MediumExport[] = data.exports || [];
-        const match = exports.find((e) =>
-          nodeId ? e.nodeId === nodeId : e.nodeId === null
-        );
-        setExistingExport(match ?? null);
-      })
-      .catch(() => {});
-  }, [open, projectId, projectTitle, nodeId]);
+  }, [open, projectTitle]);
 
   const parsedTags = tagsInput
     .split(",")
     .map((t) => t.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+    .filter(Boolean);
 
-  const tagValidationError =
-    parsedTags.some((t) => t.length > 25)
-      ? "Each tag must be 25 characters or fewer"
-      : parsedTags.length > 3
-      ? "Maximum 3 tags"
-      : "";
-
-  const titleTooLong = title.length > 100;
+  const tagValidationError = parsedTags.some((t) => t.length > 50)
+    ? "Each tag must be 50 characters or fewer"
+    : "";
 
   const handlePublish = async () => {
     setPublishing(true);
     setError("");
     try {
-      const res = await fetch(`/api/projects/${projectId}/publish-to-medium`, {
+      const res = await fetch(`/api/projects/${projectId}/publish-to-hashnode`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -109,7 +82,10 @@ export function MediumPublishDialog({
         setError(data.error || "Publish failed");
         return;
       }
-      setResult({ url: data.mediumPostUrl });
+      setResult({
+        url: data.hashnodePostUrl,
+        isDraft: (data.publishStatus ?? publishStatus) === "draft",
+      });
     } finally {
       setPublishing(false);
     }
@@ -119,16 +95,18 @@ export function MediumPublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Publish to Medium</DialogTitle>
+          <DialogTitle>Publish to Hashnode</DialogTitle>
           <DialogDescription>
-            Send your story to Medium as a post. You can edit it on Medium before making it public.
+            Send your story to Hashnode. Draft mode lets you review before going live.
           </DialogDescription>
         </DialogHeader>
 
         {result ? (
           <div className="space-y-4 pt-2">
             <p className="text-sm text-text-secondary">
-              {existingExport ? "Republished successfully!" : "Published successfully!"}
+              {result.isDraft
+                ? "Draft created! Review and publish it from your Hashnode dashboard."
+                : "Published successfully!"}
             </p>
             <a
               href={result.url}
@@ -137,7 +115,7 @@ export function MediumPublishDialog({
               className="flex items-center gap-1.5 text-sm text-accent hover:underline"
             >
               <ExternalLink className="h-4 w-4 shrink-0" />
-              Open in Medium
+              {result.isDraft ? "Open draft in Hashnode" : "Open post in Hashnode"}
             </a>
             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
               Done
@@ -145,58 +123,35 @@ export function MediumPublishDialog({
           </div>
         ) : (
           <div className="space-y-4 pt-2">
-            {existingExport && (
-              <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-300 mb-1">
-                  Already published
-                </p>
-                <p className="text-amber-700 dark:text-amber-400 text-xs">
-                  This will create a new Medium post — Medium does not support updating existing posts.
-                </p>
-                <a
-                  href={existingExport.mediumPostUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 mt-1.5 text-xs text-accent hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  View existing post
-                </a>
-              </div>
-            )}
-
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-text-secondary">Title</label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Post title"
-                maxLength={120}
               />
-              {titleTooLong && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Title exceeds 100 characters — Medium may truncate it.
-                </p>
-              )}
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-text-secondary">Publish status</label>
-              <Select value={publishStatus} onValueChange={(v) => setPublishStatus(v as typeof publishStatus)}>
+              <label className="text-sm font-medium text-text-secondary">Publish mode</label>
+              <Select
+                value={publishStatus}
+                onValueChange={(v) => setPublishStatus(v as typeof publishStatus)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Draft (recommended)</SelectItem>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="unlisted">Unlisted</SelectItem>
+                  <SelectItem value="draft">Draft (review before publishing)</SelectItem>
+                  <SelectItem value="public">Public (visible in feed)</SelectItem>
+                  <SelectItem value="unlisted">Unlisted (shareable link, not in feed)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-text-secondary">
-                Tags <span className="text-text-muted font-normal">(optional, max 3)</span>
+                Tags <span className="text-text-muted font-normal">(optional, comma-separated)</span>
               </label>
               <Input
                 value={tagsInput}
@@ -237,11 +192,7 @@ export function MediumPublishDialog({
               </Button>
               <Button
                 onClick={handlePublish}
-                disabled={
-                  publishing ||
-                  !title.trim() ||
-                  !!tagValidationError
-                }
+                disabled={publishing || !title.trim() || !!tagValidationError}
                 className="flex-1 gap-1.5"
               >
                 {publishing ? (
@@ -249,17 +200,9 @@ export function MediumPublishDialog({
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {publishing
-                  ? "Publishing..."
-                  : existingExport
-                  ? "Republish"
-                  : "Publish"}
+                {publishing ? "Publishing..." : "Publish"}
               </Button>
             </div>
-
-            <p className="text-xs text-text-muted">
-              Note: The Medium API is deprecated (Jan 2025) but continues to work for existing integration tokens.
-            </p>
           </div>
         )}
       </DialogContent>
