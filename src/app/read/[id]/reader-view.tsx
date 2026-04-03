@@ -155,7 +155,11 @@ function ManuscriptNode({
           scenes.map((scene, i) => (
             <div key={scene.id}>
               {i > 0 && scene.content && scene.content !== "<p></p>" && (
-                <hr className="my-10 border-0 h-px bg-border/30" />
+                <div className="flex justify-center my-10">
+                  <span className="text-text-muted tracking-[0.5em] text-sm select-none">
+                    * * *
+                  </span>
+                </div>
               )}
               <SceneContent content={scene.content || ""} />
             </div>

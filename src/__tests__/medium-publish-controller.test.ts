@@ -36,11 +36,6 @@ describe("MediumPublishController", () => {
     let credId: string;
 
     beforeEach(async () => {
-        // Create local user required by MediumCredential FK (local/single-user mode)
-        await testPrisma.user.create({
-            data: { id: "local", email: "local@wordcoach.local", googleId: "local" },
-        });
-
         // Create a project
         const project = await testPrisma.project.create({
             data: { title: "My Story", author: "Test Author" },
