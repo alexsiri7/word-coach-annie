@@ -42,6 +42,7 @@ model User {
   projects          Project[]
   universes         Universe[]
   aiSettings        UserAiSettings?
+  mediumCredential  MediumCredential?
 }
 
 model Project {
@@ -286,12 +287,13 @@ model OAuthClient {
 
 model MediumCredential {
   id               String         @id @default(cuid())
-  userId           String         @unique  // "local" in single-user mode, actual user ID in multi-user
+  userId           String         @unique
   integrationToken String         // stored encrypted via lib/crypto
   authorId         String         @default("")
   username         String         @default("")
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   exports          MediumExport[]
 }
 
