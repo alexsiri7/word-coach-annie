@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown } from "lucide-react";
+import { X, Save, Trash2, Plus, Clock, MoveUp, MoveDown, Link, Copy } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,67 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { WorldObject, WorldObjectTimelineEntry } from "@/lib/types";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import type { WorldObject, WorldObjectTimelineEntry, Relationship } from "@/lib/types";
+
+const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
+    APPEARS_IN: "Appears in",
+    LOCATED_AT: "Located at",
+    PART_OF_PLOTLINE: "Part of plotline",
+    RELATED_TO: "Related to",
+    INTERACTS_WITH: "Interacts with",
+    CONTAINS: "Contains",
+    PRECEDES: "Precedes",
+    FOLLOWS: "Follows",
+};
+
+interface NormalizedRelationship {
+    relationshipId: string;
+    type: string;
+    label: string;
+    direction: "outgoing" | "incoming";
+    target: {
+        id: string;
+        name: string;
+        entityType: string;
+    } | null;
+}
+
+function normalizeRelationships(data: WorldObject): NormalizedRelationship[] {
+    const rels: NormalizedRelationship[] = [];
+    if (Array.isArray(data.relationships)) {
+        for (const r of data.relationships as Relationship[]) {
+            const target = r.toNode
+                ? { id: r.toNode.id, name: (r.toNode as unknown as { title: string }).title, entityType: r.toNode.type as string }
+                : r.toObject
+                    ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
+                    : r.toWorldObject
+                        ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
+                        : null;
+            rels.push({ relationshipId: r.id, type: r.type, label: r.label, direction: "outgoing", target });
+        }
+    }
+    if (Array.isArray(data.relatedBy)) {
+        for (const r of data.relatedBy as Relationship[]) {
+            const target = r.fromNode
+                ? { id: r.fromNode.id, name: (r.fromNode as unknown as { title: string }).title, entityType: r.fromNode.type as string }
+                : r.fromObject
+                    ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
+                    : r.fromWorldObject
+                        ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
+                        : null;
+            rels.push({ relationshipId: r.id, type: r.type, label: r.label, direction: "incoming", target });
+        }
+    }
+    return rels;
+}
 
 interface WorldObjectPanelProps {
     objectId: string;
@@ -35,12 +95,16 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [copyOpen, setCopyOpen] = useState(false);
+    const [copying, setCopying] = useState(false);
+    const [linkedProjects, setLinkedProjects] = useState<{ id: string; title: string }[]>([]);
 
     // Timeline state
     const [timeline, setTimeline] = useState<WorldObjectTimelineEntry[]>([]);
     const [newEntryOpen, setNewEntryOpen] = useState(false);
     const [newEntryLabel, setNewEntryLabel] = useState("");
     const [newEntryDesc, setNewEntryDesc] = useState("");
+    const [relationships, setRelationships] = useState<NormalizedRelationship[]>([]);
 
     const fetchWo = async () => {
         const res = await fetch(`/api/world-objects/${objectId}`);
@@ -53,6 +117,7 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
             setType(data.type || "");
             setTags(data.tags || "");
             setTimeline(data.timeline || []);
+            setRelationships(normalizeRelationships(data));
         }
     };
 
@@ -102,6 +167,33 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
             method: "DELETE",
         });
         if (res.ok) fetchWo();
+    };
+
+    const handleOpenCopy = async () => {
+        if (!wo) return;
+        const res = await fetch(`/api/universes/${wo.universeId}`);
+        if (res.ok) {
+            const data = await res.json();
+            setLinkedProjects(data.projects || []);
+        }
+        setCopyOpen(true);
+    };
+
+    const handleCopyToProject = async (projectId: string) => {
+        setCopying(true);
+        try {
+            const res = await offlineFetch(`/api/projects/${projectId}/copy-world-object`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ worldObjectId: objectId }),
+            });
+            if (res.ok) {
+                setCopyOpen(false);
+                onUpdated();
+            }
+        } finally {
+            setCopying(false);
+        }
     };
 
     const handleReorder = async (startIndex: number, direction: 'up' | 'down') => {
@@ -185,6 +277,9 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                             Add Entry
                         </Button>
                     </div>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                        Track how this {wo.type.toLowerCase()} changes over story time. Annie uses this to check consistency across scenes.
+                    </p>
 
                     {newEntryOpen && (
                         <div className="glass-card p-4 space-y-3 bg-surface-overlay border-accent/20">
@@ -242,6 +337,40 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     </div>
                 </div>
 
+                {/* Relationships Section */}
+                {relationships.length > 0 && (
+                    <div className="space-y-4 border-t border-border pt-6">
+                        <div className="flex items-center gap-2">
+                            <Link className="h-4 w-4 text-accent" />
+                            <h3 className="text-sm font-semibold text-text-primary tracking-tight">Relationships</h3>
+                        </div>
+                        <div className="space-y-1.5">
+                            {relationships.map((rel) => (
+                                <div
+                                    key={rel.relationshipId}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-surface-overlay/50 hover:bg-surface-overlay transition-colors"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <span className="tag-pill text-[10px] px-1.5 py-0.5 bg-accent/10 text-accent/80">
+                                                {rel.direction === "incoming" ? "\u2190" : "\u2192"} {RELATIONSHIP_TYPE_LABELS[rel.type] || rel.type}
+                                            </span>
+                                            {rel.target && (
+                                                <span className="truncate font-medium text-text-primary">
+                                                    {rel.target.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {rel.label && (
+                                            <p className="text-[11px] text-text-muted mt-0.5 truncate">{rel.label}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Tags */}
                 <div className="border-t border-border pt-6">
                     <label className="block text-xs font-medium text-text-muted mb-1.5 uppercase tracking-wider">Tags</label>
@@ -265,6 +394,15 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     Delete
                 </Button>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={handleOpenCopy}
+                    >
+                        <Copy className="h-4 w-4" />
+                        Copy to Project
+                    </Button>
                     {saved && <span className="text-xs text-success">Saved!</span>}
                     <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
                         <Save className="h-4 w-4 mr-1.5" />
@@ -290,6 +428,40 @@ export function WorldObjectPanel({ objectId, onClose, onDeleted, onUpdated }: Wo
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Copy to Project dialog */}
+            <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Copy to Project</DialogTitle>
+                        <DialogDescription>
+                            Import &ldquo;{wo.name}&rdquo; into a linked project as a story object. The original stays in the universe.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2 max-h-[300px] overflow-y-auto space-y-1">
+                        {linkedProjects.length === 0 ? (
+                            <p className="text-sm text-text-muted text-center py-4">
+                                No projects are linked to this universe yet.
+                            </p>
+                        ) : (
+                            linkedProjects.map((p) => (
+                                <button
+                                    key={p.id}
+                                    className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between"
+                                    onClick={() => handleCopyToProject(p.id)}
+                                    disabled={copying}
+                                >
+                                    {p.title}
+                                    <Copy className="h-3 w-3 text-text-muted" />
+                                </button>
+                            ))
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCopyOpen(false)}>Cancel</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

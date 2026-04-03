@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class ProjectsController {
     static async listProjects(limit: number = 20, offset: number = 0) {
@@ -77,6 +78,33 @@ export class ProjectsController {
 
         if (!project) throw new Error(`Project not found: ${projectId}`);
 
+        // Calculate word count from latest content versions of all scenes
+        const scenes = await prisma.structureNode.findMany({
+            where: { projectId, type: "SCENE" },
+            select: { id: true },
+        });
+
+        let wordCount = 0;
+        if (scenes.length > 0) {
+            const sceneIds = scenes.map((s) => s.id);
+            const versions = await prisma.contentVersion.findMany({
+                where: { nodeId: { in: sceneIds } },
+                orderBy: { createdAt: "desc" },
+                select: { nodeId: true, wordCount: true },
+            });
+
+            const latestWordCounts = new Map<string, number>();
+            for (const v of versions) {
+                if (!latestWordCounts.has(v.nodeId)) {
+                    latestWordCounts.set(v.nodeId, v.wordCount ?? 0);
+                }
+            }
+
+            for (const wc of latestWordCounts.values()) {
+                wordCount += wc;
+            }
+        }
+
         return {
             id: project.id,
             title: project.title,
@@ -84,8 +112,12 @@ export class ProjectsController {
             synopsis: project.synopsis,
             genre: project.genre,
             projectType: project.projectType,
+            wordCount,
             nodeCount: project._count.structureNodes,
+            sceneCount: scenes.length,
             storyObjectCount: project._count.storyObjects,
+            characterCount: project._count.storyObjects,
+            archivedAt: project.archivedAt?.toISOString() ?? null,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
         };
@@ -133,10 +165,10 @@ export class ProjectsController {
         if (!existing) throw new Error(`Project not found: ${projectId}`);
 
         const updateData: Record<string, string> = {};
-        if (data.title !== undefined) updateData.title = data.title.trim();
-        if (data.author !== undefined) updateData.author = data.author.trim();
-        if (data.synopsis !== undefined) updateData.synopsis = data.synopsis.trim();
-        if (data.genre !== undefined) updateData.genre = data.genre.trim();
+        if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());
+        if (data.author !== undefined) updateData.author = sanitizeInput(data.author.trim());
+        if (data.synopsis !== undefined) updateData.synopsis = sanitizeInput(data.synopsis.trim());
+        if (data.genre !== undefined) updateData.genre = sanitizeInput(data.genre.trim());
         if (data.projectType !== undefined) updateData.projectType = data.projectType;
         if (data.universeId !== undefined) (updateData as Record<string, unknown>).universeId = data.universeId;
 

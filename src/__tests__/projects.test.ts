@@ -116,3 +116,56 @@ describe("Project CRUD", () => {
     expect(versions).toHaveLength(0);
   });
 });
+
+describe("Project Archive", () => {
+  it("archives a project by setting archivedAt", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Archivable" },
+    });
+
+    expect(project.archivedAt).toBeNull();
+
+    const updated = await testPrisma.project.update({
+      where: { id: project.id },
+      data: { archivedAt: new Date() },
+    });
+
+    expect(updated.archivedAt).toBeInstanceOf(Date);
+  });
+
+  it("unarchives a project by setting archivedAt to null", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Restore Me", archivedAt: new Date() },
+    });
+
+    expect(project.archivedAt).toBeInstanceOf(Date);
+
+    const updated = await testPrisma.project.update({
+      where: { id: project.id },
+      data: { archivedAt: null },
+    });
+
+    expect(updated.archivedAt).toBeNull();
+  });
+
+  it("filters projects by archive status", async () => {
+    await testPrisma.project.create({ data: { title: "Active" } });
+    const archivedProject = await testPrisma.project.create({ data: { title: "Archived" } });
+    // Archive via update (mirrors real usage)
+    await testPrisma.project.update({
+      where: { id: archivedProject.id },
+      data: { archivedAt: new Date() },
+    });
+
+    const active = await testPrisma.project.findMany({
+      where: { archivedAt: null },
+    });
+    expect(active).toHaveLength(1);
+    expect(active[0].title).toBe("Active");
+
+    const all = await testPrisma.project.findMany();
+    const archived = all.filter((p) => p.archivedAt !== null);
+    expect(archived).toHaveLength(1);
+    expect(archived[0].title).toBe("Archived");
+  });
+});

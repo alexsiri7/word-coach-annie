@@ -1,6 +1,6 @@
 ---
 name: scene-drafting-assistant
-description: Help draft a scene given the outline, characters, setting, and story context
+description: Plan a scene as structured beats given the outline, characters, setting, and story context — produces BEAT blocks, not prose
 required_tools:
   - get_outline
   - read_scene_content
@@ -19,7 +19,7 @@ triggers:
 
 ## When to Use
 
-Use this skill when the author wants help drafting a scene. This is a collaborative process — the assistant gathers context, proposes a draft, and the author reviews/revises.
+Use this skill when the author wants help planning a scene. Annie maps the scene as a sequence of BEAT blocks — structural waypoints that tell the author what happens, what shifts, and what to aim for. The author writes the prose; Annie provides the blueprint.
 
 ## Prerequisites
 
@@ -49,39 +49,45 @@ Use this skill when the author wants help drafting a scene. This is a collaborat
    - **Tone:** What emotional tone should the scene carry?
    - **Key Moments:** Any specific beats that must happen?
 
-6. **Draft the scene.** Write the scene following these principles:
+6. **Plan the scene as beats.** Break the scene into a sequence of BEAT blocks — structural waypoints that describe what happens, what shifts, and what the reader should feel. Annie does NOT write prose. Each beat should cover:
 
-   ### 6a. Opening
-   - Ground the reader in time, place, and POV immediately (first 2–3 sentences).
-   - Start with action or a compelling hook — avoid throat-clearing.
+   ### 6a. Opening Beat(s)
+   - Where and when are we? Whose POV? What's the emotional entry point?
+   - What hook or tension pulls the reader in?
 
-   ### 6b. Body
-   - Alternate between action, dialogue, and internalization.
-   - Use sensory details to make the setting vivid.
-   - Maintain consistent POV and narrative distance.
-   - Ensure dialogue reveals character and advances the plot simultaneously.
-   - Include physical action beats between dialogue lines (avoid talking heads).
+   ### 6b. Body Beats
+   - What actions, dialogue exchanges, or revelations occur?
+   - What does each beat accomplish for the scene's goal?
+   - Where does tension rise, release, or shift?
+   - What sensory/emotional texture should the author aim for?
 
-   ### 6c. Closing
-   - End on a moment of change, revelation, or decision.
-   - Create forward momentum — the reader should want to turn the page.
-   - Avoid neat, tidy endings for non-final scenes. Leave a question or tension unresolved.
+   ### 6c. Closing Beat(s)
+   - What changes, decision, or revelation ends the scene?
+   - What question or tension carries the reader forward?
 
-7. **Write the draft.** Use `write_scene_content` to save the draft to the scene. Format as clean HTML (the editor uses Tiptap/ProseMirror):
-   - Use `<p>` for paragraphs
-   - Use `<em>` for italics, `<strong>` for bold
-   - Use `<h2>`, `<h3>` for section headers if needed
-   - Use `<blockquote>` for internal thoughts or quoted text
+7. **Write the beats.** Use `write_scene_content` with the `blocks` parameter, using **BEAT blocks only** (never CONTENT blocks). Each beat is a structural waypoint, not prose:
 
-8. **Provide a drafting note** to the author explaining:
-   - Choices made in the draft and why
-   - Areas that might need the author's voice/style applied
+   ```json
+   {
+     "blocks": [
+       { "type": "BEAT", "content": "OPENING — Elena's kitchen, morning. She's rehearsing her resignation speech to the coffee maker. Tone: nervous energy masked as calm." },
+       { "type": "BEAT", "content": "TURN — Phone rings. It's Marcus. He knows. Tension spikes — how did he find out?" },
+       { "type": "BEAT", "content": "ESCALATION — Argument. Elena defends her choice; Marcus appeals to loyalty. Dialogue-heavy, rapid-fire. Reader should feel both sides." },
+       { "type": "BEAT", "content": "CLOSING — Elena hangs up. Silence. She looks at the resignation letter. Decision hardens. End on: she folds the letter into her bag." }
+     ]
+   }
+   ```
+
+8. **Provide coaching notes** to the author:
+   - Why you structured the beats this way
+   - What each beat needs to land emotionally
+   - Suggestions for voice, pacing, and sensory detail the author should bring
    - Any questions or decision points left open
 
 ## Output Format
 
 ```markdown
-# Scene Draft: [Scene Title]
+# Scene Beats: [Scene Title]
 
 ## Context Used
 - **Previous Scene:** [title] — [brief summary of where we left off]
@@ -89,25 +95,27 @@ Use this skill when the author wants help drafting a scene. This is a collaborat
 - **Location:** [setting]
 - **Scene Goal:** [what happens in this scene]
 
-## Draft
-[The scene content is saved directly to the scene via write_scene_content]
+## Beats
+[Saved directly to the scene via write_scene_content using BEAT blocks]
 
-## Drafting Notes
+## Coaching Notes
 - **POV:** [character and why]
-- **Tone:** [what we went for]
-- **Choices Made:**
-  - [Choice 1 and rationale]
-  - [Choice 2 and rationale]
-- **For Author Review:**
-  - [Areas where the author should apply their unique voice]
+- **Tone:** [what to aim for]
+- **Beat Rationale:**
+  - [Why the opening beat works this way]
+  - [Why the turn lands here]
+  - [Why the closing beat creates forward momentum]
+- **For the Author:**
+  - [What voice/style to bring to each beat]
+  - [Where sensory detail matters most]
   - [Decision points left open]
   - [Facts/details that need verification]
 ```
 
 ## Tips
 
-- This produces a FIRST DRAFT. Set expectations accordingly — it's a starting point, not finished prose.
-- Match the established voice if previous scenes exist. Read them carefully to absorb the style.
-- When in doubt about a detail, use a placeholder and flag it for the author: `[CHECK: character's eye color]`.
-- Aim for the project's typical scene length. Check word counts of existing scenes via the outline.
-- Don't info-dump character backstory. Reveal it naturally through action and dialogue.
+- Beats are a BLUEPRINT. The author writes the prose — Annie maps the structure.
+- Each beat should be specific enough to draft from but loose enough for the author's voice.
+- When in doubt about a detail, flag it: `[CHECK: character's eye color]`.
+- Aim for 4-8 beats per scene. Too few = vague; too many = micromanaging.
+- Reference the previous scene's emotional endpoint to ensure continuity.

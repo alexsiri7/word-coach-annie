@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
 
 interface FeedbackBody {
   type: "bug" | "feature" | "other";
   message: string;
   email?: string;
+  screenshot?: string; // data URL (image/jpeg;base64,...)
   context?: {
     url?: string;
     userAgent?: string;
@@ -18,6 +20,79 @@ const LABEL_MAP: Record<string, string> = {
   feature: "enhancement",
   other: "feedback",
 };
+
+/**
+ * Upload a screenshot via GitHub's issue image upload endpoint.
+ * Returns a markdown image URL (https://github.com/user-attachments/assets/...).
+ * Only requires issues:write scope — no contents:write needed.
+ */
+async function uploadScreenshot(
+  token: string,
+  repo: string,
+  dataUrl: string
+): Promise<string | null> {
+  try {
+    const base64 = dataUrl.split(",")[1];
+    if (!base64) return null;
+
+    // Convert base64 to binary
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "image/jpeg" });
+
+    // 2MB limit
+    if (blob.size > 2 * 1024 * 1024) {
+      logger.error("Screenshot too large", { size: blob.size });
+      return null;
+    }
+
+    const filename = `feedback-${Date.now()}.jpg`;
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    formData.append("repository_id", await getRepoId(token, repo));
+    formData.append("authenticity_token", token);
+
+    // Use GitHub's issue image upload endpoint
+    const res = await fetch(
+      `https://uploads.github.com/repos/${repo}/issues/uploads`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      logger.error("GitHub screenshot upload failed", { status: res.status, body: errText });
+      return null;
+    }
+
+    const data = await res.json();
+    // Response includes href with the permanent asset URL
+    return data.href || data.asset?.href || null;
+  } catch (err) {
+    logger.error("Screenshot upload error", err);
+    return null;
+  }
+}
+
+async function getRepoId(token: string, repo: string): Promise<string> {
+  const res = await fetch(`https://api.github.com/repos/${repo}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  const data = await res.json();
+  return String(data.id);
+}
 
 export async function POST(request: NextRequest) {
   const body: FeedbackBody = await request.json();
@@ -46,27 +121,42 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Upload screenshot if provided
+  let screenshotUrl: string | null = null;
+  if (body.screenshot) {
+    screenshotUrl = await uploadScreenshot(token, repo, body.screenshot);
+  }
+
+  // Sanitize and escape user-provided fields before embedding in GitHub Markdown
+  const safeMessage = sanitizeInput(body.message.trim());
+  const safeEmail = body.email ? escapeMarkdown(sanitizeInput(body.email)) : undefined;
+  const safeUrl = body.context?.url ? escapeMarkdown(body.context.url) : undefined;
+  const safeUserAgent = body.context?.userAgent ? escapeMarkdown(body.context.userAgent) : undefined;
+  const safeScreenSize = body.context?.screenSize ? escapeMarkdown(body.context.screenSize) : undefined;
+
   // Build issue body with app context
   const contextLines: string[] = [];
-  if (body.email) contextLines.push(`**Reporter:** ${body.email}`);
-  if (body.context?.url) contextLines.push(`**Page:** ${body.context.url}`);
-  if (body.context?.userAgent)
-    contextLines.push(`**Browser:** ${body.context.userAgent}`);
-  if (body.context?.screenSize)
-    contextLines.push(`**Screen:** ${body.context.screenSize}`);
+  if (safeEmail) contextLines.push(`**Reporter:** ${safeEmail}`);
+  if (safeUrl) contextLines.push(`**Page:** ${safeUrl}`);
+  if (safeUserAgent)
+    contextLines.push(`**Browser:** ${safeUserAgent}`);
+  if (safeScreenSize)
+    contextLines.push(`**Screen:** ${safeScreenSize}`);
   contextLines.push(`**App version:** ${process.env.npm_package_version || "unknown"}`);
 
-  const issueBody = [
-    body.message.trim(),
-    "",
-    "---",
-    "### Context",
-    ...contextLines,
-  ].join("\n");
+  const bodyParts = [safeMessage];
+
+  if (screenshotUrl) {
+    bodyParts.push("", "### Screenshot", `![Screenshot](${screenshotUrl})`);
+  }
+
+  bodyParts.push("", "---", "### Context", ...contextLines);
+
+  const issueBody = bodyParts.join("\n");
 
   const typePrefix =
     body.type === "bug" ? "Bug: " : body.type === "feature" ? "Feature: " : "";
-  const titleSnippet = body.message.trim().split("\n")[0].slice(0, 80);
+  const titleSnippet = safeMessage.split("\n")[0].slice(0, 80);
   const title = `${typePrefix}${titleSnippet}`;
 
   const labels = [LABEL_MAP[body.type] || "feedback"];

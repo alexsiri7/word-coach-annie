@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { MessageSquarePlus } from "lucide-react";
+import { useState, useCallback } from "react";
+import { MessageSquarePlus, Camera, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScreenshotEditor } from "@/components/screenshot-editor";
 
 type FeedbackType = "bug" | "feature" | "other";
 
@@ -42,16 +43,85 @@ export function FeedbackDialog({
     issueUrl?: string;
   } | null>(null);
 
+  // Screenshot state
+  const [screenshotRaw, setScreenshotRaw] = useState<string | null>(null);
+  const [screenshotEdited, setScreenshotEdited] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+
   const reset = () => {
     setType("bug");
     setMessage("");
     setResult(null);
     setSubmitting(false);
+    setScreenshotRaw(null);
+    setScreenshotEdited(null);
+    setShowEditor(false);
+    setCapturing(false);
   };
 
   const handleClose = (open: boolean) => {
     if (!open) reset();
     onOpenChange(open);
+  };
+
+  const handleCaptureScreenshot = useCallback(async () => {
+    // Hide the dialog before capturing
+    setCapturing(true);
+    onOpenChange(false);
+
+    // Wait for dialog to close and DOM to settle
+    await new Promise((r) => setTimeout(r, 350));
+
+    try {
+      const { captureScreenshot, canvasToDataUrl } = await import(
+        "@/lib/screenshot"
+      );
+      const canvas = await captureScreenshot();
+      const dataUrl = canvasToDataUrl(canvas);
+      setScreenshotRaw(dataUrl);
+      setScreenshotEdited(null);
+      setShowEditor(true);
+    } catch (err) {
+      console.error("Screenshot capture failed:", err);
+      // Re-open dialog with error
+      onOpenChange(true);
+      setResult({
+        success: false,
+        message: "Failed to capture screenshot. Please try again.",
+      });
+    } finally {
+      setCapturing(false);
+    }
+  }, [onOpenChange]);
+
+  const handleEditorSave = useCallback(
+    (editedDataUrl: string) => {
+      setScreenshotEdited(editedDataUrl);
+      setShowEditor(false);
+      // Re-open the feedback dialog
+      onOpenChange(true);
+    },
+    [onOpenChange]
+  );
+
+  const handleEditorCancel = useCallback(() => {
+    setShowEditor(false);
+    setScreenshotRaw(null);
+    // Re-open dialog without screenshot
+    onOpenChange(true);
+  }, [onOpenChange]);
+
+  const handleRemoveScreenshot = () => {
+    setScreenshotRaw(null);
+    setScreenshotEdited(null);
+  };
+
+  const handleEditScreenshot = () => {
+    if (screenshotRaw) {
+      setShowEditor(true);
+      onOpenChange(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -67,6 +137,7 @@ export function FeedbackDialog({
           type,
           message: message.trim(),
           email: userEmail,
+          screenshot: screenshotEdited || undefined,
           context: {
             url: window.location.href,
             userAgent: navigator.userAgent,
@@ -83,6 +154,8 @@ export function FeedbackDialog({
           issueUrl: data.issueUrl,
         });
         setMessage("");
+        setScreenshotRaw(null);
+        setScreenshotEdited(null);
       } else {
         const data = await res.json().catch(() => ({}));
         setResult({
@@ -99,6 +172,22 @@ export function FeedbackDialog({
       setSubmitting(false);
     }
   };
+
+  // Show the full-screen editor overlay
+  if (showEditor && screenshotRaw) {
+    return (
+      <ScreenshotEditor
+        imageDataUrl={screenshotEdited || screenshotRaw}
+        onSave={handleEditorSave}
+        onCancel={handleEditorCancel}
+      />
+    );
+  }
+
+  // Don't render dialog while capturing
+  if (capturing) return null;
+
+  const screenshotAttached = !!screenshotEdited;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -167,10 +256,62 @@ export function FeedbackDialog({
                         ? "Describe the feature you'd like to see..."
                         : "Share your thoughts..."
                   }
-                  rows={5}
+                  rows={4}
                   autoFocus
                 />
               </div>
+
+              {/* Screenshot section */}
+              <div>
+                <label className="text-sm font-medium text-text-secondary mb-2 block">
+                  Screenshot
+                </label>
+                {screenshotAttached ? (
+                  <div className="relative rounded border border-border/15 overflow-hidden bg-surface-overlay">
+                    <img
+                      src={screenshotEdited!}
+                      alt="Annotated screenshot"
+                      className="w-full max-h-40 object-contain"
+                    />
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-surface/80 backdrop-blur-sm"
+                        onClick={handleEditScreenshot}
+                        title="Edit screenshot"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-surface/80 backdrop-blur-sm"
+                        onClick={handleRemoveScreenshot}
+                        title="Remove screenshot"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCaptureScreenshot}
+                    className="w-full"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Capture Screenshot
+                  </Button>
+                )}
+                {!screenshotAttached && (
+                  <p className="text-xs text-text-secondary mt-1">
+                    Sensitive content can be redacted before submitting.
+                  </p>
+                )}
+              </div>
+
               {result && !result.success && (
                 <p className="text-sm text-danger">{result.message}</p>
               )}

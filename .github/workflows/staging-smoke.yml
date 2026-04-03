@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -64,9 +64,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: staging-e2e
     steps:
-      - name: Trigger Railway production deploy
+      - name: Get staging deployment image
+        id: staging-image
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_STAGING_SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN not set — cannot deploy to production"
@@ -74,13 +78,48 @@ jobs:
             exit 1
           fi
 
-          echo "Triggering production redeploy..."
+          echo "Fetching latest staging deployment..."
           RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { serviceInstanceRedeploy(environmentId: \"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\", serviceId: \"${{ secrets.RAILWAY_SERVICE_ID }}\") }"
-            }')
+            -d "{
+              \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
+            }")
+
+          echo "Staging deployments response: $RESPONSE"
+
+          STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
+          if [ "$STAGING_STATUS" != "SUCCESS" ]; then
+            echo "::error::Latest staging deployment status is '$STAGING_STATUS', expected 'SUCCESS'"
+            exit 1
+          fi
+
+          IMAGE=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.image // empty')
+          if [ -z "$IMAGE" ]; then
+            echo "::error::Could not extract image from staging deployment metadata"
+            echo "Full meta: $(echo "$RESPONSE" | jq '.data.deployments.edges[0].node.meta')"
+            exit 1
+          fi
+
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "✓ Staging image: $IMAGE"
+
+      - name: Deploy staging image to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          IMAGE="${{ steps.staging-image.outputs.image }}"
+          echo "Deploying staging image to production: $IMAGE"
+
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"mutation { serviceInstanceDeploy(input: { serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", image: \\\"$IMAGE\\\" }) }\"
+            }")
 
           echo "Response: $RESPONSE"
 
@@ -90,7 +129,7 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Production deploy triggered"
+          echo "✓ Production deploy triggered with staging image"
 
   # ── Stage 3: Verify production ────────────────────────────────────────
   health-check:
@@ -217,7 +256,7 @@ jobs:
               `### Manual rollback steps`,
               `1. Go to [Railway Dashboard](https://railway.app) > Annie project > Deployments`,
               `2. Find the last known-good deployment and click "Rollback"`,
-              `3. Or revert the commit: \`git revert ${shortSha} && git push origin master\``,
+              `3. Or revert the commit: \`git revert ${shortSha} && git push origin main\``,
               ``,
               `### Investigation`,
               `- Check [production health](https://annie.interstellarai.net/api/health)`,

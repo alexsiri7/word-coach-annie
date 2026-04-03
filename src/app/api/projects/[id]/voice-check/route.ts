@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
+import { getVoiceContext } from "@/mcp/tools/coaching";
 import OpenAI from "openai";
 
 interface VoiceProfile {
@@ -24,11 +24,7 @@ interface VoiceFeedback {
  * POST /api/projects/[id]/voice-check
  *
  * Analyzes character voice consistency in a scene.
- * Body: { sceneId: string, selectedText?: string }
- * Returns: { profiles: VoiceProfile[], feedback: VoiceFeedback[] }
- *
- * profiles: established voice traits for each character linked to this scene
- * feedback: voice consistency issues found (only when selectedText is provided or scene has dialogue)
+ * Uses shared context from MCP coaching module.
  */
 export async function POST(
   request: NextRequest,
@@ -36,7 +32,7 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   let sceneId: string | undefined;
@@ -54,71 +50,34 @@ export async function POST(
   }
 
   try {
-    // Find characters linked to this scene via relationships
-    const sceneRelationships = await prisma.relationship.findMany({
-      where: {
-        OR: [
-          { fromNodeId: sceneId },
-          { toNodeId: sceneId },
-        ],
-      },
-      select: {
-        fromObjectId: true,
-        toObjectId: true,
-      },
-    });
+    const ctx = await getVoiceContext(projectId, sceneId);
 
-    const linkedObjectIds = new Set<string>();
-    for (const rel of sceneRelationships) {
-      if (rel.fromObjectId) linkedObjectIds.add(rel.fromObjectId);
-      if (rel.toObjectId) linkedObjectIds.add(rel.toObjectId);
-    }
-
-    if (linkedObjectIds.size === 0) {
-      return NextResponse.json({ profiles: [], feedback: [] });
-    }
-
-    // Load characters from linked objects
-    const characters = await prisma.storyObject.findMany({
-      where: {
-        id: { in: Array.from(linkedObjectIds) },
-        type: "CHARACTER",
-        projectId,
-      },
-      select: { id: true, name: true, description: true, notes: true, role: true },
-    });
-
-    if (characters.length === 0) {
+    if (ctx.characters.length === 0) {
       return NextResponse.json({ profiles: [], feedback: [] });
     }
 
     const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       // Return basic profiles without AI feedback
-      const profiles: VoiceProfile[] = characters.map((c) => ({
+      const profiles: VoiceProfile[] = ctx.characters.map((c) => ({
         characterId: c.id,
         characterName: c.name,
-        traits: extractTraits(c.description + " " + c.notes),
-        summary: c.description.slice(0, 200) || "No description available.",
+        traits: extractTraits((c.description || "") + " " + (c.notes || "")),
+        summary: c.description?.slice(0, 200) || "No description available.",
       }));
       return NextResponse.json({ profiles, feedback: [] });
     }
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
-
-    const characterSummary = characters
+    const characterSummary = ctx.characters
       .map((c) => {
         const parts = [`${c.name}${c.role ? ` (${c.role})` : ""}`];
-        if (c.description) parts.push(`Description: ${c.description.slice(0, 400)}`);
-        if (c.notes) parts.push(`Notes: ${c.notes.slice(0, 200)}`);
+        if (c.description) parts.push(`Description: ${c.description}`);
+        if (c.notes) parts.push(`Notes: ${c.notes}`);
         return parts.join(". ");
       })
       .join("\n\n");
 
-    const textToAnalyze = selectedText || await getSceneText(sceneId);
+    const textToAnalyze = selectedText || ctx.sceneText;
 
     const prompt = `You are a character voice coach for a fiction writer.
 
@@ -155,6 +114,11 @@ Return ONLY valid JSON with this structure:
 }
 
 The "feedback" array should be empty if the text is not dialogue or no voice issues are found.`;
+
+    const client = new OpenAI({
+      apiKey: aiConfig.apiKey,
+      baseURL: aiConfig.baseUrl || undefined,
+    });
 
     const response = await client.chat.completions.create({
       model: aiConfig.model,
@@ -195,21 +159,6 @@ The "feedback" array should be empty if the text is not dialogue or no voice iss
       { status: 500 }
     );
   }
-}
-
-async function getSceneText(sceneId: string): Promise<string> {
-  const version = await prisma.contentVersion.findFirst({
-    where: { nodeId: sceneId },
-    orderBy: { createdAt: "desc" },
-    select: { content: true },
-  });
-  if (!version?.content) return "";
-  return version.content
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 1500);
 }
 
 function extractTraits(text: string): string[] {

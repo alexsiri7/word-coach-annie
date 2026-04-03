@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeHtml } from "@/lib/sanitize-server";
 
 export async function GET(
   request: NextRequest,
@@ -12,7 +13,7 @@ export async function GET(
 
   try {
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccessByNode(nodeId, userId);
+    const access = await verifyProjectReadAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const searchParams = request.nextUrl.searchParams;
@@ -65,7 +66,7 @@ export async function POST(
 
   try {
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccessByNode(nodeId, userId);
+    const access = await verifyProjectWriteAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const body = await request.json();
@@ -78,7 +79,8 @@ export async function POST(
       );
     }
 
-    const result = await StructureController.writeSceneContent(nodeId, content);
+    const sanitizedContent = sanitizeHtml(content);
+    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     logger.error("Failed to save content", error);
@@ -97,7 +99,7 @@ export async function PATCH(
 
   try {
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccessByNode(nodeId, userId);
+    const access = await verifyProjectWriteAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const body = await request.json();
