@@ -1,5 +1,5 @@
--- AddColumn: credentialId to MediumExport
-ALTER TABLE "MediumExport" ADD COLUMN "credentialId" TEXT NOT NULL DEFAULT '';
+-- AddColumn: credentialId to MediumExport (nullable — avoids FK violation from empty-string default)
+ALTER TABLE "MediumExport" ADD COLUMN "credentialId" TEXT;
 
 -- AddColumn: updatedAt to MediumExport
 ALTER TABLE "MediumExport" ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

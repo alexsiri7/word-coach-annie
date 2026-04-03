@@ -305,11 +305,11 @@ model MediumExport {
   mediumPostUrl String
   publishStatus String           @default("draft")
   lastSyncedAt  DateTime
-  credentialId  String
+  credentialId  String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  credential    MediumCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  credential    MediumCredential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, nodeId, credentialId])
   @@index([projectId])
