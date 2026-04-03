@@ -8,15 +8,16 @@ import { join } from "path";
 
 // Generate version.json at build time for version-check polling
 function generateVersionFile() {
-  let version: string;
+  let commitSha: string;
   try {
-    version = execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+    const envSha = process.env.COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA;
+    commitSha = envSha ? envSha.substring(0, 7) : execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
   } catch {
-    version = Date.now().toString();
+    commitSha = "unknown";
   }
-  const versionData = { version, buildTime: new Date().toISOString() };
+  const versionData = { version: commitSha, commitSha, buildTime: new Date().toISOString() };
   writeFileSync(join(__dirname, "public", "version.json"), JSON.stringify(versionData));
-  return version;
+  return commitSha;
 }
 
 const buildVersion = generateVersionFile();
