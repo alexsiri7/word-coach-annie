@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
-import { MediumPublishController } from '@/lib/controllers/medium-publish';
+import { HashnodePublishController } from '@/lib/controllers/hashnode-publish';
 import { logger } from '@/lib/logger';
 
 /**
- * POST /api/projects/[id]/publish-to-medium
+ * POST /api/projects/[id]/publish-to-hashnode
  * Body: {
  *   nodeId?: string,
  *   titleOverride?: string,
@@ -26,7 +26,6 @@ export async function POST(
         const body = await request.json();
         const { nodeId, titleOverride, publishStatus, tags, canonicalUrl } = body;
 
-        // Validate publishStatus if provided
         if (publishStatus && !['draft', 'public', 'unlisted'].includes(publishStatus)) {
             return NextResponse.json(
                 { error: 'publishStatus must be draft, public, or unlisted' },
@@ -34,12 +33,11 @@ export async function POST(
             );
         }
 
-        // Validate tags
         if (tags !== undefined && !Array.isArray(tags)) {
             return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
         }
 
-        const result = await MediumPublishController.publish(id, userId, {
+        const result = await HashnodePublishController.publish(id, userId, {
             nodeId,
             titleOverride,
             publishStatus,
@@ -50,9 +48,9 @@ export async function POST(
         if (result.alreadyPublished) {
             return NextResponse.json(
                 {
-                    warning: 'This content has already been published to Medium. Medium does not support post updates via API.',
-                    mediumPostUrl: result.mediumPostUrl,
-                    mediumPostId: result.mediumPostId,
+                    warning: 'This content has already been published to Hashnode.',
+                    hashnodePostUrl: result.hashnodePostUrl,
+                    hashnodePostId: result.hashnodePostId,
                     publishStatus: result.publishStatus,
                 },
                 { status: 200 }
@@ -61,23 +59,20 @@ export async function POST(
 
         return NextResponse.json(
             {
-                mediumPostUrl: result.mediumPostUrl,
-                mediumPostId: result.mediumPostId,
+                hashnodePostUrl: result.hashnodePostUrl,
+                hashnodePostId: result.hashnodePostId,
                 publishStatus: result.publishStatus,
             },
             { status: 201 }
         );
     } catch (error) {
-        logger.error('POST /api/projects/[id]/publish-to-medium error', error);
+        logger.error('POST /api/projects/[id]/publish-to-hashnode error', error);
         const message = error instanceof Error ? error.message : 'Internal server error';
 
-        if (message === 'Medium account not connected') {
+        if (message === 'Hashnode account not connected') {
             return NextResponse.json({ error: message }, { status: 400 });
         }
-        if (message.startsWith('Title exceeds') || message.startsWith('Medium allows')) {
-            return NextResponse.json({ error: message }, { status: 422 });
-        }
-        if (message.startsWith('Medium API error')) {
+        if (message.startsWith('Hashnode API error')) {
             return NextResponse.json({ error: message }, { status: 502 });
         }
 
