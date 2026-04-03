@@ -1,19 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
-import { decrypt } from "@/lib/crypto";
-import { exportMedium } from "@/mcp/tools/export";
-import { logger } from "@/lib/logger";
+import { NextRequest, NextResponse } from 'next/server';
+import { MediumPublishController } from '@/lib/controllers/medium-publish';
+import { getCurrentUserId, verifyProjectWriteAccess, verifyProjectAccess } from '@/lib/api-auth';
+import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/db';
 
 /**
  * POST /api/projects/[id]/publish-to-medium
- * Body: {
- *   title: string,
- *   publishStatus: "draft" | "public" | "unlisted",
- *   tags?: string[],
- *   canonicalUrl?: string,
- *   nodeId?: string,  // for single article/chapter export
- * }
+ *
+ * Body (all optional except where noted):
+ *   nodeId?       - Publish a single article/chapter instead of whole project
+ *   title?        - Override project title (max 100 chars)
+ *   publishStatus - "draft" (default) | "public" | "unlisted"
+ *   tags?         - Array of strings, max 3
+ *   canonicalUrl? - Canonical URL for SEO
+ *
+ * Returns 201 with { mediumPostId, mediumPostUrl, publishStatus } on success.
+ * Returns 409 with alreadyPublished: true if already exported.
  */
 export async function POST(
     request: NextRequest,
@@ -23,118 +25,80 @@ export async function POST(
         const { id: projectId } = await params;
         const userId = getCurrentUserId(request);
 
-        const access = await verifyProjectAccess(projectId, userId);
+        const access = await verifyProjectWriteAccess(projectId, userId);
         if (!access.authorized) return access.response;
 
-        // Get Medium credential
-        const cred = await prisma.mediumCredential.findFirst({
-            where: userId ? { userId } : {},
-        });
-        if (!cred) {
+        const body = await request.json().catch(() => ({}));
+        const { nodeId, title, publishStatus, tags, canonicalUrl } = body;
+
+        // Validate publishStatus
+        const validStatuses = ['draft', 'public', 'unlisted'];
+        if (publishStatus && !validStatuses.includes(publishStatus)) {
             return NextResponse.json(
-                { error: "Medium is not connected. Go to Settings to connect your account." },
+                { error: `publishStatus must be one of: ${validStatuses.join(', ')}` },
                 { status: 400 }
             );
         }
 
-        const body = await request.json();
-        const {
-            title,
-            publishStatus = "draft",
-            tags = [],
-            canonicalUrl,
-            nodeId,
-        } = body;
-
-        if (!title || typeof title !== "string") {
-            return NextResponse.json({ error: "title is required" }, { status: 400 });
-        }
-        if (!["draft", "public", "unlisted"].includes(publishStatus)) {
-            return NextResponse.json({ error: "Invalid publishStatus" }, { status: 400 });
-        }
-        if (Array.isArray(tags) && tags.length > 3) {
-            return NextResponse.json({ error: "Maximum 3 tags allowed" }, { status: 400 });
+        // Validate tags
+        if (tags !== undefined && !Array.isArray(tags)) {
+            return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
         }
 
-        // Generate content
-        const content = await exportMedium(projectId, nodeId);
-        if (!content) {
-            return NextResponse.json({ error: "No content to publish" }, { status: 400 });
-        }
-
-        const token = decrypt(cred.integrationToken);
-
-        // Publish to Medium
-        const postRes = await fetch(
-            `https://api.medium.com/v1/users/${cred.authorId}/posts`,
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                },
-                body: JSON.stringify({
-                    title,
-                    contentFormat: "markdown",
-                    content,
-                    publishStatus,
-                    tags: tags.slice(0, 3),
-                    ...(canonicalUrl ? { canonicalUrl } : {}),
-                }),
-            }
-        );
-
-        if (!postRes.ok) {
-            const errorText = await postRes.text();
-            logger.error("Medium publish failed", { status: postRes.status, body: errorText });
+        // Validate title length
+        if (title && typeof title === 'string' && title.length > 100) {
             return NextResponse.json(
-                { error: `Medium API error: ${postRes.status}` },
-                { status: 502 }
+                { error: 'Title exceeds 100 characters (Medium limit)' },
+                { status: 400 }
             );
         }
 
-        const postData = await postRes.json();
-        const mediumPostId: string = postData.data?.id;
-        const mediumPostUrl: string = postData.data?.url;
+        const result = await MediumPublishController.publish(
+            {
+                projectId,
+                nodeId: typeof nodeId === 'string' ? nodeId : undefined,
+                titleOverride: typeof title === 'string' ? title : undefined,
+                publishStatus: publishStatus as 'draft' | 'public' | 'unlisted' | undefined,
+                tags: Array.isArray(tags) ? tags : undefined,
+                canonicalUrl: typeof canonicalUrl === 'string' ? canonicalUrl : undefined,
+            },
+            userId
+        );
 
-        if (!mediumPostId || !mediumPostUrl) {
-            return NextResponse.json({ error: "Unexpected response from Medium" }, { status: 502 });
+        if (result.alreadyPublished) {
+            return NextResponse.json(
+                {
+                    warning: 'This content has already been published to Medium. Medium API does not support updates.',
+                    ...result,
+                },
+                { status: 409 }
+            );
         }
 
-        // Track the export (upsert to handle republish)
-        await prisma.mediumExport.upsert({
-            where: {
-                projectId_nodeId_credentialId: {
-                    projectId,
-                    nodeId: nodeId ?? null,
-                    credentialId: cred.id,
-                },
-            },
-            update: {
-                mediumPostId,
-                mediumPostUrl,
-                publishStatus,
-                lastSyncedAt: new Date(),
-            },
-            create: {
-                projectId,
-                nodeId: nodeId ?? null,
-                mediumPostId,
-                mediumPostUrl,
-                publishStatus,
-                lastSyncedAt: new Date(),
-                credentialId: cred.id,
-            },
-        });
-
-        return NextResponse.json(
-            { mediumPostId, mediumPostUrl },
-            { status: 201 }
-        );
+        return NextResponse.json(result, { status: 201 });
     } catch (error) {
-        logger.error("POST /api/projects/[id]/publish-to-medium error", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        logger.error('POST /api/projects/[id]/publish-to-medium error', error);
+        const message = error instanceof Error ? error.message : 'Internal server error';
+
+        if (message === 'Medium account not connected') {
+            return NextResponse.json({ error: message }, { status: 422 });
+        }
+        if (message.includes('Maximum 3 tags')) {
+            return NextResponse.json({ error: message }, { status: 400 });
+        }
+        if (message.includes('Title exceeds 100')) {
+            return NextResponse.json({ error: message }, { status: 400 });
+        }
+        if (message.includes('No content to publish')) {
+            return NextResponse.json({ error: message }, { status: 422 });
+        }
+        if (message.includes('Medium API error')) {
+            const statusMatch = message.match(/\((\d+)\)/);
+            const upstreamStatus = statusMatch ? parseInt(statusMatch[1]) : 502;
+            return NextResponse.json({ error: message }, { status: upstreamStatus >= 500 ? 502 : upstreamStatus });
+        }
+
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -162,12 +126,12 @@ export async function GET(
 
         const exports = await prisma.mediumExport.findMany({
             where: { projectId, credentialId: cred.id },
-            orderBy: { lastSyncedAt: "desc" },
+            orderBy: { lastSyncedAt: 'desc' },
         });
 
         return NextResponse.json({ exports });
     } catch (error) {
-        logger.error("GET /api/projects/[id]/publish-to-medium error", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        logger.error('GET /api/projects/[id]/publish-to-medium error', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
