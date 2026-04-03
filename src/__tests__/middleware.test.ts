@@ -172,11 +172,13 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
         });
 
-        it("returns 429 when Bearer token user exceeds chat rate limit", async () => {
+        it("does not rate limit static API_TOKEN requests (privileged system token)", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             process.env.API_TOKEN = "test-token";
 
-            for (let i = 0; i < 30; i++) {
+            // API_TOKEN is a privileged system token (used by E2E tests, MCP, CI)
+            // It bypasses rate limiting entirely
+            for (let i = 0; i < 40; i++) {
                 const req = createRequest("/api/chat", {
                     method: "POST",
                     headers: { authorization: "Bearer test-token" },
@@ -184,13 +186,6 @@ describe("middleware", () => {
                 const res = await middleware(req);
                 expect(res.status).toBe(200);
             }
-
-            const req = createRequest("/api/chat", {
-                method: "POST",
-                headers: { authorization: "Bearer test-token" },
-            });
-            const res = await middleware(req);
-            expect(res.status).toBe(429);
         });
 
         it("allows read API requests up to 120/min", async () => {
