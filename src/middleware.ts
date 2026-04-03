@@ -154,10 +154,8 @@ export async function middleware(request: NextRequest) {
             ? authHeader.slice(7)
             : null;
 
-        // 1. Check static API_TOKEN
+        // 1. Check static API_TOKEN (privileged system token — no rate limiting)
         if (token && apiToken && token === apiToken) {
-            const rateLimited = applyRateLimit(request, "apitoken");
-            if (rateLimited) return rateLimited;
             return NextResponse.next();
         }
 
