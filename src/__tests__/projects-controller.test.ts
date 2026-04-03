@@ -47,6 +47,19 @@ describe("ProjectsController", () => {
             expect(result.title).toBe("Novel");
             expect(result.nodeCount).toBe(1);
             expect(result.storyObjectCount).toBe(0);
+            expect(result.wordCount).toBe(0);
+        });
+
+        it("returns correct word count from scene content", async () => {
+            const p = await ProjectsController.createProject({ title: "Novel" });
+            const ch = await StructureController.createNode({ projectId: p.id, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({
+                projectId: p.id, type: "SCENE", title: "S1", parentId: ch.id
+            });
+            await StructureController.writeSceneContent(scene.id, "One two three");
+
+            const result = await ProjectsController.getProject(p.id);
+            expect(result.wordCount).toBe(3);
         });
 
         it("throws for non-existent project", async () => {

@@ -37,6 +37,24 @@ export default defineConfig({
         colorScheme: 'dark',
       },
     },
+    {
+      name: 'integration',
+      testMatch: 'e2e/integration.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        colorScheme: 'light',
+      },
+    },
+    {
+      name: 'sharing',
+      testMatch: 'e2e/sharing.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        colorScheme: 'light',
+      },
+    },
   ],
   // Start a local Next.js server when not using a live BASE_URL
   ...(process.env.BASE_URL

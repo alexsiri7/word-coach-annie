@@ -32,8 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
     const userId = getCurrentUserId(request);
-    const userEmail = request.headers.get("x-user-email");
-    const access = await verifyProjectReadAccess(id, userId, userEmail);
+    const access = await verifyProjectReadAccess(id, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const project = await prisma.project.findUnique({

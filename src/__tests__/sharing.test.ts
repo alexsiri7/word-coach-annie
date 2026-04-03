@@ -159,6 +159,49 @@ describe("Share management API — /api/projects/[id]/share", () => {
         expect(body.error).toMatch(/already/i);
     });
 
+    it("POST — owner can add an editor by email", async () => {
+        const { POST } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "POST",
+            body: { email: "editor@example.com", role: "EDITOR" },
+            userId: ownerId,
+        });
+        const res = await POST(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(201);
+        const body = await (res as any).json();
+        expect(body.email).toBe("editor@example.com");
+        expect(body.role).toBe("EDITOR");
+    });
+
+    it("POST — defaults to READER when role not specified", async () => {
+        const { POST } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "POST",
+            body: { email: "reader2@example.com" },
+            userId: ownerId,
+        });
+        const res = await POST(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(201);
+        const body = await (res as any).json();
+        expect(body.role).toBe("READER");
+    });
+
+    it("POST — ignores invalid role and defaults to READER", async () => {
+        const { POST } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "POST",
+            body: { email: "bad-role@example.com", role: "ADMIN" },
+            userId: ownerId,
+        });
+        const res = await POST(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(201);
+        const body = await (res as any).json();
+        expect(body.role).toBe("READER");
+    });
+
     it("POST — returns 400 for invalid email", async () => {
         const { POST } = await import("@/app/api/projects/[id]/share/route");
         const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
@@ -215,6 +258,73 @@ describe("Share management API — /api/projects/[id]/share", () => {
             userId: other.id,
         });
         const res = await GET(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(403);
+    });
+
+    it("PATCH — owner can change share role", async () => {
+        await testPrisma.projectShare.create({
+            data: { projectId, email: "reader@example.com", role: "READER" },
+        });
+
+        const { PATCH } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "PATCH",
+            body: { email: "reader@example.com", role: "EDITOR" },
+            userId: ownerId,
+        });
+        const res = await PATCH(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(200);
+        const body = await (res as any).json();
+        expect(body.role).toBe("EDITOR");
+
+        // Verify in DB
+        const share = await testPrisma.projectShare.findFirst({ where: { projectId } });
+        expect(share!.role).toBe("EDITOR");
+    });
+
+    it("PATCH — returns 404 for non-existent share", async () => {
+        const { PATCH } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "PATCH",
+            body: { email: "nobody@example.com", role: "EDITOR" },
+            userId: ownerId,
+        });
+        const res = await PATCH(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(404);
+    });
+
+    it("PATCH — returns 400 for invalid role", async () => {
+        await testPrisma.projectShare.create({
+            data: { projectId, email: "reader@example.com", role: "READER" },
+        });
+
+        const { PATCH } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "PATCH",
+            body: { email: "reader@example.com", role: "ADMIN" },
+            userId: ownerId,
+        });
+        const res = await PATCH(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(400);
+    });
+
+    it("PATCH — non-owner gets 403", async () => {
+        const other = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: "reader@example.com", role: "READER" },
+        });
+
+        const { PATCH } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "PATCH",
+            body: { email: "reader@example.com", role: "EDITOR" },
+            userId: other.id,
+        });
+        const res = await PATCH(req as never, mockParams({ id: projectId }));
 
         expect((res as any).status).toBe(403);
     });
@@ -278,7 +388,7 @@ describe("Manuscript API — GET /api/projects/[id]/manuscript", () => {
         expect(body.title).toBe("Shared Novel");
     });
 
-    it("shared reader can access", async () => {
+    it("shared reader can access manuscript", async () => {
         const reader = await createOtherUser();
         await testPrisma.projectShare.create({
             data: { projectId, email: reader.email, role: "READER" },
@@ -470,11 +580,78 @@ describe("Access control — verifyProjectAccess / verifyProjectReadAccess", () 
         }
     });
 
+    it("verifyProjectReadAccess — shared editor gets authorized with role EDITOR", async () => {
+        const editor = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: editor.email, role: "EDITOR" },
+        });
+
+        const { verifyProjectReadAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectReadAccess(projectId, editor.id, editor.email);
+
+        expect(result.authorized).toBe(true);
+        if (result.authorized) {
+            expect(result.role).toBe("EDITOR");
+        }
+    });
+
     it("verifyProjectReadAccess — non-shared user gets 403", async () => {
         const stranger = await createOtherUser();
 
         const { verifyProjectReadAccess } = await import("@/lib/api-auth");
         const result = await verifyProjectReadAccess(projectId, stranger.id, stranger.email);
+
+        expect(result.authorized).toBe(false);
+        if (!result.authorized) {
+            expect(result.response.status).toBe(403);
+        }
+    });
+
+    it("verifyProjectWriteAccess — owner gets authorized with role OWNER", async () => {
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, ownerId, "owner@example.com");
+
+        expect(result.authorized).toBe(true);
+        if (result.authorized) {
+            expect(result.role).toBe("OWNER");
+        }
+    });
+
+    it("verifyProjectWriteAccess — shared editor gets authorized with role EDITOR", async () => {
+        const editor = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: editor.email, role: "EDITOR" },
+        });
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, editor.id, editor.email);
+
+        expect(result.authorized).toBe(true);
+        if (result.authorized) {
+            expect(result.role).toBe("EDITOR");
+        }
+    });
+
+    it("verifyProjectWriteAccess — shared reader gets 403", async () => {
+        const reader = await createOtherUser();
+        await testPrisma.projectShare.create({
+            data: { projectId, email: reader.email, role: "READER" },
+        });
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, reader.id, reader.email);
+
+        expect(result.authorized).toBe(false);
+        if (!result.authorized) {
+            expect(result.response.status).toBe(403);
+        }
+    });
+
+    it("verifyProjectWriteAccess — non-shared user gets 403", async () => {
+        const stranger = await createOtherUser();
+
+        const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+        const result = await verifyProjectWriteAccess(projectId, stranger.id, stranger.email);
 
         expect(result.authorized).toBe(false);
         if (!result.authorized) {

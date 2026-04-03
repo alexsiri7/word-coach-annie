@@ -24,6 +24,12 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/ai/settings", () => ({
   getAiConfig: () => mockGetAiConfig(),
+  getAiPreferences: vi.fn().mockResolvedValue({
+    customInstructions: "",
+    coachingStyle: "balanced",
+    responseLength: "moderate",
+  }),
+  buildPreferenceInstructions: vi.fn().mockReturnValue(""),
 }));
 
 // Import after mocks

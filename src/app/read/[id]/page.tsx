@@ -97,7 +97,8 @@ async function getManuscriptData(projectId: string) {
 
 async function checkReaderAccess(
   projectId: string,
-  userId: string | null
+  userId: string | null,
+  userEmail: string | null
 ): Promise<boolean> {
   // In dev/API_TOKEN mode (no userId), allow access
   if (!userId) return true;
@@ -111,19 +112,23 @@ async function checkReaderAccess(
   if (!project) return false;
   if (project.userId === userId) return true;
 
-  // Look up user's email to check shares via ProjectShare
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true },
-  });
+  // Use the email from the middleware header, falling back to a DB lookup
+  let email = userEmail;
+  if (!email) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    email = user?.email ?? null;
+  }
 
-  if (!user) return false;
+  if (!email) return false;
 
   const shareByEmail = await prisma.projectShare.findUnique({
     where: {
       projectId_email: {
         projectId,
-        email: user.email,
+        email: email.toLowerCase(),
       },
     },
   });
@@ -138,9 +143,10 @@ export default async function ReaderPage({
 }) {
   const { id: projectId } = await params;
 
-  // Get user ID from headers (set by middleware)
+  // Get user identity from headers (set by middleware)
   const headersList = await headers();
   const userId = headersList.get("x-user-id");
+  const userEmail = headersList.get("x-user-email");
 
   // If auth is enabled and no user, redirect to login
   if (isAuthEnabled() && !userId) {
@@ -148,7 +154,7 @@ export default async function ReaderPage({
   }
 
   // Check access
-  const hasAccess = await checkReaderAccess(projectId, userId);
+  const hasAccess = await checkReaderAccess(projectId, userId, userEmail);
   if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

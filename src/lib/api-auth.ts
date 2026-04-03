@@ -68,7 +68,7 @@ export async function verifyProjectReadAccess(
     userId: string | null,
     userEmail?: string | null
 ): Promise<
-    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "READER" | null }
+    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "READER" | "EDITOR" | null }
     | { authorized: false; response: NextResponse }
 > {
     const project = await prisma.project.findUnique({
@@ -104,7 +104,8 @@ export async function verifyProjectReadAccess(
             },
         });
         if (share) {
-            return { authorized: true, project, role: "READER" };
+            const shareRole = share.role === "EDITOR" ? "EDITOR" : "READER";
+            return { authorized: true, project, role: shareRole as "READER" | "EDITOR" };
         }
     }
 
@@ -151,6 +152,59 @@ export async function verifyUniverseAccess(
 }
 
 /**
+ * Verify that the current user has write access to a project.
+ * Allows owners and editors (via ProjectShare with role EDITOR).
+ * When userId is null (API_TOKEN/dev mode), all projects are accessible (role = null).
+ */
+export async function verifyProjectWriteAccess(
+    projectId: string,
+    userId: string | null,
+    userEmail?: string | null
+): Promise<
+    | { authorized: true; project: { id: string; userId: string | null }; role: "OWNER" | "EDITOR" | null }
+    | { authorized: false; response: NextResponse }
+> {
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, userId: true },
+    });
+
+    if (!project) {
+        return {
+            authorized: false,
+            response: NextResponse.json({ error: "Project not found" }, { status: 404 }),
+        };
+    }
+
+    if (!userId) {
+        return { authorized: true, project, role: null };
+    }
+
+    if (project.userId === userId) {
+        return { authorized: true, project, role: "OWNER" };
+    }
+
+    if (userEmail) {
+        const share = await prisma.projectShare.findUnique({
+            where: {
+                projectId_email: {
+                    projectId,
+                    email: userEmail.toLowerCase(),
+                },
+            },
+        });
+        if (share && share.role === "EDITOR") {
+            return { authorized: true, project, role: "EDITOR" };
+        }
+    }
+
+    return {
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+}
+
+/**
  * Verify access to a resource via its parent project.
  * Looks up the resource's projectId, then checks project ownership.
  */
@@ -173,4 +227,56 @@ export async function verifyProjectAccessByNode(
     const access = await verifyProjectAccess(node.projectId, userId);
     if (!access.authorized) return access;
     return { authorized: true, projectId: node.projectId };
+}
+
+/**
+ * Verify read access to a resource via its parent project.
+ * Allows owners, editors, and readers (via ProjectShare).
+ */
+export async function verifyProjectReadAccessByNode(
+    nodeId: string,
+    userId: string | null,
+    userEmail?: string | null
+): Promise<{ authorized: true; projectId: string; role: "OWNER" | "READER" | "EDITOR" | null } | { authorized: false; response: NextResponse }> {
+    const node = await prisma.structureNode.findUnique({
+        where: { id: nodeId },
+        select: { projectId: true },
+    });
+
+    if (!node) {
+        return {
+            authorized: false,
+            response: NextResponse.json({ error: "Node not found" }, { status: 404 }),
+        };
+    }
+
+    const access = await verifyProjectReadAccess(node.projectId, userId, userEmail);
+    if (!access.authorized) return access;
+    return { authorized: true, projectId: node.projectId, role: access.role };
+}
+
+/**
+ * Verify write access to a resource via its parent project.
+ * Allows owners and editors (via ProjectShare with role EDITOR).
+ */
+export async function verifyProjectWriteAccessByNode(
+    nodeId: string,
+    userId: string | null,
+    userEmail?: string | null
+): Promise<{ authorized: true; projectId: string; role: "OWNER" | "EDITOR" | null } | { authorized: false; response: NextResponse }> {
+    const node = await prisma.structureNode.findUnique({
+        where: { id: nodeId },
+        select: { projectId: true },
+    });
+
+    if (!node) {
+        return {
+            authorized: false,
+            response: NextResponse.json({ error: "Node not found" }, { status: 404 }),
+        };
+    }
+
+    const access = await verifyProjectWriteAccess(node.projectId, userId, userEmail);
+    if (!access.authorized) return access;
+    return { authorized: true, projectId: node.projectId, role: access.role };
 }

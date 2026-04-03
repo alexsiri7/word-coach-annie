@@ -8,10 +8,12 @@ import {
     Users,
     MapPin,
     Globe,
+    Pencil,
     Link as LinkIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog,
     DialogContent,
@@ -48,6 +50,9 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
     const [newObjectName, setNewObjectName] = useState("");
     const [linkProjectOpen, setLinkProjectOpen] = useState(false);
     const [allProjects, setAllProjects] = useState<{ id: string, title: string }[]>([]);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editTitle, setEditTitle] = useState("");
+    const [editDescription, setEditDescription] = useState("");
 
     const fetchUniverse = async () => {
         const res = await fetch(`/api/universes/${universeId}`);
@@ -68,6 +73,26 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
     useEffect(() => {
         fetchUniverse();
     }, [universeId]);
+
+    const openEdit = () => {
+        if (!universe) return;
+        setEditTitle(universe.title);
+        setEditDescription(universe.description || "");
+        setEditOpen(true);
+    };
+
+    const handleEdit = async () => {
+        if (!editTitle.trim()) return;
+        const res = await offlineFetch(`/api/universes/${universeId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: editTitle, description: editDescription }),
+        });
+        if (res.ok) {
+            setEditOpen(false);
+            fetchUniverse();
+        }
+    };
 
     const handleAddObject = async () => {
         if (!newObjectName.trim()) return;
@@ -104,6 +129,9 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Globe className="h-4 w-4 text-accent flex-shrink-0" />
                     <h1 className="font-semibold text-text-primary truncate">{universe.title}</h1>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-text-muted hover:text-text-primary" onClick={openEdit}>
+                        <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-text-muted hidden sm:inline">
@@ -224,6 +252,39 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setAddObjectOpen(false)}>Cancel</Button>
                         <Button onClick={handleAddObject} disabled={!newObjectName.trim()}>Add</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Universe</DialogTitle>
+                        <DialogDescription>Update your universe details.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <label className="text-sm font-medium text-text-secondary">Title *</label>
+                            <Input
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                placeholder="The Forgotten Realms"
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-text-secondary">Description</label>
+                            <Textarea
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder="Briefly describe your world..."
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+                        <Button onClick={handleEdit} disabled={!editTitle.trim()}>Save</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -18,6 +18,7 @@ vi.mock("@/lib/db", () => ({
         },
         project: {
             findUnique: vi.fn(),
+            update: vi.fn(),
         },
     },
 }));
@@ -28,7 +29,7 @@ describe("Scene Beats", () => {
     });
 
     describe("Validation (StructureController.writeSceneContent)", () => {
-        const mockNode = { id: "scene-1", type: "SCENE", title: "Scene 1" };
+        const mockNode = { id: "scene-1", type: "SCENE", title: "Scene 1", projectId: "proj-1" };
 
         it("should accept content with valid beats", async () => {
             (prisma.structureNode.findUnique as any).mockResolvedValue(mockNode);

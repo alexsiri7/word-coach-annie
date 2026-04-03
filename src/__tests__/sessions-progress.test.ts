@@ -31,6 +31,7 @@ vi.mock("next/server", () => ({
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn().mockReturnValue(null),
   verifyProjectAccess: vi.fn().mockResolvedValue({ authorized: true, project: { id: "test", userId: null }, role: null }),
+  verifyProjectWriteAccess: vi.fn().mockResolvedValue({ authorized: true, project: { id: "test", userId: null }, role: null }),
   verifyProjectReadAccess: vi.fn().mockResolvedValue({ authorized: true, project: { id: "test", userId: null }, role: null }),
 }));
 

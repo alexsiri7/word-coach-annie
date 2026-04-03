@@ -61,7 +61,7 @@ function LoginForm() {
                 className="w-full"
                 asChild
             >
-                <a href="/api/auth/google">
+                <a href={`/api/auth/google${searchParams.get("from") ? `?from=${encodeURIComponent(searchParams.get("from")!)}` : ""}`}>
                     Sign in with Google
                 </a>
             </Button>
@@ -122,6 +122,15 @@ export default function LoginPage() {
                 <Suspense>
                     <LoginForm />
                 </Suspense>
+                <div className="text-center text-xs text-muted-foreground pt-2">
+                    <a href="/privacy" className="hover:text-foreground transition-colors">
+                        Privacy
+                    </a>
+                    {" · "}
+                    <a href="/terms" className="hover:text-foreground transition-colors">
+                        Terms
+                    </a>
+                </div>
             </div>
         </div>
     );

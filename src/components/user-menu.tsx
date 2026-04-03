@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus, Plug } from "lucide-react";
+import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus, Plug, Settings } from "lucide-react";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 
 export function UserMenu() {
@@ -48,6 +48,10 @@ export function UserMenu() {
                         </div>
                     )}
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => router.push("/setup")} className="cursor-pointer">
                         <Plug className="h-4 w-4 mr-2" />
                         Connect AI

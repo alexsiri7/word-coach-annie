@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getAiConfig } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { getManuscriptContext } from "@/mcp/tools/coaching";
 import OpenAI from "openai";
 
 export type ManuscriptAnalysisType =
@@ -10,81 +10,7 @@ export type ManuscriptAnalysisType =
   | "character-arcs"
   | "consistency-check";
 
-async function buildManuscriptContext(projectId: string) {
-  const [project, nodes, storyObjects, relationships] = await Promise.all([
-    prisma.project.findUnique({ where: { id: projectId } }),
-    prisma.structureNode.findMany({
-      where: { projectId },
-      orderBy: { orderIndex: "asc" },
-      include: {
-        contentVersions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { content: true, wordCount: true },
-        },
-      },
-    }),
-    prisma.storyObject.findMany({
-      where: { projectId },
-      select: { id: true, type: true, name: true, description: true, role: true },
-    }),
-    prisma.relationship.findMany({
-      where: {
-        OR: [
-          { fromObject: { projectId } },
-          { toObject: { projectId } },
-        ],
-      },
-      include: {
-        fromObject: { select: { name: true, type: true } },
-        toObject: { select: { name: true, type: true } },
-      },
-      take: 30,
-    }),
-  ]);
-
-  if (!project) throw new Error("Project not found");
-
-  const chapters = nodes.filter((n) => n.type === "CHAPTER");
-  const scenes = nodes.filter((n) => n.type === "SCENE");
-
-  const outlineWithContent = chapters
-    .map((ch) => {
-      const chScenes = scenes
-        .filter((s) => s.parentId === ch.id)
-        .map((s) => {
-          const content = s.contentVersions[0]?.content || "";
-          const preview = content
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 300);
-          return `    Scene: ${s.title} [${s.status}]${s.synopsis ? ` — ${s.synopsis}` : ""}${preview ? `\n      Content preview: ${preview}...` : ""}`;
-        })
-        .join("\n");
-      return `Chapter: ${ch.title}${ch.synopsis ? ` — ${ch.synopsis}` : ""}\n${chScenes}`;
-    })
-    .join("\n\n");
-
-  const characters = storyObjects
-    .filter((o) => o.type === "CHARACTER")
-    .map((o) => `${o.name}${o.role ? ` (${o.role})` : ""}${o.description ? `: ${o.description.slice(0, 200)}` : ""}`)
-    .join("\n");
-
-  const plotlines = storyObjects
-    .filter((o) => o.type === "PLOTLINE")
-    .map((o) => `${o.name}${o.description ? `: ${o.description.slice(0, 200)}` : ""}`)
-    .join("\n");
-
-  const relationshipsText = relationships
-    .filter((r) => r.fromObject && r.toObject)
-    .map((r) => `${r.fromObject!.name} → ${r.toObject!.name}: ${r.type}`)
-    .join("\n");
-
-  return { project, outlineWithContent, characters, plotlines, relationships: relationshipsText };
-}
-
-const ANALYSIS_PROMPTS: Record<ManuscriptAnalysisType, (ctx: Awaited<ReturnType<typeof buildManuscriptContext>>) => string> = {
+const ANALYSIS_PROMPTS: Record<ManuscriptAnalysisType, (ctx: Awaited<ReturnType<typeof getManuscriptContext>>) => string> = {
   "plot-threads": ({ project, outlineWithContent, plotlines }) => `Analyze the plot threads in "${project.title}". Based on the manuscript structure below, identify:
 1. **Active threads** — which plot lines are introduced and developed
 2. **Dormant threads** — threads introduced but not recently advanced
@@ -129,7 +55,11 @@ ${outlineWithContent || "(No scenes yet)"}
 Format as a structured report. List specific potential issues with scene references where possible. If no issues are found in a category, say so briefly. Be honest but constructive.`,
 };
 
-// POST /api/ai-manuscript — run manuscript-level analysis
+/**
+ * POST /api/ai-manuscript — run manuscript-level analysis
+ *
+ * Uses shared manuscript context from MCP coaching module.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -159,8 +89,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unknown analysis type" }, { status: 400 });
     }
 
-    const ctx = await buildManuscriptContext(projectId);
+    const ctx = await getManuscriptContext(projectId);
     const prompt = promptFn(ctx);
+
+    // Load user preferences for system-level behavior guidance
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
 
     const client = new OpenAI({
       apiKey: aiConfig.apiKey,
@@ -169,7 +103,10 @@ export async function POST(request: NextRequest) {
 
     const response = await client.chat.completions.create({
       model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: prefInstructions },
+        { role: "user", content: prompt },
+      ],
       max_tokens: 2000,
       temperature: 0.5,
     });

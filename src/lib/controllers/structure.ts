@@ -201,11 +201,20 @@ export class StructureController {
             },
         });
 
+        const createPromises: Promise<unknown>[] = [
+            prisma.project.update({
+                where: { id: projectId },
+                data: { updatedAt: new Date() },
+            }),
+        ];
         if (type === "SCENE") {
-            await prisma.contentVersion.create({
-                data: { nodeId: node.id, content: "", wordCount: 0 },
-            });
+            createPromises.push(
+                prisma.contentVersion.create({
+                    data: { nodeId: node.id, content: "", wordCount: 0 },
+                })
+            );
         }
+        await Promise.all(createPromises);
 
         return {
             id: node.id,
@@ -255,10 +264,16 @@ export class StructureController {
             throw new Error("No fields to update");
         }
 
-        const node = await prisma.structureNode.update({
-            where: { id: nodeId },
-            data: updateData,
-        });
+        const [node] = await Promise.all([
+            prisma.structureNode.update({
+                where: { id: nodeId },
+                data: updateData,
+            }),
+            prisma.project.update({
+                where: { id: existing.projectId },
+                data: { updatedAt: new Date() },
+            }),
+        ]);
 
         return {
             id: node.id,
@@ -286,7 +301,13 @@ export class StructureController {
             logger.warn("Snapshot failed or not available", e);
         }
 
-        await prisma.structureNode.delete({ where: { id: nodeId } });
+        await Promise.all([
+            prisma.structureNode.delete({ where: { id: nodeId } }),
+            prisma.project.update({
+                where: { id: node.projectId },
+                data: { updatedAt: new Date() },
+            }),
+        ]);
 
         const siblings = await prisma.structureNode.findMany({
             where: { projectId: node.projectId, parentId: node.parentId },
@@ -362,7 +383,7 @@ export class StructureController {
     static async writeSceneContent(nodeId: string, content: string) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
-            select: { id: true, type: true, title: true },
+            select: { id: true, type: true, title: true, projectId: true },
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
@@ -379,9 +400,15 @@ export class StructureController {
         const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
-        const version = await prisma.contentVersion.create({
-            data: { nodeId, content, wordCount },
-        });
+        const [version] = await Promise.all([
+            prisma.contentVersion.create({
+                data: { nodeId, content, wordCount },
+            }),
+            prisma.project.update({
+                where: { id: node.projectId },
+                data: { updatedAt: new Date() },
+            }),
+        ]);
 
         // Prune old versions (keep latest 50)
         const allVersions = await prisma.contentVersion.findMany({
@@ -439,7 +466,7 @@ export class StructureController {
     static async restoreSceneVersion(nodeId: string, versionId: string) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
-            select: { id: true, title: true },
+            select: { id: true, title: true, projectId: true },
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
 
@@ -448,13 +475,19 @@ export class StructureController {
         });
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
-        const newVersion = await prisma.contentVersion.create({
-            data: {
-                nodeId,
-                content: oldVersion.content,
-                wordCount: oldVersion.wordCount,
-            },
-        });
+        const [newVersion] = await Promise.all([
+            prisma.contentVersion.create({
+                data: {
+                    nodeId,
+                    content: oldVersion.content,
+                    wordCount: oldVersion.wordCount,
+                },
+            }),
+            prisma.project.update({
+                where: { id: node.projectId },
+                data: { updatedAt: new Date() },
+            }),
+        ]);
 
         return {
             nodeId,

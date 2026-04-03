@@ -117,7 +117,7 @@ No component tests or e2e tests yet (Playwright visual tests in progress).
 ### Code Quality
 - **ESLint**: Modern flat config (eslint.config.mjs)
 - **TypeScript**: Strict mode enabled
-- **Branch protection**: master requires Quality Gates check
+- **Branch protection**: main requires Quality Gates check
 
 ### Networking
 - **Cloudflare Tunnel** — Public access via tunnel token in docker-compose
