@@ -32,16 +32,17 @@ model ContentVersion {
 }
 
 model User {
-  id            String          @id @default(cuid())
-  email         String          @unique
-  googleId      String          @unique
-  name          String          @default("")
-  picture       String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  projects      Project[]
-  universes     Universe[]
-  aiSettings    UserAiSettings?
+  id                String             @id @default(cuid())
+  email             String             @unique
+  googleId          String             @unique
+  name              String             @default("")
+  picture           String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  projects          Project[]
+  universes         Universe[]
+  aiSettings        UserAiSettings?
+  mediumCredential  MediumCredential?
 }
 
 model Project {
@@ -65,6 +66,7 @@ model Project {
   googleDocExports GoogleDocExport[]
   writingSessions WritingSession[]
   shares         ProjectShare[]
+  mediumExports  MediumExport[]
 
   @@index([userId])
 }
@@ -281,4 +283,33 @@ model OAuthClient {
   redirectUris String   // JSON array stored as string
   grantTypes   String   @default("[\"authorization_code\",\"refresh_token\"]")
   createdAt    DateTime @default(now())
+}
+
+model MediumCredential {
+  id               String         @id @default(cuid())
+  userId           String         @unique
+  integrationToken String         // stored encrypted via lib/crypto
+  authorId         String         @default("")
+  username         String         @default("")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exports          MediumExport[]
+}
+
+model MediumExport {
+  id            String           @id @default(cuid())
+  projectId     String
+  nodeId        String?
+  mediumPostId  String
+  mediumPostUrl String
+  publishStatus String           @default("draft")
+  lastSyncedAt  DateTime
+  credentialId  String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  credential    MediumCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, nodeId, credentialId])
 }
