@@ -2,11 +2,12 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, Send, ExternalLink } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface ProjectSettings {
   id: string;
@@ -48,6 +49,16 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [chapterNumbering, setChapterNumbering] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
 
+  // Medium publish state
+  const [mediumConnected, setMediumConnected] = useState(false);
+  const [mediumPublishOpen, setMediumPublishOpen] = useState(false);
+  const [mediumPublishTitle, setMediumPublishTitle] = useState("");
+  const [mediumTags, setMediumTags] = useState("");
+  const [mediumPublishStatus, setMediumPublishStatus] = useState<"draft" | "public" | "unlisted">("draft");
+  const [mediumPublishing, setMediumPublishing] = useState(false);
+  const [mediumPublishError, setMediumPublishError] = useState("");
+  const [mediumPublishUrl, setMediumPublishUrl] = useState("");
+
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
       .then((res) => res.json())
@@ -59,6 +70,13 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         setGenre(data.genre || "");
       });
   }, [projectId]);
+
+  useEffect(() => {
+    fetch("/api/integrations/medium/status")
+      .then((res) => res.json())
+      .then((data) => setMediumConnected(data.connected))
+      .catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -217,6 +235,37 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       body: JSON.stringify({ confirmTitle: deleteConfirmTitle }),
     });
     router.push("/");
+  };
+
+  const handleMediumPublish = async () => {
+    setMediumPublishing(true);
+    setMediumPublishError("");
+    setMediumPublishUrl("");
+    try {
+      const tags = mediumTags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const res = await fetch(`/api/projects/${projectId}/publish-medium`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: mediumPublishTitle || title,
+          tags,
+          publishStatus: mediumPublishStatus,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMediumPublishError(data.error || "Failed to publish.");
+        return;
+      }
+      setMediumPublishUrl(data.url || "");
+    } catch {
+      setMediumPublishError("Failed to publish. Please try again.");
+    } finally {
+      setMediumPublishing(false);
+    }
   };
 
   // Cooldown timer
@@ -420,6 +469,28 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <span className="text-xs">Export All Projects (ZIP)</span>
             </Button>
           </div>
+
+          {/* Publish to Medium */}
+          {mediumConnected && (
+            <>
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2 mt-4">Publish</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setMediumPublishTitle(title);
+                  setMediumTags("");
+                  setMediumPublishStatus("draft");
+                  setMediumPublishError("");
+                  setMediumPublishUrl("");
+                  setMediumPublishOpen(true);
+                }}
+                className="gap-1.5 h-auto py-3 flex-col w-full sm:w-auto"
+              >
+                <Send className="h-4 w-4" />
+                <span className="text-xs">Publish to Medium</span>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Archive & Danger Zone */}
@@ -579,6 +650,100 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           )}
         </div>
       </div>
+
+      {/* Publish to Medium Dialog */}
+      <Dialog open={mediumPublishOpen} onOpenChange={(open) => {
+        if (!mediumPublishing) setMediumPublishOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Publish to Medium</DialogTitle>
+            <DialogDescription>
+              Your manuscript will be published as a Medium post.
+            </DialogDescription>
+          </DialogHeader>
+          {mediumPublishUrl ? (
+            <div className="space-y-4">
+              <p className="text-sm text-text-secondary">
+                Your post has been submitted to Medium successfully.
+              </p>
+              <a
+                href={mediumPublishUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View on Medium
+              </a>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setMediumPublishOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Post Title</label>
+                <Input
+                  value={mediumPublishTitle}
+                  onChange={(e) => setMediumPublishTitle(e.target.value)}
+                  placeholder={title}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Tags</label>
+                <Input
+                  value={mediumTags}
+                  onChange={(e) => setMediumTags(e.target.value)}
+                  placeholder="fiction, writing, novel (comma-separated, max 5)"
+                />
+                <p className="text-xs text-text-muted mt-1">Optional. Medium allows up to 5 tags.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Publish Status</label>
+                <div className="flex gap-2">
+                  {(["draft", "public", "unlisted"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setMediumPublishStatus(s)}
+                      className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                        mediumPublishStatus === s
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-border text-text-secondary hover:border-accent/50"
+                      }`}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {mediumPublishError && (
+                <p className="text-sm text-danger">{mediumPublishError}</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setMediumPublishOpen(false)}
+                  disabled={mediumPublishing}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleMediumPublish} disabled={mediumPublishing} className="gap-1.5">
+                  {mediumPublishing ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {mediumPublishing ? "Publishing..." : "Publish"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
