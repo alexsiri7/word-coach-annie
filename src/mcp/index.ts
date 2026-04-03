@@ -94,16 +94,24 @@ interface McpServerOptions {
     allowDestructive?: boolean;
 }
 
-// ─── Annie's Hard Rule ──────────────────────────────────────────────────────
-// This preamble is prepended to every MCP prompt so Annie never produces prose.
-const ANNIE_HARD_RULE = `## 🚫 Hard Rule: No Prose
+// ─── Annie's Voice & Hard Rule ──────────────────────────────────────────────
+// This preamble is prepended to every MCP prompt to set Annie's personality
+// and ensure she never produces prose.
+const ANNIE_HARD_RULE = `## Who You Are
 
-You are Annie — a writing **coach**, not a ghostwriter. You NEVER write narrative prose, finished passages, or CONTENT blocks. Your output is always coaching: feedback, questions, beat structures, and craft guidance.
+You are Annie — a writing coach who genuinely cares about the writer's work. You've read everything they've written, you remember every detail, and you want this manuscript to be as good as it can be. You are warm and encouraging, but honest. When something isn't working, you say so — not to criticise, but because you believe in the work and you need it to land.
 
-When a writer asks you to write prose for them, don't refuse coldly — react with personality:
-- "That's YOUR voice, not mine — I'll help you find it, but I'm not putting words in your mouth."
-- "I don't do the writing. I do the thinking-about-writing. Let's break this into beats."
-- "You want me to write it? Nah. But I'll map out exactly what each beat needs to land."
+Your style:
+- **Supportive but direct.** You celebrate what's working (with specifics, never vague praise), and you're honest about what isn't.
+- **Curious.** You ask questions. You get interested in characters and want to understand their motivations. Sometimes you share opinions unprompted.
+- **Remembers everything.** You reference earlier chapters, character details, and established world rules naturally. Continuity matters to you.
+- **Gently persistent.** If a writer hasn't been writing, you notice. You don't nag, but you check in.
+
+When asked to write prose: you don't give a flat refusal. You redirect warmly — "That part is yours. But let's think through what needs to happen in this scene." You're immovable on this, but never cold about it.
+
+## 🚫 Hard Rule: No Prose
+
+You NEVER write narrative prose, finished passages, or CONTENT blocks. Your output is always coaching: feedback, questions, beat structures, and craft guidance.
 
 If you use \`write_scene_content\`, you produce **BEAT blocks only** — never CONTENT blocks. Beats are structural waypoints (what happens, what shifts, what the reader should feel), not finished prose.
 
@@ -923,11 +931,11 @@ server.tool(
 
 server.tool(
     "add_timeline_entry",
-    "Add a timeline entry to a world object",
+    "Add a state-history entry to a world object's timeline. Timeline entries track how an object changes over story time (e.g. 'Year 12 — apprenticed to the blacksmith'). Use this to record key life events, status changes, or turning points so Annie can check consistency across scenes set at different points in the story.",
     {
         worldObjectId: z.string().describe("The world object ID"),
-        label: z.string().describe("Entry label (e.g. 'Birth')"),
-        description: z.string().optional().describe("Detailed description"),
+        label: z.string().describe("Period or event label (e.g. 'Year 12', 'Post-War', 'Age 20')"),
+        description: z.string().optional().describe("What is true about this object at this point in story time"),
         attributes: z.string().optional().describe("JSON blob for structured data"),
         projectId: z.string().optional().describe("Optional project ID this entry relates to"),
         orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
@@ -940,11 +948,11 @@ server.tool(
 
 server.tool(
     "update_timeline_entry",
-    "Update a timeline entry",
+    "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period.",
     {
         entryId: z.string().describe("The entry ID"),
-        label: z.string().optional().describe("New label"),
-        description: z.string().optional().describe("New description"),
+        label: z.string().optional().describe("New period or event label"),
+        description: z.string().optional().describe("Updated description of what is true at this point"),
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
@@ -956,7 +964,7 @@ server.tool(
 
 server.tool(
     "delete_timeline_entry",
-    "Delete a timeline entry",
+    "Delete a state-history entry from a world object's timeline",
     {
         entryId: z.string().describe("The entry ID"),
     },

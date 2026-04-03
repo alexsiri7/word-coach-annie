@@ -6,7 +6,9 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 import {
+    getCurrentUserId,
     verifyProjectAccess,
+    verifyProjectReadAccess,
     verifyUniverseAccess,
     verifyProjectAccessByNode,
 } from "@/lib/api-auth";
@@ -25,6 +27,91 @@ async function createTestUser(id: string) {
 }
 
 describe("api-auth", () => {
+    describe("getCurrentUserId", () => {
+        it("returns userId from x-user-id header", () => {
+            const headers = new Headers({ "x-user-id": "user-abc", "x-user-email": "abc@test.com" });
+            const request = { headers } as unknown as import("next/server").NextRequest;
+            expect(getCurrentUserId(request)).toBe("user-abc");
+        });
+
+        it("returns null when x-user-id header is absent", () => {
+            const headers = new Headers();
+            const request = { headers } as unknown as import("next/server").NextRequest;
+            expect(getCurrentUserId(request)).toBeNull();
+        });
+    });
+
+    describe("verifyProjectReadAccess", () => {
+        it("returns 404 for non-existent project", async () => {
+            const result = await verifyProjectReadAccess("nonexistent", "user-1");
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(404);
+            }
+        });
+
+        it("allows access when userId is null (dev mode)", async () => {
+            const project = await ProjectsController.createProject({ title: "ReadTest" });
+            const result = await verifyProjectReadAccess(project.id, null);
+            expect(result.authorized).toBe(true);
+            if (result.authorized) {
+                expect(result.role).toBeNull();
+            }
+        });
+
+        it("allows owner access with OWNER role", async () => {
+            const user = await createTestUser("read-owner");
+            const project = await prisma.project.create({
+                data: { title: "Owned", userId: user.id },
+            });
+            const result = await verifyProjectReadAccess(project.id, user.id, user.email);
+            expect(result.authorized).toBe(true);
+            if (result.authorized) {
+                expect(result.role).toBe("OWNER");
+            }
+        });
+
+        it("allows shared reader access with READER role", async () => {
+            const owner = await createTestUser("read-proj-owner");
+            const reader = await createTestUser("read-proj-reader");
+            const project = await prisma.project.create({
+                data: { title: "Shared", userId: owner.id },
+            });
+            await prisma.projectShare.create({
+                data: { projectId: project.id, email: reader.email },
+            });
+            const result = await verifyProjectReadAccess(project.id, reader.id, reader.email);
+            expect(result.authorized).toBe(true);
+            if (result.authorized) {
+                expect(result.role).toBe("READER");
+            }
+        });
+
+        it("denies access to non-owner non-shared user", async () => {
+            const owner = await createTestUser("read-deny-owner");
+            const project = await prisma.project.create({
+                data: { title: "Private", userId: owner.id },
+            });
+            const result = await verifyProjectReadAccess(project.id, "stranger", "stranger@test.com");
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(403);
+            }
+        });
+
+        it("denies access when no email provided for non-owner", async () => {
+            const owner = await createTestUser("read-no-email");
+            const project = await prisma.project.create({
+                data: { title: "NoEmail", userId: owner.id },
+            });
+            const result = await verifyProjectReadAccess(project.id, "stranger", null);
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(403);
+            }
+        });
+    });
+
     describe("verifyProjectAccess", () => {
         it("returns 404 for non-existent project", async () => {
             const result = await verifyProjectAccess("nonexistent", "user-1");

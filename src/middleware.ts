@@ -18,6 +18,8 @@ const PUBLIC_PATHS = [
     "/api/auth/google",
     "/api/auth/me",
     "/login",
+    "/privacy",
+    "/terms",
     "/.well-known/oauth-authorization-server",
     "/oauth/register",
     "/oauth/token",
@@ -30,38 +32,101 @@ function isPublicPath(pathname: string): boolean {
     );
 }
 
+function makeRateLimitResponse(
+    config: { limit: number; windowMs: number },
+    retryAfterMs: number,
+    resetMs: number
+): NextResponse {
+    const retryAfterSec = Math.ceil((retryAfterMs ?? 1000) / 1000);
+    return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+            status: 429,
+            headers: {
+                "Retry-After": String(retryAfterSec),
+                "X-RateLimit-Limit": String(config.limit),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": String(Math.ceil(resetMs / 1000)),
+            },
+        }
+    );
+}
+
 /**
  * Apply per-user rate limiting on API routes.
- * Chat endpoint: 30 req/min. Other API routes: 100 req/min.
- * Returns a 429 response if the limit is exceeded, or null if allowed.
+ * - Chat: 30 req/min
+ * - Read (GET): 120 req/min
+ * - Write (POST/PATCH/DELETE): 60 req/min
+ * - Project creation (POST /api/projects): 10/hour
+ * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
 function applyRateLimit(
-    pathname: string,
+    request: NextRequest,
     userKey: string
 ): NextResponse | null {
+    const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
+    const method = request.method;
+
+    // Chat endpoint has its own dedicated limit
     const isChatRoute =
         pathname === "/api/chat" || pathname.startsWith("/api/chat/");
-    const config = isChatRoute ? RATE_LIMITS.chat : RATE_LIMITS.api;
-    const prefix = isChatRoute ? "chat" : "api";
+    if (isChatRoute) {
+        const result = checkRateLimit(`chat:${userKey}`, RATE_LIMITS.chat);
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.chat,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+        return null;
+    }
+
+    // Project creation: POST /api/projects (not /api/projects/:id subpaths)
+    const isProjectCreate = method === "POST" && pathname === "/api/projects";
+    if (isProjectCreate) {
+        const result = checkRateLimit(
+            `projectCreate:${userKey}`,
+            RATE_LIMITS.projectCreate
+        );
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.projectCreate,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+    }
+
+    // Feedback submission: POST /api/feedback
+    const isFeedback = method === "POST" && pathname === "/api/feedback";
+    if (isFeedback) {
+        const result = checkRateLimit(
+            `feedback:${userKey}`,
+            RATE_LIMITS.feedback
+        );
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.feedback,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+    }
+
+    // Read vs write rate limit
+    const isRead = method === "GET" || method === "HEAD";
+    const config = isRead ? RATE_LIMITS.read : RATE_LIMITS.write;
+    const prefix = isRead ? "read" : "write";
     const result = checkRateLimit(`${prefix}:${userKey}`, config);
 
     if (!result.allowed) {
-        const retryAfterSec = Math.ceil((result.retryAfterMs ?? 1000) / 1000);
-        return NextResponse.json(
-            { error: "Too many requests. Please try again later." },
-            {
-                status: 429,
-                headers: {
-                    "Retry-After": String(retryAfterSec),
-                    "X-RateLimit-Limit": String(config.limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": String(
-                        Math.ceil(result.resetMs / 1000)
-                    ),
-                },
-            }
+        return makeRateLimitResponse(
+            config,
+            result.retryAfterMs!,
+            result.resetMs
         );
     }
 
@@ -91,7 +156,7 @@ export async function middleware(request: NextRequest) {
 
         // 1. Check static API_TOKEN
         if (token && apiToken && token === apiToken) {
-            const rateLimited = applyRateLimit(pathname, "apitoken");
+            const rateLimited = applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
             return NextResponse.next();
         }
@@ -100,7 +165,7 @@ export async function middleware(request: NextRequest) {
         if (token) {
             const mcpSession = await verifyMcpToken(token, "mcp_access");
             if (mcpSession) {
-                const rateLimited = applyRateLimit(pathname, mcpSession.userId);
+                const rateLimited = applyRateLimit(request, mcpSession.userId);
                 if (rateLimited) return rateLimited;
 
                 Sentry.setUser({
@@ -133,7 +198,7 @@ export async function middleware(request: NextRequest) {
         const session = await verifySessionToken(sessionCookie);
         if (session) {
             // Rate limit by authenticated user ID
-            const rateLimited = applyRateLimit(pathname, session.userId);
+            const rateLimited = applyRateLimit(request, session.userId);
             if (rateLimited) return rateLimited;
 
             // Set Sentry user context for error attribution
@@ -156,7 +221,7 @@ export async function middleware(request: NextRequest) {
             const expected = await deriveSessionToken(apiToken);
             if (sessionCookie === expected) {
                 // Rate limit legacy sessions by token
-                const rateLimited = applyRateLimit(pathname, "apitoken");
+                const rateLimited = applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;
                 return NextResponse.next();
             }

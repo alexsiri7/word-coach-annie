@@ -40,6 +40,8 @@ export interface WorldObject {
   createdAt: string;
   updatedAt: string;
   timeline?: WorldObjectTimelineEntry[];
+  relationships?: Relationship[];
+  relatedBy?: Relationship[];
 }
 
 export interface WorldObjectTimelineEntry {
@@ -105,13 +107,17 @@ export interface Relationship {
   label: string;
   fromNodeId: string | null;
   fromObjectId: string | null;
+  fromWorldObjectId: string | null;
   toNodeId: string | null;
   toObjectId: string | null;
+  toWorldObjectId: string | null;
   createdAt: string;
   fromNode?: StructureNode;
   fromObject?: StoryObject;
+  fromWorldObject?: WorldObject;
   toNode?: StructureNode;
   toObject?: StoryObject;
+  toWorldObject?: WorldObject;
 }
 
 export interface ContentVersion {

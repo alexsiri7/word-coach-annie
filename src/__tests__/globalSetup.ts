@@ -27,4 +27,11 @@ export function setup() {
     env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL, DIRECT_DATABASE_URL: TEST_DATABASE_URL },
     stdio: "inherit",
   });
+
+  // Regenerate client to ensure it matches the current schema.
+  // This guards against stale cached node_modules in CI.
+  execSync("npx prisma generate", {
+    env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
+    stdio: "inherit",
+  });
 }
