@@ -20,6 +20,7 @@ import {
   BookOpen,
   TrendingUp,
   Eye,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel")
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
 const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
+const PeerReviewDialog = dynamic(() => import("@/components/peer-review-dialog").then(m => m.PeerReviewDialog));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ShareButton } from "@/components/share-dialog";
@@ -117,6 +119,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
+  const [showPeerReview, setShowPeerReview] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -423,6 +426,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          onClick={() => setShowPeerReview(true)}
+          aria-label="Peer review"
+          title="Peer review"
+        >
+          <Layers className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
           onClick={() => router.push(`/project/${projectId}/settings`)}
           aria-label="Project settings"
         >
@@ -685,6 +698,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           )}
         </main>
       </div>
+
+      {/* Peer Review Dialog */}
+      <PeerReviewDialog
+        open={showPeerReview}
+        onOpenChange={setShowPeerReview}
+        projectId={projectId}
+      />
 
       {/* Add Node Dialog */}
       <Dialog open={addNodeDialogOpen} onOpenChange={setAddNodeDialogOpen}>
