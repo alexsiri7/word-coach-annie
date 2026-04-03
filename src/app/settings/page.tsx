@@ -56,16 +56,16 @@ export default function SettingsPage() {
   const [coachingStyle, setCoachingStyle] = useState("balanced");
   const [responseLength, setResponseLength] = useState("moderate");
 
-  // Medium integration state
-  const [mediumLoading, setMediumLoading] = useState(true);
-  const [mediumConnected, setMediumConnected] = useState(false);
-  const [mediumUsername, setMediumUsername] = useState<string | null>(null);
-  const [mediumConnectOpen, setMediumConnectOpen] = useState(false);
-  const [mediumDisconnectOpen, setMediumDisconnectOpen] = useState(false);
-  const [mediumToken, setMediumToken] = useState("");
-  const [mediumConnecting, setMediumConnecting] = useState(false);
-  const [mediumDisconnecting, setMediumDisconnecting] = useState(false);
-  const [mediumError, setMediumError] = useState("");
+  // Hashnode integration state
+  const [hashnodeLoading, setHashnodeLoading] = useState(true);
+  const [hashnodeConnected, setHashnodeConnected] = useState(false);
+  const [hashnodeUsername, setHashnodeUsername] = useState<string | null>(null);
+  const [hashnodeConnectOpen, setHashnodeConnectOpen] = useState(false);
+  const [hashnodeDisconnectOpen, setHashnodeDisconnectOpen] = useState(false);
+  const [hashnodeToken, setHashnodeToken] = useState("");
+  const [hashnodeConnecting, setHashnodeConnecting] = useState(false);
+  const [hashnodeDisconnecting, setHashnodeDisconnecting] = useState(false);
+  const [hashnodeError, setHashnodeError] = useState("");
 
 
   useEffect(() => {
@@ -84,50 +84,50 @@ export default function SettingsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    fetch("/api/integrations/medium")
+    fetch("/api/integrations/hashnode")
       .then((res) => res.json())
       .then((data) => {
-        setMediumConnected(data.connected ?? false);
-        setMediumUsername(data.username ?? null);
+        setHashnodeConnected(data.connected ?? false);
+        setHashnodeUsername(data.username ?? null);
       })
       .catch(console.error)
-      .finally(() => setMediumLoading(false));
+      .finally(() => setHashnodeLoading(false));
   }, []);
 
-  const handleMediumConnect = async () => {
-    const trimmed = mediumToken.trim();
+  const handleHashnodeConnect = async () => {
+    const trimmed = hashnodeToken.trim();
     if (!trimmed) return;
-    setMediumConnecting(true);
-    setMediumError("");
+    setHashnodeConnecting(true);
+    setHashnodeError("");
     try {
-      const res = await fetch("/api/integrations/medium", {
+      const res = await fetch("/api/integrations/hashnode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ integrationToken: trimmed }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setMediumError(data.error || "Failed to connect");
+        setHashnodeError(data.error || "Failed to connect");
         return;
       }
-      setMediumConnected(true);
-      setMediumUsername(data.username ?? null);
-      setMediumConnectOpen(false);
-      setMediumToken("");
+      setHashnodeConnected(true);
+      setHashnodeUsername(data.username ?? null);
+      setHashnodeConnectOpen(false);
+      setHashnodeToken("");
     } finally {
-      setMediumConnecting(false);
+      setHashnodeConnecting(false);
     }
   };
 
-  const handleMediumDisconnect = async () => {
-    setMediumDisconnecting(true);
+  const handleHashnodeDisconnect = async () => {
+    setHashnodeDisconnecting(true);
     try {
-      await fetch("/api/integrations/medium", { method: "DELETE" });
-      setMediumConnected(false);
-      setMediumUsername(null);
-      setMediumDisconnectOpen(false);
+      await fetch("/api/integrations/hashnode", { method: "DELETE" });
+      setHashnodeConnected(false);
+      setHashnodeUsername(null);
+      setHashnodeDisconnectOpen(false);
     } finally {
-      setMediumDisconnecting(false);
+      setHashnodeDisconnecting(false);
     }
   };
 
@@ -333,31 +333,31 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Medium Integration */}
+        {/* Hashnode Integration (compact status card) */}
         <div className="glass-card p-6 mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Link2 className="h-4 w-4 text-accent" />
-            <h2 className="text-lg font-semibold text-text-primary">Medium</h2>
+            <h2 className="text-lg font-semibold text-text-primary">Hashnode</h2>
           </div>
 
-          {mediumLoading ? (
+          {hashnodeLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : mediumConnected ? (
+          ) : hashnodeConnected ? (
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-primary">
-                  Connected{mediumUsername ? ` as @${mediumUsername}` : ""}
+                  Connected{hashnodeUsername ? ` as @${hashnodeUsername}` : ""}
                 </p>
                 <p className="text-xs text-text-muted mt-0.5">
-                  You can publish posts directly to Medium.
+                  You can publish posts directly to Hashnode.
                 </p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setMediumDisconnectOpen(true)}
+                onClick={() => setHashnodeDisconnectOpen(true)}
               >
                 Disconnect
               </Button>
@@ -367,80 +367,80 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm text-text-primary">Not connected</p>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Connect your Medium account to publish directly.
+                  Connect your Hashnode account to publish directly.
                 </p>
               </div>
-              <Button size="sm" onClick={() => { setMediumError(""); setMediumToken(""); setMediumConnectOpen(true); }}>
+              <Button size="sm" onClick={() => { setHashnodeError(""); setHashnodeToken(""); setHashnodeConnectOpen(true); }}>
                 Connect
               </Button>
             </div>
           )}
         </div>
 
-        {/* Medium Connect Dialog */}
-        <Dialog open={mediumConnectOpen} onOpenChange={setMediumConnectOpen}>
+        {/* Hashnode Connect Dialog */}
+        <Dialog open={hashnodeConnectOpen} onOpenChange={setHashnodeConnectOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Connect Medium Account</DialogTitle>
+              <DialogTitle>Connect Hashnode Account</DialogTitle>
               <DialogDescription>
-                Paste your Medium integration token to link your account.
+                Paste your Hashnode Personal Access Token to link your account.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <label htmlFor="medium-token" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Integration Token
+                <label htmlFor="hashnode-token" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Personal Access Token
                 </label>
                 <Input
-                  id="medium-token"
+                  id="hashnode-token"
                   type="password"
-                  value={mediumToken}
-                  onChange={(e) => { setMediumToken(e.target.value); if (mediumError) setMediumError(""); }}
+                  value={hashnodeToken}
+                  onChange={(e) => { setHashnodeToken(e.target.value); if (hashnodeError) setHashnodeError(""); }}
                   placeholder="Paste your token here"
-                  onKeyDown={(e) => e.key === "Enter" && handleMediumConnect()}
-                  disabled={mediumConnecting}
+                  onKeyDown={(e) => e.key === "Enter" && handleHashnodeConnect()}
+                  disabled={hashnodeConnecting}
                 />
                 <p className="text-xs text-text-muted mt-1">
-                  Find your token at{" "}
+                  Generate a token at{" "}
                   <a
-                    href="https://medium.com/me/settings/security"
+                    href="https://hashnode.com/settings/developer"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent underline underline-offset-2"
                   >
-                    medium.com/me/settings/security
-                  </a>{" "}
-                  under &ldquo;Integration tokens&rdquo;.
+                    hashnode.com/settings/developer
+                  </a>
+                  .
                 </p>
               </div>
-              {mediumError && (
-                <p className="text-xs text-danger">{mediumError}</p>
+              {hashnodeError && (
+                <p className="text-xs text-danger">{hashnodeError}</p>
               )}
               <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" size="sm" onClick={() => setMediumConnectOpen(false)} disabled={mediumConnecting}>
+                <Button variant="outline" size="sm" onClick={() => setHashnodeConnectOpen(false)} disabled={hashnodeConnecting}>
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleMediumConnect} disabled={mediumConnecting || !mediumToken.trim()}>
-                  {mediumConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
+                <Button size="sm" onClick={handleHashnodeConnect} disabled={hashnodeConnecting || !hashnodeToken.trim()}>
+                  {hashnodeConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Medium Disconnect Confirmation */}
-        <AlertDialog open={mediumDisconnectOpen} onOpenChange={setMediumDisconnectOpen}>
+        {/* Hashnode Disconnect Confirmation */}
+        <AlertDialog open={hashnodeDisconnectOpen} onOpenChange={setHashnodeDisconnectOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Disconnect Medium?</AlertDialogTitle>
+              <AlertDialogTitle>Disconnect Hashnode?</AlertDialogTitle>
               <AlertDialogDescription>
-                Your integration token will be removed. You won&apos;t be able to publish to Medium until you reconnect.
+                Your access token will be removed. You won&apos;t be able to publish to Hashnode until you reconnect.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={mediumDisconnecting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleMediumDisconnect} disabled={mediumDisconnecting}>
-                {mediumDisconnecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              <AlertDialogCancel disabled={hashnodeDisconnecting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleHashnodeDisconnect} disabled={hashnodeDisconnecting}>
+                {hashnodeDisconnecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 Disconnect
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -463,50 +463,42 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Medium Integration */}
+        {/* Hashnode Integration (detailed inline form) */}
         {!loading && (
           <div className="glass-card p-6 mt-6">
             <div className="flex items-center gap-2 mb-1">
-              <svg
-                role="img"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 fill-current text-accent"
-                aria-hidden="true"
-              >
-                <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
-              </svg>
-              <h2 className="text-lg font-semibold text-text-primary">Medium</h2>
+              <Link2 className="h-4 w-4 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">Hashnode</h2>
             </div>
             <p className="text-sm text-text-secondary mb-4">
-              Publish your stories directly to Medium. Uses a self-issued integration token from your{" "}
+              Publish your stories directly to Hashnode. Requires a Personal Access Token from your{" "}
               <a
-                href="https://medium.com/me/settings/security"
+                href="https://hashnode.com/settings/developer"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent hover:underline"
               >
-                Medium security settings
+                Hashnode developer settings
               </a>
               .
             </p>
 
-            {mediumConnected ? (
+            {hashnodeConnected ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Link2 className="h-4 w-4 text-green-500" />
                   <span className="text-text-secondary">
-                    Connected{mediumUsername ? ` as @${mediumUsername}` : ""}
+                    Connected{hashnodeUsername ? ` as @${hashnodeUsername}` : ""}
                   </span>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleMediumDisconnect}
-                  disabled={mediumConnecting}
+                  onClick={handleHashnodeDisconnect}
+                  disabled={hashnodeDisconnecting}
                   className="gap-1.5"
                 >
-                  {mediumConnecting ? (
+                  {hashnodeDisconnecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Link2Off className="h-4 w-4" />
@@ -518,34 +510,31 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Integration Token
+                    Personal Access Token
                   </label>
                   <Input
                     type="password"
-                    value={mediumToken}
-                    onChange={(e) => setMediumToken(e.target.value)}
-                    placeholder="Paste your Medium integration token"
+                    value={hashnodeToken}
+                    onChange={(e) => setHashnodeToken(e.target.value)}
+                    placeholder="Paste your Hashnode PAT"
                   />
                   <p className="text-xs text-text-muted mt-1">
-                    Get it from medium.com/me/settings/security → Integration tokens
+                    Get it from hashnode.com/settings/developer
                   </p>
                 </div>
-                {mediumError && <p className="text-sm text-danger">{mediumError}</p>}
+                {hashnodeError && <p className="text-sm text-danger">{hashnodeError}</p>}
                 <Button
-                  onClick={handleMediumConnect}
-                  disabled={mediumConnecting || !mediumToken.trim()}
+                  onClick={handleHashnodeConnect}
+                  disabled={hashnodeConnecting || !hashnodeToken.trim()}
                   className="gap-1.5"
                 >
-                  {mediumConnecting ? (
+                  {hashnodeConnecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Link2 className="h-4 w-4" />
                   )}
-                  Connect Medium
+                  Connect Hashnode
                 </Button>
-                <p className="text-xs text-text-muted">
-                  Note: The Medium API is deprecated as of Jan 2025 but continues to work for existing integration tokens.
-                </p>
               </div>
             )}
           </div>

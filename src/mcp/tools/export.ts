@@ -331,6 +331,9 @@ export async function exportMedium(projectId: string, nodeId?: string): Promise<
     return lines.join("\n").trim();
 }
 
+// Hashnode uses the same markdown export format as the Medium export
+export const exportHashnode = exportMedium;
+
 export async function getProjectSummary(projectId: string) {
     return mcpCache.getOrSet(
         `projectSummary:${projectId}`,

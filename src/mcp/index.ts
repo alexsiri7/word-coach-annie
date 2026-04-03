@@ -729,15 +729,15 @@ server.tool(
 );
 
 server.tool(
-    "export_medium",
-    "Export a specific node (Article/Chapter) or the entire project in Medium-ready Markdown format (with front matter)",
+    "export_hashnode",
+    "Export a specific node (Article/Chapter) or the entire project in Hashnode-ready Markdown format (with front matter)",
     {
         projectId: z.string().describe("The project ID"),
         nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
     },
     async ({ projectId, nodeId }) => {
-        const { exportMedium } = await import("./tools/export");
-        const markdown = await exportMedium(projectId, nodeId);
+        const { exportHashnode } = await import("./tools/export");
+        const markdown = await exportHashnode(projectId, nodeId);
         return { content: [{ type: "text", text: markdown }] };
     }
 );
