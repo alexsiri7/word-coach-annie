@@ -16,6 +16,53 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     steps:
+      - name: Configure API token on staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_STAGING_SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          if [ -z "$API_TOKEN" ]; then
+            echo "::error::API_TOKEN secret is not set in GitHub."
+            echo "::error::Add it at: Settings > Secrets > Actions > New repository secret"
+            echo "::error::Set the same value as API_TOKEN in the Railway staging service."
+            exit 1
+          fi
+
+          # Check if auth already works — skip reconfiguration if so
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer $API_TOKEN" \
+            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1)
+          if [ "$STATUS" = "200" ]; then
+            echo "✓ API token auth already works on staging — no reconfiguration needed"
+            exit 0
+          fi
+          echo "Staging auth returned HTTP $STATUS — need to configure API_TOKEN on staging"
+
+          if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_PROJECT_ID" ]; then
+            echo "::error::RAILWAY_TOKEN / RAILWAY_PROJECT_ID not set — cannot auto-configure staging"
+            echo "::error::Manually set API_TOKEN in the Railway staging service environment variables"
+            echo "::error::Value must match the API_TOKEN GitHub secret"
+            exit 1
+          fi
+
+          echo "Setting API_TOKEN on staging service via Railway API..."
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-raw "{\"query\":\"mutation { variableUpsert(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", name: \\\"API_TOKEN\\\", value: \\\"$API_TOKEN\\\" }) }\"}")
+
+          echo "Railway API response: $RESPONSE"
+          ERRORS=$(echo "$RESPONSE" | jq -r '.errors // empty')
+          if [ -n "$ERRORS" ] && [ "$ERRORS" != "null" ]; then
+            echo "::error::Failed to set API_TOKEN on staging via Railway API: $ERRORS"
+            echo "::error::Manually set API_TOKEN in Railway staging service env vars"
+            exit 1
+          fi
+          echo "✓ API_TOKEN configured on staging — Railway will redeploy. Health check will wait..."
+
       - name: Wait for healthy staging deploy
         run: |
           MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
@@ -23,7 +70,6 @@ jobs:
           echo "Polling staging health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
           for i in $(seq 1 $MAX_ATTEMPTS); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-              -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
               https://word-coach-annie-staging.up.railway.app/api/health)
             if [ "$STATUS" = "200" ]; then
               echo "✓ Staging health check passed after $((i * INTERVAL))s"
@@ -36,6 +82,18 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Verify API token authentication
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1)
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::API token auth still failing after deploy (HTTP $STATUS)"
+            echo "::error::Check that API_TOKEN in Railway staging matches the GitHub secret"
+            exit 1
+          fi
+          echo "✓ API token authentication works against staging (HTTP $STATUS)"
 
       - name: Checkout code
         uses: actions/checkout@v4
