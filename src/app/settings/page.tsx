@@ -8,6 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AiSettingsData {
   baseUrl: string;
@@ -39,55 +56,17 @@ export default function SettingsPage() {
   const [coachingStyle, setCoachingStyle] = useState("balanced");
   const [responseLength, setResponseLength] = useState("moderate");
 
-  // Medium integration
+  // Medium integration state
+  const [mediumLoading, setMediumLoading] = useState(true);
   const [mediumConnected, setMediumConnected] = useState(false);
-  const [mediumUsername, setMediumUsername] = useState("");
+  const [mediumUsername, setMediumUsername] = useState<string | null>(null);
+  const [mediumConnectOpen, setMediumConnectOpen] = useState(false);
+  const [mediumDisconnectOpen, setMediumDisconnectOpen] = useState(false);
   const [mediumToken, setMediumToken] = useState("");
   const [mediumConnecting, setMediumConnecting] = useState(false);
+  const [mediumDisconnecting, setMediumDisconnecting] = useState(false);
   const [mediumError, setMediumError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/integrations/medium")
-      .then((r) => r.json())
-      .then((d) => {
-        setMediumConnected(d.connected ?? false);
-        setMediumUsername(d.username ?? "");
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleMediumConnect = async () => {
-    setMediumConnecting(true);
-    setMediumError("");
-    try {
-      const res = await fetch("/api/integrations/medium", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: mediumToken.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMediumError(data.error || "Connection failed");
-        return;
-      }
-      setMediumConnected(true);
-      setMediumUsername(data.username || "");
-      setMediumToken("");
-    } finally {
-      setMediumConnecting(false);
-    }
-  };
-
-  const handleMediumDisconnect = async () => {
-    setMediumConnecting(true);
-    try {
-      await fetch("/api/integrations/medium", { method: "DELETE" });
-      setMediumConnected(false);
-      setMediumUsername("");
-    } finally {
-      setMediumConnecting(false);
-    }
-  };
 
   useEffect(() => {
     fetch("/api/ai-settings")
@@ -104,7 +83,53 @@ export default function SettingsPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    fetch("/api/integrations/medium")
+      .then((res) => res.json())
+      .then((data) => {
+        setMediumConnected(data.connected ?? false);
+        setMediumUsername(data.username ?? null);
+      })
+      .catch(console.error)
+      .finally(() => setMediumLoading(false));
   }, []);
+
+  const handleMediumConnect = async () => {
+    const trimmed = mediumToken.trim();
+    if (!trimmed) return;
+    setMediumConnecting(true);
+    setMediumError("");
+    try {
+      const res = await fetch("/api/integrations/medium", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ integrationToken: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMediumError(data.error || "Failed to connect");
+        return;
+      }
+      setMediumConnected(true);
+      setMediumUsername(data.username ?? null);
+      setMediumConnectOpen(false);
+      setMediumToken("");
+    } finally {
+      setMediumConnecting(false);
+    }
+  };
+
+  const handleMediumDisconnect = async () => {
+    setMediumDisconnecting(true);
+    try {
+      await fetch("/api/integrations/medium", { method: "DELETE" });
+      setMediumConnected(false);
+      setMediumUsername(null);
+      setMediumDisconnectOpen(false);
+    } finally {
+      setMediumDisconnecting(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -307,6 +332,120 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+        {/* Medium Integration */}
+        <div className="glass-card p-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Link2 className="h-4 w-4 text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">Medium</h2>
+          </div>
+
+          {mediumLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : mediumConnected ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">
+                  Connected{mediumUsername ? ` as @${mediumUsername}` : ""}
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  You can publish posts directly to Medium.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMediumDisconnectOpen(true)}
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">Not connected</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Connect your Medium account to publish directly.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => { setMediumError(""); setMediumToken(""); setMediumConnectOpen(true); }}>
+                Connect
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Medium Connect Dialog */}
+        <Dialog open={mediumConnectOpen} onOpenChange={setMediumConnectOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Connect Medium Account</DialogTitle>
+              <DialogDescription>
+                Paste your Medium integration token to link your account.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="medium-token" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Integration Token
+                </label>
+                <Input
+                  id="medium-token"
+                  type="password"
+                  value={mediumToken}
+                  onChange={(e) => { setMediumToken(e.target.value); if (mediumError) setMediumError(""); }}
+                  placeholder="Paste your token here"
+                  onKeyDown={(e) => e.key === "Enter" && handleMediumConnect()}
+                  disabled={mediumConnecting}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Find your token at{" "}
+                  <a
+                    href="https://medium.com/me/settings/security"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline underline-offset-2"
+                  >
+                    medium.com/me/settings/security
+                  </a>{" "}
+                  under &ldquo;Integration tokens&rdquo;.
+                </p>
+              </div>
+              {mediumError && (
+                <p className="text-xs text-danger">{mediumError}</p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => setMediumConnectOpen(false)} disabled={mediumConnecting}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleMediumConnect} disabled={mediumConnecting || !mediumToken.trim()}>
+                  {mediumConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Medium Disconnect Confirmation */}
+        <AlertDialog open={mediumDisconnectOpen} onOpenChange={setMediumDisconnectOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Disconnect Medium?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your integration token will be removed. You won&apos;t be able to publish to Medium until you reconnect.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={mediumDisconnecting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleMediumDisconnect} disabled={mediumDisconnecting}>
+                {mediumDisconnecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Disconnect
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Save Button */}
         {!loading && (

@@ -34,8 +34,9 @@ CREATE INDEX "MediumExport_projectId_idx" ON "MediumExport"("projectId");
 -- CreateIndex
 CREATE INDEX "MediumExport_nodeId_idx" ON "MediumExport"("nodeId");
 
--- AddForeignKey
-ALTER TABLE "MediumCredential" ADD CONSTRAINT "MediumCredential_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- No FK from MediumCredential.userId to User: userId is "local" in single-user
+-- mode and an actual user ID in multi-user mode. The sentinel value "local"
+-- cannot satisfy a User FK constraint, so cascade is handled in application code.
 
 -- AddForeignKey
 ALTER TABLE "MediumExport" ADD CONSTRAINT "MediumExport_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;

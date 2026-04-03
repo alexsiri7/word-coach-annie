@@ -42,7 +42,7 @@ beforeEach(async () => {
       "UserAiSettings", "AiSettings", "WritingSession", "Relationship",
       "Annotation", "ContentVersion", "StoryObject", "StructureNode",
       "ProjectShare", "WorldObjectTimelineEntry", "WorldObject", "Project",
-      "Universe", "User"
+      "Universe", "User", "MediumCredential", "MediumExport"
     CASCADE`
   );
 });
