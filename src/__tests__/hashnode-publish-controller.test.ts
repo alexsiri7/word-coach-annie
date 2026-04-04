@@ -245,6 +245,8 @@ describe("HashnodePublishController", () => {
 
     describe("re-publish guard", () => {
         it("returns alreadyPublished when export record exists", async () => {
+            global.fetch = vi.fn();
+
             await testPrisma.hashnodeExport.create({
                 data: {
                     projectId,
