@@ -997,8 +997,8 @@ test.describe('Integration tests — real server, real data', () => {
         nodeIdMap.set(node.id, created.id)
       }
 
-      // Restore content for scenes
-      for (const cv of exported.contentVersions) {
+      // Restore content for scenes (skip auto-created empty versions to avoid count mismatch)
+      for (const cv of exported.contentVersions.filter((cv: { content: string }) => cv.content)) {
         const newNodeId = nodeIdMap.get(cv.nodeId)
         if (newNodeId) {
           const res = await request.post(
