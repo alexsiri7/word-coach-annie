@@ -92,7 +92,7 @@ export function HashnodePublishDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title,
+          titleOverride: title,
           publishStatus,
           tags: parsedTags,
           ...(canonicalUrl.trim() ? { canonicalUrl: canonicalUrl.trim() } : {}),
@@ -105,6 +105,8 @@ export function HashnodePublishDialog({
         return;
       }
       setResult({ url: data.hashnodePostUrl, isDraft: publishStatus === "draft" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Publish failed — check your connection");
     } finally {
       setPublishing(false);
     }
