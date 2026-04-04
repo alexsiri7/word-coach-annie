@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,12 +53,32 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [hashnodeConnected, setHashnodeConnected] = useState(false);
   const [hashnodeDialogOpen, setHashnodeDialogOpen] = useState(false);
 
+  // Google Docs integration
+  interface GoogleDocExportInfo {
+    id: string;
+    exportMode: string;
+    googleDocUrl: string;
+    lastSyncedAt: string;
+    lastCommentSyncAt: string | null;
+  }
+  const [googleDocExports, setGoogleDocExports] = useState<GoogleDocExportInfo[]>([]);
+  const [syncingComments, setSyncingComments] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
+
   useEffect(() => {
     fetch("/api/integrations/hashnode")
       .then((r) => r.json())
       .then((d) => setHashnodeConnected(d.connected ?? false))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/integrations/google-docs?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d) => setGoogleDocExports(d.exports ?? []))
+      .catch(() => {});
+  }, [projectId]);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -178,6 +198,30 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       }
     } finally {
       setExporting(null);
+    }
+  };
+
+  const handleSyncComments = async () => {
+    setSyncingComments(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/integrations/google-docs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      setSyncResult({ imported: data.imported, skipped: data.skipped, unresolvable: data.unresolvable });
+      // Refresh export info
+      const infoRes = await fetch(`/api/integrations/google-docs?projectId=${projectId}`);
+      const infoData = await infoRes.json();
+      setGoogleDocExports(infoData.exports ?? []);
+    } catch (err) {
+      setSyncResult(null);
+      alert(err instanceof Error ? err.message : "Comment sync failed");
+    } finally {
+      setSyncingComments(false);
     }
   };
 
@@ -465,6 +509,58 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               </a>{" "}
               to publish directly to Hashnode.
             </p>
+          )}
+
+          {googleDocExports.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Google Docs</p>
+              <div className="space-y-3">
+                {googleDocExports.map((exp) => (
+                  <div key={exp.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0">
+                      <a
+                        href={exp.googleDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline truncate block"
+                      >
+                        {exp.exportMode === "STORY_READER"
+                          ? "Reader Copy"
+                          : exp.exportMode === "STORY_INTERNAL"
+                          ? "Internal Draft"
+                          : "Export"}
+                      </a>
+                      {exp.lastCommentSyncAt && (
+                        <p className="text-xs text-text-muted">
+                          Comments synced {new Date(exp.lastCommentSyncAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  onClick={handleSyncComments}
+                  disabled={syncingComments}
+                  className="gap-1.5 h-auto py-2 px-3"
+                >
+                  {syncingComments ? (
+                    <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  <span className="text-xs">Sync comments from Google Docs</span>
+                </Button>
+                {syncResult && (
+                  <p className="text-xs text-text-muted">
+                    Imported {syncResult.imported} comment{syncResult.imported !== 1 ? "s" : ""} as annotations
+                    {syncResult.skipped > 0 ? `, ${syncResult.skipped} already imported` : ""}
+                    {syncResult.unresolvable > 0 ? `, ${syncResult.unresolvable} unresolvable` : ""}
+                    .
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </div>
 
