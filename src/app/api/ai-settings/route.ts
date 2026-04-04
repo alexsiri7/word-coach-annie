@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { UpdateAiSettingsSchema } from "@/lib/api-schemas";
 
 // GET /api/ai-settings — return current AI settings (user-level if authenticated, else global)
 export async function GET(request: NextRequest) {
@@ -55,14 +56,8 @@ export async function PUT(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
     const body = await request.json();
-    const { baseUrl, apiKey, model, customInstructions, coachingStyle, responseLength } = body as {
-      baseUrl?: string;
-      apiKey?: string;
-      model?: string;
-      customInstructions?: string;
-      coachingStyle?: string;
-      responseLength?: string;
-    };
+    const { baseUrl, apiKey, model, customInstructions, coachingStyle, responseLength } =
+      UpdateAiSettingsSchema.parse(body);
 
     // Build update data — only include fields that were actually sent
     const data: Record<string, string> = {};

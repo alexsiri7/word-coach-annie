@@ -10,13 +10,7 @@ import { AiSettingsDialog } from "@/components/ai-settings-dialog";
 import { cn } from "@/lib/utils";
 import { sanitizeMessageContent } from "@/lib/sanitize";
 import { useNetworkStatus } from "@/lib/offline/use-network-status";
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: string;
-}
+import type { ChatMessage } from "@/lib/api-schemas";
 
 interface ToolActivity {
   id: string;
@@ -33,7 +27,7 @@ interface AIChatPanelProps {
   onPromptConsumed?: () => void;
 }
 
-function formatTime(dateStr: string): string {
+function formatTime(dateStr: string | Date): string {
   const d = new Date(dateStr);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

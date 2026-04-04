@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { CreateProjectSchema } from "@/lib/api-schemas";
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
 export async function GET(request: NextRequest) {
@@ -92,15 +93,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, author, synopsis, genre, projectType } = body;
-    const userId = getCurrentUserId(request);
-
-    if (!title || typeof title !== "string" || title.trim() === "") {
+    const parsed = CreateProjectSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Title is required" },
+        { error: parsed.error.errors[0]?.message ?? "Invalid request" },
         { status: 400 }
       );
     }
+    const { title, author, synopsis, genre, projectType } = parsed.data;
+    const userId = getCurrentUserId(request);
 
     const project = await prisma.project.create({
       data: {

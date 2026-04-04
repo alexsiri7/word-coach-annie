@@ -12,14 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
-interface AiSettingsData {
-  baseUrl: string;
-  apiKey: string;
-  model: string;
-  hasApiKey?: boolean;
-  scope?: "user" | "global";
-}
+import type { AiSettingsData } from "@/lib/api-schemas";
 
 export function AiSettingsDialog() {
   const [open, setOpen] = useState(false);
