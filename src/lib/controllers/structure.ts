@@ -356,6 +356,12 @@ export class StructureController {
         return annotation;
     }
 
+    static async getNode(nodeId: string) {
+        const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
+        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        return node;
+    }
+
     static async readSceneContent(nodeId: string) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },

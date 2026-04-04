@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { exportManuscript, exportStoryBible, exportMedium, getProjectSummary, exportUniverse } from "@/mcp/tools/export";
+import { exportManuscript, exportStoryBible, exportHashnode, getProjectSummary, exportUniverse } from "@/mcp/tools/export";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
 import { UniversesController } from "@/lib/controllers/universes";
@@ -168,13 +168,13 @@ describe("MCP Export Tools", () => {
         });
     });
 
-    describe("exportMedium", () => {
+    describe("exportHashnode", () => {
         it("exports all scenes for project", async () => {
             const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Article" });
             const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Section 1", parentId: ch.id });
             await StructureController.writeSceneContent(scene.id, "<p>Article content here</p>");
 
-            const md = await exportMedium(projectId);
+            const md = await exportHashnode(projectId);
             expect(md).toContain("# Article");
             expect(md).toContain("Article content here");
         });
@@ -184,18 +184,18 @@ describe("MCP Export Tools", () => {
             const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Section", parentId: ch.id });
             await StructureController.writeSceneContent(scene.id, "<p>Specific content</p>");
 
-            const md = await exportMedium(projectId, ch.id);
+            const md = await exportHashnode(projectId, ch.id);
             expect(md).toContain("My Article");
             expect(md).toContain("Specific content");
         });
 
         it("returns empty for project with no scenes", async () => {
-            const md = await exportMedium(projectId);
+            const md = await exportHashnode(projectId);
             expect(md).toBe("");
         });
 
         it("throws for non-existent project", async () => {
-            await expect(exportMedium("bad")).rejects.toThrow("Project not found");
+            await expect(exportHashnode("bad")).rejects.toThrow("Project not found");
         });
     });
 

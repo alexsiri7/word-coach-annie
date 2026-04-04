@@ -216,16 +216,17 @@ server.tool(
 
 server.tool(
     "update_project",
-    "Update a project's metadata (title, author, synopsis, genre)",
+    "Update a project's metadata (title, author, synopsis, genre). Requires contentHash from get_project to prevent stale overwrites.",
     {
         projectId: z.string().describe("The project ID"),
+        contentHash: z.string().describe("The contentHash from get_project — ensures you are updating the version you read"),
         title: z.string().optional().describe("New project title"),
         author: z.string().optional().describe("New author name"),
         synopsis: z.string().optional().describe("New synopsis"),
         genre: z.string().optional().describe("New genre"),
     },
-    async ({ projectId, title, author, synopsis, genre }) => {
-        const result = await updateProject(projectId, { title, author, synopsis, genre });
+    async ({ projectId, contentHash, title, author, synopsis, genre }) => {
+        const result = await updateProject(projectId, { title, author, synopsis, genre }, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -315,17 +316,18 @@ server.tool(
 
 server.tool(
     "update_node",
-    "Update a structure node's title, synopsis, status, order, or parent",
+    "Update a structure node's title, synopsis, status, order, or parent. Requires contentHash from get_outline to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The node ID to update"),
+        contentHash: z.string().describe("The contentHash for this node from get_outline — ensures you are updating the version you read"),
         title: z.string().optional().describe("New title"),
         synopsis: z.string().optional().describe("New synopsis"),
         status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
         orderIndex: z.number().optional().describe("New order index"),
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
-    async ({ nodeId, ...data }) => {
-        const result = await updateNode(nodeId, data);
+    async ({ nodeId, contentHash, ...data }) => {
+        const result = await updateNode(nodeId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -347,7 +349,7 @@ server.tool(
 
 server.tool(
     "read_scene_content",
-    "Read the latest content of a scene (returns HTML content, word count, and list of annotations)",
+    "Read the latest content of a scene (returns HTML content, word count, list of annotations, and a contentHash for stale-write protection)",
     {
         nodeId: z.string().describe("The scene node ID"),
     },
@@ -359,22 +361,23 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version.",
+    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version. Requires contentHash from read_scene_content to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The scene node ID"),
+        contentHash: z.string().describe("The contentHash from read_scene_content — ensures you are writing over the version you read"),
         content: z.string().optional().describe("The HTML content to write"),
         blocks: z.array(z.object({
             type: z.enum(["CONTENT", "BEAT"]),
             content: z.string()
         })).optional().describe("Structured content blocks")
     },
-    async ({ nodeId, content, blocks }) => {
+    async ({ nodeId, contentHash, content, blocks }) => {
         if (blocks) {
-            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[]);
+            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         if (content !== undefined) {
-            const result = await writeSceneContent(nodeId, content);
+            const result = await writeSceneContent(nodeId, content, contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         throw new Error("Either 'content' or 'blocks' must be provided");
@@ -524,17 +527,18 @@ server.tool(
 
 server.tool(
     "update_story_object",
-    "Update a story object's fields (name, description, notes, role, tags)",
+    "Update a story object's fields (name, description, notes, role, tags). Requires contentHash from get_story_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The story object ID"),
+        contentHash: z.string().describe("The contentHash from get_story_object — ensures you are updating the version you read"),
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
         role: z.string().nullable().optional().describe("New role (null to clear)"),
         tags: z.string().optional().describe("New comma-separated tags"),
     },
-    async ({ objectId, ...data }) => {
-        const result = await updateStoryObject(objectId, data);
+    async ({ objectId, contentHash, ...data }) => {
+        const result = await updateStoryObject(objectId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -729,15 +733,15 @@ server.tool(
 );
 
 server.tool(
-    "export_medium",
-    "Export a specific node (Article/Chapter) or the entire project in Medium-ready Markdown format (with front matter)",
+    "export_hashnode",
+    "Export a specific node (Article/Chapter) or the entire project in Hashnode-ready Markdown format (with front matter)",
     {
         projectId: z.string().describe("The project ID"),
         nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
     },
     async ({ projectId, nodeId }) => {
-        const { exportMedium } = await import("./tools/export");
-        const markdown = await exportMedium(projectId, nodeId);
+        const { exportHashnode } = await import("./tools/export");
+        const markdown = await exportHashnode(projectId, nodeId);
         return { content: [{ type: "text", text: markdown }] };
     }
 );
@@ -832,14 +836,15 @@ server.tool(
 
 server.tool(
     "update_universe",
-    "Update a universe's metadata",
+    "Update a universe's metadata. Requires contentHash from get_universe to prevent stale overwrites.",
     {
         universeId: z.string().describe("The universe ID"),
+        contentHash: z.string().describe("The contentHash from get_universe — ensures you are updating the version you read"),
         title: z.string().optional().describe("New title"),
         description: z.string().optional().describe("New description"),
     },
-    async ({ universeId, ...data }) => {
-        const result = await updateUniverse(universeId, data);
+    async ({ universeId, contentHash, ...data }) => {
+        const result = await updateUniverse(universeId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -901,17 +906,18 @@ server.tool(
 
 server.tool(
     "update_world_object",
-    "Update a world object's fields",
+    "Update a world object's fields. Requires contentHash from get_world_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The world object ID"),
+        contentHash: z.string().describe("The contentHash from get_world_object — ensures you are updating the version you read"),
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
         tags: z.string().optional().describe("New tags"),
         type: z.string().optional().describe("New type"),
     },
-    async ({ objectId, ...data }) => {
-        const result = await updateWorldObject(objectId, data);
+    async ({ objectId, contentHash, ...data }) => {
+        const result = await updateWorldObject(objectId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -948,16 +954,17 @@ server.tool(
 
 server.tool(
     "update_timeline_entry",
-    "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period.",
+    "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period. Requires contentHash from get_world_object (the entry's contentHash in the timeline array) to prevent stale overwrites.",
     {
         entryId: z.string().describe("The entry ID"),
+        contentHash: z.string().describe("The contentHash for this entry from get_world_object's timeline array — ensures you are updating the version you read"),
         label: z.string().optional().describe("New period or event label"),
         description: z.string().optional().describe("Updated description of what is true at this point"),
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
-    async ({ entryId, ...data }) => {
-        const result = await updateTimelineEntry(entryId, data);
+    async ({ entryId, contentHash, ...data }) => {
+        const result = await updateTimelineEntry(entryId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

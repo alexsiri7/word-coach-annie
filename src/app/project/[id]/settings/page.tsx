@@ -7,7 +7,7 @@ import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MediumPublishDialog } from "@/components/medium-publish-dialog";
+import { HashnodePublishDialog } from "@/components/hashnode-publish-dialog";
 
 interface ProjectSettings {
   id: string;
@@ -49,9 +49,9 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [chapterNumbering, setChapterNumbering] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
 
-  // Medium integration
-  const [mediumConnected, setMediumConnected] = useState(false);
-  const [mediumDialogOpen, setMediumDialogOpen] = useState(false);
+  // Hashnode integration
+  const [hashnodeConnected, setHashnodeConnected] = useState(false);
+  const [hashnodeDialogOpen, setHashnodeDialogOpen] = useState(false);
 
   // Google Docs integration
   interface GoogleDocExportInfo {
@@ -66,9 +66,9 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
 
   useEffect(() => {
-    fetch("/api/integrations/medium")
+    fetch("/api/integrations/hashnode")
       .then((r) => r.json())
-      .then((d) => setMediumConnected(d.connected ?? false))
+      .then((d) => setHashnodeConnected(d.connected ?? false))
       .catch(() => {});
   }, []);
 
@@ -477,13 +477,13 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             </Button>
           </div>
 
-          {mediumConnected && (
+          {hashnodeConnected && (
             <>
               <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Publish</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Button
                   variant="outline"
-                  onClick={() => setMediumDialogOpen(true)}
+                  onClick={() => setHashnodeDialogOpen(true)}
                   className="gap-1.5 h-auto py-3 flex-col"
                 >
                   <svg
@@ -493,21 +493,21 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
                     className="h-4 w-4 fill-current"
                     aria-hidden="true"
                   >
-                    <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+                    <path d="M22.351 8.019l-6.37-6.37a5.63 5.63 0 0 0-7.962 0l-6.37 6.37a5.63 5.63 0 0 0 0 7.962l6.37 6.37a5.63 5.63 0 0 0 7.962 0l6.37-6.37a5.63 5.63 0 0 0 0-7.962zM12 15.953a3.953 3.953 0 1 1 0-7.906 3.953 3.953 0 0 1 0 7.906z" />
                   </svg>
-                  <span className="text-xs">Publish to Medium</span>
+                  <span className="text-xs">Publish to Hashnode</span>
                 </Button>
               </div>
             </>
           )}
 
-          {!mediumConnected && (
+          {!hashnodeConnected && (
             <p className="text-xs text-text-muted mt-4">
-              Connect Medium in{" "}
+              Connect Hashnode in{" "}
               <a href="/settings" className="text-accent hover:underline">
                 Settings
               </a>{" "}
-              to publish directly to Medium.
+              to publish directly to Hashnode.
             </p>
           )}
 
@@ -565,11 +565,11 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         </div>
 
         {project && (
-          <MediumPublishDialog
+          <HashnodePublishDialog
             projectId={projectId}
             projectTitle={title || project.title}
-            open={mediumDialogOpen}
-            onOpenChange={setMediumDialogOpen}
+            open={hashnodeDialogOpen}
+            onOpenChange={setHashnodeDialogOpen}
           />
         )}
 
