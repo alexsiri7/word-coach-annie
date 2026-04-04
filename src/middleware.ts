@@ -101,6 +101,7 @@ function applyRateLimit(
                 result.resetMs
             );
         }
+        return null;
     }
 
     // Feedback submission: POST /api/feedback
@@ -117,6 +118,7 @@ function applyRateLimit(
                 result.resetMs
             );
         }
+        return null;
     }
 
     // Read vs write rate limit
