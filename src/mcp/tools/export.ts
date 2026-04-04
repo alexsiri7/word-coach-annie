@@ -212,7 +212,7 @@ export async function exportStoryBible(projectId: string): Promise<string> {
     return lines.join("\n");
 }
 
-export async function exportMedium(projectId: string, nodeId?: string): Promise<string> {
+export async function exportHashnode(projectId: string, nodeId?: string): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
