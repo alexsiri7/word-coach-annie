@@ -45,10 +45,10 @@ export async function POST(
             canonicalUrl,
         });
 
-        if (result.alreadyPublished) {
+        if (result.updated) {
             return NextResponse.json(
                 {
-                    warning: 'This content has already been published to Hashnode.',
+                    updated: true,
                     hashnodePostUrl: result.hashnodePostUrl,
                     hashnodePostId: result.hashnodePostId,
                     publishStatus: result.publishStatus,
