@@ -285,8 +285,9 @@ export async function exportHashnode(projectId: string, nodeId?: string): Promis
             // Let's iterate.
             if (n.type === "CHAPTER" || n.type === "PART") {
                 result.push(`# ${n.title}\n`);
-                for (const child of n.children) {
-                    result.push(...collectMarkdown(child));
+                for (let i = 0; i < n.children.length; i++) {
+                    if (i > 0) result.push("\n\n---\n\n");
+                    result.push(...collectMarkdown(n.children[i]));
                 }
             }
         }
