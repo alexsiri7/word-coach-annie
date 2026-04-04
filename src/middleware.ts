@@ -57,7 +57,7 @@ function makeRateLimitResponse(
  * - Chat: 30 req/min
  * - Read (GET): 120 req/min
  * - Write (POST/PATCH/DELETE): 60 req/min
- * - Project creation (POST /api/projects): 100/hour
+ * - Project creation (POST /api/projects): 100/hour (exclusive — does not also consume write quota)
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
 function applyRateLimit(
@@ -88,6 +88,7 @@ function applyRateLimit(
     }
 
     // Project creation: POST /api/projects (not /api/projects/:id subpaths)
+    // Project creates have their own hourly limit; skip the general write limit.
     const isProjectCreate = method === "POST" && pathname === "/api/projects";
     if (isProjectCreate) {
         const result = checkRateLimit(
@@ -101,6 +102,7 @@ function applyRateLimit(
                 result.resetMs
             );
         }
+        return null;
     }
 
     // Feedback submission: POST /api/feedback
