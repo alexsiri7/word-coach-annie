@@ -4,8 +4,7 @@ import { NextRequest } from "next/server";
 // Mock AI settings and OpenAI
 vi.mock("@/lib/ai/settings", () => ({
   getAiConfig: vi.fn().mockResolvedValue({
-    baseUrl: "https://api.example.com/v1",
-    apiKey: "test-key",
+        apiKey: "test-key",
     model: "test-model",
   }),
   getAiPreferences: vi.fn().mockResolvedValue({
@@ -115,7 +114,7 @@ describe("POST /api/ai-inline", () => {
 
   it("returns 503 when AI is not configured", async () => {
     const { getAiConfig } = await import("@/lib/ai/settings");
-    vi.mocked(getAiConfig).mockResolvedValueOnce({ baseUrl: "", apiKey: "", model: "" });
+    vi.mocked(getAiConfig).mockResolvedValueOnce({ apiKey: "", model: "" });
     const req = makeRequest({ selectedText: "text", action: "expand" });
     const res = await POST(req);
     expect(res.status).toBe(503);

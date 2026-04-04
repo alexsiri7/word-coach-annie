@@ -34,7 +34,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/ai/settings", () => ({
   getAiConfig: vi.fn().mockResolvedValue({
-    baseUrl: "https://api.example.com/v1",
+
     apiKey: "test-key",
     model: "test-model",
   }),
@@ -136,7 +136,7 @@ describe("POST /api/ai-manuscript", () => {
 
   it("returns 503 when AI is not configured", async () => {
     const { getAiConfig } = await import("@/lib/ai/settings");
-    vi.mocked(getAiConfig).mockResolvedValueOnce({ baseUrl: "", apiKey: "", model: "" });
+    vi.mocked(getAiConfig).mockResolvedValueOnce({ apiKey: "", model: "" });
     const req = makeRequest({ projectId: "proj-1", analysisType: "plot-threads" });
     const res = await POST(req);
     expect(res.status).toBe(503);
