@@ -500,4 +500,93 @@ test.describe('Integration tests — real server, real data', () => {
     expect(Array.isArray(body.projects)).toBeTruthy()
     expect(typeof body.total).toBe('number')
   })
+
+  // ── g) Beats survive save/load cycle (regression: an-9yp) ───────────
+  test('beats survive save/load cycle', async ({ page, request }) => {
+    let projectId: string | undefined
+
+    try {
+      // 1. Create project + chapter + scene
+      const project = await createProject(request, 'beats-regression')
+      projectId = project.id
+
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Chapter One', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Beat Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // 2. Save scene content that includes beat annotations
+      const contentWithBeats =
+        '<p>Opening paragraph.</p>' +
+        '<!-- beat: ACTION: The hero leaps across the chasm -->' +
+        '<p>Landing paragraph.</p>' +
+        '<!-- beat: EMOTION: Relief washes over her -->' +
+        '<p>Closing paragraph.</p>'
+
+      const saveRes = await request.post(
+        `/api/nodes/${scene.id}/content`,
+        {
+          headers: AUTH_HEADERS,
+          data: { content: contentWithBeats },
+        },
+      )
+      expect(saveRes.status()).toBe(201)
+
+      // 3. Reload content via API and verify beats are preserved
+      const readRes = await request.get(
+        `/api/nodes/${scene.id}/content`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(readRes.ok()).toBeTruthy()
+      const contentBody = await readRes.json()
+      const savedContent: string = contentBody.latest.content
+
+      expect(savedContent).toContain('<!-- beat:')
+      expect(savedContent).toContain('ACTION: The hero leaps across the chasm')
+      expect(savedContent).toContain('EMOTION: Relief washes over her')
+      expect(savedContent).toContain('Opening paragraph.')
+      expect(savedContent).toContain('Landing paragraph.')
+      expect(savedContent).toContain('Closing paragraph.')
+
+      // 4. Navigate to the scene editor and verify beats render in the UI
+      await page.goto(`/project/${projectId}`)
+      await page.waitForSelector('main', { timeout: 20_000 })
+
+      // Expand chapter and click scene
+      await page.getByRole('treeitem', { name: 'Chapter One' }).click()
+      await page.getByRole('treeitem', { name: 'Beat Scene' }).click()
+
+      // The editor converts <!-- beat: ... --> comments to
+      // <div data-type="beat-annotation"> nodes for display
+      await expect(
+        page.locator('.beat-annotation').first(),
+      ).toBeVisible({ timeout: 15_000 })
+
+      // Both beat annotations should be visible
+      const beatAnnotations = page.locator('.beat-annotation')
+      await expect(beatAnnotations).toHaveCount(2, { timeout: 5_000 })
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
 })
