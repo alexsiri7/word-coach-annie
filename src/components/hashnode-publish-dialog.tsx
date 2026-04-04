@@ -48,7 +48,7 @@ export function HashnodePublishDialog({
   const [tagsInput, setTagsInput] = useState("");
   const [canonicalUrl, setCanonicalUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
-  const [result, setResult] = useState<{ url: string; isDraft: boolean } | null>(null);
+  const [result, setResult] = useState<{ url: string; isDraft: boolean; updated?: boolean } | null>(null);
   const [error, setError] = useState("");
   const [existingExport, setExistingExport] = useState<HashnodeExport | null>(null);
 
@@ -104,7 +104,7 @@ export function HashnodePublishDialog({
         setError(data.error || "Publish failed");
         return;
       }
-      setResult({ url: data.hashnodePostUrl, isDraft: publishStatus === "draft" });
+      setResult({ url: data.hashnodePostUrl, isDraft: publishStatus === "draft", updated: data.updated });
     } finally {
       setPublishing(false);
     }
@@ -123,9 +123,13 @@ export function HashnodePublishDialog({
         {result ? (
           <div className="space-y-4 pt-2">
             <p className="text-sm text-text-secondary">
-              {result.isDraft
-                ? "Draft created! Review and publish from your Hashnode dashboard."
-                : "Published successfully!"}
+              {result.updated
+                ? result.isDraft
+                  ? "Draft updated! Review and publish from your Hashnode dashboard."
+                  : "Post updated on Hashnode."
+                : result.isDraft
+                  ? "Draft created! Review and publish from your Hashnode dashboard."
+                  : "Published successfully!"}
             </p>
             <a
               href={result.url}
@@ -143,21 +147,18 @@ export function HashnodePublishDialog({
         ) : (
           <div className="space-y-4 pt-2">
             {existingExport && (
-              <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-300 mb-1">
-                  Already published
-                </p>
-                <p className="text-amber-700 dark:text-amber-400 text-xs">
-                  A post already exists for this content on Hashnode.
+              <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-sm">
+                <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">
+                  Already published — clicking Update will sync new content
                 </p>
                 <a
                   href={existingExport.hashnodePostUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 mt-1.5 text-xs text-accent hover:underline"
+                  className="flex items-center gap-1 mt-1 text-xs text-accent hover:underline"
                 >
                   <ExternalLink className="h-3 w-3" />
-                  View existing post
+                  View existing {existingExport.publishStatus === "draft" ? "draft" : "post"}
                 </a>
               </div>
             )}
@@ -241,7 +242,11 @@ export function HashnodePublishDialog({
                   <Send className="h-4 w-4" />
                 )}
                 {publishing
-                  ? "Publishing..."
+                  ? existingExport
+                    ? "Updating..."
+                    : "Publishing..."
+                  : existingExport
+                  ? "Update"
                   : publishStatus === "draft"
                   ? "Create Draft"
                   : "Publish"}
