@@ -128,6 +128,16 @@ export interface ContentVersion {
   createdAt: string;
 }
 
+export interface SceneNode {
+  id: string;
+  nodeId: string;
+  type: "paragraph" | "beat";
+  orderIndex: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Annotation {
   id: string;
   nodeId: string;
