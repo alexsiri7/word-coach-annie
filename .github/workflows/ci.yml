@@ -99,6 +99,7 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/annie_test
       API_TOKEN: e2e-ci-token
+      DISABLE_RATE_LIMIT: "true"
     steps:
       - uses: actions/checkout@v4
 
