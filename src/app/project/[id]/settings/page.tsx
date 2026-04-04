@@ -65,6 +65,18 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [syncingComments, setSyncingComments] = useState(false);
   const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
 
+  // Google Docs integration
+  interface GoogleDocExportInfo {
+    id: string;
+    exportMode: string;
+    googleDocUrl: string;
+    lastSyncedAt: string;
+    lastCommentSyncAt: string | null;
+  }
+  const [googleDocExports, setGoogleDocExports] = useState<GoogleDocExportInfo[]>([]);
+  const [syncingComments, setSyncingComments] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
+
   useEffect(() => {
     fetch("/api/integrations/hashnode")
       .then((r) => r.json())
