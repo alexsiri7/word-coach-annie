@@ -430,6 +430,42 @@ async function _getProjectSummary(projectId: string) {
     };
 }
 
+export async function getFullText(projectId: string): Promise<string> {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+
+    const outline = await buildOutlineTree(projectId);
+
+    const lines: string[] = [];
+    lines.push(`# ${project.title}\n`);
+
+    let chapterNum = 0;
+
+    function renderNode(node: OutlineNode) {
+        if (node.type === "PART") {
+            lines.push(`\n# ${node.title}\n`);
+            for (const child of node.children) renderNode(child);
+        } else if (node.type === "CHAPTER") {
+            chapterNum++;
+            lines.push(`\n## Chapter ${chapterNum}: ${node.title}\n`);
+            for (const child of node.children) renderNode(child);
+        } else if (node.type === "SCENE") {
+            if (node.title) lines.push(`\n### ${node.title}\n`);
+            if (node.content) {
+                const md = htmlToMarkdown(node.content, { includeBeats: false });
+                if (md) {
+                    lines.push(md);
+                    lines.push("\n");
+                }
+            }
+        }
+    }
+
+    for (const node of outline) renderNode(node);
+
+    return lines.join("\n").replace(/\n{4,}/g, "\n\n\n").trim();
+}
+
 export async function exportUniverse(universeId: string): Promise<string> {
     const universe = await prisma.universe.findUnique({
         where: { id: universeId },
