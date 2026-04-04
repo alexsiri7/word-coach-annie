@@ -1,13 +1,14 @@
 /**
- * ADK agent runner — replaces the manual tool loop with ADK's native agent execution.
+ * ADK agent runner — runs agents via the native Gemini LLM backend.
  *
  * Creates an LlmAgent with DynamicToolset (for load_toolset pattern) and
- * OpenAICompatibleLlm (for provider flexibility). Returns the final content
+ * Gemini (native ADK Gemini integration). Returns the final content
  * and tool log in the same format as the previous manual loop.
  */
 import {
   LlmAgent,
   InMemoryRunner,
+  Gemini,
   createEvent,
   createEventActions,
   getFunctionCalls,
@@ -17,7 +18,6 @@ import {
 import type { Content } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
 import type { ToolCategory } from "./adk-tools";
-import { OpenAICompatibleLlm } from "./adk-openai-llm";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -32,14 +32,13 @@ const SIMPLE_AGENT_NAME = "simple_completion";
 export async function runSimpleCompletion(params: {
   systemPrompt?: string;
   userMessage: string;
-  aiConfig: { baseUrl: string; apiKey: string; model: string };
+  aiConfig: { apiKey: string; model: string };
   maxTokens?: number;
   temperature?: number;
 }): Promise<string> {
-  const llm = new OpenAICompatibleLlm({
+  const llm = new Gemini({
     model: params.aiConfig.model,
     apiKey: params.aiConfig.apiKey,
-    baseUrl: params.aiConfig.baseUrl,
   });
 
   const agent = new LlmAgent({
@@ -99,7 +98,7 @@ export async function runChatAgent(params: {
   systemPrompt: string;
   chatHistory: { role: string; content: string }[];
   userMessage: string;
-  aiConfig: { baseUrl: string; apiKey: string; model: string };
+  aiConfig: { apiKey: string; model: string };
 }): Promise<ChatAgentResult> {
   const tracer = getTracer();
 
@@ -113,10 +112,9 @@ export async function runChatAgent(params: {
         params.userMessage.length,
       );
 
-      const llm = new OpenAICompatibleLlm({
+      const llm = new Gemini({
         model: params.aiConfig.model,
         apiKey: params.aiConfig.apiKey,
-        baseUrl: params.aiConfig.baseUrl,
       });
 
       const toolset = new DynamicToolset();
