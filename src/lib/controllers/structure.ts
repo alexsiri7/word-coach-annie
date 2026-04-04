@@ -566,6 +566,152 @@ export class StructureController {
         });
     }
 
+    private static async saveContentFromNodes(nodeId: string, projectId: string) {
+        const sceneNodes = await prisma.sceneNode.findMany({
+            where: { nodeId },
+            orderBy: { orderIndex: "asc" },
+        });
+
+        const blocks = sceneNodes.map((n: { type: string; content: string }) => ({
+            type: n.type === "beat" ? "BEAT" as const : "CONTENT" as const,
+            content: n.content,
+        }));
+        const content = StructureController.serializeSceneContent(blocks);
+
+        const stripped = content
+            .replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, "")
+            .replace(/(<!-- beat:[\s\S]*?-->)/g, "");
+        const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+        const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
+
+        const [version] = await Promise.all([
+            prisma.contentVersion.create({ data: { nodeId, content, wordCount } }),
+            prisma.project.update({ where: { id: projectId }, data: { updatedAt: new Date() } }),
+        ]);
+
+        const allVersions = await prisma.contentVersion.findMany({
+            where: { nodeId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+        });
+        if (allVersions.length > 50) {
+            const idsToDelete = allVersions.slice(50).map((v: { id: string }) => v.id);
+            await prisma.contentVersion.deleteMany({ where: { id: { in: idsToDelete } } });
+        }
+
+        return { content, wordCount, versionId: version.id };
+    }
+
+    static async getSceneNodeByOrderIndex(sceneId: string, type: "paragraph" | "beat", orderIndex: number) {
+        const node = await prisma.structureNode.findUnique({
+            where: { id: sceneId },
+            select: { id: true, type: true },
+        });
+        if (!node) throw new Error(`Node not found: ${sceneId}`);
+        if (node.type !== "SCENE") throw new Error("Node is not a SCENE");
+
+        const sceneNode = await prisma.sceneNode.findFirst({
+            where: { nodeId: sceneId, orderIndex },
+        });
+        if (!sceneNode) throw new Error(`No node at orderIndex ${orderIndex}`);
+        if (sceneNode.type !== type) {
+            throw new Error(`Node at orderIndex ${orderIndex} is type '${sceneNode.type}', not '${type}'`);
+        }
+
+        return {
+            id: sceneNode.id,
+            nodeId: sceneId,
+            type: sceneNode.type as "paragraph" | "beat",
+            orderIndex: sceneNode.orderIndex,
+            content: sceneNode.content,
+            createdAt: sceneNode.createdAt.toISOString(),
+            updatedAt: sceneNode.updatedAt.toISOString(),
+        };
+    }
+
+    static async updateSceneNodeContent(sceneId: string, type: "paragraph" | "beat", orderIndex: number, content: string) {
+        const node = await prisma.structureNode.findUnique({
+            where: { id: sceneId },
+            select: { id: true, type: true, projectId: true },
+        });
+        if (!node) throw new Error(`Node not found: ${sceneId}`);
+        if (node.type !== "SCENE") throw new Error("Node is not a SCENE");
+
+        const sceneNode = await prisma.sceneNode.findFirst({
+            where: { nodeId: sceneId, orderIndex },
+        });
+        if (!sceneNode) throw new Error(`No node at orderIndex ${orderIndex}`);
+        if (sceneNode.type !== type) {
+            throw new Error(`Node at orderIndex ${orderIndex} is type '${sceneNode.type}', not '${type}'`);
+        }
+
+        await prisma.sceneNode.update({
+            where: { id: sceneNode.id },
+            data: { content },
+        });
+
+        const { wordCount, versionId } = await StructureController.saveContentFromNodes(sceneId, node.projectId);
+        return { nodeId: sceneId, orderIndex, type, content, wordCount, versionId };
+    }
+
+    static async insertParagraph(sceneId: string, afterOrderIndex: number, content: string) {
+        const node = await prisma.structureNode.findUnique({
+            where: { id: sceneId },
+            select: { id: true, type: true, projectId: true },
+        });
+        if (!node) throw new Error(`Node not found: ${sceneId}`);
+        if (node.type !== "SCENE") throw new Error("Node is not a SCENE");
+
+        const newOrderIndex = afterOrderIndex + 1;
+
+        await prisma.sceneNode.updateMany({
+            where: { nodeId: sceneId, orderIndex: { gte: newOrderIndex } },
+            data: { orderIndex: { increment: 1 } },
+        });
+
+        const sceneNode = await prisma.sceneNode.create({
+            data: { nodeId: sceneId, type: "paragraph", orderIndex: newOrderIndex, content },
+        });
+
+        const { wordCount, versionId } = await StructureController.saveContentFromNodes(sceneId, node.projectId);
+        return {
+            id: sceneNode.id,
+            nodeId: sceneId,
+            type: "paragraph" as const,
+            orderIndex: newOrderIndex,
+            content,
+            wordCount,
+            versionId,
+        };
+    }
+
+    static async deleteParagraph(sceneId: string, orderIndex: number) {
+        const node = await prisma.structureNode.findUnique({
+            where: { id: sceneId },
+            select: { id: true, type: true, projectId: true },
+        });
+        if (!node) throw new Error(`Node not found: ${sceneId}`);
+        if (node.type !== "SCENE") throw new Error("Node is not a SCENE");
+
+        const sceneNode = await prisma.sceneNode.findFirst({
+            where: { nodeId: sceneId, orderIndex },
+        });
+        if (!sceneNode) throw new Error(`No node at orderIndex ${orderIndex}`);
+        if (sceneNode.type !== "paragraph") {
+            throw new Error(`Node at orderIndex ${orderIndex} is type '${sceneNode.type}', not 'paragraph'`);
+        }
+
+        await prisma.sceneNode.delete({ where: { id: sceneNode.id } });
+
+        await prisma.sceneNode.updateMany({
+            where: { nodeId: sceneId, orderIndex: { gt: orderIndex } },
+            data: { orderIndex: { decrement: 1 } },
+        });
+
+        const { wordCount, versionId } = await StructureController.saveContentFromNodes(sceneId, node.projectId);
+        return { deleted: true, nodeId: sceneId, orderIndex, wordCount, versionId };
+    }
+
     static async updateAnnotation(annotationId: string, data: { content?: string; resolved?: boolean }) {
         return prisma.annotation.update({
             where: { id: annotationId },

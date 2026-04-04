@@ -26,6 +26,12 @@ import {
     batchCreateNodes,
     batchUpdateNodes,
     batchDeleteNodes,
+    getParagraph,
+    updateParagraph,
+    insertParagraph,
+    deleteParagraph,
+    getBeat,
+    updateBeat,
 } from "./tools/structure";
 import {
     listStoryObjects,
@@ -470,6 +476,90 @@ server.tool(
     },
     async ({ projectId }) => {
         const result = await getOpenAnnotations(projectId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Paragraph & Beat Tools ─────────────────────────────────────────────────
+
+server.tool(
+    "get_paragraph",
+    "Get a specific paragraph node from a scene by its orderIndex (from read_scene_content nodes[])",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        orderIndex: z.number().describe("The orderIndex of the paragraph (as returned by read_scene_content)"),
+    },
+    async ({ sceneId, orderIndex }) => {
+        const result = await getParagraph(sceneId, orderIndex);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_paragraph",
+    "Update the content of a paragraph node in a scene. Creates a new content version.",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        orderIndex: z.number().describe("The orderIndex of the paragraph to update"),
+        content: z.string().describe("The new paragraph content (HTML)"),
+    },
+    async ({ sceneId, orderIndex, content }) => {
+        const result = await updateParagraph(sceneId, orderIndex, content);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "insert_paragraph",
+    "Insert a new paragraph node into a scene after the given orderIndex. Use afterOrderIndex=-1 to insert at the beginning.",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        afterOrderIndex: z.number().describe("Insert after this orderIndex. Use -1 to insert at position 0."),
+        content: z.string().describe("The paragraph content (HTML)"),
+    },
+    async ({ sceneId, afterOrderIndex, content }) => {
+        const result = await insertParagraph(sceneId, afterOrderIndex, content);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "delete_paragraph",
+    "Delete a paragraph node from a scene by its orderIndex. Remaining nodes are renumbered.",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        orderIndex: z.number().describe("The orderIndex of the paragraph to delete"),
+    },
+    async ({ sceneId, orderIndex }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await deleteParagraph(sceneId, orderIndex);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "get_beat",
+    "Get a specific beat node from a scene by its orderIndex (from read_scene_content nodes[])",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        orderIndex: z.number().describe("The orderIndex of the beat (as returned by read_scene_content)"),
+    },
+    async ({ sceneId, orderIndex }) => {
+        const result = await getBeat(sceneId, orderIndex);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "update_beat",
+    "Update the content of a beat node in a scene. Creates a new content version.",
+    {
+        sceneId: z.string().describe("The scene node ID"),
+        orderIndex: z.number().describe("The orderIndex of the beat to update"),
+        content: z.string().describe("The new beat content (beat description text)"),
+    },
+    async ({ sceneId, orderIndex, content }) => {
+        const result = await updateBeat(sceneId, orderIndex, content);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

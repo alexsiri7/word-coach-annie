@@ -160,3 +160,39 @@ export async function batchDeleteNodes(nodeIds: string[]) {
 export async function getOpenAnnotations(projectId?: string) {
     return StructureController.getOpenAnnotations(projectId);
 }
+
+export async function getParagraph(sceneId: string, orderIndex: number) {
+    return StructureController.getSceneNodeByOrderIndex(sceneId, "paragraph", orderIndex);
+}
+
+export async function updateParagraph(sceneId: string, orderIndex: number, content: string) {
+    const result = await StructureController.updateSceneNodeContent(sceneId, "paragraph", orderIndex, content);
+    mcpCache.delete(`sceneContent:${sceneId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function insertParagraph(sceneId: string, afterOrderIndex: number, content: string) {
+    const result = await StructureController.insertParagraph(sceneId, afterOrderIndex, content);
+    mcpCache.delete(`sceneContent:${sceneId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function deleteParagraph(sceneId: string, orderIndex: number) {
+    const result = await StructureController.deleteParagraph(sceneId, orderIndex);
+    mcpCache.delete(`sceneContent:${sceneId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function getBeat(sceneId: string, orderIndex: number) {
+    return StructureController.getSceneNodeByOrderIndex(sceneId, "beat", orderIndex);
+}
+
+export async function updateBeat(sceneId: string, orderIndex: number, content: string) {
+    const result = await StructureController.updateSceneNodeContent(sceneId, "beat", orderIndex, content);
+    mcpCache.delete(`sceneContent:${sceneId}`);
+    invalidateStructureCaches();
+    return result;
+}

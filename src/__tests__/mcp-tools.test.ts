@@ -115,6 +115,83 @@ describe("MCP Structure Tools", () => {
         expect(open).toHaveLength(1);
         expect(open[0].content).toBe("Open one");
     });
+
+    it("getParagraph returns paragraph node at orderIndex", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>Hello</p><!-- beat: Action --><p>World</p>");
+        const para = await structureTools.getParagraph(scene.id, 0);
+        expect(para.type).toBe("paragraph");
+        expect(para.content).toBe("<p>Hello</p>");
+    });
+
+    it("updateParagraph updates content and creates new version", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>Original</p>");
+        const result = await structureTools.updateParagraph(scene.id, 0, "<p>Updated</p>");
+        expect(result.content).toBe("<p>Updated</p>");
+        expect(result.versionId).toBeTruthy();
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.content).toBe("<p>Updated</p>");
+    });
+
+    it("insertParagraph inserts after given orderIndex", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>First</p><p>Second</p>");
+        const result = await structureTools.insertParagraph(scene.id, 0, "<p>Middle</p>");
+        expect(result.orderIndex).toBe(1);
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.nodes).toHaveLength(3);
+        expect(content.nodes[1].content).toBe("<p>Middle</p>");
+    });
+
+    it("insertParagraph with afterOrderIndex=-1 inserts at beginning", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>Existing</p>");
+        await structureTools.insertParagraph(scene.id, -1, "<p>New first</p>");
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.nodes[0].content).toBe("<p>New first</p>");
+    });
+
+    it("deleteParagraph removes node and renumbers", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>A</p><p>B</p><p>C</p>");
+        await structureTools.deleteParagraph(scene.id, 1);
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.nodes).toHaveLength(2);
+        expect(content.nodes[0].content).toBe("<p>A</p>");
+        expect(content.nodes[0].orderIndex).toBe(0);
+        expect(content.nodes[1].content).toBe("<p>C</p>");
+        expect(content.nodes[1].orderIndex).toBe(1);
+    });
+
+    it("getBeat returns beat node at orderIndex", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>Prose</p><!-- beat: Initial beat -->");
+        const beat = await structureTools.getBeat(scene.id, 1);
+        expect(beat.type).toBe("beat");
+        expect(beat.content).toBe("Initial beat");
+    });
+
+    it("updateBeat updates beat content and creates new version", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<!-- beat: Old beat -->");
+        const result = await structureTools.updateBeat(scene.id, 0, "New beat");
+        expect(result.content).toBe("New beat");
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.nodes[0].content).toBe("New beat");
+    });
+
+    it("getParagraph throws when node is a beat", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<!-- beat: A beat -->");
+        await expect(structureTools.getParagraph(scene.id, 0)).rejects.toThrow("type 'beat', not 'paragraph'");
+    });
+
+    it("getBeat throws when node is a paragraph", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContent(scene.id, "<p>Some text</p>");
+        await expect(structureTools.getBeat(scene.id, 0)).rejects.toThrow("type 'paragraph', not 'beat'");
+    });
 });
 
 describe("MCP Project Tools", () => {
