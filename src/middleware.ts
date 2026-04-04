@@ -119,6 +119,7 @@ function applyRateLimit(
                 result.resetMs
             );
         }
+        return null;
     }
 
     // Read vs write rate limit
