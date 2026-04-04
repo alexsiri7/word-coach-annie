@@ -32,6 +32,19 @@ model ContentVersion {
   @@index([nodeId, createdAt(sort: Desc)])
 }
 
+model SceneNode {
+  id         String        @id @default(cuid())
+  nodeId     String
+  type       String        // "paragraph" | "beat"
+  orderIndex Int
+  content    String        @default("")
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  node       StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, orderIndex])
+}
+
 model User {
   id                String             @id @default(cuid())
   email             String             @unique
@@ -140,6 +153,7 @@ model StructureNode {
   updatedAt       DateTime         @updatedAt
   annotations     Annotation[]
   contentVersions ContentVersion[]
+  sceneNodes      SceneNode[]
   writingSessions WritingSession[]
   relationships   Relationship[]   @relation("Relationship_toNodeIdToStructureNode")
   relatedBy       Relationship[]   @relation("Relationship_fromNodeIdToStructureNode")

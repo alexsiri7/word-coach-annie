@@ -40,7 +40,7 @@ beforeEach(async () => {
     `TRUNCATE TABLE
       "OAuthClient", "GoogleDocExport", "GoogleCredential", "ChatMessage",
       "UserAiSettings", "AiSettings", "WritingSession", "Relationship",
-      "Annotation", "ContentVersion", "StoryObject", "StructureNode",
+      "Annotation", "SceneNode", "ContentVersion", "StoryObject", "StructureNode",
       "ProjectShare", "WorldObjectTimelineEntry", "WorldObject", "Project",
       "Universe", "User", "MediumCredential", "MediumExport"
     CASCADE`

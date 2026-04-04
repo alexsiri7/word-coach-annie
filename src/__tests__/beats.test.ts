@@ -16,6 +16,11 @@ vi.mock("@/lib/db", () => ({
             deleteMany: vi.fn(),
             findFirst: vi.fn(),
         },
+        sceneNode: {
+            findMany: vi.fn().mockResolvedValue([]),
+            deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+            createMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
         project: {
             findUnique: vi.fn(),
             update: vi.fn(),
@@ -26,6 +31,10 @@ vi.mock("@/lib/db", () => ({
 describe("Scene Beats", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Default sceneNode mocks for all write operations
+        (prisma.sceneNode.deleteMany as any).mockResolvedValue({ count: 0 });
+        (prisma.sceneNode.createMany as any).mockResolvedValue({ count: 0 });
+        (prisma.sceneNode.findMany as any).mockResolvedValue([]);
     });
 
     describe("Validation (StructureController.writeSceneContent)", () => {

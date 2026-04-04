@@ -58,6 +58,16 @@ export class StructureController {
         }).join("");
     }
 
+    private static async syncSceneNodes(
+        nodeId: string,
+        data: { nodeId: string; type: string; orderIndex: number; content: string }[]
+    ) {
+        await prisma.sceneNode.deleteMany({ where: { nodeId } });
+        if (data.length > 0) {
+            await prisma.sceneNode.createMany({ data });
+        }
+    }
+
     private static validateSceneContent(content: string) {
         // Validate beats: ensure they don't contain nested comments or broken syntax
         // Simple check: count of "<!-- beat:" must match count of "-->" (roughly)
@@ -363,15 +373,20 @@ export class StructureController {
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
 
-        const version = await prisma.contentVersion.findFirst({
-            where: { nodeId },
-            orderBy: { createdAt: "desc" },
-        });
-
-        const annotations = await prisma.annotation.findMany({
-            where: { nodeId },
-            orderBy: { createdAt: "asc" },
-        });
+        const [version, annotations, sceneNodes] = await Promise.all([
+            prisma.contentVersion.findFirst({
+                where: { nodeId },
+                orderBy: { createdAt: "desc" },
+            }),
+            prisma.annotation.findMany({
+                where: { nodeId },
+                orderBy: { createdAt: "asc" },
+            }),
+            prisma.sceneNode.findMany({
+                where: { nodeId },
+                orderBy: { orderIndex: "asc" },
+            }),
+        ]);
 
         const content = version?.content ?? "";
 
@@ -380,6 +395,15 @@ export class StructureController {
             title: node.title,
             content: content,
             blocks: StructureController.parseSceneContent(content),
+            nodes: sceneNodes.map((n: { id: string; type: string; orderIndex: number; content: string; createdAt: Date; updatedAt: Date }) => ({
+                id: n.id,
+                nodeId,
+                type: n.type as "paragraph" | "beat",
+                orderIndex: n.orderIndex,
+                content: n.content,
+                createdAt: n.createdAt.toISOString(),
+                updatedAt: n.updatedAt.toISOString(),
+            })),
             wordCount: version?.wordCount ?? 0,
             versionId: version?.id ?? null,
             lastModified: version?.createdAt.toISOString() ?? null,
@@ -413,6 +437,15 @@ export class StructureController {
         const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
+        // Parse content into ordered paragraph/beat nodes
+        const blocks = StructureController.parseSceneContent(content);
+        const sceneNodeData = blocks.map((block, index) => ({
+            nodeId,
+            type: block.type === "BEAT" ? "beat" : "paragraph",
+            orderIndex: index,
+            content: block.content,
+        }));
+
         const [version] = await Promise.all([
             prisma.contentVersion.create({
                 data: { nodeId, content, wordCount },
@@ -422,6 +455,9 @@ export class StructureController {
                 data: { updatedAt: new Date() },
             }),
         ]);
+
+        // Sync scene nodes: replace current nodes with parsed content
+        await StructureController.syncSceneNodes(nodeId, sceneNodeData);
 
         // Prune old versions (keep latest 50)
         const allVersions = await prisma.contentVersion.findMany({
@@ -488,11 +524,20 @@ export class StructureController {
         });
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
+        const restoredContent = oldVersion.content;
+        const restoredBlocks = StructureController.parseSceneContent(restoredContent);
+        const restoredSceneNodeData = restoredBlocks.map((block, index) => ({
+            nodeId,
+            type: block.type === "BEAT" ? "beat" : "paragraph",
+            orderIndex: index,
+            content: block.content,
+        }));
+
         const [newVersion] = await Promise.all([
             prisma.contentVersion.create({
                 data: {
                     nodeId,
-                    content: oldVersion.content,
+                    content: restoredContent,
                     wordCount: oldVersion.wordCount,
                 },
             }),
@@ -501,6 +546,8 @@ export class StructureController {
                 data: { updatedAt: new Date() },
             }),
         ]);
+
+        await StructureController.syncSceneNodes(nodeId, restoredSceneNodeData);
 
         return {
             nodeId,
