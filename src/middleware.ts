@@ -57,7 +57,7 @@ function makeRateLimitResponse(
  * - Chat: 30 req/min
  * - Read (GET): 120 req/min
  * - Write (POST/PATCH/DELETE): 60 req/min
- * - Project creation (POST /api/projects): 10/hour
+ * - Project creation (POST /api/projects): 100/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
 function applyRateLimit(
