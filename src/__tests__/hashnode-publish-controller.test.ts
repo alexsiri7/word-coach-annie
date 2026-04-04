@@ -5,7 +5,6 @@ import { encrypt } from "@/lib/crypto";
 
 vi.mock("@/mcp/tools/export", () => ({
     exportHashnode: vi.fn().mockResolvedValue("# Test Article\n\nSome content here."),
-    exportMedium: vi.fn().mockResolvedValue("# Test Article\n\nSome content here."),
 }));
 
 const DRAFT_RESPONSE = {

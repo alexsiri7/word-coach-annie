@@ -163,7 +163,7 @@ vi.mock("@/mcp/tools/relationships", () => ({
 vi.mock("@/mcp/tools/export", () => ({
   exportManuscript: vi.fn().mockResolvedValue({ markdown: "# Test" }),
   exportStoryBible: vi.fn().mockResolvedValue({ markdown: "# Bible" }),
-  exportMedium: vi.fn().mockResolvedValue({ html: "<p>Test</p>" }),
+  exportHashnode: vi.fn().mockResolvedValue({ html: "<p>Test</p>" }),
   getProjectSummary: vi.fn().mockResolvedValue({ title: "Test", wordCount: 1000 }),
 }));
 
