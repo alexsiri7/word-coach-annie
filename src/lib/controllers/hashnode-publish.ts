@@ -27,6 +27,28 @@ mutation PublishPost($input: PublishPostInput!) {
 }
 `;
 
+const UPDATE_DRAFT_MUTATION = `
+mutation UpdateDraft($input: UpdateDraftInput!) {
+  updateDraft(input: $input) {
+    draft {
+      id
+      title
+    }
+  }
+}
+`;
+
+const UPDATE_POST_MUTATION = `
+mutation UpdatePost($input: UpdatePostInput!) {
+  updatePost(input: $input) {
+    post {
+      id
+      url
+    }
+  }
+}
+`;
+
 export interface PublishToHashnodeOptions {
     nodeId?: string;
     titleOverride?: string;
@@ -40,6 +62,13 @@ export interface PublishResult {
     hashnodePostUrl: string;
     publishStatus: string;
     alreadyPublished?: boolean;
+    updated?: boolean;
+}
+
+export interface ExistingExportInfo {
+    hashnodePostId: string;
+    hashnodePostUrl: string;
+    publishStatus: string;
 }
 
 function toTagSlug(name: string): string {
@@ -67,6 +96,26 @@ async function callGql(token: string, query: string, variables: Record<string, u
 }
 
 export class HashnodePublishController {
+    static async getExistingExport(
+        projectId: string,
+        userId: string | null,
+        nodeId?: string
+    ): Promise<ExistingExportInfo | null> {
+        const cred = await HashnodeAuthController.getCredential(userId);
+        if (!cred) return null;
+
+        const existing = await prisma.hashnodeExport.findFirst({
+            where: { projectId, nodeId: nodeId ?? null, credentialId: cred.id },
+        });
+        if (!existing) return null;
+
+        return {
+            hashnodePostId: existing.hashnodePostId,
+            hashnodePostUrl: existing.hashnodePostUrl,
+            publishStatus: existing.publishStatus,
+        };
+    }
+
     static async publish(
         projectId: string,
         userId: string | null,
@@ -98,22 +147,52 @@ export class HashnodePublishController {
             title = project.title;
         }
 
-        // Check for existing export
+        // Check for existing export — update if found
         const existingExport = await prisma.hashnodeExport.findFirst({
             where: { projectId, nodeId: nodeId ?? null, credentialId: cred.id },
         });
+
+        const content = await exportHashnode(projectId, nodeId);
+        const hashnodeTags = tags.map((t) => ({ name: t, slug: toTagSlug(t) }));
+
         if (existingExport) {
+            const isDraft = existingExport.publishStatus === 'draft';
+
+            if (isDraft) {
+                const input: Record<string, unknown> = {
+                    id: existingExport.hashnodePostId,
+                    title,
+                    contentMarkdown: content,
+                };
+                if (hashnodeTags.length > 0) input.tags = hashnodeTags;
+                if (canonicalUrl) input.originalArticleURL = canonicalUrl;
+
+                await callGql(cred.token, UPDATE_DRAFT_MUTATION, { input });
+            } else {
+                const input: Record<string, unknown> = {
+                    id: existingExport.hashnodePostId,
+                    title,
+                    contentMarkdown: content,
+                    settings: { isDelisted: existingExport.publishStatus === 'unlisted' },
+                };
+                if (hashnodeTags.length > 0) input.tags = hashnodeTags;
+                if (canonicalUrl) input.originalArticleURL = canonicalUrl;
+
+                await callGql(cred.token, UPDATE_POST_MUTATION, { input });
+            }
+
+            await prisma.hashnodeExport.update({
+                where: { id: existingExport.id },
+                data: { lastSyncedAt: new Date() },
+            });
+
             return {
                 hashnodePostId: existingExport.hashnodePostId,
                 hashnodePostUrl: existingExport.hashnodePostUrl,
                 publishStatus: existingExport.publishStatus,
-                alreadyPublished: true,
+                updated: true,
             };
         }
-
-        const content = await exportHashnode(projectId, nodeId);
-
-        const hashnodeTags = tags.map((t) => ({ name: t, slug: toTagSlug(t) }));
 
         let hashnodePostId: string;
         let hashnodePostUrl: string;

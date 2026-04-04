@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
+import { getCurrentUserId, verifyProjectWriteAccess, verifyProjectReadAccess } from '@/lib/api-auth';
 import { HashnodePublishController } from '@/lib/controllers/hashnode-publish';
 import { logger } from '@/lib/logger';
+
+/**
+ * GET /api/projects/[id]/publish-to-hashnode?nodeId=...
+ * Returns existing Hashnode export info if present, or null.
+ */
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectReadAccess(id, userId, request.headers.get('x-user-email'));
+        if (!access.authorized) return access.response;
+
+        const nodeId = request.nextUrl.searchParams.get('nodeId') ?? undefined;
+        const existing = await HashnodePublishController.getExistingExport(id, userId, nodeId);
+        return NextResponse.json({ existing });
+    } catch (error) {
+        logger.error('GET /api/projects/[id]/publish-to-hashnode error', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
 
 /**
  * POST /api/projects/[id]/publish-to-hashnode
@@ -45,25 +68,14 @@ export async function POST(
             canonicalUrl,
         });
 
-        if (result.alreadyPublished) {
-            return NextResponse.json(
-                {
-                    warning: 'This content has already been published to Hashnode.',
-                    hashnodePostUrl: result.hashnodePostUrl,
-                    hashnodePostId: result.hashnodePostId,
-                    publishStatus: result.publishStatus,
-                },
-                { status: 200 }
-            );
-        }
-
         return NextResponse.json(
             {
                 hashnodePostUrl: result.hashnodePostUrl,
                 hashnodePostId: result.hashnodePostId,
                 publishStatus: result.publishStatus,
+                updated: result.updated ?? false,
             },
-            { status: 201 }
+            { status: result.updated ? 200 : 201 }
         );
     } catch (error) {
         logger.error('POST /api/projects/[id]/publish-to-hashnode error', error);

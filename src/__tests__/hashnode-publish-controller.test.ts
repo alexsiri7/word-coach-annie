@@ -203,7 +203,40 @@ describe("HashnodePublishController", () => {
             ).rejects.toThrow("Hashnode account not connected");
         });
 
-        it("returns alreadyPublished when export record exists", async () => {
+        it("updates existing draft when export record exists with publishStatus=draft", async () => {
+            await testPrisma.hashnodeExport.create({
+                data: {
+                    projectId,
+                    nodeId: null,
+                    hashnodePostId: "existing-draft-id",
+                    hashnodePostUrl: "https://hashnode.com/draft/existing-draft-id",
+                    publishStatus: "draft",
+                    lastSyncedAt: new Date(),
+                    credentialId: credId,
+                },
+            });
+
+            const UPDATE_DRAFT_RESPONSE = {
+                data: { updateDraft: { draft: { id: "existing-draft-id", title: "My Story" } } },
+            };
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue(UPDATE_DRAFT_RESPONSE),
+            } as unknown as Response);
+
+            const result = await HashnodePublishController.publish(projectId, null, {});
+
+            expect(result.updated).toBe(true);
+            expect(result.hashnodePostId).toBe("existing-draft-id");
+            expect(result.alreadyPublished).toBeUndefined();
+
+            const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+            const body = JSON.parse(fetchCall[1].body);
+            expect(body.query).toContain("UpdateDraft");
+            expect(body.variables.input.id).toBe("existing-draft-id");
+        });
+
+        it("updates existing published post when export record exists with publishStatus=public", async () => {
             await testPrisma.hashnodeExport.create({
                 data: {
                     projectId,
@@ -216,11 +249,23 @@ describe("HashnodePublishController", () => {
                 },
             });
 
+            const UPDATE_POST_RESPONSE = {
+                data: { updatePost: { post: { id: "existing-post-id", url: "https://testuser.hashnode.dev/existing" } } },
+            };
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue(UPDATE_POST_RESPONSE),
+            } as unknown as Response);
+
             const result = await HashnodePublishController.publish(projectId, null, {});
 
-            expect(result.alreadyPublished).toBe(true);
+            expect(result.updated).toBe(true);
             expect(result.hashnodePostId).toBe("existing-post-id");
-            expect(global.fetch).not.toHaveBeenCalled();
+
+            const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+            const body = JSON.parse(fetchCall[1].body);
+            expect(body.query).toContain("UpdatePost");
+            expect(body.variables.input.id).toBe("existing-post-id");
         });
 
         it("throws when Hashnode API returns an error", async () => {

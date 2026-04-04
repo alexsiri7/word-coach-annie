@@ -28,6 +28,12 @@ interface HashnodePublishDialogProps {
   nodeId?: string;
 }
 
+interface ExistingExport {
+  hashnodePostId: string;
+  hashnodePostUrl: string;
+  publishStatus: string;
+}
+
 export function HashnodePublishDialog({
   projectId,
   projectTitle,
@@ -40,8 +46,9 @@ export function HashnodePublishDialog({
   const [tagsInput, setTagsInput] = useState("");
   const [canonicalUrl, setCanonicalUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
-  const [result, setResult] = useState<{ url: string; isDraft: boolean } | null>(null);
+  const [result, setResult] = useState<{ url: string; isDraft: boolean; updated?: boolean } | null>(null);
   const [error, setError] = useState("");
+  const [existingExport, setExistingExport] = useState<ExistingExport | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +58,17 @@ export function HashnodePublishDialog({
     setCanonicalUrl("");
     setError("");
     setResult(null);
-  }, [open, projectTitle]);
+    setExistingExport(null);
+
+    const params = new URLSearchParams();
+    if (nodeId) params.set("nodeId", nodeId);
+    fetch(`/api/projects/${projectId}/publish-to-hashnode?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.existing) setExistingExport(data.existing);
+      })
+      .catch(() => {/* non-critical — ignore */});
+  }, [open, projectTitle, projectId, nodeId]);
 
   const parsedTags = tagsInput
     .split(",")
@@ -85,6 +102,7 @@ export function HashnodePublishDialog({
       setResult({
         url: data.hashnodePostUrl,
         isDraft: (data.publishStatus ?? publishStatus) === "draft",
+        updated: data.updated,
       });
     } finally {
       setPublishing(false);
@@ -104,9 +122,13 @@ export function HashnodePublishDialog({
         {result ? (
           <div className="space-y-4 pt-2">
             <p className="text-sm text-text-secondary">
-              {result.isDraft
-                ? "Draft created! Review and publish it from your Hashnode dashboard."
-                : "Published successfully!"}
+              {result.updated
+                ? result.isDraft
+                  ? "Draft updated! Review and publish it from your Hashnode dashboard."
+                  : "Post updated on Hashnode."
+                : result.isDraft
+                  ? "Draft created! Review and publish it from your Hashnode dashboard."
+                  : "Published successfully!"}
             </p>
             <a
               href={result.url}
@@ -123,6 +145,23 @@ export function HashnodePublishDialog({
           </div>
         ) : (
           <div className="space-y-4 pt-2">
+            {existingExport && (
+              <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-sm">
+                <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">
+                  Already published — clicking Update will sync new content
+                </p>
+                <a
+                  href={existingExport.hashnodePostUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 mt-1 text-xs text-accent hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View existing {existingExport.publishStatus === "draft" ? "draft" : "post"}
+                </a>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-text-secondary">Title</label>
               <Input
@@ -200,7 +239,15 @@ export function HashnodePublishDialog({
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {publishing ? "Publishing..." : "Publish"}
+                {publishing
+                  ? existingExport
+                    ? "Updating..."
+                    : "Publishing..."
+                  : existingExport
+                  ? "Update"
+                  : publishStatus === "draft"
+                  ? "Create Draft"
+                  : "Publish"}
               </Button>
             </div>
           </div>
