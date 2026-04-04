@@ -74,7 +74,7 @@ export class HashnodePublishController {
 
             if (isDraft) {
                 const input: Record<string, unknown> = {
-                    id: existingExport.hashnodePostId,
+                    draftId: existingExport.hashnodePostId,
                     title,
                     contentMarkdown,
                     tags: tagInput,
@@ -113,7 +113,7 @@ export class HashnodePublishController {
                 }
             } else {
                 const input: Record<string, unknown> = {
-                    id: existingExport.hashnodePostId,
+                    postId: existingExport.hashnodePostId,
                     title,
                     contentMarkdown,
                     tags: tagInput,

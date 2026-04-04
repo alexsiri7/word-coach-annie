@@ -304,7 +304,7 @@ describe("HashnodePublishController", () => {
             const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
             const requestBody = JSON.parse(fetchCall[1].body);
             expect(requestBody.query).toContain("updateDraft");
-            expect(requestBody.variables.input.id).toBe("existing-draft-id");
+            expect(requestBody.variables.input.draftId).toBe("existing-draft-id");
         });
 
         it("calls updatePost when existing export has public status", async () => {
@@ -330,7 +330,7 @@ describe("HashnodePublishController", () => {
             const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
             const requestBody = JSON.parse(fetchCall[1].body);
             expect(requestBody.query).toContain("updatePost");
-            expect(requestBody.variables.input.id).toBe("existing-post-id");
+            expect(requestBody.variables.input.postId).toBe("existing-post-id");
         });
 
         it("updates lastSyncedAt on the export record", async () => {
