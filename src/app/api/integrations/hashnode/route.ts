@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { HashnodeAuthController } from '@/lib/controllers/hashnode-auth';
 import { getCurrentUserId } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { ConnectHashnodeSchema } from '@/lib/api-schemas';
 
 /**
  * POST /api/integrations/hashnode
@@ -11,14 +12,13 @@ import { logger } from '@/lib/logger';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { accessToken } = body;
-
-        if (!accessToken || typeof accessToken !== 'string') {
-            return NextResponse.json({ error: 'accessToken is required' }, { status: 400 });
+        const parsed = ConnectHashnodeSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid request" }, { status: 400 });
         }
 
         const userId = getCurrentUserId(request);
-        const result = await HashnodeAuthController.connect(accessToken.trim(), userId);
+        const result = await HashnodeAuthController.connect(parsed.data.accessToken.trim(), userId);
 
         return NextResponse.json({ connected: true, ...result });
     } catch (error) {

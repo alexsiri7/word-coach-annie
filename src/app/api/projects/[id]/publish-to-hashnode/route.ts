@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
 import { HashnodePublishController } from '@/lib/controllers/hashnode-publish';
 import { logger } from '@/lib/logger';
+import { PublishToHashnodeSchema } from '@/lib/api-schemas';
 
 /**
  * POST /api/projects/[id]/publish-to-hashnode
@@ -24,18 +25,14 @@ export async function POST(
         if (!access.authorized) return access.response;
 
         const body = await request.json();
-        const { nodeId, titleOverride, publishStatus, tags, canonicalUrl } = body;
-
-        if (publishStatus && !['draft', 'unlisted', 'public'].includes(publishStatus)) {
+        const parsed = PublishToHashnodeSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'publishStatus must be draft, unlisted, or public' },
+                { error: parsed.error.errors[0]?.message ?? "Invalid request" },
                 { status: 400 }
             );
         }
-
-        if (tags !== undefined && !Array.isArray(tags)) {
-            return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
-        }
+        const { nodeId, titleOverride, publishStatus, tags, canonicalUrl } = parsed.data;
 
         const result = await HashnodePublishController.publish(id, userId, {
             nodeId,

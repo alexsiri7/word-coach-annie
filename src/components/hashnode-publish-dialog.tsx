@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { HashnodeExport } from "@/lib/api-schemas";
 
 interface HashnodePublishDialogProps {
   projectId: string;
@@ -26,14 +27,6 @@ interface HashnodePublishDialogProps {
   onOpenChange: (open: boolean) => void;
   /** If set, publish a single node (chapter/article) instead of the full project */
   nodeId?: string;
-}
-
-interface HashnodeExport {
-  hashnodePostId: string;
-  hashnodePostUrl: string;
-  publishStatus: string;
-  nodeId: string | null;
-  lastSyncedAt: string;
 }
 
 export function HashnodePublishDialog({

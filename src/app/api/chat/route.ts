@@ -5,6 +5,7 @@ import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent } from "@/lib/ai/adk-agent";
+import { SendChatMessageSchema } from "@/lib/api-schemas";
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
@@ -112,18 +113,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, message, sceneContext } = body as {
-      projectId: string;
-      message: string;
-      sceneContext?: string;
-    };
-
-    if (!projectId || !message) {
+    const parsed = SendChatMessageSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "projectId and message are required" },
+        { error: parsed.error.errors[0]?.message ?? "Invalid request" },
         { status: 400 }
       );
     }
+    const { projectId, message, sceneContext } = parsed.data;
 
     const userId = getCurrentUserId(request);
     const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
