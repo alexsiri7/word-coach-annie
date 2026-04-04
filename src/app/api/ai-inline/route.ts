@@ -3,7 +3,7 @@ import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/li
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
-import OpenAI from "openai";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 export type InlineAiAction =
   | "rewrite-tighter"
@@ -79,23 +79,14 @@ export async function POST(request: NextRequest) {
     const prefs = await getAiPreferences(userId);
     const prefInstructions = buildPreferenceInstructions(prefs);
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [
-        { role: "system", content: prefInstructions },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 1000,
+    const result = await runSimpleCompletion({
+      systemPrompt: prefInstructions,
+      userMessage: prompt,
+      aiConfig,
+      maxTokens: 1000,
       temperature: 0.7,
     });
-
-    const result = response.choices[0]?.message?.content?.trim() || "";
-    return NextResponse.json({ result });
+    return NextResponse.json({ result: result.trim() });
   } catch (error) {
     logger.error("POST /api/ai-inline error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
