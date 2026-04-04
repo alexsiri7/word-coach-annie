@@ -30,6 +30,28 @@ const HASHNODE_PUBLISH_RESPONSE = {
     },
 };
 
+const HASHNODE_UPDATE_DRAFT_RESPONSE = {
+    data: {
+        updateDraft: {
+            draft: {
+                id: "existing-draft-id",
+                title: "Test Article",
+            },
+        },
+    },
+};
+
+const HASHNODE_UPDATE_POST_RESPONSE = {
+    data: {
+        updatePost: {
+            post: {
+                id: "existing-post-id",
+                url: "https://testuser.hashnode.dev/existing-post",
+            },
+        },
+    },
+};
+
 function mockFetchDraft() {
     global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -56,6 +78,20 @@ function mockFetchGraphQLError(message: string) {
     global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue({ errors: [{ message }] }),
+    } as unknown as Response);
+}
+
+function mockFetchUpdateDraft() {
+    global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(HASHNODE_UPDATE_DRAFT_RESPONSE),
+    } as unknown as Response);
+}
+
+function mockFetchUpdatePost() {
+    global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(HASHNODE_UPDATE_POST_RESPONSE),
     } as unknown as Response);
 }
 
@@ -243,9 +279,36 @@ describe("HashnodePublishController", () => {
         });
     });
 
-    describe("re-publish guard", () => {
-        it("returns alreadyPublished when export record exists", async () => {
-            global.fetch = vi.fn();
+    describe("update flow (existing export)", () => {
+        it("calls updateDraft when existing export has draft status", async () => {
+            mockFetchUpdateDraft();
+
+            await testPrisma.hashnodeExport.create({
+                data: {
+                    projectId,
+                    nodeId: null,
+                    hashnodePostId: "existing-draft-id",
+                    hashnodePostUrl: "https://hashnode.com/draft/existing-draft-id",
+                    publishStatus: "draft",
+                    lastSyncedAt: new Date(),
+                    credentialId: credId,
+                },
+            });
+
+            const result = await HashnodePublishController.publish(projectId, null, {});
+
+            expect(result.updated).toBe(true);
+            expect(result.hashnodePostId).toBe("existing-draft-id");
+            expect(result.alreadyPublished).toBeUndefined();
+
+            const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+            const requestBody = JSON.parse(fetchCall[1].body);
+            expect(requestBody.query).toContain("updateDraft");
+            expect(requestBody.variables.input.id).toBe("existing-draft-id");
+        });
+
+        it("calls updatePost when existing export has public status", async () => {
+            mockFetchUpdatePost();
 
             await testPrisma.hashnodeExport.create({
                 data: {
@@ -261,9 +324,35 @@ describe("HashnodePublishController", () => {
 
             const result = await HashnodePublishController.publish(projectId, null, {});
 
-            expect(result.alreadyPublished).toBe(true);
+            expect(result.updated).toBe(true);
             expect(result.hashnodePostId).toBe("existing-post-id");
-            expect(global.fetch).not.toHaveBeenCalled();
+
+            const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+            const requestBody = JSON.parse(fetchCall[1].body);
+            expect(requestBody.query).toContain("updatePost");
+            expect(requestBody.variables.input.id).toBe("existing-post-id");
+        });
+
+        it("updates lastSyncedAt on the export record", async () => {
+            mockFetchUpdateDraft();
+            const oldDate = new Date("2024-01-01");
+
+            await testPrisma.hashnodeExport.create({
+                data: {
+                    projectId,
+                    nodeId: null,
+                    hashnodePostId: "existing-draft-id",
+                    hashnodePostUrl: "https://hashnode.com/draft/existing-draft-id",
+                    publishStatus: "draft",
+                    lastSyncedAt: oldDate,
+                    credentialId: credId,
+                },
+            });
+
+            await HashnodePublishController.publish(projectId, null, {});
+
+            const updated = await testPrisma.hashnodeExport.findFirst({ where: { projectId } });
+            expect(updated!.lastSyncedAt.getTime()).toBeGreaterThan(oldDate.getTime());
         });
     });
 
