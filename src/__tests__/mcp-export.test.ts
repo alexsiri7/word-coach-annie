@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { exportManuscript, exportStoryBible, exportMedium, getProjectSummary, exportUniverse } from "@/mcp/tools/export";
+import { exportManuscript, exportStoryBible, exportMedium, getFullText, getProjectSummary, exportUniverse } from "@/mcp/tools/export";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
 import { UniversesController } from "@/lib/controllers/universes";
@@ -165,6 +165,46 @@ describe("MCP Export Tools", () => {
 
         it("throws for non-existent project", async () => {
             await expect(getProjectSummary("bad")).rejects.toThrow("Project not found");
+        });
+    });
+
+    describe("getFullText", () => {
+        it("exports title as h1", async () => {
+            const md = await getFullText(projectId);
+            expect(md).toContain("# My Novel");
+        });
+
+        it("does not include author/genre/synopsis front matter", async () => {
+            const md = await getFullText(projectId);
+            expect(md).not.toContain("Jane Doe");
+            expect(md).not.toContain("Fantasy");
+            expect(md).not.toContain("An epic tale");
+        });
+
+        it("exports chapters and scenes with scene headings", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "The Beginning" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Awakening", parentId: ch.id });
+            await StructureController.writeSceneContent(scene.id, "<p>The hero awoke.</p>");
+
+            const md = await getFullText(projectId);
+            expect(md).toContain("## Chapter 1: The Beginning");
+            expect(md).toContain("### Awakening");
+            expect(md).toContain("The hero awoke.");
+        });
+
+        it("strips beats", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1", parentId: ch.id });
+            await StructureController.writeSceneContent(scene.id, "<p>Text</p><!-- beat: hidden beat --><p>More</p>");
+
+            const md = await getFullText(projectId);
+            expect(md).not.toContain("hidden beat");
+            expect(md).toContain("Text");
+            expect(md).toContain("More");
+        });
+
+        it("throws for non-existent project", async () => {
+            await expect(getFullText("bad")).rejects.toThrow("Project not found");
         });
     });
 

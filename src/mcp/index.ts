@@ -45,6 +45,7 @@ import {
 import {
     exportManuscript,
     exportStoryBible,
+    getFullText,
     getProjectSummary,
 } from "./tools/export";
 import {
@@ -712,6 +713,18 @@ server.tool(
     },
     async ({ projectId }) => {
         const markdown = await exportManuscript(projectId);
+        return { content: [{ type: "text", text: markdown }] };
+    }
+);
+
+server.tool(
+    "get_full_text",
+    "Get the entire story as a single clean Markdown document. Concatenates all scenes in order with part/chapter/scene headings. Beats are stripped — only prose content is included. Use this for a readable view of the whole manuscript.",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async ({ projectId }) => {
+        const markdown = await getFullText(projectId);
         return { content: [{ type: "text", text: markdown }] };
     }
 );
