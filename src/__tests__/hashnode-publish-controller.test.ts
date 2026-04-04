@@ -64,6 +64,8 @@ describe("HashnodePublishController", () => {
     let credId: string;
 
     beforeEach(async () => {
+        global.fetch = vi.fn();
+
         const project = await testPrisma.project.create({
             data: { title: "My Story", author: "Test Author" },
         });
