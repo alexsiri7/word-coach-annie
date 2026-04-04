@@ -979,4 +979,449 @@ test.describe('Integration tests — real server, real data', () => {
       if (sourceProjectId) await deleteProject(request, sourceProjectId)
     }
   })
+
+  // ── l) Beats persistence ────────────────────────────────────────────
+  test('beats: save scene with beats, reload, verify beats persist', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'beats-persist')
+      projectId = project.id
+
+      // Create chapter + scene
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Beat Chapter', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Beat Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // Save content that embeds two beat annotations as HTML comments
+      const contentWithBeats = [
+        '<!-- beat: Hero enters the darkened room -->',
+        '<p>The door creaked open and shadows swallowed the light.</p>',
+        '<!-- beat: Hero discovers the clue -->',
+        '<p>A single envelope lay on the dusty desk.</p>',
+      ].join('\n')
+
+      const saveRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: contentWithBeats },
+      })
+      expect(saveRes.status()).toBe(201)
+
+      // Reload content and verify beats are present verbatim
+      const readRes = await request.get(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(readRes.ok()).toBeTruthy()
+      const body = await readRes.json()
+      expect(body.latest).toBeDefined()
+      expect(body.latest.content).toContain(
+        '<!-- beat: Hero enters the darkened room -->',
+      )
+      expect(body.latest.content).toContain(
+        '<!-- beat: Hero discovers the clue -->',
+      )
+      expect(body.latest.content).toContain('shadows swallowed the light')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── m) Node reorder and delete ──────────────────────────────────────
+  test('story structure: reorder chapters, delete a scene', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'structure-ops')
+      projectId = project.id
+
+      // Create two chapters
+      const ch1Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Chapter Alpha', orderIndex: 0 },
+        },
+      )
+      expect(ch1Res.status()).toBe(201)
+      const ch1 = await ch1Res.json()
+
+      const ch2Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Chapter Beta', orderIndex: 1 },
+        },
+      )
+      expect(ch2Res.status()).toBe(201)
+      const ch2 = await ch2Res.json()
+
+      // Add two scenes to Chapter Alpha
+      const scene1Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Scene One',
+            parentId: ch1.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(scene1Res.status()).toBe(201)
+      const scene1 = await scene1Res.json()
+
+      const scene2Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Scene Two',
+            parentId: ch1.id,
+            orderIndex: 1,
+          },
+        },
+      )
+      expect(scene2Res.status()).toBe(201)
+      const scene2 = await scene2Res.json()
+
+      // Reorder: move Chapter Beta before Chapter Alpha (index 0)
+      const moveRes = await request.post('/api/nodes/move', {
+        headers: AUTH_HEADERS,
+        data: { nodeId: ch2.id, newParentId: null, newIndex: 0 },
+      })
+      expect(moveRes.ok()).toBeTruthy()
+
+      // Verify the new order in the tree
+      const treeRes = await request.get(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(treeRes.ok()).toBeTruthy()
+      const tree = await treeRes.json()
+      const topLevel = tree.tree as Array<{ id: string; orderIndex: number }>
+      const ch1Node = topLevel.find((n) => n.id === ch1.id)
+      const ch2Node = topLevel.find((n) => n.id === ch2.id)
+      expect(ch2Node!.orderIndex).toBeLessThan(ch1Node!.orderIndex)
+
+      // Delete Scene One and verify it's gone
+      const delRes = await request.delete(`/api/nodes/${scene1.id}`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(delRes.ok()).toBeTruthy()
+
+      // Scene Two should still exist
+      const treeRes2 = await request.get(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+      })
+      const tree2 = await treeRes2.json()
+      const allIds = (
+        tree2.tree as Array<{ id: string; children?: Array<{ id: string }> }>
+      ).flatMap((n) => [n.id, ...(n.children?.map((c) => c.id) ?? [])])
+      expect(allIds).not.toContain(scene1.id)
+      expect(allIds).toContain(scene2.id)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── n) Annotations ──────────────────────────────────────────────────
+  test('annotations: create, view, resolve, delete', async ({ request }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'annotations')
+      projectId = project.id
+
+      // Create chapter + scene
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Annotated Chapter', orderIndex: 0 },
+        },
+      )
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Annotated Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // Create an annotation on the scene
+      const createRes = await request.post(
+        `/api/nodes/${scene.id}/annotations`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            content: 'This paragraph needs more tension.',
+            selectedText: 'The door creaked',
+          },
+        },
+      )
+      expect(createRes.status()).toBe(201)
+      const annotation = await createRes.json()
+      expect(annotation.id).toBeDefined()
+      expect(annotation.content).toBe('This paragraph needs more tension.')
+
+      // List annotations for the scene
+      const listRes = await request.get(
+        `/api/nodes/${scene.id}/annotations`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(listRes.ok()).toBeTruthy()
+      const listBody = await listRes.json()
+      expect(Array.isArray(listBody)).toBeTruthy()
+      const found = listBody.find((a: { id: string }) => a.id === annotation.id)
+      expect(found).toBeDefined()
+
+      // Resolve the annotation via PATCH
+      const patchRes = await request.patch(
+        `/api/annotations/${annotation.id}`,
+        {
+          headers: AUTH_HEADERS,
+          data: { resolved: true },
+        },
+      )
+      expect(patchRes.ok()).toBeTruthy()
+      const patched = await patchRes.json()
+      expect(patched.resolved).toBe(true)
+
+      // Delete the annotation
+      const delRes = await request.delete(
+        `/api/annotations/${annotation.id}`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(delRes.ok()).toBeTruthy()
+
+      // Verify it's gone
+      const listRes2 = await request.get(
+        `/api/nodes/${scene.id}/annotations`,
+        { headers: AUTH_HEADERS },
+      )
+      const listBody2 = await listRes2.json()
+      const stillThere = listBody2.find(
+        (a: { id: string }) => a.id === annotation.id,
+      )
+      expect(stillThere).toBeUndefined()
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── o) Search ───────────────────────────────────────────────────────
+  test('search: finds content in scenes and story objects', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'search-test')
+      projectId = project.id
+
+      // Create chapter + scene with distinctive content
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Search Chapter', orderIndex: 0 },
+        },
+      )
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Searchable Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      const scene = await sceneRes.json()
+
+      await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: {
+          content:
+            '<p>The xylophone-playing walrus sat beneath the crimson moon.</p>',
+        },
+      })
+
+      // Create a story object with searchable text
+      await request.post(`/api/projects/${projectId}/story-objects`, {
+        headers: AUTH_HEADERS,
+        data: {
+          type: 'CHARACTER',
+          name: 'Xylophone Walrus',
+          description: 'A walrus famous for its musical talent',
+        },
+      })
+
+      // Search for the unique token — should match scene content and character
+      const searchRes = await request.get(
+        `/api/projects/${projectId}/search?q=xylophone`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(searchRes.ok()).toBeTruthy()
+      const body = await searchRes.json()
+      expect(body.query).toBe('xylophone')
+      expect(body.scenes.length).toBeGreaterThanOrEqual(1)
+      expect(body.storyObjects.length).toBeGreaterThanOrEqual(1)
+      expect(body.totalResults).toBeGreaterThanOrEqual(2)
+
+      // Verify the scene result points to the right scene
+      const sceneResult = body.scenes.find(
+        (s: { id: string }) => s.id === scene.id,
+      )
+      expect(sceneResult).toBeDefined()
+      expect(sceneResult.snippet).toContain('xylophone')
+
+      // Empty query should return 400
+      const emptyRes = await request.get(
+        `/api/projects/${projectId}/search?q=`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(emptyRes.status()).toBe(400)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── p) Universe world-building ──────────────────────────────────────
+  test('universes: create universe, add world objects, link to project', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+    let universeId: string | undefined
+
+    try {
+      // 1. Create a universe
+      const universeRes = await request.post('/api/universes', {
+        headers: AUTH_HEADERS,
+        data: {
+          title: 'E2E Test Universe',
+          description: 'A shared universe for testing',
+        },
+      })
+      expect(universeRes.status()).toBe(201)
+      const universe = await universeRes.json()
+      universeId = universe.id
+      expect(universe.title).toBe('E2E Test Universe')
+
+      // 2. Add a world object (CHARACTER type) to the universe
+      const woRes = await request.post(
+        `/api/universes/${universeId}/world-objects`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'CHARACTER',
+            name: 'Universal Hero',
+            description: 'A hero shared across the multiverse',
+          },
+        },
+      )
+      expect(woRes.ok()).toBeTruthy()
+      const worldObject = await woRes.json()
+      expect(worldObject.id).toBeDefined()
+      expect(worldObject.name).toBe('Universal Hero')
+
+      // 3. List world objects in the universe
+      const listRes = await request.get(
+        `/api/universes/${universeId}/world-objects`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(listRes.ok()).toBeTruthy()
+      const listBody = await listRes.json()
+      const found = listBody.find(
+        (wo: { id: string }) => wo.id === worldObject.id,
+      )
+      expect(found).toBeDefined()
+
+      // 4. Create a project and copy the world object into it as a story object
+      const project = await createProject(request, 'universe-link')
+      projectId = project.id
+
+      const copyRes = await request.post(
+        `/api/projects/${projectId}/copy-world-object`,
+        {
+          headers: AUTH_HEADERS,
+          data: { worldObjectId: worldObject.id },
+        },
+      )
+      expect(copyRes.ok()).toBeTruthy()
+      const copied = await copyRes.json()
+      expect(copied.name).toBe('Universal Hero')
+
+      // 5. Verify the story object now exists in the project
+      const soListRes = await request.get(
+        `/api/projects/${projectId}/story-objects`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(soListRes.ok()).toBeTruthy()
+      const soBody = await soListRes.json()
+      const soFound = soBody.data.find(
+        (o: { name: string }) => o.name === 'Universal Hero',
+      )
+      expect(soFound).toBeDefined()
+
+      // 6. Update the universe title
+      const patchRes = await request.patch(`/api/universes/${universeId}`, {
+        headers: AUTH_HEADERS,
+        data: { title: 'E2E Test Universe (updated)' },
+      })
+      expect(patchRes.ok()).toBeTruthy()
+      const patched = await patchRes.json()
+      expect(patched.title).toBe('E2E Test Universe (updated)')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+      if (universeId) {
+        try {
+          await request.delete(`/api/universes/${universeId}`, {
+            headers: AUTH_HEADERS,
+          })
+        } catch {
+          // cleanup best-effort
+        }
+      }
+    }
+  })
 })
