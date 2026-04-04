@@ -1,6 +1,7 @@
-import { StructureController } from "@/lib/controllers/structure";
+import { StructureController, type OutlineNode } from "@/lib/controllers/structure";
 import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
+import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
 
 /** Invalidate caches affected by structure/content changes. */
 function invalidateStructureCaches(projectId?: string) {
@@ -14,11 +15,24 @@ function invalidateStructureCaches(projectId?: string) {
     mcpCache.invalidatePrefix("projects:");
 }
 
+function nodeContentHash(node: { title: string; synopsis: string; status: string }): string {
+    return computeContentHash(node.title, node.synopsis, node.status);
+}
+
+function addHashesToOutline(nodes: OutlineNode[]): (OutlineNode & { contentHash: string })[] {
+    return nodes.map(node => ({
+        ...node,
+        contentHash: nodeContentHash(node),
+        children: addHashesToOutline(node.children),
+    }));
+}
+
 export async function getOutline(projectId: string) {
-    return mcpCache.getOrSet(
+    const nodes = await mcpCache.getOrSet(
         `outline:${projectId}`,
         () => StructureController.getOutline(projectId),
     );
+    return addHashesToOutline(nodes);
 }
 
 export async function createNode(params: {
@@ -43,8 +57,13 @@ export async function updateNode(
         status?: string;
         orderIndex?: number;
         parentId?: string | null;
-    }
+    },
+    contentHash?: string
 ) {
+    if (contentHash !== undefined) {
+        const current = await StructureController.getNode(nodeId);
+        verifyContentHash(contentHash, nodeContentHash(current), "get_outline");
+    }
     const result = await StructureController.updateNode(nodeId, data);
     invalidateStructureCaches();
     return result;
@@ -57,20 +76,36 @@ export async function deleteNode(nodeId: string) {
 }
 
 export async function readSceneContent(nodeId: string) {
-    return mcpCache.getOrSet(
+    const raw = await mcpCache.getOrSet(
         `sceneContent:${nodeId}`,
         () => StructureController.readSceneContent(nodeId),
     );
+    return {
+        ...raw,
+        contentHash: computeContentHash(raw.content),
+    };
 }
 
-export async function writeSceneContent(nodeId: string, content: string) {
+export async function writeSceneContent(nodeId: string, content: string, contentHash?: string) {
+    if (contentHash !== undefined) {
+        const current = await StructureController.readSceneContent(nodeId);
+        verifyContentHash(contentHash, computeContentHash(current.content), "read_scene_content");
+    }
     const result = await StructureController.writeSceneContent(nodeId, content);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();
     return result;
 }
 
-export async function writeSceneContentFromBlocks(nodeId: string, blocks: { type: "CONTENT" | "BEAT"; content: string }[]) {
+export async function writeSceneContentFromBlocks(
+    nodeId: string,
+    blocks: { type: "CONTENT" | "BEAT"; content: string }[],
+    contentHash?: string
+) {
+    if (contentHash !== undefined) {
+        const current = await StructureController.readSceneContent(nodeId);
+        verifyContentHash(contentHash, computeContentHash(current.content), "read_scene_content");
+    }
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();
