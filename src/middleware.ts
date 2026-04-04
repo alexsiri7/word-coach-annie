@@ -67,6 +67,9 @@ function applyRateLimit(
     const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
+    // Allow E2E / CI environments to bypass rate limiting
+    if (process.env.DISABLE_RATE_LIMIT === "true") return null;
+
     const method = request.method;
 
     // Chat endpoint has its own dedicated limit
