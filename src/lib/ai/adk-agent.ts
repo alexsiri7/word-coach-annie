@@ -22,10 +22,72 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
 const AGENT_NAME = "writing_assistant";
+const SIMPLE_AGENT_NAME = "simple_completion";
 
 export interface ChatAgentResult {
   finalContent: string;
   toolLog: { tool: string; args: Record<string, unknown>; result: string }[];
+}
+
+/**
+ * Run a simple single-turn completion through the ADK LLM shim.
+ * Use this for routes that need one-shot responses without tool use.
+ */
+export async function runSimpleCompletion(params: {
+  systemPrompt?: string;
+  userMessage: string;
+  aiConfig: { baseUrl: string; apiKey: string; model: string };
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<string> {
+  const llm = new OpenAICompatibleLlm({
+    model: params.aiConfig.model,
+    apiKey: params.aiConfig.apiKey,
+    baseUrl: params.aiConfig.baseUrl,
+  });
+
+  const agent = new LlmAgent({
+    name: SIMPLE_AGENT_NAME,
+    model: llm,
+    instruction: params.systemPrompt || "",
+    tools: [],
+    generateContentConfig: {
+      temperature: params.temperature,
+      maxOutputTokens: params.maxTokens,
+    } as Record<string, unknown>,
+  });
+
+  const runner = new InMemoryRunner({
+    agent,
+    appName: "word-coach-annie",
+  });
+
+  const session = await runner.sessionService.createSession({
+    appName: "word-coach-annie",
+    userId: "default",
+  });
+
+  const newMessage: Content = {
+    role: "user",
+    parts: [{ text: params.userMessage }],
+  };
+
+  let result = "";
+  for await (const event of runner.runAsync({
+    userId: "default",
+    sessionId: session.id,
+    newMessage,
+  })) {
+    if (
+      event.author === SIMPLE_AGENT_NAME &&
+      getFunctionCalls(event).length === 0 &&
+      getFunctionResponses(event).length === 0
+    ) {
+      const text = stringifyContent(event);
+      if (text) result = text;
+    }
+  }
+  return result;
 }
 
 /**
