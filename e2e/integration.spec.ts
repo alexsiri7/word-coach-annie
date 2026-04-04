@@ -589,4 +589,929 @@ test.describe('Integration tests — real server, real data', () => {
       if (projectId) await deleteProject(request, projectId)
     }
   })
+
+  // ── g) JSON export round-trip ──────────────────────────────────────
+  test('JSON export contains all project data', async ({ request }) => {
+    let projectId: string | undefined
+
+    try {
+      // 1. Create a project with content and story objects
+      const project = await createProject(request, 'json-export')
+      projectId = project.id
+
+      // 2. Add a chapter with a scene
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Export Chapter', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Export Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // 3. Save content to the scene
+      const contentHtml = '<p>The ship sailed into the harbor at dawn.</p>'
+      const saveRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: contentHtml },
+      })
+      expect(saveRes.status()).toBe(201)
+
+      // 4. Add a character
+      const charRes = await request.post(
+        `/api/projects/${projectId}/story-objects`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'CHARACTER',
+            name: 'Export Hero',
+            description: 'A test character for export',
+            role: 'Protagonist',
+          },
+        },
+      )
+      expect(charRes.status()).toBe(201)
+
+      // 5. Export as JSON
+      const exportRes = await request.get(
+        `/api/projects/${projectId}/export?type=json`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(exportRes.ok()).toBeTruthy()
+
+      // Verify Content-Type and Content-Disposition headers
+      const contentType = exportRes.headers()['content-type']
+      expect(contentType).toContain('application/json')
+      const disposition = exportRes.headers()['content-disposition']
+      expect(disposition).toContain('attachment')
+      expect(disposition).toContain('.json')
+
+      // 6. Parse and validate the exported JSON
+      const exported = await exportRes.json()
+      expect(exported.exportVersion).toBe(1)
+      expect(exported.exportedAt).toBeDefined()
+
+      // Project metadata
+      expect(exported.project.id).toBe(projectId)
+      expect(exported.project.title).toBe(project.title)
+      expect(exported.project.projectType).toBe('FICTION')
+
+      // Structure nodes (chapter + scene)
+      expect(exported.structureNodes.length).toBe(2)
+      const expChapter = exported.structureNodes.find(
+        (n: { type: string }) => n.type === 'CHAPTER',
+      )
+      expect(expChapter).toBeDefined()
+      expect(expChapter.title).toBe('Export Chapter')
+
+      const expScene = exported.structureNodes.find(
+        (n: { type: string }) => n.type === 'SCENE',
+      )
+      expect(expScene).toBeDefined()
+      expect(expScene.title).toBe('Export Scene')
+      expect(expScene.parentId).toBe(chapter.id)
+
+      // Content versions
+      expect(exported.contentVersions.length).toBeGreaterThanOrEqual(1)
+      const expContent = exported.contentVersions.find(
+        (v: { nodeId: string }) => v.nodeId === scene.id,
+      )
+      expect(expContent).toBeDefined()
+      expect(expContent.content).toContain('sailed into the harbor')
+
+      // Story objects
+      expect(exported.storyObjects.length).toBe(1)
+      expect(exported.storyObjects[0].name).toBe('Export Hero')
+      expect(exported.storyObjects[0].type).toBe('CHARACTER')
+      expect(exported.storyObjects[0].role).toBe('Protagonist')
+
+      // Arrays exist (may be empty)
+      expect(Array.isArray(exported.annotations)).toBe(true)
+      expect(Array.isArray(exported.relationships)).toBe(true)
+      expect(Array.isArray(exported.chatHistory)).toBe(true)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── h) Manuscript export ───────────────────────────────────────────
+  test('manuscript export returns valid markdown', async ({ request }) => {
+    let projectId: string | undefined
+
+    try {
+      // 1. Create project with content
+      const project = await createProject(request, 'manuscript-export')
+      projectId = project.id
+
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'First Chapter', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Opening',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: '<p>It was a dark and stormy night.</p>' },
+      })
+
+      // 2. Export as manuscript (markdown)
+      const exportRes = await request.get(
+        `/api/projects/${projectId}/export?type=manuscript`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(exportRes.ok()).toBeTruthy()
+
+      const contentType = exportRes.headers()['content-type']
+      expect(contentType).toContain('text/markdown')
+      const disposition = exportRes.headers()['content-disposition']
+      expect(disposition).toContain('attachment')
+      expect(disposition).toContain('.md')
+
+      const markdown = await exportRes.text()
+
+      // Verify manuscript structure
+      expect(markdown).toContain(`# ${project.title}`)
+      expect(markdown).toContain('## Chapter 1: First Chapter')
+      expect(markdown).toContain('dark and stormy night')
+
+      // 3. Export without chapter numbering
+      const noNumRes = await request.get(
+        `/api/projects/${projectId}/export?type=manuscript&chapterNumbering=false`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(noNumRes.ok()).toBeTruthy()
+      const noNumMd = await noNumRes.text()
+      expect(noNumMd).toContain('## First Chapter')
+      expect(noNumMd).not.toContain('Chapter 1:')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── i) Story bible export ──────────────────────────────────────────
+  test('story bible export includes characters and locations', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'bible-export')
+      projectId = project.id
+
+      // Add character and location
+      await request.post(`/api/projects/${projectId}/story-objects`, {
+        headers: AUTH_HEADERS,
+        data: {
+          type: 'CHARACTER',
+          name: 'Detective Blake',
+          description: 'Hard-boiled detective',
+          role: 'Protagonist',
+        },
+      })
+      await request.post(`/api/projects/${projectId}/story-objects`, {
+        headers: AUTH_HEADERS,
+        data: {
+          type: 'LOCATION',
+          name: 'Noir City',
+          description: 'A rain-soaked metropolis',
+        },
+      })
+
+      // Export story bible
+      const exportRes = await request.get(
+        `/api/projects/${projectId}/export?type=story-bible`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(exportRes.ok()).toBeTruthy()
+
+      const contentType = exportRes.headers()['content-type']
+      expect(contentType).toContain('text/markdown')
+
+      const markdown = await exportRes.text()
+      expect(markdown).toContain(`Story Bible: ${project.title}`)
+      expect(markdown).toContain('## Characters')
+      expect(markdown).toContain('### Detective Blake')
+      expect(markdown).toContain('Hard-boiled detective')
+      expect(markdown).toContain('**Role:** Protagonist')
+      expect(markdown).toContain('## Locations')
+      expect(markdown).toContain('### Noir City')
+      expect(markdown).toContain('rain-soaked metropolis')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── j) Export-all ZIP ──────────────────────────────────────────────
+  test('export-all returns a valid ZIP with project data', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'export-all')
+      projectId = project.id
+
+      const exportRes = await request.get('/api/projects/export-all', {
+        headers: AUTH_HEADERS,
+      })
+      expect(exportRes.ok()).toBeTruthy()
+
+      const contentType = exportRes.headers()['content-type']
+      expect(contentType).toContain('application/zip')
+      const disposition = exportRes.headers()['content-disposition']
+      expect(disposition).toContain('attachment')
+      expect(disposition).toContain('annie-export-')
+      expect(disposition).toContain('.zip')
+
+      // Verify the response body is non-empty (valid ZIP)
+      const body = await exportRes.body()
+      expect(body.length).toBeGreaterThan(0)
+
+      // ZIP magic bytes: PK\x03\x04
+      expect(body[0]).toBe(0x50) // P
+      expect(body[1]).toBe(0x4b) // K
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── k) JSON export → re-import round-trip ──────────────────────────
+  test('JSON export data can be used to recreate a project', async ({
+    request,
+  }) => {
+    let sourceProjectId: string | undefined
+    let importedProjectId: string | undefined
+
+    try {
+      // 1. Create a rich source project
+      const source = await createProject(request, 'round-trip-source')
+      sourceProjectId = source.id
+
+      // Add chapter + scene + content
+      const chapterRes = await request.post(
+        `/api/projects/${sourceProjectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Round Trip Chapter', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${sourceProjectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Round Trip Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      const contentRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: '<p>Round-trip test content that must survive.</p>' },
+      })
+      expect(contentRes.status()).toBe(201)
+
+      // Add story object
+      const storyObjRes = await request.post(
+        `/api/projects/${sourceProjectId}/story-objects`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'CHARACTER',
+            name: 'Round Trip Hero',
+            description: 'Survives the export-import cycle',
+          },
+        },
+      )
+      expect(storyObjRes.status()).toBe(201)
+
+      // 2. Export the project as JSON
+      const exportRes = await request.get(
+        `/api/projects/${sourceProjectId}/export?type=json`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(exportRes.ok()).toBeTruthy()
+      const exported = await exportRes.json()
+
+      // 3. Use exported data to create a new project (simulating import)
+      const importRes = await request.post('/api/projects', {
+        headers: AUTH_HEADERS,
+        data: {
+          title: `${exported.project.title} (imported)`,
+          author: exported.project.author,
+          genre: exported.project.genre,
+          projectType: exported.project.projectType,
+        },
+      })
+      expect(importRes.status()).toBe(201)
+      const imported = await importRes.json()
+      importedProjectId = imported.id
+
+      // 4. Recreate structure from exported data
+      const nodeIdMap = new Map<string, string>()
+
+      // Create chapters first (no parent dependency)
+      for (const node of exported.structureNodes.filter(
+        (n: { type: string }) => n.type === 'CHAPTER',
+      )) {
+        const res = await request.post(
+          `/api/projects/${importedProjectId}/nodes`,
+          {
+            headers: AUTH_HEADERS,
+            data: {
+              type: node.type,
+              title: node.title,
+              orderIndex: node.orderIndex,
+            },
+          },
+        )
+        expect(res.status()).toBe(201)
+        const created = await res.json()
+        nodeIdMap.set(node.id, created.id)
+      }
+
+      // Create scenes under their chapters
+      for (const node of exported.structureNodes.filter(
+        (n: { type: string }) => n.type === 'SCENE',
+      )) {
+        const newParentId = node.parentId
+          ? nodeIdMap.get(node.parentId)
+          : undefined
+        const res = await request.post(
+          `/api/projects/${importedProjectId}/nodes`,
+          {
+            headers: AUTH_HEADERS,
+            data: {
+              type: node.type,
+              title: node.title,
+              parentId: newParentId,
+              orderIndex: node.orderIndex,
+            },
+          },
+        )
+        expect(res.status()).toBe(201)
+        const created = await res.json()
+        nodeIdMap.set(node.id, created.id)
+      }
+
+      // Restore content for scenes
+      for (const cv of exported.contentVersions) {
+        const newNodeId = nodeIdMap.get(cv.nodeId)
+        if (newNodeId) {
+          const res = await request.post(
+            `/api/nodes/${newNodeId}/content`,
+            {
+              headers: AUTH_HEADERS,
+              data: { content: cv.content },
+            },
+          )
+          expect(res.status()).toBe(201)
+        }
+      }
+
+      // Restore story objects
+      for (const obj of exported.storyObjects) {
+        const res = await request.post(
+          `/api/projects/${importedProjectId}/story-objects`,
+          {
+            headers: AUTH_HEADERS,
+            data: {
+              type: obj.type,
+              name: obj.name,
+              description: obj.description,
+              role: obj.role,
+            },
+          },
+        )
+        expect(res.status()).toBe(201)
+      }
+
+      // 5. Export the imported project and compare
+      const reExportRes = await request.get(
+        `/api/projects/${importedProjectId}/export?type=json`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(reExportRes.ok()).toBeTruthy()
+      const reExported = await reExportRes.json()
+
+      // Verify structural equivalence
+      expect(reExported.structureNodes.length).toBe(
+        exported.structureNodes.length,
+      )
+      expect(reExported.contentVersions.length).toBe(
+        exported.contentVersions.length,
+      )
+      expect(reExported.storyObjects.length).toBe(
+        exported.storyObjects.length,
+      )
+
+      // Verify content survived the round-trip
+      const reExportedContent = reExported.contentVersions.find(
+        (v: { content: string }) =>
+          v.content.includes('Round-trip test content'),
+      )
+      expect(reExportedContent).toBeDefined()
+
+      // Verify story object survived
+      const reExportedChar = reExported.storyObjects.find(
+        (o: { name: string }) => o.name === 'Round Trip Hero',
+      )
+      expect(reExportedChar).toBeDefined()
+      expect(reExportedChar.description).toBe(
+        'Survives the export-import cycle',
+      )
+    } finally {
+      if (importedProjectId) await deleteProject(request, importedProjectId)
+      if (sourceProjectId) await deleteProject(request, sourceProjectId)
+    }
+  })
+
+  // ── l) Beats persistence ────────────────────────────────────────────
+  test('beats: save scene with beats, reload, verify beats persist', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'beats-persist')
+      projectId = project.id
+
+      // Create chapter + scene
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Beat Chapter', orderIndex: 0 },
+        },
+      )
+      expect(chapterRes.status()).toBe(201)
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Beat Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // Save content that embeds two beat annotations as HTML comments
+      const contentWithBeats = [
+        '<!-- beat: Hero enters the darkened room -->',
+        '<p>The door creaked open and shadows swallowed the light.</p>',
+        '<!-- beat: Hero discovers the clue -->',
+        '<p>A single envelope lay on the dusty desk.</p>',
+      ].join('\n')
+
+      const saveRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: contentWithBeats },
+      })
+      expect(saveRes.status()).toBe(201)
+
+      // Reload content and verify beats are present verbatim
+      const readRes = await request.get(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(readRes.ok()).toBeTruthy()
+      const body = await readRes.json()
+      expect(body.latest).toBeDefined()
+      expect(body.latest.content).toContain(
+        '<!-- beat: Hero enters the darkened room -->',
+      )
+      expect(body.latest.content).toContain(
+        '<!-- beat: Hero discovers the clue -->',
+      )
+      expect(body.latest.content).toContain('shadows swallowed the light')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── m) Node reorder and delete ──────────────────────────────────────
+  test('story structure: reorder chapters, delete a scene', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'structure-ops')
+      projectId = project.id
+
+      // Create two chapters
+      const ch1Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Chapter Alpha', orderIndex: 0 },
+        },
+      )
+      expect(ch1Res.status()).toBe(201)
+      const ch1 = await ch1Res.json()
+
+      const ch2Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Chapter Beta', orderIndex: 1 },
+        },
+      )
+      expect(ch2Res.status()).toBe(201)
+      const ch2 = await ch2Res.json()
+
+      // Add two scenes to Chapter Alpha
+      const scene1Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Scene One',
+            parentId: ch1.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(scene1Res.status()).toBe(201)
+      const scene1 = await scene1Res.json()
+
+      const scene2Res = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Scene Two',
+            parentId: ch1.id,
+            orderIndex: 1,
+          },
+        },
+      )
+      expect(scene2Res.status()).toBe(201)
+      const scene2 = await scene2Res.json()
+
+      // Reorder: move Chapter Beta before Chapter Alpha (index 0)
+      const moveRes = await request.post('/api/nodes/move', {
+        headers: AUTH_HEADERS,
+        data: { nodeId: ch2.id, newParentId: null, newIndex: 0 },
+      })
+      expect(moveRes.ok()).toBeTruthy()
+
+      // Verify the new order in the tree
+      const treeRes = await request.get(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(treeRes.ok()).toBeTruthy()
+      const tree = await treeRes.json()
+      const topLevel = tree.tree as Array<{ id: string; orderIndex: number }>
+      const ch1Node = topLevel.find((n) => n.id === ch1.id)
+      const ch2Node = topLevel.find((n) => n.id === ch2.id)
+      expect(ch2Node!.orderIndex).toBeLessThan(ch1Node!.orderIndex)
+
+      // Delete Scene One and verify it's gone
+      const delRes = await request.delete(`/api/nodes/${scene1.id}`, {
+        headers: AUTH_HEADERS,
+      })
+      expect(delRes.ok()).toBeTruthy()
+
+      // Scene Two should still exist
+      const treeRes2 = await request.get(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+      })
+      const tree2 = await treeRes2.json()
+      const allIds = (
+        tree2.tree as Array<{ id: string; children?: Array<{ id: string }> }>
+      ).flatMap((n) => [n.id, ...(n.children?.map((c) => c.id) ?? [])])
+      expect(allIds).not.toContain(scene1.id)
+      expect(allIds).toContain(scene2.id)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── n) Annotations ──────────────────────────────────────────────────
+  test('annotations: create, view, resolve, delete', async ({ request }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'annotations')
+      projectId = project.id
+
+      // Create chapter + scene
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Annotated Chapter', orderIndex: 0 },
+        },
+      )
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Annotated Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      // Create an annotation on the scene
+      const createRes = await request.post(
+        `/api/nodes/${scene.id}/annotations`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            content: 'This paragraph needs more tension.',
+            selectedText: 'The door creaked',
+          },
+        },
+      )
+      expect(createRes.status()).toBe(201)
+      const annotation = await createRes.json()
+      expect(annotation.id).toBeDefined()
+      expect(annotation.content).toBe('This paragraph needs more tension.')
+
+      // List annotations for the scene
+      const listRes = await request.get(
+        `/api/nodes/${scene.id}/annotations`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(listRes.ok()).toBeTruthy()
+      const listBody = await listRes.json()
+      expect(Array.isArray(listBody)).toBeTruthy()
+      const found = listBody.find((a: { id: string }) => a.id === annotation.id)
+      expect(found).toBeDefined()
+
+      // Resolve the annotation via PATCH
+      const patchRes = await request.patch(
+        `/api/annotations/${annotation.id}`,
+        {
+          headers: AUTH_HEADERS,
+          data: { resolved: true },
+        },
+      )
+      expect(patchRes.ok()).toBeTruthy()
+      const patched = await patchRes.json()
+      expect(patched.resolved).toBe(true)
+
+      // Delete the annotation
+      const delRes = await request.delete(
+        `/api/annotations/${annotation.id}`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(delRes.ok()).toBeTruthy()
+
+      // Verify it's gone
+      const listRes2 = await request.get(
+        `/api/nodes/${scene.id}/annotations`,
+        { headers: AUTH_HEADERS },
+      )
+      const listBody2 = await listRes2.json()
+      const stillThere = listBody2.find(
+        (a: { id: string }) => a.id === annotation.id,
+      )
+      expect(stillThere).toBeUndefined()
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── o) Search ───────────────────────────────────────────────────────
+  test('search: finds content in scenes and story objects', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'search-test')
+      projectId = project.id
+
+      // Create chapter + scene with distinctive content
+      const chapterRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: { type: 'CHAPTER', title: 'Search Chapter', orderIndex: 0 },
+        },
+      )
+      const chapter = await chapterRes.json()
+
+      const sceneRes = await request.post(
+        `/api/projects/${projectId}/nodes`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'SCENE',
+            title: 'Searchable Scene',
+            parentId: chapter.id,
+            orderIndex: 0,
+          },
+        },
+      )
+      const scene = await sceneRes.json()
+
+      await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: {
+          content:
+            '<p>The xylophone-playing walrus sat beneath the crimson moon.</p>',
+        },
+      })
+
+      // Create a story object with searchable text
+      await request.post(`/api/projects/${projectId}/story-objects`, {
+        headers: AUTH_HEADERS,
+        data: {
+          type: 'CHARACTER',
+          name: 'Xylophone Walrus',
+          description: 'A walrus famous for its musical talent',
+        },
+      })
+
+      // Search for the unique token — should match scene content and character
+      const searchRes = await request.get(
+        `/api/projects/${projectId}/search?q=xylophone`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(searchRes.ok()).toBeTruthy()
+      const body = await searchRes.json()
+      expect(body.query).toBe('xylophone')
+      expect(body.scenes.length).toBeGreaterThanOrEqual(1)
+      expect(body.storyObjects.length).toBeGreaterThanOrEqual(1)
+      expect(body.totalResults).toBeGreaterThanOrEqual(2)
+
+      // Verify the scene result points to the right scene
+      const sceneResult = body.scenes.find(
+        (s: { id: string }) => s.id === scene.id,
+      )
+      expect(sceneResult).toBeDefined()
+      expect(sceneResult.snippet).toContain('xylophone')
+
+      // Empty query should return 400
+      const emptyRes = await request.get(
+        `/api/projects/${projectId}/search?q=`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(emptyRes.status()).toBe(400)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  // ── p) Universe world-building ──────────────────────────────────────
+  test('universes: create universe, add world objects, link to project', async ({
+    request,
+  }) => {
+    let projectId: string | undefined
+    let universeId: string | undefined
+
+    try {
+      // 1. Create a universe
+      const universeRes = await request.post('/api/universes', {
+        headers: AUTH_HEADERS,
+        data: {
+          title: 'E2E Test Universe',
+          description: 'A shared universe for testing',
+        },
+      })
+      expect(universeRes.status()).toBe(201)
+      const universe = await universeRes.json()
+      universeId = universe.id
+      expect(universe.title).toBe('E2E Test Universe')
+
+      // 2. Add a world object (CHARACTER type) to the universe
+      const woRes = await request.post(
+        `/api/universes/${universeId}/world-objects`,
+        {
+          headers: AUTH_HEADERS,
+          data: {
+            type: 'CHARACTER',
+            name: 'Universal Hero',
+            description: 'A hero shared across the multiverse',
+          },
+        },
+      )
+      expect(woRes.ok()).toBeTruthy()
+      const worldObject = await woRes.json()
+      expect(worldObject.id).toBeDefined()
+      expect(worldObject.name).toBe('Universal Hero')
+
+      // 3. List world objects in the universe
+      const listRes = await request.get(
+        `/api/universes/${universeId}/world-objects`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(listRes.ok()).toBeTruthy()
+      const listBody = await listRes.json()
+      const found = listBody.find(
+        (wo: { id: string }) => wo.id === worldObject.id,
+      )
+      expect(found).toBeDefined()
+
+      // 4. Create a project and copy the world object into it as a story object
+      const project = await createProject(request, 'universe-link')
+      projectId = project.id
+
+      const copyRes = await request.post(
+        `/api/projects/${projectId}/copy-world-object`,
+        {
+          headers: AUTH_HEADERS,
+          data: { worldObjectId: worldObject.id },
+        },
+      )
+      expect(copyRes.ok()).toBeTruthy()
+      const copied = await copyRes.json()
+      expect(copied.name).toBe('Universal Hero')
+
+      // 5. Verify the story object now exists in the project
+      const soListRes = await request.get(
+        `/api/projects/${projectId}/story-objects`,
+        { headers: AUTH_HEADERS },
+      )
+      expect(soListRes.ok()).toBeTruthy()
+      const soBody = await soListRes.json()
+      const soFound = soBody.data.find(
+        (o: { name: string }) => o.name === 'Universal Hero',
+      )
+      expect(soFound).toBeDefined()
+
+      // 6. Update the universe title
+      const patchRes = await request.patch(`/api/universes/${universeId}`, {
+        headers: AUTH_HEADERS,
+        data: { title: 'E2E Test Universe (updated)' },
+      })
+      expect(patchRes.ok()).toBeTruthy()
+      const patched = await patchRes.json()
+      expect(patched.title).toBe('E2E Test Universe (updated)')
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+      if (universeId) {
+        try {
+          await request.delete(`/api/universes/${universeId}`, {
+            headers: AUTH_HEADERS,
+          })
+        } catch {
+          // cleanup best-effort
+        }
+      }
+    }
+  })
+
 })
