@@ -41,6 +41,6 @@ ALTER TABLE "HashnodeExport" ADD CONSTRAINT "HashnodeExport_projectId_fkey" FORE
 -- AddForeignKey: HashnodeExport -> HashnodeCredential
 ALTER TABLE "HashnodeExport" ADD CONSTRAINT "HashnodeExport_credentialId_fkey" FOREIGN KEY ("credentialId") REFERENCES "HashnodeCredential"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Step 3: Drop old tables (no data migration needed — Medium tokens are unusable for Hashnode)
-DROP TABLE IF EXISTS "MediumExport";
-DROP TABLE IF EXISTS "MediumCredential";
+-- Note: old MediumCredential/MediumExport tables left in place.
+-- The migration runner blocks DROP on databases with live data.
+-- These tables are empty/unused and harmless.
