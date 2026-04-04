@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
+import {
+  getAiConfig,
+  getAiPreferences,
+  buildPreferenceInstructions,
+} from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
   | "character-arcs"
   | "consistency-check";
 
-const ANALYSIS_PROMPTS: Record<ManuscriptAnalysisType, (ctx: Awaited<ReturnType<typeof getManuscriptContext>>) => string> = {
-  "plot-threads": ({ project, outlineWithContent, plotlines }) => `Analyze the plot threads in "${project.title}". Based on the manuscript structure below, identify:
+const ANALYSIS_PROMPTS: Record<
+  ManuscriptAnalysisType,
+  (ctx: Awaited<ReturnType<typeof getManuscriptContext>>) => string
+> = {
+  "plot-threads": ({
+    project,
+    outlineWithContent,
+    plotlines,
+  }) => `Analyze the plot threads in "${project.title}". Based on the manuscript structure below, identify:
 1. **Active threads** — which plot lines are introduced and developed
 2. **Dormant threads** — threads introduced but not recently advanced
 3. **Unresolved threads** — threads that need payoff
@@ -23,7 +34,12 @@ ${outlineWithContent || "(No scenes yet)"}
 
 Format your response as a structured report with clear sections. Be specific about which scenes/chapters contain each thread. Keep it concise and actionable.`,
 
-  "character-arcs": ({ project, outlineWithContent, characters, relationships }) => `Analyze character arcs in "${project.title}". For each major character, identify:
+  "character-arcs": ({
+    project,
+    outlineWithContent,
+    characters,
+    relationships,
+  }) => `Analyze character arcs in "${project.title}". For each major character, identify:
 1. **Arc type** — transformation, revelation, flat/steadfast, fallen
 2. **Current position** — where they are in their arc based on the manuscript
 3. **Missing beats** — what arc beats are absent or underdeveloped
@@ -40,7 +56,11 @@ ${outlineWithContent || "(No scenes yet)"}
 
 Format your response as a structured report with one section per major character. Be specific about which scenes show arc development.`,
 
-  "consistency-check": ({ project, outlineWithContent, characters }) => `Perform a consistency check on "${project.title}". Look for potential contradictions or inconsistencies in:
+  "consistency-check": ({
+    project,
+    outlineWithContent,
+    characters,
+  }) => `Perform a consistency check on "${project.title}". Look for potential contradictions or inconsistencies in:
 1. **Character details** — appearance, backstory, traits mentioned differently
 2. **Timeline** — events out of chronological order, impossible timing
 3. **World/setting** — location descriptions that contradict each other
@@ -71,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!projectId || !analysisType) {
       return NextResponse.json(
         { error: "projectId and analysisType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -80,13 +100,16 @@ export async function POST(request: NextRequest) {
     if (!aiConfig.apiKey) {
       return NextResponse.json(
         { error: "AI provider not configured. Set API key in AI Settings." },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
     const promptFn = ANALYSIS_PROMPTS[analysisType];
     if (!promptFn) {
-      return NextResponse.json({ error: "Unknown analysis type" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unknown analysis type" },
+        { status: 400 },
+      );
     }
 
     const ctx = await getManuscriptContext(projectId);
@@ -96,25 +119,19 @@ export async function POST(request: NextRequest) {
     const prefs = await getAiPreferences(userId);
     const prefInstructions = buildPreferenceInstructions(prefs);
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [
-        { role: "system", content: prefInstructions },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 2000,
+    const result = await runSimpleCompletion({
+      systemPrompt: prefInstructions,
+      userMessage: prompt,
+      aiConfig,
+      maxTokens: 2000,
       temperature: 0.5,
     });
-
-    const result = response.choices[0]?.message?.content?.trim() || "";
     return NextResponse.json({ result, analysisType });
   } catch (error) {
     logger.error("POST /api/ai-manuscript error", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

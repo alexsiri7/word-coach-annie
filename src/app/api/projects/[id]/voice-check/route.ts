@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getVoiceContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 interface VoiceProfile {
   characterId: string;
@@ -28,11 +28,15 @@ interface VoiceFeedback {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+  const access = await verifyProjectWriteAccess(
+    projectId,
+    userId,
+    request.headers.get("x-user-email"),
+  );
   if (!access.authorized) return access.response;
 
   let sceneId: string | undefined;
@@ -42,7 +46,10 @@ export async function POST(
     sceneId = body.sceneId;
     selectedText = body.selectedText;
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   if (!sceneId) {
@@ -88,9 +95,11 @@ ${textToAnalyze ? `TEXT TO ANALYZE:\n${textToAnalyze.slice(0, 1000)}` : ""}
 
 Task 1: For each character listed, extract their voice traits (speaking style, vocabulary level, emotional tone, speech patterns) as a JSON array.
 
-Task 2: ${textToAnalyze
-  ? "If the text contains dialogue, identify any lines that sound more like a different character than the one speaking them."
-  : "No text provided — skip voice feedback."}
+Task 2: ${
+      textToAnalyze
+        ? "If the text contains dialogue, identify any lines that sound more like a different character than the one speaking them."
+        : "No text provided — skip voice feedback."
+    }
 
 Return ONLY valid JSON with this structure:
 {
@@ -115,19 +124,12 @@ Return ONLY valid JSON with this structure:
 
 The "feedback" array should be empty if the text is not dialogue or no voice issues are found.`;
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1000,
+    const rawContent = await runSimpleCompletion({
+      userMessage: prompt,
+      aiConfig,
+      maxTokens: 1000,
       temperature: 0.1,
     });
-
-    const rawContent = response.choices[0]?.message?.content ?? "{}";
     let parsed: { profiles?: VoiceProfile[]; feedback?: VoiceFeedback[] } = {};
     try {
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
@@ -156,7 +158,7 @@ The "feedback" array should be empty if the text is not dialogue or no voice iss
     logger.error("POST /api/projects/[id]/voice-check error", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -165,9 +167,26 @@ function extractTraits(text: string): string[] {
   if (!text.trim()) return [];
   const words = text.toLowerCase().match(/\b\w{4,}\b/g) ?? [];
   const voiceWords = words.filter((w) =>
-    ["formal", "informal", "clipped", "verbose", "poetic", "blunt", "witty",
-     "sarcastic", "earnest", "eloquent", "gruff", "gentle", "aggressive",
-     "military", "scholarly", "rustic", "noble", "common"].includes(w)
+    [
+      "formal",
+      "informal",
+      "clipped",
+      "verbose",
+      "poetic",
+      "blunt",
+      "witty",
+      "sarcastic",
+      "earnest",
+      "eloquent",
+      "gruff",
+      "gentle",
+      "aggressive",
+      "military",
+      "scholarly",
+      "rustic",
+      "noble",
+      "common",
+    ].includes(w),
   );
   return [...new Set(voiceWords)].slice(0, 5);
 }

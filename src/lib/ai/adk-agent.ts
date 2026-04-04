@@ -14,7 +14,7 @@ import {
   getFunctionResponses,
   stringifyContent,
 } from "@google/adk";
-import type { Content } from "@google/genai";
+import type { Content, GenerateContentConfig } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
 import type { ToolCategory } from "./adk-tools";
 import { OpenAICompatibleLlm } from "./adk-openai-llm";
@@ -45,10 +45,7 @@ export async function runChatAgent(params: {
       span.setAttribute("agent.name", AGENT_NAME);
       span.setAttribute("agent.model", params.aiConfig.model);
       span.setAttribute("agent.history_length", params.chatHistory.length);
-      span.setAttribute(
-        "agent.user_message_length",
-        params.userMessage.length,
-      );
+      span.setAttribute("agent.user_message_length", params.userMessage.length);
 
       const llm = new OpenAICompatibleLlm({
         model: params.aiConfig.model,
@@ -155,10 +152,7 @@ export async function runChatAgent(params: {
 
       // Record summary attributes
       span.setAttribute("agent.tool_calls_total", toolLog.length);
-      span.setAttribute(
-        "agent.response_length",
-        finalContent.length,
-      );
+      span.setAttribute("agent.response_length", finalContent.length);
       span.setStatus({ code: SpanStatusCode.OK });
 
       return { finalContent, toolLog };
@@ -172,4 +166,57 @@ export async function runChatAgent(params: {
       span.end();
     }
   });
+}
+
+/**
+ * Run a simple single-turn completion through the ADK LLM shim.
+ * Used by routes that don't need tool use or multi-turn conversation.
+ * Routes through OpenAICompatibleLlm so all AI calls share one code path.
+ */
+export async function runSimpleCompletion(params: {
+  systemPrompt?: string;
+  userMessage: string;
+  aiConfig: { baseUrl: string; apiKey: string; model: string };
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<string> {
+  const llm = new OpenAICompatibleLlm({
+    model: params.aiConfig.model,
+    apiKey: params.aiConfig.apiKey,
+    baseUrl: params.aiConfig.baseUrl,
+  });
+
+  const contents: Content[] = [
+    { role: "user", parts: [{ text: params.userMessage }] },
+  ];
+
+  const config: GenerateContentConfig = {
+    ...(params.systemPrompt ? { systemInstruction: params.systemPrompt } : {}),
+    ...(params.temperature !== undefined
+      ? { temperature: params.temperature }
+      : {}),
+    ...(params.maxTokens !== undefined
+      ? { maxOutputTokens: params.maxTokens }
+      : {}),
+  };
+
+  // LlmRequest is not exported from @google/adk — construct compatible object
+  const llmRequest = {
+    contents,
+    config,
+    liveConnectConfig: {},
+    toolsDict: {},
+  } as Parameters<typeof llm.generateContentAsync>[0];
+
+  let result = "";
+  for await (const response of llm.generateContentAsync(llmRequest)) {
+    if (response.content?.parts) {
+      const text = response.content.parts
+        .filter((p) => p.text != null)
+        .map((p) => p.text)
+        .join("");
+      if (text) result = text;
+    }
+  }
+  return result.trim();
 }
