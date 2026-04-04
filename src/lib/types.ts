@@ -83,6 +83,7 @@ export interface PlotlineIndicator {
 export interface OutlineNode extends StructureNode {
   children: OutlineNode[];
   plotIndicators?: PlotlineIndicator[];
+  hasNewFeedback?: boolean; // true when scene has unresolved annotations imported from Google Docs
 }
 
 export type StoryObjectType = "CHARACTER" | "LOCATION" | "PLOTLINE" | "WORLD_ELEMENT" | "NOTE";
@@ -134,6 +135,7 @@ export interface Annotation {
   content: string;
   range: string;
   selectedText?: string | null;
+  externalId?: string | null; // set for annotations imported from Google Docs
   resolved: boolean;
   createdAt: string;
   updatedAt: string;

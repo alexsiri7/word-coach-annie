@@ -1,4 +1,4 @@
-import { google, docs_v1 } from 'googleapis';
+import { google, docs_v1, drive_v3 } from 'googleapis';
 import { GoogleAuthController } from './controllers/google-auth';
 
 export class GoogleDocsApi {
@@ -33,6 +33,28 @@ export class GoogleDocsApi {
             documentId,
             requestBody: { requests }
         });
+    }
+
+    static async fetchComments(documentId: string): Promise<drive_v3.Schema$Comment[]> {
+        const auth = await GoogleAuthController.getValidClient();
+        if (!auth) throw new Error("Not authenticated");
+
+        const drive = google.drive({ version: 'v3', auth });
+        const allComments: drive_v3.Schema$Comment[] = [];
+        let pageToken: string | undefined;
+
+        do {
+            const res = await drive.comments.list({
+                fileId: documentId,
+                fields: 'comments(id,content,quotedFileContent,author,resolved,replies,createdTime),nextPageToken',
+                includeDeleted: false,
+                pageToken,
+            });
+            allComments.push(...(res.data.comments ?? []));
+            pageToken = res.data.nextPageToken ?? undefined;
+        } while (pageToken);
+
+        return allComments;
     }
 
     static async replaceContent(documentId: string, text: string) {
