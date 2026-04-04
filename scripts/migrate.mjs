@@ -90,24 +90,30 @@ async function migrate() {
     console.log(`  apply ${dir}`);
 
     // Split into individual statements for Prisma's $executeRawUnsafe
-    // which only supports single statements at a time
+    // which only supports single statements at a time.
+    // Note: dollar-quoted blocks (DO $$...$$) are NOT split on inner semicolons
+    // because we split on bare ';' — dollar-quoted strings don't contain unescaped ';'
+    // at the top level when written with a trailing ';' after the closing $$.
     const statements = sql
       .split(';')
       .map((s) => s.replace(/--[^\n]*/g, '').trim())
       .filter((s) => s.length > 0);
 
-    for (const stmt of statements) {
-      await prisma.$executeRawUnsafe(stmt);
-    }
-
-    // Record in _prisma_migrations
+    // Run all statements + migration recording in a single PostgreSQL transaction.
+    // This is atomic: if any statement fails, the entire migration is rolled back
+    // and will be retried on the next deploy (it won't be recorded as applied).
     const id = randomUUID();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
-      id,
-      checksum,
-      dir
-    );
+    await prisma.$transaction(async (tx) => {
+      for (const stmt of statements) {
+        await tx.$executeRawUnsafe(stmt);
+      }
+      await tx.$executeRawUnsafe(
+        `INSERT INTO "_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
+        id,
+        checksum,
+        dir
+      );
+    });
 
     appliedCount++;
     console.log(`  done  ${dir}`);
