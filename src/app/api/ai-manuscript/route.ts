@@ -3,7 +3,7 @@ import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/li
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runChatAgent } from "@/lib/ai/adk-agent";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
@@ -96,23 +96,14 @@ export async function POST(request: NextRequest) {
     const prefs = await getAiPreferences(userId);
     const prefInstructions = buildPreferenceInstructions(prefs);
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
+    const { finalContent } = await runChatAgent({
+      systemPrompt: prefInstructions,
+      chatHistory: [],
+      userMessage: prompt,
+      aiConfig,
     });
 
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [
-        { role: "system", content: prefInstructions },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 2000,
-      temperature: 0.5,
-    });
-
-    const result = response.choices[0]?.message?.content?.trim() || "";
-    return NextResponse.json({ result, analysisType });
+    return NextResponse.json({ result: finalContent.trim(), analysisType });
   } catch (error) {
     logger.error("POST /api/ai-manuscript error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

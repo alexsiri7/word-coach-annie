@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getVoiceContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runChatAgent } from "@/lib/ai/adk-agent";
 
 interface VoiceProfile {
   characterId: string;
@@ -115,19 +115,12 @@ Return ONLY valid JSON with this structure:
 
 The "feedback" array should be empty if the text is not dialogue or no voice issues are found.`;
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
+    const { finalContent: rawContent } = await runChatAgent({
+      systemPrompt: "",
+      chatHistory: [],
+      userMessage: prompt,
+      aiConfig,
     });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1000,
-      temperature: 0.1,
-    });
-
-    const rawContent = response.choices[0]?.message?.content ?? "{}";
     let parsed: { profiles?: VoiceProfile[]; feedback?: VoiceFeedback[] } = {};
     try {
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);

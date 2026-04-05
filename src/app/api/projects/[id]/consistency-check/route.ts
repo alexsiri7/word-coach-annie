@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getConsistencyContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runChatAgent } from "@/lib/ai/adk-agent";
 
 export interface ConsistencyAlert {
   id: string;
@@ -95,19 +95,12 @@ For each issue found, provide a JSON object. Return ONLY a valid JSON array (no 
 If no contradictions are found, return [].
 Only report clear, specific contradictions. Do not report vague impressions.`;
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
+    const { finalContent: rawContent } = await runChatAgent({
+      systemPrompt: "",
+      chatHistory: [],
+      userMessage: prompt,
+      aiConfig,
     });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1500,
-      temperature: 0.1,
-    });
-
-    const rawContent = response.choices[0]?.message?.content ?? "[]";
     let parsed: {
       type: string;
       severity: string;
