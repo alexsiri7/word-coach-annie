@@ -13,11 +13,12 @@ import {
   getFunctionCalls,
   getFunctionResponses,
   stringifyContent,
+  type LlmRequest,
 } from "@google/adk";
 import type { Content } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
 import type { ToolCategory } from "./adk-tools";
-import { OpenAICompatibleLlm } from "./adk-openai-llm";
+import { OpenAICompatibleLlm, createOpenAILlmFromConfig } from "./adk-openai-llm";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -172,4 +173,48 @@ export async function runChatAgent(params: {
       span.end();
     }
   });
+}
+
+/**
+ * Run a simple single-turn completion through the ADK OpenAI shim.
+ * Use this for non-agentic routes (inline edits, consistency check, voice check)
+ * that just need one prompt → one response without tool use.
+ */
+export async function runSimpleCompletion(params: {
+  systemPrompt?: string;
+  userMessage: string;
+  aiConfig: { baseUrl: string; apiKey: string; model: string };
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<string> {
+  const llm = createOpenAILlmFromConfig(params.aiConfig);
+
+  const contents: Content[] = [
+    { role: "user", parts: [{ text: params.userMessage }] },
+  ];
+
+  const request = {
+    model: params.aiConfig.model,
+    contents,
+    config: {
+      ...(params.systemPrompt
+        ? { systemInstruction: params.systemPrompt }
+        : {}),
+      ...(params.temperature !== undefined
+        ? { temperature: params.temperature }
+        : {}),
+      ...(params.maxTokens !== undefined
+        ? { maxOutputTokens: params.maxTokens }
+        : {}),
+    },
+  } as LlmRequest;
+
+  for await (const response of llm.generateContentAsync(request)) {
+    const text = response.content?.parts
+      ?.filter((p) => p.text != null)
+      .map((p) => p.text)
+      .join("") ?? "";
+    if (text) return text.trim();
+  }
+  return "";
 }
