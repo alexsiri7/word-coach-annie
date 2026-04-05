@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 
 interface AiSettingsData {
-  baseUrl: string;
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
@@ -23,7 +22,6 @@ interface AiSettingsData {
 
 export function AiSettingsDialog() {
   const [open, setOpen] = useState(false);
-  const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [maskedKey, setMaskedKey] = useState("");
@@ -38,7 +36,6 @@ export function AiSettingsDialog() {
     fetch("/api/ai-settings")
       .then((res) => res.json())
       .then((data: AiSettingsData) => {
-        setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setMaskedKey(data.apiKey || "");
         setApiKey(""); // Don't pre-fill with masked value
@@ -51,7 +48,6 @@ export function AiSettingsDialog() {
     setSaving(true);
     setSaved(false);
     const body: Record<string, string> = {
-      baseUrl,
       model,
     };
     // Only send apiKey if user actually typed a new one
@@ -91,7 +87,7 @@ export function AiSettingsDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>AI Provider Settings</DialogTitle>
+          <DialogTitle>AI Settings</DialogTitle>
         </DialogHeader>
         {!loaded ? (
           <div className="flex items-center justify-center py-8">
@@ -100,28 +96,13 @@ export function AiSettingsDialog() {
         ) : (
           <div className="space-y-4 pt-2">
             <p className="text-xs text-text-muted">
-              Configure any OpenAI-compatible provider (OpenRouter, Ollama, direct OpenAI, etc.).
+              Configure your Google AI (Gemini) API key and model.
               Settings override environment variables.
             </p>
 
             <div>
-              <label htmlFor="ai-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                Base URL
-              </label>
-              <Input
-                id="ai-base-url"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.openai.com/v1"
-              />
-              <p className="text-xs text-text-muted mt-1">
-                OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-              </p>
-            </div>
-
-            <div>
               <label htmlFor="ai-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
-                API Key
+                Google AI API Key
               </label>
               <div className="relative">
                 <Input
@@ -129,7 +110,7 @@ export function AiSettingsDialog() {
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={maskedKey || "sk-..."}
+                  placeholder={maskedKey || "AIza..."}
                   className="pr-10"
                 />
                 <button
@@ -156,7 +137,7 @@ export function AiSettingsDialog() {
                 id="ai-model"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."
+                placeholder="gemini-2.0-flash-001"
               />
             </div>
 
