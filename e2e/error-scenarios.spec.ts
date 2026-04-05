@@ -51,7 +51,7 @@ async function mockProjectApiWithError(
   )
   await page.route('**/api/ai-settings', (route) =>
     route.fulfill({
-      json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+      json: { model: 'gemini-2.0-flash-001', apiKey: '' },
       status: 200,
     }),
   )
@@ -168,7 +168,7 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     )
     await page.route('**/api/ai-settings', (route) =>
       route.fulfill({
-        json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        json: { model: 'gemini-2.0-flash-001', apiKey: '' },
         status: 200,
       }),
     )
@@ -337,7 +337,7 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     )
     await page.route('**/api/ai-settings', (route) =>
       route.fulfill({
-        json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        json: { model: 'gemini-2.0-flash-001', apiKey: '' },
         status: 200,
       }),
     )

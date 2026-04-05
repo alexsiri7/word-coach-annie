@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface AiSettingsData {
-  baseUrl: string;
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
@@ -41,7 +40,6 @@ export default function SettingsPage() {
   const router = useRouter();
 
   // AI settings state
-  const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [maskedKey, setMaskedKey] = useState("");
@@ -77,7 +75,6 @@ export default function SettingsPage() {
     fetch("/api/ai-settings")
       .then((res) => res.json())
       .then((data: AiSettingsData) => {
-        setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
@@ -156,7 +153,6 @@ export default function SettingsPage() {
     setSaving(true);
     setSaved(false);
     const body: Record<string, string> = {
-      baseUrl,
       model,
       customInstructions,
       coachingStyle,
@@ -227,24 +223,9 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-text-muted">
-                Configure any OpenAI-compatible provider (OpenRouter, Ollama, direct OpenAI, etc.).
+                Configure your Google Gemini API key and model.
                 Settings are saved per-user when signed in, and override environment variables.
               </p>
-
-              <div>
-                <label htmlFor="settings-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="settings-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
 
               <div>
                 <label htmlFor="settings-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -283,7 +264,7 @@ export default function SettingsPage() {
                   id="settings-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."
+                  placeholder="gemini-2.0-flash-001, gemini-2.5-flash, gemini-2.5-pro..."
                 />
               </div>
             </div>
