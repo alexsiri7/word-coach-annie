@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { UniverseUpdateSchema } from "@/schemas/universes";
 
 export async function GET(
     request: NextRequest,
@@ -32,7 +33,14 @@ export async function PATCH(
         if (!access.authorized) return access.response;
 
         const body = await request.json();
-        const universe = await UniversesController.updateUniverse(id, body);
+        const parsed = UniverseUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.errors[0].message },
+                { status: 400 }
+            );
+        }
+        const universe = await UniversesController.updateUniverse(id, parsed.data);
         return NextResponse.json(universe);
     } catch (error: unknown) {
         logger.error("Route error", error);
