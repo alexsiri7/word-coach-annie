@@ -83,21 +83,25 @@ class ScriptedLlm extends BaseLlm {
   }
 }
 
-// ─── Mock the OpenAI import so adk-agent.ts uses our scripted LLM ───────────
+// ─── Mock the Gemini constructor so adk-agent.ts uses our scripted LLM ──────
 //
-// We intercept the OpenAICompatibleLlm constructor to inject our ScriptedLlm
-// instead, while keeping the rest of adk-agent.ts real (DynamicToolset, runner).
+// We intercept the Gemini constructor to inject our ScriptedLlm instead,
+// while keeping the rest of adk-agent.ts real (DynamicToolset, runner).
 
 let activeLlm: ScriptedLlm | null = null;
 
-vi.mock("@/lib/ai/adk-openai-llm", () => ({
-  OpenAICompatibleLlm: class {
-    constructor() {
-      // Return the active scripted LLM — tests set this before calling runChatAgent
-      return activeLlm!;
-    }
-  },
-}));
+vi.mock("@google/adk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@google/adk")>();
+  return {
+    ...actual,
+    Gemini: class {
+      constructor() {
+        // Return the active scripted LLM — tests set this before calling runChatAgent
+        return activeLlm!;
+      }
+    },
+  };
+});
 
 // Mock all tool executors to return deterministic results
 // We mock the entire tool handler modules to avoid hitting the real DB
@@ -159,7 +163,7 @@ vi.mock("@/mcp/tools/relationships", () => ({
 vi.mock("@/mcp/tools/export", () => ({
   exportManuscript: vi.fn().mockResolvedValue({ markdown: "# Test" }),
   exportStoryBible: vi.fn().mockResolvedValue({ markdown: "# Bible" }),
-  exportMedium: vi.fn().mockResolvedValue({ html: "<p>Test</p>" }),
+  exportHashnode: vi.fn().mockResolvedValue({ html: "<p>Test</p>" }),
   getProjectSummary: vi.fn().mockResolvedValue({ title: "Test", wordCount: 1000 }),
 }));
 
@@ -211,7 +215,6 @@ vi.mock("@/lib/export/google-docs-exporter", () => ({
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const defaultConfig = {
-  baseUrl: "https://test.example.com/v1",
   apiKey: "test-key",
   model: "test-model",
 };
