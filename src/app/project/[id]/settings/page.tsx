@@ -62,6 +62,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     lastCommentSyncAt: string | null;
   }
   const [googleDocExports, setGoogleDocExports] = useState<GoogleDocExportInfo[]>([]);
+  const [googleDocsConnected, setGoogleDocsConnected] = useState(false);
   const [syncingComments, setSyncingComments] = useState(false);
   const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
   const [googleExportMode, setGoogleExportMode] = useState<"STORY_READER" | "STORY_INTERNAL">("STORY_READER");
@@ -79,7 +80,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     if (!projectId) return;
     fetch(`/api/integrations/google-docs?projectId=${projectId}`)
       .then((r) => r.json())
-      .then((d) => setGoogleDocExports(d.exports ?? []))
+      .then((d) => {
+        setGoogleDocExports(d.exports ?? []);
+        setGoogleDocsConnected(d.connected ?? false);
+      })
       .catch(() => {});
   }, [projectId]);
 
@@ -242,6 +246,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       const infoRes = await fetch(`/api/integrations/google-docs?projectId=${projectId}`);
       const infoData = await infoRes.json();
       setGoogleDocExports(infoData.exports ?? []);
+      setGoogleDocsConnected(infoData.connected ?? false);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Export to Google Docs failed");
     } finally {
@@ -545,6 +550,16 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           <>
             <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Google Docs</p>
             <div className="space-y-3">
+              {!googleDocsConnected ? (
+                <p className="text-xs text-text-muted">
+                  Connect Google Docs in{" "}
+                  <a href="/settings" className="text-accent hover:underline">
+                    Settings
+                  </a>{" "}
+                  to export directly to Google Docs.
+                </p>
+              ) : (
+                <>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
                   <input
@@ -650,6 +665,8 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
                   )}
                 </>
               )}
+            </>
+          )}
             </div>
           </>
         </div>
