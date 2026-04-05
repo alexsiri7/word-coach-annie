@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const baseUrl = new URL(request.url).origin;
+        const proto = request.headers.get("x-forwarded-proto") || "https";
+        const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
+        const baseUrl = `${proto}://${host}`;
         const redirectUri = `${baseUrl}/api/auth/google-docs/callback`;
 
         const state = crypto.randomUUID();

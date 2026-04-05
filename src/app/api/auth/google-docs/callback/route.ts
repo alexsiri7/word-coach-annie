@@ -7,7 +7,11 @@ import { logger } from "@/lib/logger";
  * Exchanges auth code for tokens, stores GoogleCredential, redirects to /settings.
  */
 export async function GET(request: NextRequest) {
-    const { searchParams, origin } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
+    const origin = `${proto}://${host}`;
+
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const stateCookie = request.cookies.get("google_docs_oauth_state")?.value;
