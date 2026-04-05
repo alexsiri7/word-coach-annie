@@ -16,6 +16,7 @@ import {
     readSceneContent,
     writeSceneContent,
     writeSceneContentFromBlocks,
+    updateParagraph,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -349,7 +350,7 @@ server.tool(
 
 server.tool(
     "read_scene_content",
-    "Read the latest content of a scene (returns HTML content, word count, list of annotations, and a contentHash for stale-write protection)",
+    "Read the latest content of a scene (returns HTML content, word count, list of annotations, a contentHash for stale-write protection, and a paragraphs array [{index, type, content, contentHash}] for targeted paragraph updates via update_paragraph)",
     {
         nodeId: z.string().describe("The scene node ID"),
     },
@@ -381,6 +382,22 @@ server.tool(
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         throw new Error("Either 'content' or 'blocks' must be provided");
+    }
+);
+
+server.tool(
+    "update_paragraph",
+    "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Optionally also accepts sceneContentHash for scene-level stale detection.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        index: z.number().int().describe("The paragraph index from the paragraphs array"),
+        content: z.string().describe("New content for this paragraph (must match the existing type — CONTENT or BEAT)"),
+        paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
+        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+    },
+    async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
+        const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
 
