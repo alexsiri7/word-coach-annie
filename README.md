@@ -39,8 +39,8 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript (strict mode) |
 | Frontend | React 19, Shadcn/ui, Tailwind CSS, Tiptap 3 |
-| Database | SQLite via Prisma 6 |
-| AI | OpenAI SDK → Requesty gateway → Gemini 2.0 Flash |
+| Database | PostgreSQL (Supabase) via Prisma 6 |
+| AI | Google AI + @google/adk (Gemini 2.0 Flash) |
 | MCP | @modelcontextprotocol/sdk 1.12 (stdio transport) |
 | Testing | Vitest + @vitest/coverage-v8 |
 | Container | Docker + Docker Compose |
@@ -65,17 +65,21 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `AI_API_BASE_URL` | For AI chat | OpenAI-compatible API base URL (e.g. `https://api.openai.com/v1`) |
-| `AI_API_KEY` | For AI chat | API key for your AI provider |
-| `AI_MODEL` | No | Model name (default: `gpt-4o`) |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string (Supabase or local PG) |
+| `GEMINI_API_KEY` | For AI chat | Google AI API key (can also configure in Settings UI) |
+| `AI_MODEL` | No | Gemini model name (default: `gemini-2.0-flash-001`) |
 | `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |
+| `API_TOKEN` | Recommended | Bearer token for API/MCP access (32-byte hex) |
+| `JWT_SECRET` | No | JWT signing secret for Google OAuth sessions |
+| `ENCRYPTION_KEY` | No | Key for encrypting API keys at rest |
+| `ALLOWED_EMAILS` | No | Comma-separated list of allowed Google accounts |
 | `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for public access |
 
 ## MCP Server (for AI Agents)
 
-Annie includes a Model Context Protocol server with 48 tools for full read/write access to project data.
+Annie includes a Model Context Protocol server with 67 tools for full read/write access to project data.
 
 ### Claude Desktop Configuration
 
@@ -98,25 +102,37 @@ The `-T` flag disables pseudo-tty allocation for clean stdio communication.
 
 | Category | Tools | Examples |
 |----------|-------|---------|
-| Projects | 4 | list, get, create, update |
-| Structure | 10 | outline, create/update/delete nodes, scene content, versions, annotations |
-| Story Objects | 5 | list, get, create, update, delete |
+| Projects | 8 | list, get, create, update, link/unlink to universe, transfer story objects |
+| Structure | 12 | outline, create/update/delete nodes, scene content, versions, batch operations |
+| Annotations | 5 | add, update, delete, resolve, get open annotations |
+| Story Objects | 8 | list, get, create, update, delete + batch create/update/delete |
 | Relationships | 3 | list, create, delete |
-| Universes | 14 | CRUD for universes, world objects, timeline entries |
-| Export | 4 | manuscript, story bible, medium, Google Docs |
+| Universes | 14 | CRUD for universes, world objects, timeline entries, reorder |
+| Export | 5 | manuscript, story bible, Hashnode, Google Docs, project summary |
 | Database Safety | 3 | snapshot, list snapshots, restore |
-| Google Auth | 4 | status, connect, callback, disconnect |
+| Google Auth | 5 | status, connect, callback, disconnect, export to Google Docs |
+| Coaching & Analysis | 6 | plot thread status, scene focus, manuscript context, consistency, story bible cross-reference, voice context |
 | Skills | 1 | list available writing skills |
 
 ### Writing Skills (MCP Prompts)
 
-Six curated instruction sets registered as MCP Prompts:
+Eight curated instruction sets registered as MCP Prompts, plus 4 built-in coaching prompts:
+
+**Skills** (from `.skills/`):
 - **Developmental Edit** — structural/story-level feedback
 - **Line Edit** — sentence-level clarity, voice, word choice
 - **Consistency Check** — cross-reference world elements for contradictions
 - **Plot Structure Analysis** — analyze against frameworks (3-act, hero's journey, etc.)
 - **Character Arc Review** — map arcs, identify flat characters
 - **Scene Drafting Assistant** — draft scenes from outline context
+- **Outline Review** — review scene outlines before drafting
+- **Story Development Chat** — open-ended story development conversation
+
+**Built-in Prompts**:
+- **review** — status-aware routing (OUTLINE→outline review, DRAFT→dev edit, REVISED→line edit, FINAL→consistency)
+- **scene-coaching** — status-adaptive coaching for a single scene
+- **inline-edit** — inline text operations (rewrite, continue, expand, voice-check)
+- **manuscript-analysis** — project-level analysis (plot threads, character arcs, consistency)
 
 ## Development
 
@@ -134,10 +150,9 @@ docker compose exec app npx prisma studio    # Database browser (port 5555)
 **NEVER run `prisma db push` or `prisma migrate reset` on the production database.** These can drop and recreate tables, destroying all data.
 
 For schema changes:
-1. Write migration SQL by hand (`ALTER TABLE ... ADD COLUMN ...`)
-2. Apply: `sqlite3 data/word-coach-annie.db < migration.sql`
-3. Update `prisma/schema.prisma` to match
-4. Run `npx prisma generate` (client only, safe)
+1. Create migration: `docker compose exec app npx prisma migrate dev --name <description>`
+2. The migration runner (`scripts/migrate.mjs`) applies it on container start
+3. Run `npx prisma generate` to regenerate the client
 
 ### Project Structure
 
