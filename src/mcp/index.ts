@@ -1000,7 +1000,7 @@ server.tool(
     {},
     async () => {
         try {
-            const url = GoogleAuthController.getAuthUrl();
+            const url = GoogleAuthController.getAuthUrl(env.GOOGLE_REDIRECT_URI ?? '');
             return { content: [{ type: "text", text: `Please visit this URL to authorize: ${url}` }] };
         } catch (e) {
             return { content: [{ type: "text", text: `Error generating auth URL. Check environment variables (GOOGLE_CLIENT_ID, etc). Error: ${e}` }], isError: true };
@@ -1016,7 +1016,7 @@ server.tool(
     },
     async ({ code }) => {
         try {
-            await GoogleAuthController.handleCallback(code);
+            await GoogleAuthController.handleCallback(code, env.GOOGLE_REDIRECT_URI ?? '');
             return { content: [{ type: "text", text: "Successfully connected to Google!" }] };
         } catch (e) {
             return { content: [{ type: "text", text: `Error connecting: ${e}` }], isError: true };

@@ -685,6 +685,7 @@ import {
 } from "@/mcp/tools/coaching";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
+import { env } from "@/lib/env";
 
 // ─── Handler dispatch map ────────────────────────────────────────────────────
 // Maps tool name → execute function for ADK's execute signature
@@ -805,9 +806,9 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   list_snapshots: async (a) => listDatabaseSnapshots(a.limit as number),
   restore_snapshot: async (a) => restoreDatabaseSnapshot(a.commitHash as string),
   google_auth_status: async () => GoogleAuthController.getStatus(),
-  google_auth_connect: async () => ({ authUrl: GoogleAuthController.getAuthUrl() }),
+  google_auth_connect: async () => ({ authUrl: GoogleAuthController.getAuthUrl(env.GOOGLE_REDIRECT_URI ?? '') }),
   google_auth_callback: async (a) => {
-    await GoogleAuthController.handleCallback(a.code as string);
+    await GoogleAuthController.handleCallback(a.code as string, env.GOOGLE_REDIRECT_URI ?? '');
     return { success: true };
   },
   google_auth_disconnect: async () => {
