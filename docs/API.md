@@ -475,3 +475,111 @@ Check if the app has been configured (AI settings, auth).
 Submit feedback (creates a GitHub issue if `GITHUB_FEEDBACK_TOKEN` is configured).
 
 **Body**: `{ type: "bug|feature|other", message: string, email?: string, context?: { url?, userAgent?, screenSize? } }`
+
+---
+
+## AI Inline
+
+### `POST /api/ai-inline`
+Run an inline AI editing action on a selected text passage.
+
+**Body**:
+```json
+{
+  "action": "rewrite-tighter | rewrite-vivid | rewrite-simpler | continue | expand | voice-check | ask",
+  "text": "string",
+  "context": "string (surrounding text for context)",
+  "ask": "string (custom prompt, required when action is 'ask')"
+}
+```
+
+**Response**: `{ result: "string" }` — the AI output for the action.
+
+---
+
+## AI Manuscript
+
+### `POST /api/ai-manuscript`
+Run a manuscript-level AI analysis across the full project.
+
+**Body**:
+```json
+{
+  "projectId": "string",
+  "analysisType": "plot-threads | character-arcs | consistency-check"
+}
+```
+
+**Response**: `{ result: "string" }` — the analysis report as Markdown text.
+
+---
+
+## Integrations
+
+### `GET /api/integrations/google-docs`
+Get Google Docs export status and records for a project.
+
+**Query params**: `projectId` (optional — if omitted, returns connection status only)
+
+**Response**: `{ exports: GoogleDocExport[], connected: boolean }`
+
+---
+
+### `POST /api/integrations/google-docs/export`
+Export or sync a project to Google Docs.
+
+**Body**: `{ projectId: string, exportMode: "STORY_READER" | "STORY_INTERNAL" }`
+
+**Response**: `{ googleDocUrl: string, docId: string }`
+
+---
+
+### `GET /api/integrations/hashnode`
+Get Hashnode connection status for the current user.
+
+**Response**: `{ connected: boolean, publication?: { id, title } }`
+
+---
+
+### `POST /api/integrations/hashnode`
+Connect a Hashnode account with an API access token.
+
+**Body**: `{ accessToken: string }`
+
+**Response**: `{ connected: true, publication?: { id, title } }`
+
+---
+
+### `DELETE /api/integrations/hashnode`
+Disconnect the Hashnode account (removes stored credential).
+
+**Response**: `{ ok: true }`
+
+---
+
+## Writing Sessions
+
+### `GET /api/sessions/heatmap`
+Get a 28-day activity heatmap (word counts per day).
+
+**Response**: `{ dates: string[], counts: number[] }` — parallel arrays of dates and word counts.
+
+---
+
+## Structure Nodes (Additional)
+
+### `POST /api/nodes/move`
+Move a structure node to a new parent at a specific position, reindexing siblings.
+
+**Body**: `{ nodeId: string, newParentId: string | null, newIndex: number }`
+
+**Response**: Updated node object.
+
+---
+
+## Onboarding
+
+### `POST /api/onboarding/sample`
+Create the sample project (Sherlock Holmes) for new users. No-op if the user already has projects.
+
+**Response**: `{ ok: true, projectId: string }` or `{ ok: false, reason: "already_has_projects" }`

@@ -143,6 +143,7 @@ export default function Dashboard() {
       }
     }
 
+
     setProjects(activeData.projects);
     setArchivedProjects(archivedData.projects);
     setLoading(false);
@@ -787,16 +788,10 @@ export default function Dashboard() {
           {deleteTarget && (
             <div className="space-y-4 py-2">
               {/* Stats */}
-              <div className="bg-danger/5 border border-danger/20 p-4 rounded-md space-y-1">
-                <p className="text-sm font-medium text-danger">
-                  You are about to permanently delete:
-                </p>
+              <div className="bg-surface-container p-4 rounded-md space-y-1">
                 <p className="text-sm text-text-secondary">
-                  <strong>{deleteTarget.wordCount.toLocaleString()}</strong> words across{" "}
-                  <strong>{deleteTarget.sceneCount}</strong> scene{deleteTarget.sceneCount !== 1 ? "s" : ""}
-                  {deleteTarget.characterCount > 0 && (
-                    <> with <strong>{deleteTarget.characterCount}</strong> character{deleteTarget.characterCount !== 1 ? "s" : ""}</>
-                  )}
+                  <strong>{formatWordCount(deleteTarget.wordCount)}</strong> words across{" "}
+                  <strong>{deleteTarget.nodeCount}</strong> scenes
                 </p>
               </div>
 

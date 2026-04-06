@@ -3,6 +3,7 @@ import { UniversesController } from "@/lib/controllers/universes";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { UniverseCreateSchema } from "@/schemas/universes";
 
 export async function GET(request: NextRequest) {
     try {
@@ -43,14 +44,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+        const parsed = UniverseCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.errors[0].message },
+                { status: 400 }
+            );
+        }
         const userId = getCurrentUserId(request);
 
         if (userId) {
             // Create with userId
             const universe = await prisma.universe.create({
                 data: {
-                    title: body.title?.trim() || "",
-                    description: body.description?.trim() || "",
+                    title: parsed.data.title.trim(),
+                    description: parsed.data.description?.trim() || "",
                     userId,
                 },
             });
@@ -64,7 +72,7 @@ export async function POST(request: NextRequest) {
         }
 
         // No userId — use controller (legacy behavior)
-        const universe = await UniversesController.createUniverse(body);
+        const universe = await UniversesController.createUniverse(parsed.data);
         return NextResponse.json(universe);
     } catch (error: unknown) {
         logger.error("Route error", error);

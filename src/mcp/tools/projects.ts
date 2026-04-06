@@ -1,5 +1,15 @@
 import { ProjectsController } from "@/lib/controllers/projects";
 import { mcpCache } from "@/lib/cache";
+import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
+
+function projectContentHash(p: {
+    title: string;
+    author?: string | null;
+    synopsis?: string | null;
+    genre?: string | null;
+}): string {
+    return computeContentHash(p.title, p.author, p.synopsis, p.genre);
+}
 
 export async function listProjects(limit: number = 20, offset: number = 0) {
     return mcpCache.getOrSet(
@@ -9,10 +19,14 @@ export async function listProjects(limit: number = 20, offset: number = 0) {
 }
 
 export async function getProject(projectId: string) {
-    return mcpCache.getOrSet(
+    const raw = await mcpCache.getOrSet(
         `project:${projectId}`,
         () => ProjectsController.getProject(projectId),
     );
+    return {
+        ...raw,
+        contentHash: projectContentHash(raw),
+    };
 }
 
 export async function createProject(params: {
@@ -28,8 +42,13 @@ export async function createProject(params: {
 
 export async function updateProject(
     projectId: string,
-    data: { title?: string; author?: string; synopsis?: string; genre?: string }
+    data: { title?: string; author?: string; synopsis?: string; genre?: string },
+    contentHash?: string
 ) {
+    if (contentHash !== undefined) {
+        const current = await ProjectsController.getProject(projectId);
+        verifyContentHash(contentHash, projectContentHash(current), "get_project");
+    }
     const result = await ProjectsController.updateProject(projectId, data);
     mcpCache.invalidatePrefix("projects:");
     mcpCache.delete(`project:${projectId}`);

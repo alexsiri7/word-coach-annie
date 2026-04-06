@@ -93,7 +93,14 @@ export function AnnotationsSidebar({
                 )}
 
                 <div className="flex items-center justify-between text-xs text-text-muted pl-7">
-                  <span>{timeAgo(a.createdAt)}</span>
+                  <span className="flex items-center gap-1.5">
+                    {timeAgo(a.createdAt)}
+                    {a.externalId?.startsWith('gdoc:') && (
+                      <span className="px-1 py-0.5 rounded bg-surface-sunken text-text-muted border border-border-subtle leading-none">
+                        Google Docs
+                      </span>
+                    )}
+                  </span>
                   <Button
                     variant="ghost"
                     size="icon"
