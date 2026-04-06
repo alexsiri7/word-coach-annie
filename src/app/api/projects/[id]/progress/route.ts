@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ProgressController } from "@/lib/controllers/progress";
-import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
   const { id: projectId } = await params;
   try {
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
+    const access = await verifyProjectAccess(projectId, userId);
     if (!access.authorized) return access.response;
 
     const progress = await ProgressController.getProjectProgress(projectId);
