@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface AiSettingsData {
-  baseUrl: string;
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
@@ -41,7 +40,6 @@ export default function SettingsPage() {
   const router = useRouter();
 
   // AI settings state
-  const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [maskedKey, setMaskedKey] = useState("");
@@ -55,6 +53,11 @@ export default function SettingsPage() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [coachingStyle, setCoachingStyle] = useState("balanced");
   const [responseLength, setResponseLength] = useState("moderate");
+
+  // Google Docs integration state
+  const [googleDocsLoading, setGoogleDocsLoading] = useState(true);
+  const [googleDocsConnected, setGoogleDocsConnected] = useState(false);
+  const [googleDocsDisconnecting, setGoogleDocsDisconnecting] = useState(false);
 
   // Hashnode integration state
   const [hashnodeLoading, setHashnodeLoading] = useState(true);
@@ -72,7 +75,6 @@ export default function SettingsPage() {
     fetch("/api/ai-settings")
       .then((res) => res.json())
       .then((data: AiSettingsData) => {
-        setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
@@ -92,6 +94,12 @@ export default function SettingsPage() {
       })
       .catch(console.error)
       .finally(() => setHashnodeLoading(false));
+
+    fetch("/api/integrations/google-docs")
+      .then((res) => res.json())
+      .then((data) => setGoogleDocsConnected(data.connected ?? false))
+      .catch(console.error)
+      .finally(() => setGoogleDocsLoading(false));
   }, []);
 
   const handleHashnodeConnect = async () => {
@@ -131,11 +139,20 @@ export default function SettingsPage() {
     }
   };
 
+  const handleGoogleDocsDisconnect = async () => {
+    setGoogleDocsDisconnecting(true);
+    try {
+      await fetch("/api/integrations/google-docs", { method: "DELETE" });
+      setGoogleDocsConnected(false);
+    } finally {
+      setGoogleDocsDisconnecting(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
     const body: Record<string, string> = {
-      baseUrl,
       model,
       customInstructions,
       coachingStyle,
@@ -206,24 +223,9 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-text-muted">
-                Configure any OpenAI-compatible provider (OpenRouter, Ollama, direct OpenAI, etc.).
+                Configure your Google Gemini API key and model.
                 Settings are saved per-user when signed in, and override environment variables.
               </p>
-
-              <div>
-                <label htmlFor="settings-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="settings-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
 
               <div>
                 <label htmlFor="settings-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -262,7 +264,7 @@ export default function SettingsPage() {
                   id="settings-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."
+                  placeholder="gemini-2.0-flash-001, gemini-2.5-flash, gemini-2.5-pro..."
                 />
               </div>
             </div>
@@ -437,6 +439,63 @@ export default function SettingsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Google Docs Integration */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 fill-current text-accent" aria-hidden="true">
+                <path d="M14.727 6.727H14V0H4.91C4.085 0 3.818.272 3.818 1.091v21.818c0 .82.267 1.091 1.09 1.091h14.19c.82 0 1.09-.271 1.09-1.09V6.727h-5.46zm.545 10.455H8.727v-1.364h6.545v1.364zm0-3.273H8.727v-1.364h6.545v1.364zm0-3.273H8.727V9.273h6.545v1.363zM14.727 6h6l-6-6v6z"/>
+              </svg>
+              <h2 className="text-lg font-semibold text-text-primary">Google Docs</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-4">
+              Export your stories to Google Docs and sync reader comments back as annotations. Requires a Google account with Docs and Drive access.
+            </p>
+
+            {googleDocsLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="h-5 w-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : googleDocsConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Link2 className="h-4 w-4 text-green-500" />
+                  <span className="text-text-secondary">Connected — Google Docs access granted</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGoogleDocsDisconnect}
+                  disabled={googleDocsDisconnecting}
+                  className="gap-1.5"
+                >
+                  {googleDocsDisconnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2Off className="h-4 w-4" />
+                  )}
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-text-primary">Not connected</p>
+                <p className="text-xs text-text-muted">
+                  Click Connect to authorize access to your Google Docs and Drive.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => { window.location.href = "/api/auth/google-docs"; }}
+                  className="gap-1.5"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Connect Google Docs
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Save Button */}
         {!loading && (

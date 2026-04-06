@@ -19,11 +19,11 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().optional(),
 
-  // AI Chat
-  AI_API_KEY: z.string().optional(),
-  AI_API_BASE_URL: z.string().optional(),
+  // AI Chat — Google Gemini
+  GEMINI_API_KEY: z.string().optional(),
+  AI_API_KEY: z.string().optional(),   // alias for GEMINI_API_KEY
   AI_MODEL: z.string().optional(),
-  // Legacy aliases
+  // Legacy aliases (deprecated)
   REQUESTY_API_KEY: z.string().optional(),
   REQUESTY_MODEL: z.string().optional(),
 

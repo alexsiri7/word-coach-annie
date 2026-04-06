@@ -77,6 +77,7 @@ export function ScreenshotEditor({
   const [textValue, setTextValue] = useState("");
   const [displayScale, setDisplayScale] = useState(1);
   const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputCreatedAt = useRef<number>(0);
 
   // Load the image and set up canvas dimensions
   useEffect(() => {
@@ -226,7 +227,8 @@ export function ScreenshotEditor({
     if (tool === "text") {
       setTextInput(pos);
       setTextValue("");
-      setTimeout(() => textInputRef.current?.focus(), 0);
+      textInputCreatedAt.current = Date.now();
+      setTimeout(() => textInputRef.current?.focus(), 10);
       return;
     }
 
@@ -413,7 +415,17 @@ export function ScreenshotEditor({
                     setTextValue("");
                   }
                 }}
-                onBlur={handleTextSubmit}
+                onBlur={() => {
+                  // Ignore blur events that fire immediately after the input
+                  // was created — the pointerdown on the canvas can race with
+                  // autoFocus and cause an instant blur before the user types.
+                  if (Date.now() - textInputCreatedAt.current < 200) {
+                    // Re-focus the input instead of dismissing
+                    setTimeout(() => textInputRef.current?.focus(), 0);
+                    return;
+                  }
+                  handleTextSubmit();
+                }}
                 className="bg-white text-red-500 font-bold text-sm px-1 py-0.5 border border-red-400 rounded shadow-sm outline-none min-w-[120px]"
                 placeholder="Type annotation..."
                 autoFocus

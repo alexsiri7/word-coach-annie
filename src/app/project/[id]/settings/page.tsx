@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,8 +62,12 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     lastCommentSyncAt: string | null;
   }
   const [googleDocExports, setGoogleDocExports] = useState<GoogleDocExportInfo[]>([]);
+  const [googleDocsConnected, setGoogleDocsConnected] = useState(false);
   const [syncingComments, setSyncingComments] = useState(false);
   const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; unresolvable: number } | null>(null);
+  const [googleExportMode, setGoogleExportMode] = useState<"STORY_READER" | "STORY_INTERNAL">("STORY_READER");
+  const [exportingToGoogleDocs, setExportingToGoogleDocs] = useState(false);
+  const [copiedGoogleDocUrl, setCopiedGoogleDocUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/integrations/hashnode")
@@ -76,7 +80,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     if (!projectId) return;
     fetch(`/api/integrations/google-docs?projectId=${projectId}`)
       .then((r) => r.json())
-      .then((d) => setGoogleDocExports(d.exports ?? []))
+      .then((d) => {
+        setGoogleDocExports(d.exports ?? []);
+        setGoogleDocsConnected(d.connected ?? false);
+      })
       .catch(() => {});
   }, [projectId]);
 
@@ -223,6 +230,35 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     } finally {
       setSyncingComments(false);
     }
+  };
+
+  const handleGoogleDocsExport = async () => {
+    setExportingToGoogleDocs(true);
+    try {
+      const res = await fetch("/api/integrations/google-docs/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, exportMode: googleExportMode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Export failed");
+      // Refresh export list
+      const infoRes = await fetch(`/api/integrations/google-docs?projectId=${projectId}`);
+      const infoData = await infoRes.json();
+      setGoogleDocExports(infoData.exports ?? []);
+      setGoogleDocsConnected(infoData.connected ?? false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Export to Google Docs failed");
+    } finally {
+      setExportingToGoogleDocs(false);
+    }
+  };
+
+  const handleCopyGoogleDocUrl = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedGoogleDocUrl(url);
+      setTimeout(() => setCopiedGoogleDocUrl(null), 2000);
+    });
   };
 
   const handleArchive = async () => {
@@ -511,57 +547,128 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             </p>
           )}
 
-          {googleDocExports.length > 0 && (
-            <>
-              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Google Docs</p>
-              <div className="space-y-3">
-                {googleDocExports.map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between gap-3 text-sm">
-                    <div className="min-w-0">
-                      <a
-                        href={exp.googleDocUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-accent hover:underline truncate block"
-                      >
-                        {exp.exportMode === "STORY_READER"
-                          ? "Reader Copy"
-                          : exp.exportMode === "STORY_INTERNAL"
-                          ? "Internal Draft"
-                          : "Export"}
-                      </a>
-                      {exp.lastCommentSyncAt && (
-                        <p className="text-xs text-text-muted">
-                          Comments synced {new Date(exp.lastCommentSyncAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  onClick={handleSyncComments}
-                  disabled={syncingComments}
-                  className="gap-1.5 h-auto py-2 px-3"
-                >
-                  {syncingComments ? (
-                    <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  <span className="text-xs">Sync comments from Google Docs</span>
-                </Button>
-                {syncResult && (
-                  <p className="text-xs text-text-muted">
-                    Imported {syncResult.imported} comment{syncResult.imported !== 1 ? "s" : ""} as annotations
-                    {syncResult.skipped > 0 ? `, ${syncResult.skipped} already imported` : ""}
-                    {syncResult.unresolvable > 0 ? `, ${syncResult.unresolvable} unresolvable` : ""}
-                    .
-                  </p>
-                )}
+          <>
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mt-5 mb-2">Google Docs</p>
+            <div className="space-y-3">
+              {!googleDocsConnected ? (
+                <p className="text-xs text-text-muted">
+                  Connect Google Docs in{" "}
+                  <a href="/settings" className="text-accent hover:underline">
+                    Settings
+                  </a>{" "}
+                  to export directly to Google Docs.
+                </p>
+              ) : (
+                <>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
+                  <input
+                    type="radio"
+                    name="googleExportMode"
+                    value="STORY_READER"
+                    checked={googleExportMode === "STORY_READER"}
+                    onChange={() => setGoogleExportMode("STORY_READER")}
+                    className="accent-accent"
+                  />
+                  Reader Copy
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
+                  <input
+                    type="radio"
+                    name="googleExportMode"
+                    value="STORY_INTERNAL"
+                    checked={googleExportMode === "STORY_INTERNAL"}
+                    onChange={() => setGoogleExportMode("STORY_INTERNAL")}
+                    className="accent-accent"
+                  />
+                  Internal Draft
+                </label>
               </div>
+              <Button
+                variant="outline"
+                onClick={handleGoogleDocsExport}
+                disabled={exportingToGoogleDocs}
+                className="gap-1.5 h-auto py-2 px-3"
+              >
+                {exportingToGoogleDocs ? (
+                  <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 fill-current" aria-hidden="true">
+                    <path d="M14.727 6.727H14V0H4.91C4.085 0 3.818.272 3.818 1.091v21.818c0 .82.267 1.091 1.09 1.091h14.19c.82 0 1.09-.271 1.09-1.09V6.727h-5.46zm.545 10.455H8.727v-1.364h6.545v1.364zm0-3.273H8.727v-1.364h6.545v1.364zm0-3.273H8.727V9.273h6.545v1.363zM14.727 6h6l-6-6v6z"/>
+                  </svg>
+                )}
+                <span className="text-xs">Export to Google Docs</span>
+              </Button>
+
+              {googleDocExports.length > 0 && (
+                <>
+                  {googleDocExports.map((exp) => (
+                    <div key={exp.id} className="flex items-center justify-between gap-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={exp.googleDocUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent hover:underline truncate flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                          {exp.exportMode === "STORY_READER"
+                            ? "Reader Copy"
+                            : exp.exportMode === "STORY_INTERNAL"
+                            ? "Internal Draft"
+                            : "Export"}
+                        </a>
+                        {exp.lastCommentSyncAt && (
+                          <p className="text-xs text-text-muted">
+                            Comments synced {new Date(exp.lastCommentSyncAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyGoogleDocUrl(exp.googleDocUrl)}
+                          className="gap-1.5 h-auto py-1 px-2 text-xs"
+                          title="Copy URL to import into Medium at medium.com/p/import"
+                        >
+                          {copiedGoogleDocUrl === exp.googleDocUrl ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                          {copiedGoogleDocUrl === exp.googleDocUrl ? "Copied!" : "Copy URL"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncComments}
+                    disabled={syncingComments}
+                    className="gap-1.5 h-auto py-2 px-3"
+                  >
+                    {syncingComments ? (
+                      <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    <span className="text-xs">Sync comments from Google Docs</span>
+                  </Button>
+                  {syncResult && (
+                    <p className="text-xs text-text-muted">
+                      Imported {syncResult.imported} comment{syncResult.imported !== 1 ? "s" : ""} as annotations
+                      {syncResult.skipped > 0 ? `, ${syncResult.skipped} already imported` : ""}
+                      {syncResult.unresolvable > 0 ? `, ${syncResult.unresolvable} unresolvable` : ""}
+                      .
+                    </p>
+                  )}
+                </>
+              )}
             </>
           )}
+            </div>
+          </>
         </div>
 
         {project && (
