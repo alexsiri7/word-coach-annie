@@ -944,98 +944,14 @@ test.describe('Integration tests — real server, real data', () => {
       expect(exportRes.ok()).toBeTruthy()
       const exported = await exportRes.json()
 
-      // 3. Use exported data to create a new project (simulating import)
-      const importRes = await request.post('/api/projects', {
+      // 3. Import using the dedicated import endpoint (handles all entities in one transaction)
+      const importRes = await request.post('/api/projects/import', {
         headers: AUTH_HEADERS,
-        data: {
-          title: `${exported.project.title} (imported)`,
-          author: exported.project.author,
-          genre: exported.project.genre,
-          projectType: exported.project.projectType,
-        },
+        data: exported,
       })
       expect(importRes.status()).toBe(201)
       const imported = await importRes.json()
       importedProjectId = imported.id
-
-      // 4. Recreate structure from exported data
-      const nodeIdMap = new Map<string, string>()
-
-      // Create chapters first (no parent dependency)
-      for (const node of exported.structureNodes.filter(
-        (n: { type: string }) => n.type === 'CHAPTER',
-      )) {
-        const res = await request.post(
-          `/api/projects/${importedProjectId}/nodes`,
-          {
-            headers: AUTH_HEADERS,
-            data: {
-              type: node.type,
-              title: node.title,
-              orderIndex: node.orderIndex,
-            },
-          },
-        )
-        expect(res.status()).toBe(201)
-        const created = await res.json()
-        nodeIdMap.set(node.id, created.id)
-      }
-
-      // Create scenes under their chapters
-      for (const node of exported.structureNodes.filter(
-        (n: { type: string }) => n.type === 'SCENE',
-      )) {
-        const newParentId = node.parentId
-          ? nodeIdMap.get(node.parentId)
-          : undefined
-        const res = await request.post(
-          `/api/projects/${importedProjectId}/nodes`,
-          {
-            headers: AUTH_HEADERS,
-            data: {
-              type: node.type,
-              title: node.title,
-              parentId: newParentId,
-              orderIndex: node.orderIndex,
-            },
-          },
-        )
-        expect(res.status()).toBe(201)
-        const created = await res.json()
-        nodeIdMap.set(node.id, created.id)
-      }
-
-      // Restore content for scenes (skip auto-created empty versions to avoid count mismatch)
-      for (const cv of exported.contentVersions.filter((cv: { content: string }) => cv.content)) {
-        const newNodeId = nodeIdMap.get(cv.nodeId)
-        if (newNodeId) {
-          const res = await request.post(
-            `/api/nodes/${newNodeId}/content`,
-            {
-              headers: AUTH_HEADERS,
-              data: { content: cv.content },
-            },
-          )
-          expect(res.status()).toBe(201)
-        }
-      }
-
-      // Restore story objects
-      for (const obj of exported.storyObjects) {
-        const res = await request.post(
-          `/api/projects/${importedProjectId}/story-objects`,
-          {
-            headers: AUTH_HEADERS,
-            data: {
-              type: obj.type,
-              name: obj.name,
-              description: obj.description,
-              role: obj.role,
-            },
-          },
-        )
-        expect(res.status()).toBe(201)
-      }
 
       // 5. Export the imported project and compare
       const reExportRes = await request.get(
