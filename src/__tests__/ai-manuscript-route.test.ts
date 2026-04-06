@@ -34,29 +34,25 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/ai/settings", () => ({
   getAiConfig: vi.fn().mockResolvedValue({
-    baseUrl: "https://api.example.com/v1",
+
     apiKey: "test-key",
     model: "test-model",
   }),
+  getAiPreferences: vi.fn().mockResolvedValue({
+    customInstructions: "",
+    coachingStyle: "balanced",
+    responseLength: "moderate",
+  }),
+  buildPreferenceInstructions: vi.fn().mockReturnValue(""),
 }));
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn().mockReturnValue("user-1"),
 }));
 
-vi.mock("openai", () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: vi.fn().mockResolvedValue({
-            choices: [{ message: { content: "Analysis result text" } }],
-          }),
-        },
-      },
-    })),
-  };
-});
+vi.mock("@/lib/ai/adk-agent", () => ({
+  runSimpleCompletion: vi.fn().mockResolvedValue("Analysis result text"),
+}));
 
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -130,7 +126,7 @@ describe("POST /api/ai-manuscript", () => {
 
   it("returns 503 when AI is not configured", async () => {
     const { getAiConfig } = await import("@/lib/ai/settings");
-    vi.mocked(getAiConfig).mockResolvedValueOnce({ baseUrl: "", apiKey: "", model: "" });
+    vi.mocked(getAiConfig).mockResolvedValueOnce({ apiKey: "", model: "" });
     const req = makeRequest({ projectId: "proj-1", analysisType: "plot-threads" });
     const res = await POST(req);
     expect(res.status).toBe(503);

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getConsistencyContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 export interface ConsistencyAlert {
   id: string;
@@ -30,7 +30,7 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   let focusSceneId: string | undefined;
@@ -95,19 +95,12 @@ For each issue found, provide a JSON object. Return ONLY a valid JSON array (no 
 If no contradictions are found, return [].
 Only report clear, specific contradictions. Do not report vague impressions.`;
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
-
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1500,
+    const rawContent = await runSimpleCompletion({
+      userMessage: prompt,
+      aiConfig,
+      maxTokens: 1500,
       temperature: 0.1,
-    });
-
-    const rawContent = response.choices[0]?.message?.content ?? "[]";
+    }) || "[]";
     let parsed: {
       type: string;
       severity: string;

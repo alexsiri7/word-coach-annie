@@ -10,7 +10,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 
 const connectionString = process.env.DATABASE_URL
@@ -33,26 +33,40 @@ async function runMigrations() {
   )
   const applied = new Set(rows.map((r) => r.name))
 
-  // Collect migration files sorted alphabetically
+  // Collect migration files sorted alphabetically.
+  // Supports both flat .sql files and subdirectory/migration.sql layouts.
   const migrationsDir = join(__dirname, '..', 'prisma', 'migrations')
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith('.sql'))
-    .sort()
+  const entries = readdirSync(migrationsDir).sort()
+  const migrationFiles: Array<{ name: string; path: string }> = []
+  for (const entry of entries) {
+    const entryPath = join(migrationsDir, entry)
+    if (entry.endsWith('.sql') && statSync(entryPath).isFile()) {
+      migrationFiles.push({ name: entry, path: entryPath })
+    } else if (statSync(entryPath).isDirectory()) {
+      const sqlPath = join(entryPath, 'migration.sql')
+      try {
+        statSync(sqlPath)
+        migrationFiles.push({ name: entry, path: sqlPath })
+      } catch {
+        // No migration.sql in this directory, skip
+      }
+    }
+  }
 
-  if (files.length === 0) {
+  if (migrationFiles.length === 0) {
     console.log('No migration files found.')
     return
   }
 
   let applied_count = 0
-  for (const file of files) {
+  for (const { name: file, path: filePath } of migrationFiles) {
     if (applied.has(file)) {
       console.log(`  skip  ${file} (already applied)`)
       continue
     }
 
     console.log(`  apply ${file}`)
-    const sql = readFileSync(join(migrationsDir, file), 'utf-8')
+    const sql = readFileSync(filePath, 'utf-8')
 
     // Split into individual statements, stripping line comments
     const statements = sql

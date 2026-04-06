@@ -212,7 +212,7 @@ export async function exportStoryBible(projectId: string): Promise<string> {
     return lines.join("\n");
 }
 
-export async function exportMedium(projectId: string, nodeId?: string): Promise<string> {
+export async function exportHashnode(projectId: string, nodeId?: string): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
@@ -285,8 +285,9 @@ export async function exportMedium(projectId: string, nodeId?: string): Promise<
             // Let's iterate.
             if (n.type === "CHAPTER" || n.type === "PART") {
                 result.push(`# ${n.title}\n`);
-                for (const child of n.children) {
-                    result.push(...collectMarkdown(child));
+                for (let i = 0; i < n.children.length; i++) {
+                    if (i > 0) result.push("\n\n---\n\n");
+                    result.push(...collectMarkdown(n.children[i]));
                 }
             }
         }
@@ -473,7 +474,7 @@ export async function exportUniverse(universeId: string): Promise<string> {
             if (obj.notes) lines.push(`*Notes:* ${obj.notes}\n`);
 
             if (obj.timeline.length > 0) {
-                lines.push(`\n**Timeline:**\n`);
+                lines.push(`\n**Timeline (state history):**\n`);
                 for (const entry of obj.timeline) {
                     lines.push(`- **${entry.label}**: ${entry.description}`);
                 }

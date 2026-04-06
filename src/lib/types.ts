@@ -40,6 +40,8 @@ export interface WorldObject {
   createdAt: string;
   updatedAt: string;
   timeline?: WorldObjectTimelineEntry[];
+  relationships?: Relationship[];
+  relatedBy?: Relationship[];
 }
 
 export interface WorldObjectTimelineEntry {
@@ -81,6 +83,7 @@ export interface PlotlineIndicator {
 export interface OutlineNode extends StructureNode {
   children: OutlineNode[];
   plotIndicators?: PlotlineIndicator[];
+  hasNewFeedback?: boolean; // true when scene has unresolved annotations imported from Google Docs
 }
 
 export type StoryObjectType = "CHARACTER" | "LOCATION" | "PLOTLINE" | "WORLD_ELEMENT" | "NOTE";
@@ -105,13 +108,17 @@ export interface Relationship {
   label: string;
   fromNodeId: string | null;
   fromObjectId: string | null;
+  fromWorldObjectId: string | null;
   toNodeId: string | null;
   toObjectId: string | null;
+  toWorldObjectId: string | null;
   createdAt: string;
   fromNode?: StructureNode;
   fromObject?: StoryObject;
+  fromWorldObject?: WorldObject;
   toNode?: StructureNode;
   toObject?: StoryObject;
+  toWorldObject?: WorldObject;
 }
 
 export interface ContentVersion {
@@ -128,6 +135,7 @@ export interface Annotation {
   content: string;
   range: string;
   selectedText?: string | null;
+  externalId?: string | null; // set for annotations imported from Google Docs
   resolved: boolean;
   createdAt: string;
   updatedAt: string;

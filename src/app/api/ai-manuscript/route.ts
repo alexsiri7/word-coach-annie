@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAiConfig } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
-import OpenAI from "openai";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
@@ -92,19 +92,17 @@ export async function POST(request: NextRequest) {
     const ctx = await getManuscriptContext(projectId);
     const prompt = promptFn(ctx);
 
-    const client = new OpenAI({
-      apiKey: aiConfig.apiKey,
-      baseURL: aiConfig.baseUrl || undefined,
-    });
+    // Load user preferences for system-level behavior guidance
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
 
-    const response = await client.chat.completions.create({
-      model: aiConfig.model,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 2000,
+    const result = await runSimpleCompletion({
+      systemPrompt: prefInstructions,
+      userMessage: prompt,
+      aiConfig,
+      maxTokens: 2000,
       temperature: 0.5,
     });
-
-    const result = response.choices[0]?.message?.content?.trim() || "";
     return NextResponse.json({ result, analysisType });
   } catch (error) {
     logger.error("POST /api/ai-manuscript error", error);

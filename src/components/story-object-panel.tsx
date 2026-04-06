@@ -118,8 +118,10 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
             label: string;
             toNode?: { id: string; title: string; type: string } | null;
             toObject?: { id: string; name: string; type: string } | null;
+            toWorldObject?: { id: string; name: string; type: string } | null;
             fromNode?: { id: string; title: string; type: string } | null;
             fromObject?: { id: string; name: string; type: string } | null;
+            fromWorldObject?: { id: string; name: string; type: string } | null;
         }
         if (Array.isArray(data.relationships)) {
             for (const r of data.relationships as RawRelationship[]) {
@@ -127,7 +129,9 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                     ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
                     : r.toObject
                         ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                        : null;
+                        : r.toWorldObject
+                            ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
+                            : null;
                 rels.push({ relationshipId: r.id, type: r.type, label: r.label, direction: "outgoing", target });
             }
         }
@@ -137,7 +141,9 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                     ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
                     : r.fromObject
                         ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                        : null;
+                        : r.fromWorldObject
+                            ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
+                            : null;
                 rels.push({ relationshipId: r.id, type: r.type, label: r.label, direction: "incoming", target });
             }
         }

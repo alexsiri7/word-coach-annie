@@ -122,6 +122,15 @@ export default function LoginPage() {
                 <Suspense>
                     <LoginForm />
                 </Suspense>
+                <div className="text-center text-xs text-muted-foreground pt-2">
+                    <a href="/privacy" className="hover:text-foreground transition-colors">
+                        Privacy
+                    </a>
+                    {" · "}
+                    <a href="/terms" className="hover:text-foreground transition-colors">
+                        Terms
+                    </a>
+                </div>
             </div>
         </div>
     );

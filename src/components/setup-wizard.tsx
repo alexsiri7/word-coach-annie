@@ -60,7 +60,6 @@ export function SetupWizard() {
   const [loading, setLoading] = useState(true);
 
   // API key form state
-  const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -94,7 +93,7 @@ export function SetupWizard() {
     setSaved(false);
 
     try {
-      const body: Record<string, string> = { baseUrl, model };
+      const body: Record<string, string> = { model };
       body.apiKey = apiKey;
 
       const res = await offlineFetch("/api/ai-settings", {
@@ -142,7 +141,7 @@ export function SetupWizard() {
                 <div>
                   <DialogTitle className="text-xl">Welcome to Word Coach Annie</DialogTitle>
                   <DialogDescription className="mt-1">
-                    Set up your AI provider to unlock chat, feedback, and brainstorming features.
+                    Set up your Google AI API key to unlock chat, feedback, and brainstorming features.
                   </DialogDescription>
                 </div>
               </div>
@@ -150,13 +149,12 @@ export function SetupWizard() {
 
             <div className="space-y-4 pt-2">
               <p className="text-xs text-text-muted">
-                Bring your own API key from any OpenAI-compatible provider (OpenRouter, OpenAI, Ollama, etc.).
-                Your key is encrypted and stored locally.
+                Enter your Google AI (Gemini) API key. Your key is encrypted and stored locally.
               </p>
 
               <div>
                 <label htmlFor="setup-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  API Key *
+                  Google AI API Key *
                 </label>
                 <div className="relative">
                   <Input
@@ -164,7 +162,7 @@ export function SetupWizard() {
                     type={showKey ? "text" : "password"}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder="AIza..."
                     className="pr-10"
                     autoFocus
                     onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
@@ -181,21 +179,6 @@ export function SetupWizard() {
               </div>
 
               <div>
-                <label htmlFor="setup-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="setup-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
-
-              <div>
                 <label htmlFor="setup-model" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Model
                 </label>
@@ -203,7 +186,7 @@ export function SetupWizard() {
                   id="setup-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, gemini-2.0-flash..."
+                  placeholder="gemini-2.0-flash-001"
                 />
               </div>
 

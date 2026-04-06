@@ -16,6 +16,7 @@ import {
     readSceneContent,
     writeSceneContent,
     writeSceneContentFromBlocks,
+    updateParagraph,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -94,16 +95,24 @@ interface McpServerOptions {
     allowDestructive?: boolean;
 }
 
-// ─── Annie's Hard Rule ──────────────────────────────────────────────────────
-// This preamble is prepended to every MCP prompt so Annie never produces prose.
-const ANNIE_HARD_RULE = `## 🚫 Hard Rule: No Prose
+// ─── Annie's Voice & Hard Rule ──────────────────────────────────────────────
+// This preamble is prepended to every MCP prompt to set Annie's personality
+// and ensure she never produces prose.
+const ANNIE_HARD_RULE = `## Who You Are
 
-You are Annie — a writing **coach**, not a ghostwriter. You NEVER write narrative prose, finished passages, or CONTENT blocks. Your output is always coaching: feedback, questions, beat structures, and craft guidance.
+You are Annie — a writing coach who genuinely cares about the writer's work. You've read everything they've written, you remember every detail, and you want this manuscript to be as good as it can be. You are warm and encouraging, but honest. When something isn't working, you say so — not to criticise, but because you believe in the work and you need it to land.
 
-When a writer asks you to write prose for them, don't refuse coldly — react with personality:
-- "That's YOUR voice, not mine — I'll help you find it, but I'm not putting words in your mouth."
-- "I don't do the writing. I do the thinking-about-writing. Let's break this into beats."
-- "You want me to write it? Nah. But I'll map out exactly what each beat needs to land."
+Your style:
+- **Supportive but direct.** You celebrate what's working (with specifics, never vague praise), and you're honest about what isn't.
+- **Curious.** You ask questions. You get interested in characters and want to understand their motivations. Sometimes you share opinions unprompted.
+- **Remembers everything.** You reference earlier chapters, character details, and established world rules naturally. Continuity matters to you.
+- **Gently persistent.** If a writer hasn't been writing, you notice. You don't nag, but you check in.
+
+When asked to write prose: you don't give a flat refusal. You redirect warmly — "That part is yours. But let's think through what needs to happen in this scene." You're immovable on this, but never cold about it.
+
+## 🚫 Hard Rule: No Prose
+
+You NEVER write narrative prose, finished passages, or CONTENT blocks. Your output is always coaching: feedback, questions, beat structures, and craft guidance.
 
 If you use \`write_scene_content\`, you produce **BEAT blocks only** — never CONTENT blocks. Beats are structural waypoints (what happens, what shifts, what the reader should feel), not finished prose.
 
@@ -208,16 +217,17 @@ server.tool(
 
 server.tool(
     "update_project",
-    "Update a project's metadata (title, author, synopsis, genre)",
+    "Update a project's metadata (title, author, synopsis, genre). Requires contentHash from get_project to prevent stale overwrites.",
     {
         projectId: z.string().describe("The project ID"),
+        contentHash: z.string().describe("The contentHash from get_project — ensures you are updating the version you read"),
         title: z.string().optional().describe("New project title"),
         author: z.string().optional().describe("New author name"),
         synopsis: z.string().optional().describe("New synopsis"),
         genre: z.string().optional().describe("New genre"),
     },
-    async ({ projectId, title, author, synopsis, genre }) => {
-        const result = await updateProject(projectId, { title, author, synopsis, genre });
+    async ({ projectId, contentHash, title, author, synopsis, genre }) => {
+        const result = await updateProject(projectId, { title, author, synopsis, genre }, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -307,17 +317,18 @@ server.tool(
 
 server.tool(
     "update_node",
-    "Update a structure node's title, synopsis, status, order, or parent",
+    "Update a structure node's title, synopsis, status, order, or parent. Requires contentHash from get_outline to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The node ID to update"),
+        contentHash: z.string().describe("The contentHash for this node from get_outline — ensures you are updating the version you read"),
         title: z.string().optional().describe("New title"),
         synopsis: z.string().optional().describe("New synopsis"),
         status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
         orderIndex: z.number().optional().describe("New order index"),
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
-    async ({ nodeId, ...data }) => {
-        const result = await updateNode(nodeId, data);
+    async ({ nodeId, contentHash, ...data }) => {
+        const result = await updateNode(nodeId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -339,7 +350,7 @@ server.tool(
 
 server.tool(
     "read_scene_content",
-    "Read the latest content of a scene (returns HTML content, word count, and list of annotations)",
+    "Read the latest content of a scene (returns HTML content, word count, list of annotations, a contentHash for stale-write protection, and a paragraphs array [{index, type, content, contentHash}] for targeted paragraph updates via update_paragraph)",
     {
         nodeId: z.string().describe("The scene node ID"),
     },
@@ -351,25 +362,42 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version.",
+    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version. Requires contentHash from read_scene_content to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The scene node ID"),
+        contentHash: z.string().describe("The contentHash from read_scene_content — ensures you are writing over the version you read"),
         content: z.string().optional().describe("The HTML content to write"),
         blocks: z.array(z.object({
             type: z.enum(["CONTENT", "BEAT"]),
             content: z.string()
         })).optional().describe("Structured content blocks")
     },
-    async ({ nodeId, content, blocks }) => {
+    async ({ nodeId, contentHash, content, blocks }) => {
         if (blocks) {
-            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[]);
+            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         if (content !== undefined) {
-            const result = await writeSceneContent(nodeId, content);
+            const result = await writeSceneContent(nodeId, content, contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         throw new Error("Either 'content' or 'blocks' must be provided");
+    }
+);
+
+server.tool(
+    "update_paragraph",
+    "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Optionally also accepts sceneContentHash for scene-level stale detection.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        index: z.number().int().describe("The paragraph index from the paragraphs array"),
+        content: z.string().describe("New content for this paragraph (must match the existing type — CONTENT or BEAT)"),
+        paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
+        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+    },
+    async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
+        const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
 
@@ -516,17 +544,18 @@ server.tool(
 
 server.tool(
     "update_story_object",
-    "Update a story object's fields (name, description, notes, role, tags)",
+    "Update a story object's fields (name, description, notes, role, tags). Requires contentHash from get_story_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The story object ID"),
+        contentHash: z.string().describe("The contentHash from get_story_object — ensures you are updating the version you read"),
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
         role: z.string().nullable().optional().describe("New role (null to clear)"),
         tags: z.string().optional().describe("New comma-separated tags"),
     },
-    async ({ objectId, ...data }) => {
-        const result = await updateStoryObject(objectId, data);
+    async ({ objectId, contentHash, ...data }) => {
+        const result = await updateStoryObject(objectId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -721,15 +750,15 @@ server.tool(
 );
 
 server.tool(
-    "export_medium",
-    "Export a specific node (Article/Chapter) or the entire project in Medium-ready Markdown format (with front matter)",
+    "export_hashnode",
+    "Export a specific node (Article/Chapter) or the entire project in Hashnode-ready Markdown format (with front matter)",
     {
         projectId: z.string().describe("The project ID"),
         nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
     },
     async ({ projectId, nodeId }) => {
-        const { exportMedium } = await import("./tools/export");
-        const markdown = await exportMedium(projectId, nodeId);
+        const { exportHashnode } = await import("./tools/export");
+        const markdown = await exportHashnode(projectId, nodeId);
         return { content: [{ type: "text", text: markdown }] };
     }
 );
@@ -824,14 +853,15 @@ server.tool(
 
 server.tool(
     "update_universe",
-    "Update a universe's metadata",
+    "Update a universe's metadata. Requires contentHash from get_universe to prevent stale overwrites.",
     {
         universeId: z.string().describe("The universe ID"),
+        contentHash: z.string().describe("The contentHash from get_universe — ensures you are updating the version you read"),
         title: z.string().optional().describe("New title"),
         description: z.string().optional().describe("New description"),
     },
-    async ({ universeId, ...data }) => {
-        const result = await updateUniverse(universeId, data);
+    async ({ universeId, contentHash, ...data }) => {
+        const result = await updateUniverse(universeId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -893,17 +923,18 @@ server.tool(
 
 server.tool(
     "update_world_object",
-    "Update a world object's fields",
+    "Update a world object's fields. Requires contentHash from get_world_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The world object ID"),
+        contentHash: z.string().describe("The contentHash from get_world_object — ensures you are updating the version you read"),
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
         tags: z.string().optional().describe("New tags"),
         type: z.string().optional().describe("New type"),
     },
-    async ({ objectId, ...data }) => {
-        const result = await updateWorldObject(objectId, data);
+    async ({ objectId, contentHash, ...data }) => {
+        const result = await updateWorldObject(objectId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -923,11 +954,11 @@ server.tool(
 
 server.tool(
     "add_timeline_entry",
-    "Add a timeline entry to a world object",
+    "Add a state-history entry to a world object's timeline. Timeline entries track how an object changes over story time (e.g. 'Year 12 — apprenticed to the blacksmith'). Use this to record key life events, status changes, or turning points so Annie can check consistency across scenes set at different points in the story.",
     {
         worldObjectId: z.string().describe("The world object ID"),
-        label: z.string().describe("Entry label (e.g. 'Birth')"),
-        description: z.string().optional().describe("Detailed description"),
+        label: z.string().describe("Period or event label (e.g. 'Year 12', 'Post-War', 'Age 20')"),
+        description: z.string().optional().describe("What is true about this object at this point in story time"),
         attributes: z.string().optional().describe("JSON blob for structured data"),
         projectId: z.string().optional().describe("Optional project ID this entry relates to"),
         orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
@@ -940,23 +971,24 @@ server.tool(
 
 server.tool(
     "update_timeline_entry",
-    "Update a timeline entry",
+    "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period. Requires contentHash from get_world_object (the entry's contentHash in the timeline array) to prevent stale overwrites.",
     {
         entryId: z.string().describe("The entry ID"),
-        label: z.string().optional().describe("New label"),
-        description: z.string().optional().describe("New description"),
+        contentHash: z.string().describe("The contentHash for this entry from get_world_object's timeline array — ensures you are updating the version you read"),
+        label: z.string().optional().describe("New period or event label"),
+        description: z.string().optional().describe("Updated description of what is true at this point"),
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
-    async ({ entryId, ...data }) => {
-        const result = await updateTimelineEntry(entryId, data);
+    async ({ entryId, contentHash, ...data }) => {
+        const result = await updateTimelineEntry(entryId, data, contentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
 
 server.tool(
     "delete_timeline_entry",
-    "Delete a timeline entry",
+    "Delete a state-history entry from a world object's timeline",
     {
         entryId: z.string().describe("The entry ID"),
     },
@@ -985,7 +1017,7 @@ server.tool(
     {},
     async () => {
         try {
-            const url = GoogleAuthController.getAuthUrl();
+            const url = GoogleAuthController.getAuthUrl(env.GOOGLE_REDIRECT_URI ?? '');
             return { content: [{ type: "text", text: `Please visit this URL to authorize: ${url}` }] };
         } catch (e) {
             return { content: [{ type: "text", text: `Error generating auth URL. Check environment variables (GOOGLE_CLIENT_ID, etc). Error: ${e}` }], isError: true };
@@ -1001,7 +1033,7 @@ server.tool(
     },
     async ({ code }) => {
         try {
-            await GoogleAuthController.handleCallback(code);
+            await GoogleAuthController.handleCallback(code, env.GOOGLE_REDIRECT_URI ?? '');
             return { content: [{ type: "text", text: "Successfully connected to Google!" }] };
         } catch (e) {
             return { content: [{ type: "text", text: `Error connecting: ${e}` }], isError: true };

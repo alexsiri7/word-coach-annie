@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
+import { RelationshipCreateSchema } from "@/schemas/relationships";
 
-const VALID_RELATIONSHIP_TYPES = [
-  "APPEARS_IN",
-  "LOCATED_AT",
-  "PART_OF_PLOTLINE",
-  "RELATED_TO",
-  "INTERACTS_WITH",
-  "CONTAINS",
-  "PRECEDES",
-  "FOLLOWS",
-] as const;
 
 export async function GET(
   request: NextRequest,
@@ -20,7 +12,7 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
@@ -88,7 +80,7 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
@@ -105,70 +97,20 @@ export async function POST(
       );
     }
 
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
+    const rawBody = await request.json().catch(() => null);
+    if (rawBody === null) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = RelationshipCreateSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid JSON body" },
+        { error: parsed.error.errors[0].message },
         { status: 400 }
       );
     }
 
-    const { type, label, fromNodeId, fromObjectId, toNodeId, toObjectId } =
-      body as {
-        type?: string;
-        label?: string;
-        fromNodeId?: string;
-        fromObjectId?: string;
-        toNodeId?: string;
-        toObjectId?: string;
-      };
-
-    // Validate type
-    if (!type) {
-      return NextResponse.json(
-        { error: "type is required" },
-        { status: 400 }
-      );
-    }
-
-    if (
-      !VALID_RELATIONSHIP_TYPES.includes(
-        type as (typeof VALID_RELATIONSHIP_TYPES)[number]
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error: `Invalid type. Must be one of: ${VALID_RELATIONSHIP_TYPES.join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate exactly one from-field
-    const fromFields = [fromNodeId, fromObjectId].filter(Boolean);
-    if (fromFields.length !== 1) {
-      return NextResponse.json(
-        {
-          error:
-            "Exactly one from-field must be provided (fromNodeId or fromObjectId)",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate exactly one to-field
-    const toFields = [toNodeId, toObjectId].filter(Boolean);
-    if (toFields.length !== 1) {
-      return NextResponse.json(
-        {
-          error:
-            "Exactly one to-field must be provided (toNodeId or toObjectId)",
-        },
-        { status: 400 }
-      );
-    }
+    const { type, label, fromNodeId, fromObjectId, toNodeId, toObjectId } = parsed.data;
 
     // Verify referenced entities exist and belong to the project
     if (fromNodeId) {
@@ -226,7 +168,7 @@ export async function POST(
     const relationship = await prisma.relationship.create({
       data: {
         type,
-        ...(label !== undefined && { label }),
+        ...(label !== undefined && { label: sanitizeInput(label) }),
         ...(fromNodeId && { fromNodeId }),
         ...(fromObjectId && { fromObjectId }),
         ...(toNodeId && { toNodeId }),

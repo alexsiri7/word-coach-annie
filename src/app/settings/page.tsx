@@ -2,24 +2,44 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AiSettingsData {
-  baseUrl: string;
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
   scope?: "user" | "global";
+  customInstructions?: string;
+  coachingStyle?: string;
+  responseLength?: string;
 }
 
 export default function SettingsPage() {
   const router = useRouter();
 
   // AI settings state
-  const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [maskedKey, setMaskedKey] = useState("");
@@ -29,26 +49,114 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"user" | "global">("global");
 
+  // AI behavior preferences
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [coachingStyle, setCoachingStyle] = useState("balanced");
+  const [responseLength, setResponseLength] = useState("moderate");
+
+  // Google Docs integration state
+  const [googleDocsLoading, setGoogleDocsLoading] = useState(true);
+  const [googleDocsConnected, setGoogleDocsConnected] = useState(false);
+  const [googleDocsDisconnecting, setGoogleDocsDisconnecting] = useState(false);
+
+  // Hashnode integration state
+  const [hashnodeLoading, setHashnodeLoading] = useState(true);
+  const [hashnodeConnected, setHashnodeConnected] = useState(false);
+  const [hashnodeUsername, setHashnodeUsername] = useState<string | null>(null);
+  const [hashnodeConnectOpen, setHashnodeConnectOpen] = useState(false);
+  const [hashnodeDisconnectOpen, setHashnodeDisconnectOpen] = useState(false);
+  const [hashnodeToken, setHashnodeToken] = useState("");
+  const [hashnodeConnecting, setHashnodeConnecting] = useState(false);
+  const [hashnodeDisconnecting, setHashnodeDisconnecting] = useState(false);
+  const [hashnodeError, setHashnodeError] = useState("");
+
+
   useEffect(() => {
     fetch("/api/ai-settings")
       .then((res) => res.json())
       .then((data: AiSettingsData) => {
-        setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
         setApiKey("");
+        setCustomInstructions(data.customInstructions || "");
+        setCoachingStyle(data.coachingStyle || "balanced");
+        setResponseLength(data.responseLength || "moderate");
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    fetch("/api/integrations/hashnode")
+      .then((res) => res.json())
+      .then((data) => {
+        setHashnodeConnected(data.connected ?? false);
+        setHashnodeUsername(data.username ?? null);
+      })
+      .catch(console.error)
+      .finally(() => setHashnodeLoading(false));
+
+    fetch("/api/integrations/google-docs")
+      .then((res) => res.json())
+      .then((data) => setGoogleDocsConnected(data.connected ?? false))
+      .catch(console.error)
+      .finally(() => setGoogleDocsLoading(false));
   }, []);
+
+  const handleHashnodeConnect = async () => {
+    const trimmed = hashnodeToken.trim();
+    if (!trimmed) return;
+    setHashnodeConnecting(true);
+    setHashnodeError("");
+    try {
+      const res = await fetch("/api/integrations/hashnode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setHashnodeError(data.error || "Failed to connect");
+        return;
+      }
+      setHashnodeConnected(true);
+      setHashnodeUsername(data.username ?? null);
+      setHashnodeConnectOpen(false);
+      setHashnodeToken("");
+    } finally {
+      setHashnodeConnecting(false);
+    }
+  };
+
+  const handleHashnodeDisconnect = async () => {
+    setHashnodeDisconnecting(true);
+    try {
+      await fetch("/api/integrations/hashnode", { method: "DELETE" });
+      setHashnodeConnected(false);
+      setHashnodeUsername(null);
+      setHashnodeDisconnectOpen(false);
+    } finally {
+      setHashnodeDisconnecting(false);
+    }
+  };
+
+  const handleGoogleDocsDisconnect = async () => {
+    setGoogleDocsDisconnecting(true);
+    try {
+      await fetch("/api/integrations/google-docs", { method: "DELETE" });
+      setGoogleDocsConnected(false);
+    } finally {
+      setGoogleDocsDisconnecting(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
     const body: Record<string, string> = {
-      baseUrl,
       model,
+      customInstructions,
+      coachingStyle,
+      responseLength,
     };
     if (apiKey) {
       body.apiKey = apiKey;
@@ -65,6 +173,9 @@ export default function SettingsPage() {
         setMaskedKey(data.apiKey || "");
         setScope(data.scope || "global");
         setApiKey("");
+        setCustomInstructions(data.customInstructions || "");
+        setCoachingStyle(data.coachingStyle || "balanced");
+        setResponseLength(data.responseLength || "moderate");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
@@ -112,24 +223,9 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-text-muted">
-                Configure any OpenAI-compatible provider (OpenRouter, Ollama, direct OpenAI, etc.).
+                Configure your Google Gemini API key and model.
                 Settings are saved per-user when signed in, and override environment variables.
               </p>
-
-              <div>
-                <label htmlFor="settings-base-url" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Base URL
-                </label>
-                <Input
-                  id="settings-base-url"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                />
-                <p className="text-xs text-text-muted mt-1">
-                  OpenAI-compatible API endpoint. Leave empty for direct OpenAI.
-                </p>
-              </div>
 
               <div>
                 <label htmlFor="settings-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -168,25 +264,322 @@ export default function SettingsPage() {
                   id="settings-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-sonnet-4-20250514, google/gemini-2.0-flash-001..."
+                  placeholder="gemini-2.0-flash-001, gemini-2.5-flash, gemini-2.5-pro..."
                 />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving} className="gap-1.5">
-                  {saving ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : saved ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {saving ? "Saving..." : saved ? "Saved!" : "Save"}
-                </Button>
               </div>
             </div>
           )}
         </div>
+
+        {/* AI Behavior Preferences */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="h-4 w-4 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">AI Behavior</h2>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-text-muted">
+                Customize how the AI writing coach interacts with you. These preferences apply to chat, inline suggestions, and manuscript analysis.
+              </p>
+
+              <div>
+                <label htmlFor="settings-coaching-style" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Coaching Style
+                </label>
+                <Select value={coachingStyle} onValueChange={setCoachingStyle}>
+                  <SelectTrigger id="settings-coaching-style">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gentle">Gentle &mdash; encouraging, supportive feedback</SelectItem>
+                    <SelectItem value="balanced">Balanced &mdash; honest but encouraging</SelectItem>
+                    <SelectItem value="direct">Direct &mdash; candid, actionable feedback</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="settings-response-length" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Response Length
+                </label>
+                <Select value={responseLength} onValueChange={setResponseLength}>
+                  <SelectTrigger id="settings-response-length">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="concise">Concise &mdash; brief, to the point</SelectItem>
+                    <SelectItem value="moderate">Moderate &mdash; balanced detail</SelectItem>
+                    <SelectItem value="detailed">Detailed &mdash; thorough explanations</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="settings-custom-instructions" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Custom Instructions
+                </label>
+                <Textarea
+                  id="settings-custom-instructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder="e.g., Focus on dialogue quality. I write literary fiction. Avoid clich&eacute;s..."
+                  rows={3}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Additional instructions the AI will follow in all interactions. Be specific about your writing goals or preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hashnode Integration */}
+        <div className="glass-card p-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Link2 className="h-4 w-4 text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">Hashnode</h2>
+          </div>
+
+          {hashnodeLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : hashnodeConnected ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">
+                  Connected{hashnodeUsername ? ` as @${hashnodeUsername}` : ""}
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  You can publish posts directly to Hashnode.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHashnodeDisconnectOpen(true)}
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">Not connected</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Connect your Hashnode account to publish directly.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => { setHashnodeError(""); setHashnodeToken(""); setHashnodeConnectOpen(true); }}>
+                Connect
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Hashnode Connect Dialog */}
+        <Dialog open={hashnodeConnectOpen} onOpenChange={setHashnodeConnectOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Connect Hashnode Account</DialogTitle>
+              <DialogDescription>
+                Paste your Hashnode Personal Access Token to link your account.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="hashnode-token" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Personal Access Token
+                </label>
+                <Input
+                  id="hashnode-token"
+                  type="password"
+                  value={hashnodeToken}
+                  onChange={(e) => { setHashnodeToken(e.target.value); if (hashnodeError) setHashnodeError(""); }}
+                  placeholder="Paste your token here"
+                  onKeyDown={(e) => e.key === "Enter" && handleHashnodeConnect()}
+                  disabled={hashnodeConnecting}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Generate a token in your Hashnode dashboard under Settings &rarr; Developer.
+                </p>
+              </div>
+              {hashnodeError && (
+                <p className="text-xs text-danger">{hashnodeError}</p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => setHashnodeConnectOpen(false)} disabled={hashnodeConnecting}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleHashnodeConnect} disabled={hashnodeConnecting || !hashnodeToken.trim()}>
+                  {hashnodeConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Hashnode Disconnect Confirmation */}
+        <AlertDialog open={hashnodeDisconnectOpen} onOpenChange={setHashnodeDisconnectOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Disconnect Hashnode?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your access token will be removed. You won&apos;t be able to publish to Hashnode until you reconnect.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={hashnodeDisconnecting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleHashnodeDisconnect} disabled={hashnodeDisconnecting}>
+                {hashnodeDisconnecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Disconnect
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Google Docs Integration */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 fill-current text-accent" aria-hidden="true">
+                <path d="M14.727 6.727H14V0H4.91C4.085 0 3.818.272 3.818 1.091v21.818c0 .82.267 1.091 1.09 1.091h14.19c.82 0 1.09-.271 1.09-1.09V6.727h-5.46zm.545 10.455H8.727v-1.364h6.545v1.364zm0-3.273H8.727v-1.364h6.545v1.364zm0-3.273H8.727V9.273h6.545v1.363zM14.727 6h6l-6-6v6z"/>
+              </svg>
+              <h2 className="text-lg font-semibold text-text-primary">Google Docs</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-4">
+              Export your stories to Google Docs and sync reader comments back as annotations. Requires a Google account with Docs and Drive access.
+            </p>
+
+            {googleDocsLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="h-5 w-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : googleDocsConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Link2 className="h-4 w-4 text-green-500" />
+                  <span className="text-text-secondary">Connected — Google Docs access granted</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGoogleDocsDisconnect}
+                  disabled={googleDocsDisconnecting}
+                  className="gap-1.5"
+                >
+                  {googleDocsDisconnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2Off className="h-4 w-4" />
+                  )}
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-text-primary">Not connected</p>
+                <p className="text-xs text-text-muted">
+                  Click Connect to authorize access to your Google Docs and Drive.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => { window.location.href = "/api/auth/google-docs"; }}
+                  className="gap-1.5"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Connect Google Docs
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Save Button */}
+        {!loading && (
+          <div className="flex items-center gap-2 pt-2 mt-6">
+            <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? (
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : saved ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {saving ? "Saving..." : saved ? "Saved!" : "Save"}
+            </Button>
+          </div>
+        )}
+
+        {/* Hashnode Integration (detailed) */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Link2 className="h-4 w-4 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">Hashnode</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-4">
+              Publish your stories directly to Hashnode. Uses a Personal Access Token from your Hashnode dashboard under Settings &rarr; Developer.
+            </p>
+
+            {hashnodeConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Link2 className="h-4 w-4 text-green-500" />
+                  <span className="text-text-secondary">
+                    Connected{hashnodeUsername ? ` as @${hashnodeUsername}` : ""}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleHashnodeDisconnect}
+                  disabled={hashnodeDisconnecting}
+                  className="gap-1.5"
+                >
+                  {hashnodeDisconnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2Off className="h-4 w-4" />
+                  )}
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                    Personal Access Token
+                  </label>
+                  <Input
+                    type="password"
+                    value={hashnodeToken}
+                    onChange={(e) => setHashnodeToken(e.target.value)}
+                    placeholder="Paste your Hashnode PAT"
+                  />
+                  <p className="text-xs text-text-muted mt-1">
+                    Get it from your Hashnode dashboard: Settings &rarr; Developer &rarr; Personal Access Tokens
+                  </p>
+                </div>
+                {hashnodeError && <p className="text-sm text-danger">{hashnodeError}</p>}
+                <Button
+                  onClick={handleHashnodeConnect}
+                  disabled={hashnodeConnecting || !hashnodeToken.trim()}
+                  className="gap-1.5"
+                >
+                  {hashnodeConnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                  Connect Hashnode
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

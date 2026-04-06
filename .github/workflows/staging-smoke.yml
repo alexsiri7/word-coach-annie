@@ -64,9 +64,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: staging-e2e
     steps:
-      - name: Trigger Railway production deploy
+      - name: Verify staging deployment succeeded
+        id: staging-check
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_STAGING_SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN not set — cannot deploy to production"
@@ -74,13 +78,45 @@ jobs:
             exit 1
           fi
 
-          echo "Triggering production redeploy..."
+          echo "Fetching latest staging deployment..."
           RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { serviceInstanceRedeploy(environmentId: \"${{ secrets.RAILWAY_ENVIRONMENT_ID }}\", serviceId: \"${{ secrets.RAILWAY_SERVICE_ID }}\") }"
-            }')
+            -d "{
+              \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
+            }")
+
+          STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
+          COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
+
+          if [ "$STAGING_STATUS" != "SUCCESS" ]; then
+            echo "::error::Latest staging deployment status is '$STAGING_STATUS', expected 'SUCCESS'"
+            exit 1
+          fi
+
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "✓ Staging deployment succeeded (commit: ${COMMIT:0:7})"
+
+      - name: Deploy staging commit to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          COMMIT="${{ steps.staging-check.outputs.commit }}"
+          if [ -z "$COMMIT" ]; then
+            echo "::error::No commit SHA from staging check"
+            exit 1
+          fi
+
+          echo "Deploying commit $COMMIT to production (same commit as staging)..."
+
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"mutation { serviceInstanceDeployV2(serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", commitSha: \\\"$COMMIT\\\") }\"
+            }")
 
           echo "Response: $RESPONSE"
 
@@ -90,7 +126,7 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Production deploy triggered"
+          echo "✓ Production deploy triggered for commit ${COMMIT:0:7}"
 
   # ── Stage 3: Verify production ────────────────────────────────────────
   health-check:

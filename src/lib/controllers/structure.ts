@@ -13,6 +13,7 @@ export interface OutlineNode {
     parentId: string | null;
     wordCount?: number;
     children: OutlineNode[];
+    hasNewFeedback?: boolean;
 }
 
 export class StructureController {
@@ -98,6 +99,17 @@ export class StructureController {
             },
         });
 
+        // Find scene IDs with unresolved Google Docs annotations
+        const newFeedbackAnnotations = await prisma.annotation.findMany({
+            where: {
+                node: { projectId },
+                resolved: false,
+                NOT: { externalId: null },
+            },
+            select: { nodeId: true },
+        });
+        const newFeedbackNodeIds = new Set(newFeedbackAnnotations.map((a: { nodeId: string }) => a.nodeId));
+
         const nodeMap = new Map<string, OutlineNode>();
         const roots: OutlineNode[] = [];
 
@@ -112,6 +124,7 @@ export class StructureController {
                 parentId: node.parentId,
                 wordCount: node.type === "SCENE" ? (node.contentVersions[0]?.wordCount ?? 0) : undefined,
                 children: [],
+                hasNewFeedback: newFeedbackNodeIds.has(node.id),
             });
         }
 
@@ -341,6 +354,12 @@ export class StructureController {
         });
 
         return annotation;
+    }
+
+    static async getNode(nodeId: string) {
+        const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
+        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        return node;
     }
 
     static async readSceneContent(nodeId: string) {

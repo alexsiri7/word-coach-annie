@@ -80,6 +80,26 @@ The app works with any OpenAI-compatible provider (OpenAI, Anthropic via proxy, 
 
 Required for: Google sign-in and Google Docs export.
 
+#### OAuth Consent Screen Setup
+
+To allow any Google account to sign in (not just test users), the OAuth consent screen must be published:
+
+1. Go to [Google Cloud Console → APIs & Services → OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+2. Fill in the required fields:
+   - **App name**: Word Coach Annie
+   - **User support email**: your email
+   - **App homepage**: your deployed URL (e.g., `https://yourdomain.com`)
+   - **Privacy policy link**: `https://yourdomain.com/privacy`
+   - **Authorized domains**: your domain
+3. Under **Scopes**, add: `openid`, `email`, `profile`
+4. **Publish the app**: Click "PUBLISH APP" to move from Testing to In Production
+   - In Testing mode, only manually added test users (max 100) can sign in
+   - In Production mode, any Google account can sign in
+   - An "unverified app" warning appears until Google verifies the app — users can still proceed by clicking "Advanced" → "Go to app"
+   - Full verification (removes the warning) requires Google review — submit via the consent screen page if needed
+
+> **Note:** The privacy policy page at `/privacy` must be accessible at your public URL before Google will accept the verification request.
+
 ### Security
 
 | Variable | Description |

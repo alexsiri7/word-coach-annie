@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
+import { StoryObjectCreateSchema } from "@/schemas/story-objects";
 
 export async function GET(
   request: NextRequest,
@@ -9,7 +11,7 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
@@ -68,28 +70,32 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
+    const body = await request.json().catch(() => null);
+    if (body === null) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = StoryObjectCreateSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid JSON body" },
+        { error: parsed.error.errors[0].message },
         { status: 400 }
       );
     }
 
+    const { type, name, description, notes, role, tags } = parsed.data;
     const storyObject = await StoryObjectController.createStoryObject({
       projectId,
-      type: body.type as string,
-      name: body.name as string,
-      description: body.description as string | undefined,
-      notes: body.notes as string | undefined,
-      role: body.role as string | undefined,
-      tags: body.tags as string | undefined,
+      type,
+      name: sanitizeInput(name),
+      description: description ? sanitizeInput(description) : undefined,
+      notes: notes ? sanitizeInput(notes) : undefined,
+      role: role ? sanitizeInput(role) : undefined,
+      tags: tags ? sanitizeInput(tags) : undefined,
     });
 
     return NextResponse.json(storyObject, { status: 201 });

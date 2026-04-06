@@ -36,6 +36,8 @@ export function useVersionCheck() {
     }, []);
 
     useEffect(() => {
+        if (dismissed) return;
+
         // Initial check after a short delay
         const initialTimer = setTimeout(checkVersion, 5000);
 
@@ -55,12 +57,10 @@ export function useVersionCheck() {
             clearInterval(interval);
             document.removeEventListener("visibilitychange", handleVisibility);
         };
-    }, [checkVersion]);
+    }, [checkVersion, dismissed]);
 
     const dismiss = useCallback(() => {
         setDismissed(true);
-        // Reappear on next check cycle
-        setTimeout(() => setDismissed(false), CHECK_INTERVAL);
     }, []);
 
     const refresh = useCallback(() => {

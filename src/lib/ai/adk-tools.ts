@@ -426,12 +426,12 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "add_timeline_entry",
-        description: "Add a timeline entry to a world object",
+        description: "Add a state-history entry to a world object's timeline. Timeline entries track how an object changes over story time (e.g. 'Year 12 — apprenticed to the blacksmith'). Use this to record key life events, status changes, or turning points for story consistency.",
         category: "world_building",
         parameters: z.object({
             worldObjectId: z.string().describe("The world object ID"),
-            label: z.string().describe("Entry label"),
-            description: z.string().optional().describe("Detailed description"),
+            label: z.string().describe("Period or event label (e.g. 'Year 12', 'Post-War', 'Age 20')"),
+            description: z.string().optional().describe("What is true about this object at this point in story time"),
             attributes: z.string().optional().describe("JSON blob for structured data"),
             projectId: z.string().optional().describe("Optional project ID this entry relates to"),
             orderIndex: z.number().optional().describe("Order index"),
@@ -439,19 +439,19 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_timeline_entry",
-        description: "Update a timeline entry",
+        description: "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time.",
         category: "world_building",
         parameters: z.object({
             entryId: z.string().describe("The entry ID"),
-            label: z.string().optional().describe("New label"),
-            description: z.string().optional().describe("New description"),
+            label: z.string().optional().describe("New period or event label"),
+            description: z.string().optional().describe("Updated description of what is true at this point"),
             attributes: z.string().optional().describe("New JSON blob"),
             orderIndex: z.number().optional().describe("New order index"),
         }),
     },
     {
         name: "delete_timeline_entry",
-        description: "Delete a timeline entry",
+        description: "Delete a state-history entry from a world object's timeline",
         category: "world_building",
         parameters: z.object({
             entryId: z.string().describe("The entry ID"),
@@ -459,7 +459,7 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "reorder_timeline_entries",
-        description: "Reorder timeline entries for a world object",
+        description: "Reorder state-history entries on a world object's timeline",
         category: "world_building",
         parameters: z.object({
             worldObjectId: z.string().describe("The world object ID"),
@@ -511,8 +511,8 @@ const tools: ToolDefinition[] = [
         }),
     },
     {
-        name: "export_medium",
-        description: "Export a node or project in Medium-ready Markdown format",
+        name: "export_hashnode",
+        description: "Export a node or project in Hashnode-ready Markdown format",
         category: "export",
         parameters: z.object({
             projectId: z.string().describe("The project ID"),
@@ -648,7 +648,7 @@ import {
 import {
   exportManuscript,
   exportStoryBible,
-  exportMedium,
+  exportHashnode,
   getProjectSummary,
 } from "@/mcp/tools/export";
 import {
@@ -685,6 +685,7 @@ import {
 } from "@/mcp/tools/coaching";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
+import { env } from "@/lib/env";
 
 // ─── Handler dispatch map ────────────────────────────────────────────────────
 // Maps tool name → execute function for ADK's execute signature
@@ -781,7 +782,7 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   // Export
   export_manuscript: async (a) => exportManuscript(a.projectId as string),
   export_story_bible: async (a) => exportStoryBible(a.projectId as string),
-  export_medium: async (a) => exportMedium(a.projectId as string, a.nodeId as string | undefined),
+  export_hashnode: async (a) => exportHashnode(a.projectId as string, a.nodeId as string | undefined),
   export_to_google_docs: async (a) => {
     const { projectId, universeId, exportMode } = a as {
       projectId?: string;
@@ -805,9 +806,9 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   list_snapshots: async (a) => listDatabaseSnapshots(a.limit as number),
   restore_snapshot: async (a) => restoreDatabaseSnapshot(a.commitHash as string),
   google_auth_status: async () => GoogleAuthController.getStatus(),
-  google_auth_connect: async () => ({ authUrl: GoogleAuthController.getAuthUrl() }),
+  google_auth_connect: async () => ({ authUrl: GoogleAuthController.getAuthUrl(env.GOOGLE_REDIRECT_URI ?? '') }),
   google_auth_callback: async (a) => {
-    await GoogleAuthController.handleCallback(a.code as string);
+    await GoogleAuthController.handleCallback(a.code as string, env.GOOGLE_REDIRECT_URI ?? '');
     return { success: true };
   },
   google_auth_disconnect: async () => {

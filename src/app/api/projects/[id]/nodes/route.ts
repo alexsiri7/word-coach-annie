@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StructureController } from "@/lib/controllers/structure";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { NodeCreateSchema } from "@/schemas/nodes";
 
 // Deprecated: Use GET /api/projects/[id]/outline instead for the tree structure.
 // If a flat list is needed, we should add a specific method for it, but the UI seems to want a tree.
@@ -11,7 +12,7 @@ export async function GET(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
@@ -49,22 +50,22 @@ export async function POST(
 ) {
   const { id: projectId } = await params;
   const userId = getCurrentUserId(request);
-  const access = await verifyProjectAccess(projectId, userId);
+  const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
 
   try {
     const body = await request.json();
-    // Validate required fields that might trigger controller errors if missing
-    if (!body.type || !body.title) {
+    const parsed = NodeCreateSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "type and title are required" },
+        { error: parsed.error.errors[0].message },
         { status: 400 }
       );
     }
 
     const node = await StructureController.createNode({
       projectId,
-      ...body
+      ...parsed.data,
     });
 
     return NextResponse.json(node, { status: 201 });

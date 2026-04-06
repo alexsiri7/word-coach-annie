@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
 
 interface FeedbackBody {
   type: "bug" | "feature" | "other";
@@ -34,6 +35,13 @@ async function uploadScreenshot(
     const base64 = dataUrl.split(",")[1];
     if (!base64) return null;
 
+    // Enforce 2MB size limit before binary conversion
+    const sizeInBytes = Math.ceil((base64.length * 3) / 4);
+    if (sizeInBytes > 2 * 1024 * 1024) {
+      logger.warn("Screenshot exceeds 2MB limit", { sizeInBytes });
+      return null;
+    }
+
     // Convert base64 to binary
     const binaryStr = atob(base64);
     const bytes = new Uint8Array(binaryStr.length);
@@ -41,12 +49,6 @@ async function uploadScreenshot(
       bytes[i] = binaryStr.charCodeAt(i);
     }
     const blob = new Blob([bytes], { type: "image/jpeg" });
-
-    // 2MB limit
-    if (blob.size > 2 * 1024 * 1024) {
-      logger.error("Screenshot too large", { size: blob.size });
-      return null;
-    }
 
     const filename = `feedback-${Date.now()}.jpg`;
     const formData = new FormData();
@@ -126,17 +128,24 @@ export async function POST(request: NextRequest) {
     screenshotUrl = await uploadScreenshot(token, repo, body.screenshot);
   }
 
+  // Sanitize and escape user-provided fields before embedding in GitHub Markdown
+  const safeMessage = sanitizeInput(body.message.trim());
+  const safeEmail = body.email ? escapeMarkdown(sanitizeInput(body.email)) : undefined;
+  const safeUrl = body.context?.url ? escapeMarkdown(body.context.url) : undefined;
+  const safeUserAgent = body.context?.userAgent ? escapeMarkdown(body.context.userAgent) : undefined;
+  const safeScreenSize = body.context?.screenSize ? escapeMarkdown(body.context.screenSize) : undefined;
+
   // Build issue body with app context
   const contextLines: string[] = [];
-  if (body.email) contextLines.push(`**Reporter:** ${body.email}`);
-  if (body.context?.url) contextLines.push(`**Page:** ${body.context.url}`);
-  if (body.context?.userAgent)
-    contextLines.push(`**Browser:** ${body.context.userAgent}`);
-  if (body.context?.screenSize)
-    contextLines.push(`**Screen:** ${body.context.screenSize}`);
+  if (safeEmail) contextLines.push(`**Reporter:** ${safeEmail}`);
+  if (safeUrl) contextLines.push(`**Page:** ${safeUrl}`);
+  if (safeUserAgent)
+    contextLines.push(`**Browser:** ${safeUserAgent}`);
+  if (safeScreenSize)
+    contextLines.push(`**Screen:** ${safeScreenSize}`);
   contextLines.push(`**App version:** ${process.env.npm_package_version || "unknown"}`);
 
-  const bodyParts = [body.message.trim()];
+  const bodyParts = [safeMessage];
 
   if (screenshotUrl) {
     bodyParts.push("", "### Screenshot", `![Screenshot](${screenshotUrl})`);
@@ -148,7 +157,7 @@ export async function POST(request: NextRequest) {
 
   const typePrefix =
     body.type === "bug" ? "Bug: " : body.type === "feature" ? "Feature: " : "";
-  const titleSnippet = body.message.trim().split("\n")[0].slice(0, 80);
+  const titleSnippet = safeMessage.split("\n")[0].slice(0, 80);
   const title = `${typePrefix}${titleSnippet}`;
 
   const labels = [LABEL_MAP[body.type] || "feedback"];

@@ -6,6 +6,8 @@ import { BeatAnnotation } from "@/components/editor/extensions/beat";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
+  name: "annotation",
+
   addAttributes() {
     return {
       id: {

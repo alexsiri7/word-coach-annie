@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class UniversesController {
     static async listUniverses() {
@@ -57,8 +58,8 @@ export class UniversesController {
 
         const universe = await prisma.universe.create({
             data: {
-                title: data.title.trim(),
-                description: data.description?.trim() || "",
+                title: sanitizeInput(data.title.trim()),
+                description: data.description ? sanitizeInput(data.description.trim()) : "",
             },
         });
 
@@ -73,8 +74,8 @@ export class UniversesController {
 
     static async updateUniverse(id: string, data: { title?: string; description?: string }) {
         const updateData: Record<string, string> = {};
-        if (data.title !== undefined) updateData.title = data.title.trim();
-        if (data.description !== undefined) updateData.description = data.description.trim();
+        if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());
+        if (data.description !== undefined) updateData.description = sanitizeInput(data.description.trim());
 
         if (Object.keys(updateData).length === 0) throw new Error("No fields to update");
 
@@ -118,6 +119,20 @@ export class UniversesController {
                 timeline: {
                     orderBy: { orderIndex: "asc" },
                 },
+                relationships: {
+                    include: {
+                        toNode: { select: { id: true, title: true, type: true } },
+                        toObject: { select: { id: true, name: true, type: true } },
+                        toWorldObject: { select: { id: true, name: true, type: true } },
+                    },
+                },
+                relatedBy: {
+                    include: {
+                        fromNode: { select: { id: true, title: true, type: true } },
+                        fromObject: { select: { id: true, name: true, type: true } },
+                        fromWorldObject: { select: { id: true, name: true, type: true } },
+                    },
+                },
             },
         });
 
@@ -150,10 +165,10 @@ export class UniversesController {
             data: {
                 universeId: data.universeId,
                 type: data.type.trim(),
-                name: data.name.trim(),
-                description: data.description?.trim() || "",
-                notes: data.notes?.trim() || "",
-                tags: data.tags?.trim() || "",
+                name: sanitizeInput(data.name.trim()),
+                description: data.description ? sanitizeInput(data.description.trim()) : "",
+                notes: data.notes ? sanitizeInput(data.notes.trim()) : "",
+                tags: data.tags ? sanitizeInput(data.tags.trim()) : "",
             },
         });
 
@@ -175,10 +190,10 @@ export class UniversesController {
         }
     ) {
         const updateData: Record<string, string> = {};
-        if (data.name !== undefined) updateData.name = data.name.trim();
-        if (data.description !== undefined) updateData.description = data.description.trim();
-        if (data.notes !== undefined) updateData.notes = data.notes.trim();
-        if (data.tags !== undefined) updateData.tags = data.tags.trim();
+        if (data.name !== undefined) updateData.name = sanitizeInput(data.name.trim());
+        if (data.description !== undefined) updateData.description = sanitizeInput(data.description.trim());
+        if (data.notes !== undefined) updateData.notes = sanitizeInput(data.notes.trim());
+        if (data.tags !== undefined) updateData.tags = sanitizeInput(data.tags.trim());
         if (data.type !== undefined) updateData.type = data.type.trim();
 
         if (Object.keys(updateData).length === 0) throw new Error("No fields to update");
@@ -220,8 +235,8 @@ export class UniversesController {
         const entry = await prisma.worldObjectTimelineEntry.create({
             data: {
                 worldObjectId: data.worldObjectId,
-                label: data.label.trim(),
-                description: data.description?.trim() || "",
+                label: sanitizeInput(data.label.trim()),
+                description: data.description ? sanitizeInput(data.description.trim()) : "",
                 attributes: data.attributes?.trim() || "{}",
                 projectId: data.projectId,
                 orderIndex,
@@ -233,6 +248,12 @@ export class UniversesController {
             createdAt: entry.createdAt.toISOString(),
             updatedAt: entry.updatedAt.toISOString(),
         };
+    }
+
+    static async getTimelineEntry(id: string) {
+        const entry = await prisma.worldObjectTimelineEntry.findUnique({ where: { id } });
+        if (!entry) throw new Error(`Timeline entry not found: ${id}`);
+        return entry;
     }
 
     static async updateTimelineEntry(
@@ -290,6 +311,61 @@ export class UniversesController {
         await prisma.project.update({
             where: { id: projectId },
             data: { universeId: null },
+        });
+    }
+
+    static async copyWorldObjectToProject(worldObjectId: string, projectId: string) {
+        return prisma.$transaction(async (tx) => {
+            // 1. Fetch world object
+            const wo = await tx.worldObject.findUnique({
+                where: { id: worldObjectId },
+                include: { relationships: true, relatedBy: true },
+            });
+            if (!wo) throw new Error(`World object not found: ${worldObjectId}`);
+
+            // 2. Create StoryObject (copy — original stays in universe)
+            const so = await tx.storyObject.create({
+                data: {
+                    projectId,
+                    type: wo.type,
+                    name: wo.name,
+                    description: wo.description,
+                    notes: wo.notes,
+                    tags: wo.tags,
+                },
+            });
+
+            // 3. Copy relationships: world object refs → story object refs
+            for (const rel of wo.relationships) {
+                await tx.relationship.create({
+                    data: {
+                        type: rel.type,
+                        label: rel.label,
+                        fromObjectId: so.id,
+                        toNodeId: rel.toNodeId,
+                        toObjectId: rel.toObjectId,
+                        toWorldObjectId: rel.toWorldObjectId,
+                    },
+                });
+            }
+            for (const rel of wo.relatedBy) {
+                await tx.relationship.create({
+                    data: {
+                        type: rel.type,
+                        label: rel.label,
+                        fromNodeId: rel.fromNodeId,
+                        fromObjectId: rel.fromObjectId,
+                        fromWorldObjectId: rel.fromWorldObjectId,
+                        toObjectId: so.id,
+                    },
+                });
+            }
+
+            return {
+                ...so,
+                createdAt: so.createdAt.toISOString(),
+                updatedAt: so.updatedAt.toISOString(),
+            };
         });
     }
 

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
+import { NodeUpdateSchema } from "@/schemas/nodes";
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +13,7 @@ export async function GET(
 
   try {
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectAccessByNode(id, userId);
+    const access = await verifyProjectReadAccessByNode(id, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
     const node = await prisma.structureNode.findUnique({
       where: { id },
@@ -52,7 +54,7 @@ export async function PATCH(
 
   try {
     const userId = getCurrentUserId(request);
-    const nodeAccess = await verifyProjectAccessByNode(id, userId);
+    const nodeAccess = await verifyProjectWriteAccessByNode(id, userId, request.headers.get("x-user-email"));
     if (!nodeAccess.authorized) return nodeAccess.response;
 
     const existing = await prisma.structureNode.findUnique({
@@ -64,15 +66,14 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { title, synopsis, status, orderIndex, parentId } = body;
-
-    const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
-    if (status && !validStatuses.includes(status)) {
+    const parsed = NodeUpdateSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: `status must be one of: ${validStatuses.join(", ")}` },
+        { error: parsed.error.errors[0].message },
         { status: 400 }
       );
     }
+    const { title, synopsis, status, orderIndex, parentId } = parsed.data;
 
     if (parentId !== undefined && parentId !== null) {
       const parentNode = await prisma.structureNode.findFirst({
@@ -93,8 +94,8 @@ export async function PATCH(
     }
 
     const data: Record<string, unknown> = {};
-    if (title !== undefined) data.title = title;
-    if (synopsis !== undefined) data.synopsis = synopsis;
+    if (title !== undefined) data.title = sanitizeInput(title);
+    if (synopsis !== undefined) data.synopsis = sanitizeInput(synopsis);
     if (status !== undefined) data.status = status;
     if (orderIndex !== undefined) data.orderIndex = orderIndex;
     if (parentId !== undefined) data.parentId = parentId;
@@ -129,7 +130,7 @@ export async function DELETE(
 
   try {
     const userId = getCurrentUserId(request);
-    const nodeAccess = await verifyProjectAccessByNode(id, userId);
+    const nodeAccess = await verifyProjectWriteAccessByNode(id, userId, request.headers.get("x-user-email"));
     if (!nodeAccess.authorized) return nodeAccess.response;
 
     const node = await prisma.structureNode.findUnique({
