@@ -80,10 +80,44 @@ export async function readSceneContent(nodeId: string) {
         `sceneContent:${nodeId}`,
         () => StructureController.readSceneContent(nodeId),
     );
+    const paragraphs = raw.blocks.map((block, index) => ({
+        index,
+        type: block.type,
+        content: block.content,
+        contentHash: computeContentHash(String(index), block.type, block.content),
+    }));
     return {
         ...raw,
         contentHash: computeContentHash(raw.content),
+        paragraphs,
     };
+}
+
+export async function updateParagraph(
+    nodeId: string,
+    index: number,
+    content: string,
+    paragraphContentHash?: string,
+    sceneContentHash?: string,
+) {
+    const current = await StructureController.readSceneContent(nodeId);
+    if (sceneContentHash !== undefined) {
+        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
+    }
+    const blocks = current.blocks;
+    if (index < 0 || index >= blocks.length) {
+        throw new Error(`Paragraph index ${index} out of range (0–${blocks.length - 1})`);
+    }
+    const block = blocks[index];
+    if (paragraphContentHash !== undefined) {
+        const expected = computeContentHash(String(index), block.type, block.content);
+        verifyContentHash(paragraphContentHash, expected, "read_scene_content");
+    }
+    blocks[index] = { type: block.type, content };
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
 }
 
 export async function writeSceneContent(nodeId: string, content: string, contentHash?: string) {

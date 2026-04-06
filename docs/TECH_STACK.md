@@ -34,7 +34,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | ORM | Prisma 7.6.0 | Type-safe DB access with `@prisma/adapter-pg` |
 | Database | PostgreSQL 16 | Via Supabase (connection pooler, port 6543) |
 | Validation | Zod 3.24.2 | Schema validation |
-| AI | OpenAI SDK | Chat completions (configurable provider) |
+| AI | Google AI + @google/adk 0.6 | Gemini 2.0 Flash via native ADK integration |
 | Google APIs | googleapis | Google Docs export, Drive |
 | OAuth | google-auth-library | Google authentication |
 | MCP | @modelcontextprotocol/sdk | AI tool integration server |
@@ -160,9 +160,8 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 | `GOOGLE_CLIENT_ID` | OAuth for Docs export | No |
 | `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback | No |
-| `AI_API_BASE_URL` | LLM provider endpoint | No |
-| `AI_API_KEY` | LLM API key | No |
-| `AI_MODEL` | LLM model name | No |
+| `GEMINI_API_KEY` | Google AI (Gemini) API key | No (configure in Settings UI) |
+| `AI_MODEL` | Gemini model name (default: `gemini-2.0-flash-001`) | No |
 | `ALLOWED_EMAILS` | Access control (comma-separated) | No |
 | `API_TOKEN` | Request authentication (32-byte hex) | Recommended |
 | `JWT_SECRET` | OAuth session signing | No |
@@ -181,7 +180,7 @@ See `.env.example` for the full list.
 |---------|---------|------|
 | Supabase PostgreSQL | Production database | Connection string |
 | Railway | Hosting (staging + production) | API token |
-| AI Provider | OpenAI-compatible LLM (configurable) | API key |
+| Google AI | Gemini 2.0 Flash (via @google/adk) | `GEMINI_API_KEY` |
 | Google Docs/Drive | Document export & sync | OAuth2 |
 | Medium | Story publishing | Self-issued integration token |
 | Sentry | Error tracking | Auth token |
@@ -197,3 +196,5 @@ For schema changes, use Prisma migrations:
 2. The migration runner (`scripts/migrate.mjs`) applies pending migrations on container start
 3. The runner refuses destructive DDL (DROP/TRUNCATE) if the database has data
 4. Run `npx prisma generate` to regenerate the client after schema changes
+
+For emergencies: use the `snapshot_database` MCP tool to create a database backup before any significant data operation.

@@ -249,7 +249,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 ### F28: MCP Export Tools
 - F28.1: `exportManuscript(projectId, options)` — Markdown with optional beats
 - F28.2: `exportStoryBible(projectId)` — Character/location/plotline reference
-- F28.3: `exportMedium(projectId, nodeId?)` — Medium-compatible Markdown
+- F28.3: `exportHashnode(projectId, nodeId?)` — Hashnode-ready Markdown with front matter
 - F28.4: `exportUniverse(universeId)` — Universe world-building export
 - F28.5: `getProjectSummary(projectId)` — Project metadata summary
 
@@ -277,10 +277,10 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - **Runtime**: Node.js 20+ (inside Docker)
 - **Framework**: Next.js 14+ (App Router)
 - **Language**: TypeScript (strict mode)
-- **Database**: SQLite via Prisma ORM
+- **Database**: PostgreSQL (Supabase) via Prisma ORM
 - **UI**: React + Tailwind CSS + shadcn/ui
 - **Editor**: Tiptap (ProseMirror)
-- **AI**: Gemini 2.0 Flash (API calls from API routes)
+- **AI**: Google AI + @google/adk (Gemini 2.0 Flash, native ADK integration)
 - **Agent Interface**: MCP Server (Model Context Protocol) via stdio
 - **Auth**: Google OAuth 2.0 + JWT session cookies
 - **Integrations**: Google Docs API (googleapis), Medium API

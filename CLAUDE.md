@@ -3,17 +3,20 @@ Please refer to [docs/RULES.md](docs/RULES.md) for project rules, commands, and 
 
 ## Database Safety (CRITICAL)
 
-**NEVER run `prisma db push` or `prisma migrate reset`.** These commands can drop
-and recreate SQLite tables, destroying all user data.
+**NEVER run `prisma db push` or `prisma migrate reset` on the production database.**
+These commands can drop and recreate tables, destroying all user data.
+
+The project uses **PostgreSQL** (Supabase) in production. Migrations are managed via
+Prisma Migrations (`prisma/migrations/`) and applied automatically on container start
+by `scripts/migrate.mjs` (which refuses destructive DDL if the database has live data).
 
 For schema changes:
-1. Write migration SQL by hand: `ALTER TABLE ... ADD COLUMN ...`
-2. Apply it: `sqlite3 data/word-coach-annie.db < migration.sql`
-3. Update `prisma/schema.prisma` to match
-4. Run `npx prisma generate` (regenerates client only, safe)
+1. Create migration: `npx prisma migrate dev --name <description>`
+2. Review the generated SQL in `prisma/migrations/`
+3. Run `npx prisma generate` to regenerate the client
 
-The database at `data/word-coach-annie.db` contains real creative work. It is
-backed up every 6 hours and version-controlled in `data/.git`.
+The production database contains real creative work. Always create a database snapshot
+(`snapshot_database` MCP tool) before making significant changes.
 
 ## Screenshot Tests (Visual Regression)
 

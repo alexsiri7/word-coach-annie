@@ -71,6 +71,61 @@ describe("MCP Structure Tools", () => {
         expect(content.contentHash).toHaveLength(64);
     });
 
+    it("readSceneContent includes paragraphs array", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+            { type: "BEAT", content: "Action beat" },
+            { type: "CONTENT", content: "<p>More text</p>" },
+        ], contentHash);
+        const result = await structureTools.readSceneContent(scene.id);
+        expect(result.paragraphs).toHaveLength(3);
+        expect(result.paragraphs[0]).toMatchObject({ index: 0, type: "CONTENT", content: "<p>Hello world</p>" });
+        expect(result.paragraphs[1]).toMatchObject({ index: 1, type: "BEAT", content: "Action beat" });
+        expect(result.paragraphs[2]).toMatchObject({ index: 2, type: "CONTENT", content: "<p>More text</p>" });
+        expect(result.paragraphs[0].contentHash).toHaveLength(64);
+    });
+
+    it("updateParagraph patches a single paragraph by index", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+            { type: "BEAT", content: "Action beat" },
+            { type: "CONTENT", content: "<p>More text</p>" },
+        ], contentHash);
+        const read = await structureTools.readSceneContent(scene.id);
+        const para = read.paragraphs[0];
+        await structureTools.updateParagraph(scene.id, 0, "<p>Updated</p>", para.contentHash);
+        const updated = await structureTools.readSceneContent(scene.id);
+        expect(updated.paragraphs[0].content).toBe("<p>Updated</p>");
+        expect(updated.paragraphs[1].content).toBe("Action beat");
+        expect(updated.paragraphs[2].content).toBe("<p>More text</p>");
+    });
+
+    it("updateParagraph rejects stale paragraphContentHash", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+        ], contentHash);
+        await expect(
+            structureTools.updateParagraph(scene.id, 0, "<p>Oops</p>", "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
+    });
+
+    it("updateParagraph rejects out-of-range index", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+        ], contentHash);
+        await expect(
+            structureTools.updateParagraph(scene.id, 5, "<p>Oops</p>", "any")
+        ).rejects.toThrow(/out of range/);
+    });
+
     it("writeSceneContent with valid contentHash succeeds", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         const { contentHash } = await structureTools.readSceneContent(scene.id);

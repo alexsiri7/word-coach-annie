@@ -27,15 +27,15 @@ describe("AI settings", () => {
 
     beforeEach(() => {
         origEnv.AI_API_KEY = process.env.AI_API_KEY;
+        origEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
         origEnv.AI_MODEL = process.env.AI_MODEL;
-        origEnv.AI_API_BASE_URL = process.env.AI_API_BASE_URL;
         origEnv.REQUESTY_API_KEY = process.env.REQUESTY_API_KEY;
         origEnv.REQUESTY_MODEL = process.env.REQUESTY_MODEL;
 
         // Clear env
         delete process.env.AI_API_KEY;
+        delete process.env.GEMINI_API_KEY;
         delete process.env.AI_MODEL;
-        delete process.env.AI_API_BASE_URL;
         delete process.env.REQUESTY_API_KEY;
         delete process.env.REQUESTY_MODEL;
 
@@ -51,20 +51,18 @@ describe("AI settings", () => {
 
     it("returns env defaults when no DB settings", async () => {
         vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue(null);
-        process.env.AI_API_KEY = "env-key";
+        process.env.GEMINI_API_KEY = "env-key";
         process.env.AI_MODEL = "env-model";
-        process.env.AI_API_BASE_URL = "https://env.example.com";
 
         const config = await getAiConfig();
         expect(config.apiKey).toBe("env-key");
         expect(config.model).toBe("env-model");
-        expect(config.baseUrl).toBe("https://env.example.com");
     });
 
     it("uses DB settings over env when available", async () => {
         vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue({
             id: "default",
-            baseUrl: "https://db.example.com",
+            baseUrl: "",
             apiKey: "db-key",
             model: "db-model",
         } as never);
@@ -75,7 +73,6 @@ describe("AI settings", () => {
         const config = await getAiConfig();
         expect(config.apiKey).toBe("decrypted-db-key");
         expect(config.model).toBe("db-model");
-        expect(config.baseUrl).toBe("https://db.example.com");
     });
 
     it("falls back to env when DB fields are empty", async () => {
@@ -89,12 +86,10 @@ describe("AI settings", () => {
 
         process.env.AI_API_KEY = "env-key";
         process.env.AI_MODEL = "env-model";
-        process.env.AI_API_BASE_URL = "https://env.example.com";
 
         const config = await getAiConfig();
         expect(config.apiKey).toBe("env-key");
         expect(config.model).toBe("env-model");
-        expect(config.baseUrl).toBe("https://env.example.com");
     });
 
     it("falls through to env defaults on DB error", async () => {
@@ -113,7 +108,6 @@ describe("AI settings", () => {
         const config = await getAiConfig();
         expect(config.apiKey).toBe("requesty-key");
         expect(config.model).toBe("requesty-model");
-        expect(config.baseUrl).toBe("https://router.requesty.ai/v1");
     });
 
     it("returns hardcoded defaults when no env or DB", async () => {
@@ -121,8 +115,16 @@ describe("AI settings", () => {
 
         const config = await getAiConfig();
         expect(config.apiKey).toBe("");
-        expect(config.model).toBe("google/gemini-2.0-flash-001");
-        expect(config.baseUrl).toBe("");
+        expect(config.model).toBe("gemini-2.0-flash-001");
+    });
+
+    it("prefers GEMINI_API_KEY over AI_API_KEY", async () => {
+        vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue(null);
+        process.env.GEMINI_API_KEY = "gemini-key";
+        process.env.AI_API_KEY = "ai-key";
+
+        const config = await getAiConfig();
+        expect(config.apiKey).toBe("gemini-key");
     });
 
     describe("per-user settings", () => {
@@ -130,7 +132,7 @@ describe("AI settings", () => {
             vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue({
                 id: "user-settings-1",
                 userId: "user-1",
-                baseUrl: "https://user.example.com",
+                baseUrl: "",
                 apiKey: "user-encrypted-key",
                 model: "user-model",
             } as never);
@@ -141,7 +143,6 @@ describe("AI settings", () => {
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("user-decrypted-key");
             expect(config.model).toBe("user-model");
-            expect(config.baseUrl).toBe("https://user.example.com");
             expect(prisma.userAiSettings.findUnique).toHaveBeenCalledWith({ where: { userId: "user-1" } });
         });
 
@@ -149,7 +150,7 @@ describe("AI settings", () => {
             vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue(null);
             vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue({
                 id: "default",
-                baseUrl: "https://global.example.com",
+                baseUrl: "",
                 apiKey: "global-key",
                 model: "global-model",
             } as never);
@@ -158,24 +159,22 @@ describe("AI settings", () => {
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("global-decrypted-key");
             expect(config.model).toBe("global-model");
-            expect(config.baseUrl).toBe("https://global.example.com");
         });
 
         it("falls back to global when user key is empty", async () => {
             vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue({
                 id: "user-settings-1",
                 userId: "user-1",
-                baseUrl: "https://user.example.com",
+                baseUrl: "",
                 apiKey: "",
                 model: "user-model",
             } as never);
             vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue({
                 id: "default",
-                baseUrl: "https://global.example.com",
+                baseUrl: "",
                 apiKey: "global-key",
                 model: "global-model",
             } as never);
-            // First call for user key (empty), second for global key
             vi.mocked(decrypt)
                 .mockReturnValueOnce("")
                 .mockReturnValueOnce("global-decrypted-key");
@@ -185,7 +184,7 @@ describe("AI settings", () => {
             expect(config.model).toBe("global-model");
         });
 
-        it("uses env defaults for user baseUrl when user baseUrl is empty", async () => {
+        it("uses env model when user model is empty", async () => {
             vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue({
                 id: "user-settings-1",
                 userId: "user-1",
@@ -195,12 +194,10 @@ describe("AI settings", () => {
             } as never);
             vi.mocked(decrypt).mockReturnValue("user-decrypted-key");
 
-            process.env.AI_API_BASE_URL = "https://env.example.com";
             process.env.AI_MODEL = "env-model";
 
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("user-decrypted-key");
-            expect(config.baseUrl).toBe("https://env.example.com");
             expect(config.model).toBe("env-model");
         });
 
