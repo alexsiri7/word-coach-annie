@@ -247,7 +247,7 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Limit")).toBe("60");
         });
 
-        it("returns 429 when project creation limit exceeded (10/hour)", async () => {
+        it("returns 429 when project creation limit exceeded (100/hour)", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
                 userId: "project-create-user",
@@ -255,8 +255,8 @@ describe("middleware", () => {
                 name: "Test",
             });
 
-            // 10 project creates should pass
-            for (let i = 0; i < 10; i++) {
+            // 100 project creates should pass
+            for (let i = 0; i < 100; i++) {
                 const req = createRequest("/api/projects", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
@@ -265,14 +265,14 @@ describe("middleware", () => {
                 expect(res.status).toBe(200);
             }
 
-            // 11th should be rate limited
+            // 101st should be rate limited
             const req = createRequest("/api/projects", {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
             const res = await middleware(req);
             expect(res.status).toBe(429);
-            expect(res.headers.get("X-RateLimit-Limit")).toBe("10");
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("100");
         });
 
         it("returns 429 when feedback submission limit exceeded (5/hour)", async () => {

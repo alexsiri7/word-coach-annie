@@ -17,9 +17,27 @@ export function sanitizeInput(input: string): string {
  *
  * Used as defense-in-depth for scene content before database storage.
  * The client also sanitizes on read via DOMPurify.
+ *
+ * Beat comments (`<!-- beat: ... -->`) are preserved — DOMPurify strips HTML
+ * comments by default, so we extract them before sanitization and restore after.
  */
 export function sanitizeHtml(input: string): string {
-  return DOMPurify.sanitize(input);
+  // Extract beat comments before DOMPurify strips them
+  const beats: string[] = [];
+  const withPlaceholders = input.replace(/(<!-- beat:[\s\S]*?-->)/g, (match) => {
+    const idx = beats.length;
+    beats.push(match);
+    return `<span data-beat-placeholder="${idx}"></span>`;
+  });
+
+  const sanitized = DOMPurify.sanitize(withPlaceholders, {
+    ADD_ATTR: ["data-beat-placeholder"],
+  });
+
+  // Restore beat comments
+  return sanitized.replace(/<span data-beat-placeholder="(\d+)"><\/span>/g, (_, idx) => {
+    return beats[parseInt(idx, 10)];
+  });
 }
 
 /**

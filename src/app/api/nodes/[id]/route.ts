@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { NodeUpdateSchema } from "@/schemas/nodes";
 
 export async function GET(
   request: NextRequest,
@@ -65,15 +66,14 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { title, synopsis, status, orderIndex, parentId } = body;
-
-    const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
-    if (status && !validStatuses.includes(status)) {
+    const parsed = NodeUpdateSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: `status must be one of: ${validStatuses.join(", ")}` },
+        { error: parsed.error.errors[0].message },
         { status: 400 }
       );
     }
+    const { title, synopsis, status, orderIndex, parentId } = parsed.data;
 
     if (parentId !== undefined && parentId !== null) {
       const parentNode = await prisma.structureNode.findFirst({

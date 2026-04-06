@@ -5,16 +5,16 @@ import { encrypt, decrypt } from '@/lib/crypto';
 import { env } from '@/lib/env';
 
 export class GoogleAuthController {
-    private static getClient(): OAuth2Client {
+    private static getClient(redirectUri?: string): OAuth2Client {
         return new google.auth.OAuth2(
             env.GOOGLE_CLIENT_ID,
             env.GOOGLE_CLIENT_SECRET,
-            env.GOOGLE_REDIRECT_URI
+            redirectUri ?? env.GOOGLE_REDIRECT_URI
         );
     }
 
-    static getAuthUrl() {
-        const client = this.getClient();
+    static getAuthUrl(redirectUri?: string) {
+        const client = this.getClient(redirectUri ?? env.GOOGLE_REDIRECT_URI);
         return client.generateAuthUrl({
             access_type: 'offline', // Critical for refresh token
             scope: [
@@ -25,8 +25,8 @@ export class GoogleAuthController {
         });
     }
 
-    static async handleCallback(code: string) {
-        const client = this.getClient();
+    static async handleCallback(code: string, redirectUri?: string) {
+        const client = this.getClient(redirectUri ?? env.GOOGLE_REDIRECT_URI);
         const { tokens } = await client.getToken(code);
 
         // In local single-user mode, we replace any existing credentials
@@ -48,7 +48,7 @@ export class GoogleAuthController {
         const cred = await prisma.googleCredential.findFirst();
         if (!cred) return null;
 
-        const client = this.getClient();
+        const client = this.getClient(undefined);
         client.setCredentials({
             access_token: decrypt(cred.accessToken),
             refresh_token: decrypt(cred.refreshToken),
