@@ -271,7 +271,7 @@ async function mockProjectEditorApi(page: Page) {
     route.fulfill({ json: [], status: 200 })
   )
   await page.route('**/api/ai-settings', route =>
-    route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
+    route.fulfill({ json: { model: 'gemini-2.0-flash-001', apiKey: '' }, status: 200 })
   )
   await page.route('**/api/chat', route =>
     route.fulfill({ json: { message: 'Mock response' }, status: 200 })
@@ -308,7 +308,7 @@ async function mockFocusModeApi(page: Page) {
     route.fulfill({ json: [], status: 200 })
   )
   await page.route('**/api/ai-settings', route =>
-    route.fulfill({ json: { provider: 'openai', model: 'gpt-4o', apiKey: '' }, status: 200 })
+    route.fulfill({ json: { model: 'gemini-2.0-flash-001', apiKey: '' }, status: 200 })
   )
   await page.route(
     url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),

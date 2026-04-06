@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { WorldObjectUpdateSchema } from "@/schemas/world-objects";
 
 async function verifyWorldObjectAccess(worldObjectId: string, userId: string | null) {
     const wo = await prisma.worldObject.findUnique({
@@ -44,7 +45,14 @@ export async function PATCH(
         if (!access.authorized) return access.response;
 
         const body = await request.json();
-        const worldObject = await UniversesController.updateWorldObject(id, body);
+        const parsed = WorldObjectUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.errors[0].message },
+                { status: 400 }
+            );
+        }
+        const worldObject = await UniversesController.updateWorldObject(id, parsed.data);
         return NextResponse.json(worldObject);
     } catch (error: unknown) {
         logger.error("Route error", error);

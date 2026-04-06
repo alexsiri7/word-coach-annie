@@ -203,7 +203,7 @@ async function mockProjectEditorApi(page: Page) {
   )
   await page.route('**/api/ai-settings', (route) =>
     route.fulfill({
-      json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+      json: { model: 'gemini-2.0-flash-001', apiKey: '' },
       status: 200,
     }),
   )
@@ -243,7 +243,7 @@ async function mockFocusModeApi(page: Page) {
   )
   await page.route('**/api/ai-settings', (route) =>
     route.fulfill({
-      json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+      json: { model: 'gemini-2.0-flash-001', apiKey: '' },
       status: 200,
     }),
   )
@@ -300,7 +300,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
     )
     await page.route('**/api/ai-settings', (route) =>
       route.fulfill({
-        json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        json: { model: 'gemini-2.0-flash-001', apiKey: '' },
         status: 200,
       }),
     )
@@ -477,7 +477,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
     )
     await page.route('**/api/ai-settings', (route) =>
       route.fulfill({
-        json: { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        json: { model: 'gemini-2.0-flash-001', apiKey: '' },
         status: 200,
       }),
     )

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleDocsCommentSync } from '@/lib/export/google-docs-comment-sync';
+import { GoogleAuthController } from '@/lib/controllers/google-auth';
 import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 
@@ -11,18 +12,38 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const projectId = searchParams.get('projectId');
+
+        // If no projectId, return connection status only (used by global settings page)
         if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+            const status = await GoogleAuthController.getStatus();
+            return NextResponse.json({ connected: status.connected });
         }
 
         const userId = getCurrentUserId(request);
         const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get('x-user-email'));
         if (!access.authorized) return access.response;
 
-        const exports = await GoogleDocsCommentSync.getExportInfo(projectId);
-        return NextResponse.json({ exports });
+        const [exports, status] = await Promise.all([
+            GoogleDocsCommentSync.getExportInfo(projectId),
+            GoogleAuthController.getStatus(),
+        ]);
+        return NextResponse.json({ exports, connected: status.connected });
     } catch (error) {
         logger.error('GET /api/integrations/google-docs error', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
+/**
+ * DELETE /api/integrations/google-docs
+ * Disconnects Google Docs by removing the stored credential.
+ */
+export async function DELETE() {
+    try {
+        await GoogleAuthController.disconnect();
+        return NextResponse.json({ disconnected: true });
+    } catch (error) {
+        logger.error('DELETE /api/integrations/google-docs error', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
