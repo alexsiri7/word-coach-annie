@@ -231,13 +231,12 @@ test.describe('Integration tests — real server, real data', () => {
         page.getByRole('treeitem', { name: 'Chapter One' }),
       ).toBeVisible({ timeout: 10_000 })
 
-      // Click the chapter to expand, then look for the scene
-      await page.getByRole('treeitem', { name: 'Chapter One' }).click()
-
-      // The scene should be visible (may already be visible if outline auto-expands)
-      await expect(
-        page.getByRole('treeitem', { name: 'Opening Scene' }),
-      ).toBeVisible({ timeout: 5_000 })
+      // The outline auto-expands chapters by default; only click to expand if needed
+      const openingScene = page.getByRole('treeitem', { name: 'Opening Scene' })
+      if (!(await openingScene.isVisible())) {
+        await page.getByRole('treeitem', { name: 'Chapter One' }).click()
+      }
+      await expect(openingScene).toBeVisible({ timeout: 5_000 })
     } finally {
       if (projectId) await deleteProject(request, projectId)
     }
@@ -572,9 +571,18 @@ test.describe('Integration tests — real server, real data', () => {
       await page.goto(`/project/${projectId}`)
       await page.waitForSelector('main', { timeout: 20_000 })
 
-      // Expand chapter and click scene
-      await page.getByRole('treeitem', { name: 'Chapter One' }).click()
-      await page.getByRole('treeitem', { name: 'Beat Scene' }).click()
+      // Wait for chapter to load in the tree
+      await expect(
+        page.getByRole('treeitem', { name: 'Chapter One' }),
+      ).toBeVisible({ timeout: 10_000 })
+
+      // The outline auto-expands chapters by default when nodes are loaded before mount.
+      // Only click Chapter One to expand it if Beat Scene isn't already visible.
+      const beatScene = page.getByRole('treeitem', { name: 'Beat Scene' })
+      if (!(await beatScene.isVisible())) {
+        await page.getByRole('treeitem', { name: 'Chapter One' }).click()
+      }
+      await beatScene.click()
 
       // The editor converts <!-- beat: ... --> comments to
       // <div data-type="beat-annotation"> nodes for display
