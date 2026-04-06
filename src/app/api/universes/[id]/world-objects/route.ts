@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { UniversesController } from "@/lib/controllers/universes";
 import { logger } from "@/lib/logger";
+import { WorldObjectCreateSchema } from "@/schemas/world-objects";
 
 export async function GET(
     request: Request,
@@ -25,8 +26,15 @@ export async function POST(
     try {
         const { id } = await params;
         const body = await request.json();
+        const parsed = WorldObjectCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.errors[0].message },
+                { status: 400 }
+            );
+        }
         const worldObject = await UniversesController.createWorldObject({
-            ...body,
+            ...parsed.data,
             universeId: id,
         });
         return NextResponse.json(worldObject);

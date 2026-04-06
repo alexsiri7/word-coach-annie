@@ -64,8 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: staging-e2e
     steps:
-      - name: Get staging deployment image
-        id: staging-image
+      - name: Verify staging deployment succeeded
+        id: staging-check
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
@@ -86,39 +86,36 @@ jobs:
               \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
             }")
 
-          echo "Staging deployments response: $RESPONSE"
-
           STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
+          COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
+
           if [ "$STAGING_STATUS" != "SUCCESS" ]; then
             echo "::error::Latest staging deployment status is '$STAGING_STATUS', expected 'SUCCESS'"
             exit 1
           fi
 
-          IMAGE=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.image // empty')
-          if [ -z "$IMAGE" ]; then
-            echo "::error::Could not extract image from staging deployment metadata"
-            echo "Full meta: $(echo "$RESPONSE" | jq '.data.deployments.edges[0].node.meta')"
-            exit 1
-          fi
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "✓ Staging deployment succeeded (commit: ${COMMIT:0:7})"
 
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-          echo "✓ Staging image: $IMAGE"
-
-      - name: Deploy staging image to production
+      - name: Deploy staging commit to production
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
         run: |
-          IMAGE="${{ steps.staging-image.outputs.image }}"
-          echo "Deploying staging image to production: $IMAGE"
+          COMMIT="${{ steps.staging-check.outputs.commit }}"
+          if [ -z "$COMMIT" ]; then
+            echo "::error::No commit SHA from staging check"
+            exit 1
+          fi
+
+          echo "Deploying commit $COMMIT to production (same commit as staging)..."
 
           RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"query\": \"mutation { serviceInstanceDeploy(input: { serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", image: \\\"$IMAGE\\\" }) }\"
+              \"query\": \"mutation { serviceInstanceDeployV2(serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", commitSha: \\\"$COMMIT\\\") }\"
             }")
 
           echo "Response: $RESPONSE"
@@ -129,7 +126,7 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Production deploy triggered with staging image"
+          echo "✓ Production deploy triggered for commit ${COMMIT:0:7}"
 
   # ── Stage 3: Verify production ────────────────────────────────────────
   health-check:

@@ -1,9 +1,20 @@
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
+import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
 
 function storyObjectsKey(params: { projectId: string; type?: string; search?: string; limit?: number; offset?: number }): string {
     return `storyObjects:${params.projectId}:${params.type ?? ""}:${params.search ?? ""}:${params.limit ?? 50}:${params.offset ?? 0}`;
+}
+
+function storyObjectContentHash(obj: {
+    name: string;
+    description?: string | null;
+    notes?: string | null;
+    role?: string | null;
+    tags?: string | null;
+}): string {
+    return computeContentHash(obj.name, obj.description, obj.notes, obj.role, obj.tags);
 }
 
 export async function listStoryObjects(params: {
@@ -20,10 +31,14 @@ export async function listStoryObjects(params: {
 }
 
 export async function getStoryObject(objectId: string) {
-    return mcpCache.getOrSet(
+    const raw = await mcpCache.getOrSet(
         `storyObject:${objectId}`,
         () => StoryObjectController.getStoryObject(objectId),
     );
+    return {
+        ...raw,
+        contentHash: storyObjectContentHash(raw),
+    };
 }
 
 export async function createStoryObject(params: {
@@ -50,8 +65,13 @@ export async function updateStoryObject(
         notes?: string;
         role?: string | null;
         tags?: string;
-    }
+    },
+    contentHash?: string
 ) {
+    if (contentHash !== undefined) {
+        const current = await StoryObjectController.getStoryObject(objectId);
+        verifyContentHash(contentHash, storyObjectContentHash(current), "get_story_object");
+    }
     const result = await StoryObjectController.updateStoryObject(objectId, data);
     mcpCache.delete(`storyObject:${objectId}`);
     mcpCache.invalidatePrefix("storyObjects:");
