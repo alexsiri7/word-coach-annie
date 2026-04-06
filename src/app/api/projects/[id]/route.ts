@@ -3,6 +3,7 @@ import { ProjectsController } from "@/lib/controllers/projects";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess, verifyProjectReadAccess } from "@/lib/api-auth";
+import { ProjectUpdateSchema, ProjectDeleteSchema } from "@/schemas/projects";
 
 // GET /api/projects/[id] - Get a project by ID
 export async function GET(
@@ -42,7 +43,14 @@ export async function PATCH(
     if (!access.authorized) return access.response;
 
     const body = await request.json();
-    const project = await ProjectsController.updateProject(id, body);
+    const parsed = ProjectUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.errors[0].message },
+        { status: 400 }
+      );
+    }
+    const project = await ProjectsController.updateProject(id, parsed.data);
     return NextResponse.json(project);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -84,8 +92,9 @@ export async function DELETE(
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    if (!body.confirmTitle || body.confirmTitle !== project.title) {
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = ProjectDeleteSchema.safeParse(rawBody);
+    if (!parsed.success || parsed.data.confirmTitle !== project.title) {
       return NextResponse.json(
         { error: "You must type the project title to confirm deletion" },
         { status: 400 }

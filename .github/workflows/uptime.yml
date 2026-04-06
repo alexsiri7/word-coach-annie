@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Check health endpoint
         run: |
-          BODY=$(curl -s --max-time 10 https://amusing-blessing-staging.up.railway.app/api/health)
+          BODY=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health)
           STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
           echo "Response: $BODY"
           if [ "$STATUS" = "error" ]; then

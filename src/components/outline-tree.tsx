@@ -223,6 +223,13 @@ function NodeContent({
         <BookOpen className="h-4 w-4 text-text-muted flex-shrink-0" aria-hidden="true" />
       )}
       <span className="truncate flex-1">{node.title}</span>
+      {isScene && node.hasNewFeedback && (
+        <span
+          className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-accent"
+          title="New feedback from Google Docs"
+          aria-label="New feedback"
+        />
+      )}
       {isScene && <StatusDot status={node.status as SceneStatus} />}
       {isScene && node.plotIndicators && node.plotIndicators.length > 0 && (
         <PlotThreadDots indicators={node.plotIndicators} />

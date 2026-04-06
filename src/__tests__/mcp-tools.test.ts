@@ -5,6 +5,7 @@ import * as structureTools from "@/mcp/tools/structure";
 import * as projectTools from "@/mcp/tools/projects";
 import * as storyObjectTools from "@/mcp/tools/story-objects";
 import * as universeTools from "@/mcp/tools/universes";
+import { StaleWriteError } from "@/mcp/content-hash";
 
 describe("MCP Structure Tools", () => {
     let projectId: string;
@@ -21,16 +22,33 @@ describe("MCP Structure Tools", () => {
         expect(outline[0].title).toBe("Ch 1");
     });
 
+    it("getOutline includes contentHash per node", async () => {
+        await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+        const outline = await structureTools.getOutline(projectId);
+        expect(outline[0].contentHash).toBeDefined();
+        expect(typeof outline[0].contentHash).toBe("string");
+        expect(outline[0].contentHash).toHaveLength(64); // SHA-256 hex
+    });
+
     it("createNode delegates to StructureController", async () => {
         const node = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         expect(node.title).toBe("S1");
         expect(node.type).toBe("SCENE");
     });
 
-    it("updateNode delegates to StructureController", async () => {
+    it("updateNode with valid contentHash succeeds", async () => {
         const node = await structureTools.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
-        const updated = await structureTools.updateNode(node.id, { title: "Updated" });
+        const outline = await structureTools.getOutline(projectId);
+        const { contentHash } = outline[0];
+        const updated = await structureTools.updateNode(node.id, { title: "Updated" }, contentHash);
         expect(updated.title).toBe("Updated");
+    });
+
+    it("updateNode rejects stale contentHash", async () => {
+        const node = await structureTools.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+        await expect(
+            structureTools.updateNode(node.id, { title: "New" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
     });
 
     it("deleteNode delegates to StructureController", async () => {
@@ -46,19 +64,96 @@ describe("MCP Structure Tools", () => {
         expect(content.content).toBe("");
     });
 
-    it("writeSceneContent delegates to StructureController", async () => {
+    it("readSceneContent includes contentHash", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const content = await structureTools.readSceneContent(scene.id);
+        expect(content.contentHash).toBeDefined();
+        expect(content.contentHash).toHaveLength(64);
+    });
+
+    it("readSceneContent includes paragraphs array", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+            { type: "BEAT", content: "Action beat" },
+            { type: "CONTENT", content: "<p>More text</p>" },
+        ], contentHash);
+        const result = await structureTools.readSceneContent(scene.id);
+        expect(result.paragraphs).toHaveLength(3);
+        expect(result.paragraphs[0]).toMatchObject({ index: 0, type: "CONTENT", content: "<p>Hello world</p>" });
+        expect(result.paragraphs[1]).toMatchObject({ index: 1, type: "BEAT", content: "Action beat" });
+        expect(result.paragraphs[2]).toMatchObject({ index: 2, type: "CONTENT", content: "<p>More text</p>" });
+        expect(result.paragraphs[0].contentHash).toHaveLength(64);
+    });
+
+    it("updateParagraph patches a single paragraph by index", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+            { type: "BEAT", content: "Action beat" },
+            { type: "CONTENT", content: "<p>More text</p>" },
+        ], contentHash);
+        const read = await structureTools.readSceneContent(scene.id);
+        const para = read.paragraphs[0];
+        await structureTools.updateParagraph(scene.id, 0, "<p>Updated</p>", para.contentHash);
+        const updated = await structureTools.readSceneContent(scene.id);
+        expect(updated.paragraphs[0].content).toBe("<p>Updated</p>");
+        expect(updated.paragraphs[1].content).toBe("Action beat");
+        expect(updated.paragraphs[2].content).toBe("<p>More text</p>");
+    });
+
+    it("updateParagraph rejects stale paragraphContentHash", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+        ], contentHash);
+        await expect(
+            structureTools.updateParagraph(scene.id, 0, "<p>Oops</p>", "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
+    });
+
+    it("updateParagraph rejects out-of-range index", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hello world</p>" },
+        ], contentHash);
+        await expect(
+            structureTools.updateParagraph(scene.id, 5, "<p>Oops</p>", "any")
+        ).rejects.toThrow(/out of range/);
+    });
+
+    it("writeSceneContent with valid contentHash succeeds", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        const result = await structureTools.writeSceneContent(scene.id, "Hello world", contentHash);
+        expect(result.wordCount).toBe(2);
+    });
+
+    it("writeSceneContent rejects stale contentHash", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await expect(
+            structureTools.writeSceneContent(scene.id, "Hello world", "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
+    });
+
+    it("writeSceneContent without contentHash succeeds (backward compat)", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         const result = await structureTools.writeSceneContent(scene.id, "Hello world");
         expect(result.wordCount).toBe(2);
     });
 
-    it("writeSceneContentFromBlocks delegates to StructureController", async () => {
+    it("writeSceneContentFromBlocks with valid contentHash succeeds", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
         const result = await structureTools.writeSceneContentFromBlocks(scene.id, [
             { type: "CONTENT", content: "<p>Hello world</p>" },
             { type: "BEAT", content: "Action beat" },
             { type: "CONTENT", content: "<p>More text</p>" }
-        ]);
+        ], contentHash);
         expect(result.wordCount).toBeGreaterThan(0);
     });
 
@@ -130,15 +225,30 @@ describe("MCP Project Tools", () => {
         expect(result.title).toBe("P1");
     });
 
+    it("getProject includes contentHash", async () => {
+        const p = await ProjectsController.createProject({ title: "P1" });
+        const result = await projectTools.getProject(p.id);
+        expect(result.contentHash).toBeDefined();
+        expect(result.contentHash).toHaveLength(64);
+    });
+
     it("createProject delegates to ProjectsController", async () => {
         const p = await projectTools.createProject({ title: "New Project" });
         expect(p.title).toBe("New Project");
     });
 
-    it("updateProject delegates to ProjectsController", async () => {
+    it("updateProject with valid contentHash succeeds", async () => {
         const p = await projectTools.createProject({ title: "Original" });
-        const updated = await projectTools.updateProject(p.id, { title: "Updated" });
+        const { contentHash } = await projectTools.getProject(p.id);
+        const updated = await projectTools.updateProject(p.id, { title: "Updated" }, contentHash);
         expect(updated.title).toBe("Updated");
+    });
+
+    it("updateProject rejects stale contentHash", async () => {
+        const p = await projectTools.createProject({ title: "Original" });
+        await expect(
+            projectTools.updateProject(p.id, { title: "Updated" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
     });
 });
 
@@ -162,10 +272,25 @@ describe("MCP Story Object Tools", () => {
         expect(result.name).toBe("Alice");
     });
 
-    it("updateStoryObject delegates to StoryObjectController", async () => {
+    it("getStoryObject includes contentHash", async () => {
         const obj = await storyObjectTools.createStoryObject({ projectId, type: "CHARACTER", name: "Alice" });
-        const updated = await storyObjectTools.updateStoryObject(obj.id, { name: "Bob" });
+        const result = await storyObjectTools.getStoryObject(obj.id);
+        expect(result.contentHash).toBeDefined();
+        expect(result.contentHash).toHaveLength(64);
+    });
+
+    it("updateStoryObject with valid contentHash succeeds", async () => {
+        const obj = await storyObjectTools.createStoryObject({ projectId, type: "CHARACTER", name: "Alice" });
+        const { contentHash } = await storyObjectTools.getStoryObject(obj.id);
+        const updated = await storyObjectTools.updateStoryObject(obj.id, { name: "Bob" }, contentHash);
         expect(updated.name).toBe("Bob");
+    });
+
+    it("updateStoryObject rejects stale contentHash", async () => {
+        const obj = await storyObjectTools.createStoryObject({ projectId, type: "CHARACTER", name: "Alice" });
+        await expect(
+            storyObjectTools.updateStoryObject(obj.id, { name: "Bob" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
     });
 
     it("deleteStoryObject delegates to StoryObjectController", async () => {
@@ -188,10 +313,25 @@ describe("MCP Universe Tools", () => {
         expect(result.title).toBe("U1");
     });
 
-    it("updateUniverse delegates to UniversesController", async () => {
+    it("getUniverse includes contentHash", async () => {
         const u = await universeTools.createUniverse({ title: "U1" });
-        const updated = await universeTools.updateUniverse(u.id, { title: "Updated" });
+        const result = await universeTools.getUniverse(u.id);
+        expect(result.contentHash).toBeDefined();
+        expect(result.contentHash).toHaveLength(64);
+    });
+
+    it("updateUniverse with valid contentHash succeeds", async () => {
+        const u = await universeTools.createUniverse({ title: "U1" });
+        const { contentHash } = await universeTools.getUniverse(u.id);
+        const updated = await universeTools.updateUniverse(u.id, { title: "Updated" }, contentHash);
         expect(updated.title).toBe("Updated");
+    });
+
+    it("updateUniverse rejects stale contentHash", async () => {
+        const u = await universeTools.createUniverse({ title: "U1" });
+        await expect(
+            universeTools.updateUniverse(u.id, { title: "Updated" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
     });
 
     it("deleteUniverse delegates to UniversesController", async () => {
@@ -200,7 +340,7 @@ describe("MCP Universe Tools", () => {
         await expect(universeTools.getUniverse(u.id)).rejects.toThrow();
     });
 
-    it("world objects CRUD", async () => {
+    it("world objects CRUD with contentHash", async () => {
         const u = await universeTools.createUniverse({ title: "U1" });
 
         const wo = await universeTools.createWorldObject({
@@ -213,15 +353,27 @@ describe("MCP Universe Tools", () => {
 
         const fetched = await universeTools.getWorldObject(wo.id);
         expect(fetched.name).toBe("Hero");
+        expect(fetched.contentHash).toBeDefined();
+        expect(fetched.contentHash).toHaveLength(64);
 
-        const updated = await universeTools.updateWorldObject(wo.id, { name: "Villain" });
+        const updated = await universeTools.updateWorldObject(wo.id, { name: "Villain" }, fetched.contentHash);
         expect(updated.name).toBe("Villain");
 
         await universeTools.deleteWorldObject(wo.id);
         await expect(universeTools.getWorldObject(wo.id)).rejects.toThrow();
     });
 
-    it("timeline entries CRUD", async () => {
+    it("updateWorldObject rejects stale contentHash", async () => {
+        const u = await universeTools.createUniverse({ title: "U1" });
+        const wo = await universeTools.createWorldObject({
+            universeId: u.id, type: "CHARACTER", name: "Hero"
+        });
+        await expect(
+            universeTools.updateWorldObject(wo.id, { name: "Villain" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
+    });
+
+    it("timeline entries CRUD with contentHash", async () => {
         const u = await universeTools.createUniverse({ title: "U1" });
         const wo = await universeTools.createWorldObject({
             universeId: u.id, type: "CHARACTER", name: "Hero"
@@ -232,12 +384,30 @@ describe("MCP Universe Tools", () => {
         });
         expect(entry.label).toBe("Born");
 
-        const updated = await universeTools.updateTimelineEntry(entry.id, { label: "Birth" });
+        // Get timeline entry contentHash from getWorldObject
+        const fetchedWo = await universeTools.getWorldObject(wo.id);
+        expect(fetchedWo.timeline[0].contentHash).toBeDefined();
+        const entryHash = fetchedWo.timeline[0].contentHash;
+
+        const updated = await universeTools.updateTimelineEntry(entry.id, { label: "Birth" }, entryHash);
         expect(updated.label).toBe("Birth");
 
         await universeTools.deleteTimelineEntry(entry.id);
         const obj = await universeTools.getWorldObject(wo.id);
         expect(obj.timeline).toHaveLength(0);
+    });
+
+    it("updateTimelineEntry rejects stale contentHash", async () => {
+        const u = await universeTools.createUniverse({ title: "U1" });
+        const wo = await universeTools.createWorldObject({
+            universeId: u.id, type: "CHARACTER", name: "Hero"
+        });
+        const entry = await universeTools.addTimelineEntry({
+            worldObjectId: wo.id, label: "Born"
+        });
+        await expect(
+            universeTools.updateTimelineEntry(entry.id, { label: "Birth" }, "stale-hash")
+        ).rejects.toThrow(StaleWriteError);
     });
 
     it("reorderTimelineEntries", async () => {

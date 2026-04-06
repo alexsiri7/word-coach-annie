@@ -250,6 +250,12 @@ export class UniversesController {
         };
     }
 
+    static async getTimelineEntry(id: string) {
+        const entry = await prisma.worldObjectTimelineEntry.findUnique({ where: { id } });
+        if (!entry) throw new Error(`Timeline entry not found: ${id}`);
+        return entry;
+    }
+
     static async updateTimelineEntry(
         id: string,
         data: {
