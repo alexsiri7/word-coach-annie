@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
 function stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, "").replace(/&[a-zA-Z]+;/g, " ");
@@ -31,7 +31,7 @@ export async function GET(
 ) {
     const { id: projectId } = await params;
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
+    const access = await verifyProjectAccess(projectId, userId);
     if (!access.authorized) return access.response;
 
     try {
