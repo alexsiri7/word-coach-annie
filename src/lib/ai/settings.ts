@@ -3,7 +3,6 @@ import { decrypt } from "@/lib/crypto";
 import { env } from "@/lib/env";
 
 export interface AiProviderConfig {
-  baseUrl: string;
   apiKey: string;
   model: string;
 }
@@ -24,11 +23,9 @@ const DEFAULT_PREFERENCES: AiPreferences = {
 };
 
 function getEnvDefaults(): AiProviderConfig {
-  // Support new generic env vars, fall back to legacy REQUESTY_ vars
-  const apiKey = env.AI_API_KEY || env.REQUESTY_API_KEY || "";
-  const model = env.AI_MODEL || env.REQUESTY_MODEL || "google/gemini-2.0-flash-001";
-  const baseUrl = env.AI_API_BASE_URL || (env.REQUESTY_API_KEY ? "https://router.requesty.ai/v1" : "");
-  return { baseUrl, apiKey, model };
+  const apiKey = env.GEMINI_API_KEY || env.AI_API_KEY || env.REQUESTY_API_KEY || "";
+  const model = env.AI_MODEL || env.REQUESTY_MODEL || "gemini-2.0-flash-001";
+  return { apiKey, model };
 }
 
 /**
@@ -48,7 +45,6 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
         // If user has a key set, use their full config (with fallbacks for empty fields)
         if (decryptedKey) {
           return {
-            baseUrl: userSettings.baseUrl || envDefaults.baseUrl,
             apiKey: decryptedKey,
             model: userSettings.model || envDefaults.model,
           };
@@ -65,7 +61,6 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
     if (settings) {
       const decryptedKey = decrypt(settings.apiKey);
       return {
-        baseUrl: settings.baseUrl || envDefaults.baseUrl,
         apiKey: decryptedKey || envDefaults.apiKey,
         model: settings.model || envDefaults.model,
       };

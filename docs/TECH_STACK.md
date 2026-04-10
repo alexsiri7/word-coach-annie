@@ -15,12 +15,13 @@ hierarchical story structure, world-building tools, and AI chat integration.
 │  └──────────────────┘  └─────────────────┘ │
 │                              │              │
 │                         ┌────┴────┐         │
-│                         │ SQLite  │         │
+│                         │ Postgres│         │
+│                         │(Supabase│         │
 │                         └─────────┘         │
 └─────────────────────────────────────────────┘
          │                          │
-    Cloudflare                   OpenAI
-    Tunnel                       (chat)
+      Railway                    OpenAI
+      (hosting)              (AI, configurable)
 ```
 
 ## Backend
@@ -30,13 +31,13 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | Framework | Next.js 15.2.1 | App Router, API routes |
 | Runtime | Node.js 20 | Docker base: `node:20-slim` |
 | Language | TypeScript 5.7.3 | Strict mode |
-| ORM | Prisma 6.4.1 | Type-safe database access |
-| Database | SQLite | At `./data/word-coach-annie.db` (volume-mounted) |
+| ORM | Prisma 7.6.0 | Type-safe DB access with `@prisma/adapter-pg` |
+| Database | PostgreSQL 16 | Via Supabase (connection pooler, port 6543) |
 | Validation | Zod 3.24.2 | Schema validation |
-| AI | OpenAI SDK 6.29 | Chat completions via Requesty gateway → Gemini 2.0 Flash |
-| Google APIs | googleapis 171.4 | Google Docs export, Drive |
-| OAuth | google-auth-library 10.5 | Google authentication |
-| MCP | @modelcontextprotocol/sdk 1.12 | AI tool integration server |
+| AI | Google AI + @google/adk 0.6 | Gemini 2.0 Flash via native ADK integration |
+| Google APIs | googleapis | Google Docs export, Drive |
+| OAuth | google-auth-library | Google authentication |
+| MCP | @modelcontextprotocol/sdk | AI tool integration server |
 
 ### Database Schema (Prisma)
 
@@ -55,6 +56,8 @@ Core models for hierarchical story structure:
 | ChatMessage | AI chat history per project |
 | GoogleDocExport | Export tracking for Google Docs sync |
 | GoogleCredential | OAuth token storage |
+| MediumCredential | Medium API token storage |
+| MediumExport | Medium publish tracking |
 | WorldObjectTimelineEntry | Timeline events for world objects |
 
 ## Frontend
@@ -64,10 +67,11 @@ Core models for hierarchical story structure:
 | Framework | React 19.0 | Latest React with App Router |
 | UI Library | Shadcn/ui | Built on Radix UI primitives |
 | Rich Text Editor | Tiptap 3.19 | Extensible editor (bubble menu, highlight, placeholder) |
-| Icons | Lucide React 0.564 | Icon library |
+| Icons | Lucide React | Icon library |
 | Styling | Tailwind CSS 3.4 | With tailwind-animate, tailwind-merge, CVA |
-| XSS Protection | DOMPurify 3.3 | HTML sanitization |
+| XSS Protection | DOMPurify | HTML sanitization |
 | State | React hooks | No external state library |
+| PWA | next-pwa | Runtime caching for API routes, Google Fonts |
 
 ### Key UI Features
 - Hierarchical outline tree (acts → chapters → scenes)
@@ -76,81 +80,121 @@ Core models for hierarchical story structure:
 - World-building panels (characters, locations, timelines)
 - AI chat panel per project
 - Google Docs export
+- Medium publishing (draft/public/unlisted)
 - Search across scenes and story objects
 - Mobile-responsive layout
 
 ## Infrastructure
 
-### Containerization
-- **Docker** — Node 20 slim base
-- **Docker Compose** — App service + Cloudflare tunnel
-- **Volumes**: Source code mounted for hot reload; `./data` for SQLite
-- **Port**: `127.0.0.1:3000` (local only, tunneled via Cloudflare)
+### Hosting
+
+| Environment | URL | Platform |
+|-------------|-----|----------|
+| Production | `annie.interstellarai.net` | Railway |
+| Staging | `word-coach-annie-staging.up.railway.app` | Railway |
+| Database | Supabase PostgreSQL | Port 6543 (transaction pooler) |
+
+### Docker
+
+Three-stage multi-stage build (`Dockerfile`):
+
+1. **deps** — Install npm dependencies, generate Prisma client
+2. **builder** — Build Next.js with `output: "standalone"`
+3. **runner** — Node 20-slim with standalone build + Prisma + migrations
+
+The container runs migrations on startup (`node scripts/migrate.mjs`)
+then starts the app (`node server.js`). The migration runner refuses
+destructive DDL (DROP/TRUNCATE) if the database has live data.
+
+Docker Compose adds:
+- **Phoenix** (arizephoenix/phoenix:6006) — OpenTelemetry tracing
+- **Cloudflare Tunnel** — Public access for local dev
 
 ### CI/CD (GitHub Actions)
-```
-Quality Gates (Node 20):
-  1. npm ci
-  2. Typecheck (tsc --noEmit)
-  3. Lint (ESLint)
-  4. Build (next build, NODE_OPTIONS=--max-old-space-size=4096)
-  5. Test with coverage (vitest + @vitest/coverage-v8)
 
-Deploy:
-  1. Tailscale VPN connect
-  2. SSH to 100.120.193.82
-  3. git pull + npm ci + npm run build + docker compose up
 ```
+Push/PR → CI (ci.yml)
+  ├─ Lint & Typecheck (ESLint + tsc)
+  ├─ Unit Tests (Vitest + PostgreSQL 16)
+  ├─ E2E Integration Tests (Playwright)
+  └─ Docker Build validation
+
+CI passes on main → Staging → Production Pipeline (staging-smoke.yml)
+  ├─ Staging E2E Tests (Playwright against staging)
+  ├─ Deploy to Production (promote staging image via Railway GraphQL API)
+  ├─ Production Health Check (poll /api/health, max 10 min)
+  └─ Rollback (auto-rollback via Railway API + GitHub issue if unhealthy)
+
+Every 5 min → Uptime Monitor (uptime.yml)
+  ├─ Production Health Check (annie.interstellarai.net/api/health)
+  └─ Staging Health Check (word-coach-annie-staging.up.railway.app/api/health)
+```
+
+**Deploy pipeline:** Staging must have a successful deployment. The pipeline
+fetches the staging image via Railway's GraphQL API and deploys it to
+production. Requires `RAILWAY_TOKEN`, `RAILWAY_STAGING_SERVICE_ID`,
+`RAILWAY_STAGING_ENVIRONMENT_ID`, `RAILWAY_PRODUCTION_SERVICE_ID` as
+GitHub Actions secrets.
 
 ### Testing
 
 | Tool | Purpose |
 |------|---------|
-| Vitest 3.0.7 | Unit + integration tests |
-| @vitest/coverage-v8 3.2.4 | Coverage reporting (threshold: 1%, raising incrementally) |
-| ESLint 8.57 | Linting with @typescript-eslint |
+| Vitest | Unit + integration tests (against PostgreSQL 16) |
+| @vitest/coverage-v8 | Coverage reporting |
+| Playwright | E2E and visual regression tests |
+| ESLint | Linting with @typescript-eslint |
 
-**Test coverage**: 10 test files, 80 tests. Covers controllers, API data layer,
-content versioning, beats parsing, export, story objects, structure, universes.
-No component tests or e2e tests yet (Playwright visual tests in progress).
+Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 
 ### Code Quality
 - **ESLint**: Modern flat config (eslint.config.mjs)
 - **TypeScript**: Strict mode enabled
-- **Branch protection**: main requires Quality Gates check
+- **Branch protection**: main requires CI check
 
-### Networking
-- **Cloudflare Tunnel** — Public access via tunnel token in docker-compose
-- **Tailscale VPN** — CI deploy access to internal IP
+## Environment Variables
 
-### Planned: Docker Registry Deploy (an-yoz)
-- Build image in CI → push to ghcr.io → pull on server
-- Tagged with commit SHA for instant rollback
-- Server never builds — what CI tests is what deploys
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543) | Yes |
+| `GOOGLE_CLIENT_ID` | OAuth for Docs export | No |
+| `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
+| `GOOGLE_REDIRECT_URI` | OAuth callback | No |
+| `GEMINI_API_KEY` | Google AI (Gemini) API key | No (configure in Settings UI) |
+| `AI_MODEL` | Gemini model name (default: `gemini-2.0-flash-001`) | No |
+| `ALLOWED_EMAILS` | Access control (comma-separated) | No |
+| `API_TOKEN` | Request authentication (32-byte hex) | Recommended |
+| `JWT_SECRET` | OAuth session signing | No |
+| `ENCRYPTION_KEY` | Data-at-rest encryption | No |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Error tracking | No |
+| `RAILWAY_TOKEN` | Railway API (for deploy pipeline) | CI only |
+| `RAILWAY_STAGING_SERVICE_ID` | Staging service ID | CI only |
+| `RAILWAY_STAGING_ENVIRONMENT_ID` | Staging environment ID | CI only |
+| `RAILWAY_PRODUCTION_SERVICE_ID` | Production service ID | CI only |
+
+See `.env.example` for the full list.
 
 ## External Services
 
 | Service | Purpose | Auth |
 |---------|---------|------|
-| AI Provider | Any OpenAI-compatible LLM (configurable in UI or via `AI_API_KEY`) | API key |
-| Google Docs/Drive | Document export & sync | OAuth2 (`GOOGLE_CLIENT_ID/SECRET`) |
-| Cloudflare | Tunnel for public access | Tunnel token |
-| Tailscale | VPN for CI deploy | Auth key |
+| Supabase PostgreSQL | Production database | Connection string |
+| Railway | Hosting (staging + production) | API token |
+| Google AI | Gemini 2.0 Flash (via @google/adk) | `GEMINI_API_KEY` |
+| Google Docs/Drive | Document export & sync | OAuth2 |
+| Medium | Story publishing | Self-issued integration token |
+| Sentry | Error tracking | Auth token |
+| Cloudflare Tunnel | Local dev public access | Tunnel token |
+| Phoenix | OpenTelemetry tracing (local) | N/A |
 
 ## Database Safety Rules
 
-**NEVER run `prisma db push` or `prisma migrate reset` on the production database.**
-These can drop and recreate SQLite tables, destroying all data. See CLAUDE.md.
+**NEVER run `prisma db push` or `prisma migrate reset` on production.**
 
-For schema changes:
-1. Write migration SQL by hand (`ALTER TABLE ... ADD COLUMN ...`)
-2. Apply: `sqlite3 data/word-coach-annie.db < migration.sql`
-3. Update `prisma/schema.prisma` to match
-4. Run `npx prisma generate` (client only, safe)
+For schema changes, use Prisma migrations:
+1. Create migration: `npx prisma migrate dev --name <description>`
+2. The migration runner (`scripts/migrate.mjs`) applies pending migrations on container start
+3. The runner refuses destructive DDL (DROP/TRUNCATE) if the database has data
+4. Run `npx prisma generate` to regenerate the client after schema changes
 
-## Backup Strategy
-
-- **Git versioned**: `data/.git` tracks database snapshots
-- **Local**: Every 6 hours to `/mnt/steam-fast/backups/annie/` (7-day rotation)
-- **Cloud**: Synced to Google Drive via rclone (`gdrive:backups/gas-town/annie/`)
-- **Script**: `/home/asiri/gt/mayor/scripts/backup-dbs.sh`
+For emergencies: use the `snapshot_database` MCP tool to create a database backup before any significant data operation.

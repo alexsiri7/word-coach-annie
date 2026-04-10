@@ -306,6 +306,111 @@ describe("StructureController", () => {
             });
         });
 
+        describe("writeSceneContentFromBlocks", () => {
+            it("serializes blocks and writes content", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                const result = await StructureController.writeSceneContentFromBlocks(scene.id, [
+                    { type: "CONTENT", content: "<p>Hello</p>" },
+                    { type: "BEAT", content: "Action beat" },
+                    { type: "CONTENT", content: "<p>World</p>" },
+                ]);
+                expect(result.wordCount).toBe(2); // "Hello" + "World"
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.content).toBe("<p>Hello</p><!-- beat: Action beat --><p>World</p>");
+            });
+        });
+
+        describe("batchCreateNodes", () => {
+            it("creates multiple nodes in order", async () => {
+                const result = await StructureController.batchCreateNodes(projectId, [
+                    { type: "CHAPTER", title: "Ch 1" },
+                    { type: "CHAPTER", title: "Ch 2" },
+                    { type: "CHAPTER", title: "Ch 3" },
+                ]);
+                expect(result.totalCreated).toBe(3);
+                expect(result.totalErrors).toBe(0);
+                expect(result.created[0].title).toBe("Ch 1");
+                expect(result.created[2].title).toBe("Ch 3");
+            });
+
+            it("reports errors for invalid nodes without stopping batch", async () => {
+                const result = await StructureController.batchCreateNodes(projectId, [
+                    { type: "CHAPTER", title: "Valid" },
+                    { type: "INVALID", title: "Bad type" },
+                    { type: "SCENE", title: "Also valid" },
+                ]);
+                expect(result.totalCreated).toBe(2);
+                expect(result.totalErrors).toBe(1);
+                expect(result.errors[0].error).toContain("type must be one of");
+            });
+
+            it("throws for empty array", async () => {
+                await expect(
+                    StructureController.batchCreateNodes(projectId, [])
+                ).rejects.toThrow("nodes array must not be empty");
+            });
+
+            it("throws for non-existent project", async () => {
+                await expect(
+                    StructureController.batchCreateNodes("bad-id", [{ type: "CHAPTER", title: "X" }])
+                ).rejects.toThrow("Project not found");
+            });
+        });
+
+        describe("batchUpdateNodes", () => {
+            it("updates multiple nodes", async () => {
+                const ch1 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+                const ch2 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 2" });
+                const result = await StructureController.batchUpdateNodes([
+                    { nodeId: ch1.id, title: "Updated 1" },
+                    { nodeId: ch2.id, title: "Updated 2" },
+                ]);
+                expect(result.totalUpdated).toBe(2);
+                expect(result.totalErrors).toBe(0);
+            });
+
+            it("reports errors for bad updates", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const result = await StructureController.batchUpdateNodes([
+                    { nodeId: ch.id, title: "Good" },
+                    { nodeId: "bad-id", title: "Missing" },
+                ]);
+                expect(result.totalUpdated).toBe(1);
+                expect(result.totalErrors).toBe(1);
+            });
+
+            it("throws for empty array", async () => {
+                await expect(
+                    StructureController.batchUpdateNodes([])
+                ).rejects.toThrow("updates array must not be empty");
+            });
+        });
+
+        describe("batchDeleteNodes", () => {
+            it("deletes multiple nodes", async () => {
+                const ch1 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+                const ch2 = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 2" });
+                const result = await StructureController.batchDeleteNodes([ch1.id, ch2.id]);
+                expect(result.totalDeleted).toBe(2);
+                expect(result.totalErrors).toBe(0);
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline).toHaveLength(0);
+            });
+
+            it("reports errors for non-existent nodes", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const result = await StructureController.batchDeleteNodes([ch.id, "bad-id"]);
+                expect(result.totalDeleted).toBe(1);
+                expect(result.totalErrors).toBe(1);
+            });
+
+            it("throws for empty array", async () => {
+                await expect(
+                    StructureController.batchDeleteNodes([])
+                ).rejects.toThrow("nodeIds array must not be empty");
+            });
+        });
+
         describe("getOutline", () => {
             it("throws for non-existent project", async () => {
                 await expect(StructureController.getOutline("bad")).rejects.toThrow("Project not found");

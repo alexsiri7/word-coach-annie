@@ -13,10 +13,13 @@ FROM node:20-slim AS builder
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
+ARG RAILWAY_GIT_COMMIT_SHA=""
+
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+ENV RAILWAY_GIT_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
 RUN npx prisma generate
 RUN npm run build
 

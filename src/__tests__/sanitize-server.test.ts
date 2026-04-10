@@ -35,6 +35,23 @@ describe("sanitizeHtml", () => {
     it("passes through plain text", () => {
         expect(sanitizeHtml("plain text")).toBe("plain text");
     });
+
+    it("preserves beat comments (would otherwise be stripped by DOMPurify)", () => {
+        const input = "<p>Text</p><!-- beat: Action --><p>More text</p>";
+        expect(sanitizeHtml(input)).toBe("<p>Text</p><!-- beat: Action --><p>More text</p>");
+    });
+
+    it("preserves multiple beat comments", () => {
+        const input = "<p>A</p><!-- beat: First --><!-- beat: Second --><p>B</p>";
+        expect(sanitizeHtml(input)).toBe("<p>A</p><!-- beat: First --><!-- beat: Second --><p>B</p>");
+    });
+
+    it("still strips XSS while preserving beat comments", () => {
+        const input = '<p>Text</p><!-- beat: Action --><script>alert(1)</script>';
+        const result = sanitizeHtml(input);
+        expect(result).toContain("<!-- beat: Action -->");
+        expect(result).not.toContain("<script>");
+    });
 });
 
 describe("escapeMarkdown", () => {

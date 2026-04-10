@@ -22,7 +22,7 @@ export default defineConfig({
         "src/app/**/layout.tsx",
         "src/hooks/**",
       ],
-      // Coverage threshold — 50% floor, raise as tests improve
+      // Coverage threshold — keep above 50% floor, raise as tests improve
       thresholds: {
         statements: 50,
         branches: 50,
