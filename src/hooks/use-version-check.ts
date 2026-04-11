@@ -7,9 +7,7 @@ const CHECK_INTERVAL = 60_000; // 60 seconds
 export function useVersionCheck() {
     const [updateAvailable, setUpdateAvailable] = useState(false);
     const [dismissed, setDismissed] = useState(false);
-    const loadedVersion = useRef<string | null>(
-        process.env.NEXT_PUBLIC_BUILD_VERSION || null
-    );
+    const loadedVersion = useRef<string | null>(null);
 
     const checkVersion = useCallback(async () => {
         try {
