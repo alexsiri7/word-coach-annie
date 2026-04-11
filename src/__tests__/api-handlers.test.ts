@@ -79,6 +79,74 @@ describe("API Route Handlers", () => {
             const res = await POST(req as any);
             expect(res.status).toBe(400);
         });
+
+        it("GET includes projectLimit for authenticated users", async () => {
+            const user = await testPrisma.user.create({
+                data: { email: "limit@test.com", googleId: "g-limit-get", projectLimit: 2 },
+            });
+            const { GET } = await import("@/app/api/projects/route");
+            const req = mockReq("http://localhost/api/projects");
+            req.headers.set("x-user-id", user.id);
+            const res = await GET(req as any);
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.projectLimit).toBe(2);
+        });
+
+        it("GET does not include projectLimit for unauthenticated users", async () => {
+            const { GET } = await import("@/app/api/projects/route");
+            const req = mockReq("http://localhost/api/projects");
+            const res = await GET(req as any);
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.projectLimit).toBeNull();
+        });
+
+        it("POST enforces project limit for authenticated users", async () => {
+            const user = await testPrisma.user.create({
+                data: { email: "limited@test.com", googleId: "g-limited", projectLimit: 2 },
+            });
+            // Create 2 active projects for this user (at the limit)
+            await testPrisma.project.createMany({
+                data: [
+                    { title: "Project 1", userId: user.id },
+                    { title: "Project 2", userId: user.id },
+                ],
+            });
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq("http://localhost/api/projects", { title: "Project 3" });
+            req.headers.set("x-user-id", user.id);
+            const res = await POST(req as any);
+            expect(res.status).toBe(403);
+            const data = await res.json();
+            expect(data.error).toContain("Project limit reached");
+        });
+
+        it("POST allows creation when archived projects exist but active count is below limit", async () => {
+            const user = await testPrisma.user.create({
+                data: { email: "archived@test.com", googleId: "g-archived", projectLimit: 2 },
+            });
+            // 1 active + 1 archived = only 1 active, under the limit of 2
+            await testPrisma.project.createMany({
+                data: [
+                    { title: "Active Project", userId: user.id },
+                    { title: "Archived Project", userId: user.id, archivedAt: new Date() },
+                ],
+            });
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq("http://localhost/api/projects", { title: "New Active Project" });
+            req.headers.set("x-user-id", user.id);
+            const res = await POST(req as any);
+            expect(res.status).toBe(201);
+        });
+
+        it("POST has no limit for unauthenticated users", async () => {
+            // No userId — limit not enforced
+            const { POST } = await import("@/app/api/projects/route");
+            const req = mockReq("http://localhost/api/projects", { title: "Unlimited Project" });
+            const res = await POST(req as any);
+            expect(res.status).toBe(201);
+        });
     });
 
     describe("GET/PATCH/DELETE /api/projects/[id]", () => {

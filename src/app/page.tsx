@@ -116,6 +116,8 @@ export default function Dashboard() {
   const [newGenre, setNewGenre] = useState("");
   const [newProjectType, setNewProjectType] = useState<ProjectType>("FICTION");
   const [todayWords, setTodayWords] = useState(0);
+  const [projectLimit, setProjectLimit] = useState<number | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchProjects = async () => {
     const [activeRes, archivedRes] = await Promise.all([
@@ -124,6 +126,10 @@ export default function Dashboard() {
     ]);
     const activeData = await activeRes.json();
     const archivedData = await archivedRes.json();
+
+    if (activeData.projectLimit != null) {
+      setProjectLimit(activeData.projectLimit);
+    }
 
     // If user has no projects at all, seed the sample project
     if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
@@ -170,6 +176,7 @@ export default function Dashboard() {
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
+    setCreateError(null);
     const res = await offlineFetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -190,6 +197,9 @@ export default function Dashboard() {
       setNewGenre("");
       setNewProjectType("FICTION");
       router.push(`/project/${project.id}`);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setCreateError(data.error ?? "Failed to create project.");
     }
   };
 
@@ -244,6 +254,9 @@ export default function Dashboard() {
     const timer = setTimeout(() => setDeleteCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [deleteCooldown]);
+
+  /* Project limit reached for authenticated users */
+  const atLimit = projectLimit !== null && projects.length >= projectLimit;
 
   /* Most recently updated project = hero candidate */
   const heroProject = projects.length > 0
@@ -582,13 +595,24 @@ export default function Dashboard() {
 
                   {/* Start a New Journey card */}
                   <div
-                    className="border-2 border-dashed border-outline-variant flex flex-col items-center justify-center p-6 hover:bg-surface-container transition-colors group cursor-pointer min-h-[220px]"
-                    onClick={() => setCreateOpen(true)}
+                    className={`border-2 border-dashed flex flex-col items-center justify-center p-6 transition-colors min-h-[220px] ${atLimit ? "border-outline-variant/40 opacity-60 cursor-default" : "border-outline-variant hover:bg-surface-container cursor-pointer group"}`}
+                    onClick={() => !atLimit && setCreateOpen(true)}
                   >
-                    <CirclePlus className="h-10 w-10 text-on-surface-variant mb-4 group-hover:scale-110 transition-transform" />
-                    <span className="font-label text-xs uppercase font-extrabold tracking-widest text-on-surface-variant">
-                      Start a New Journey
-                    </span>
+                    <CirclePlus className={`h-10 w-10 mb-4 ${atLimit ? "text-on-surface-variant/40" : "text-on-surface-variant group-hover:scale-110 transition-transform"}`} />
+                    {atLimit ? (
+                      <>
+                        <span className="font-label text-xs uppercase font-extrabold tracking-widest text-on-surface-variant/60 text-center">
+                          Project limit reached
+                        </span>
+                        <span className="text-xs text-on-surface-variant/40 mt-1 text-center">
+                          Archive a project to create a new one
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-label text-xs uppercase font-extrabold tracking-widest text-on-surface-variant">
+                        Start a New Journey
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -697,69 +721,89 @@ export default function Dashboard() {
       </div>
 
       {/* ── Create Project Dialog ──────────────────────────── */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setCreateError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Project</DialogTitle>
             <DialogDescription>Create a new writing project.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium text-text-secondary">Title *</label>
-              <Input
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="My Novel"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              />
+          {atLimit ? (
+            <div className="py-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  You&apos;ve reached your {projectLimit}-project limit.
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  Archive a project to create a new one.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-text-secondary">Type</label>
-              <Select value={newProjectType} onValueChange={(v) => setNewProjectType(v as ProjectType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FICTION">Fiction</SelectItem>
-                  <SelectItem value="ARTICLE_COLLECTION">Article Collection</SelectItem>
-                  <SelectItem value="GENERAL">General</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="space-y-4 py-2">
+              {createError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                  <p className="text-sm text-red-700 dark:text-red-300">{createError}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-text-secondary">Title *</label>
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="My Novel"
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-text-secondary">Type</label>
+                <Select value={newProjectType} onValueChange={(v) => setNewProjectType(v as ProjectType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FICTION">Fiction</SelectItem>
+                    <SelectItem value="ARTICLE_COLLECTION">Article Collection</SelectItem>
+                    <SelectItem value="GENERAL">General</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-text-secondary">Author</label>
+                <Input
+                  value={newAuthor}
+                  onChange={(e) => setNewAuthor(e.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-text-secondary">Genre</label>
+                <Input
+                  value={newGenre}
+                  onChange={(e) => setNewGenre(e.target.value)}
+                  placeholder="e.g. Fantasy, Sci-Fi, Literary Fiction"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-text-secondary">Synopsis</label>
+                <Textarea
+                  value={newSynopsis}
+                  onChange={(e) => setNewSynopsis(e.target.value)}
+                  placeholder="Brief description of your project..."
+                  rows={3}
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-text-secondary">Author</label>
-              <Input
-                value={newAuthor}
-                onChange={(e) => setNewAuthor(e.target.value)}
-                placeholder="Your name"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-text-secondary">Genre</label>
-              <Input
-                value={newGenre}
-                onChange={(e) => setNewGenre(e.target.value)}
-                placeholder="e.g. Fantasy, Sci-Fi, Literary Fiction"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-text-secondary">Synopsis</label>
-              <Textarea
-                value={newSynopsis}
-                onChange={(e) => setNewSynopsis(e.target.value)}
-                placeholder="Brief description of your project..."
-                rows={3}
-              />
-            </div>
-          </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateError(null); }}>
+              {atLimit ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={handleCreate} disabled={!newTitle.trim()}>
-              Create
-            </Button>
+            {!atLimit && (
+              <Button onClick={handleCreate} disabled={!newTitle.trim()}>
+                Create
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

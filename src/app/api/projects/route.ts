@@ -21,6 +21,16 @@ export async function GET(request: NextRequest) {
       archivedAt: showArchived ? { not: null } : null,
     };
 
+    // Fetch the user's project limit (only for authenticated users, not archived queries)
+    let projectLimit: number | null = null;
+    if (userId && !showArchived) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { projectLimit: true },
+      });
+      projectLimit = user?.projectLimit ?? 3;
+    }
+
     const [projects, total] = await Promise.all([
       prisma.project.findMany({
         where,
@@ -79,7 +89,7 @@ export async function GET(request: NextRequest) {
       characterCount: project._count.storyObjects,
     }));
 
-    return NextResponse.json({ projects: projectsWithWordCount, total });
+    return NextResponse.json({ projects: projectsWithWordCount, total, projectLimit });
   } catch (error) {
     logger.error("GET /api/projects error", error);
     return NextResponse.json(
@@ -101,6 +111,21 @@ export async function POST(request: NextRequest) {
         { error: parsed.error.errors[0].message },
         { status: 400 }
       );
+    }
+
+    // Enforce project limit for authenticated users (archived projects don't count)
+    if (userId) {
+      const [user, activeCount] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { projectLimit: true } }),
+        prisma.project.count({ where: { userId, archivedAt: null } }),
+      ]);
+      const limit = user?.projectLimit ?? 3;
+      if (activeCount >= limit) {
+        return NextResponse.json(
+          { error: "Project limit reached. Archive a project to create a new one." },
+          { status: 403 }
+        );
+      }
     }
 
     const { title, author, synopsis, genre, projectType } = parsed.data;
