@@ -53,6 +53,7 @@ const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel")
 const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
 const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
 const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
+const PeerReviewPanel = dynamic(() => import("@/components/editor/peer-review-panel").then(m => m.PeerReviewPanel));
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ShareButton } from "@/components/share-dialog";
@@ -117,6 +118,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
+  const [showPeerReview, setShowPeerReview] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -411,6 +413,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <Button
           variant="ghost"
           size="icon"
+          className={cn("h-8 w-8", showPeerReview && "text-accent bg-accent/10")}
+          onClick={() => setShowPeerReview(!showPeerReview)}
+          aria-label="Peer review"
+          aria-pressed={showPeerReview}
+          title="Peer Review"
+        >
+          <Users className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           className={cn("h-8 w-8", showManuscriptAI && "text-accent bg-accent/10")}
           onClick={() => setShowManuscriptAI(!showManuscriptAI)}
           aria-label="Manuscript AI analysis"
@@ -671,6 +684,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </div>
             )}
           </div>
+
+          {/* Peer Review panel (right rail) */}
+          {showPeerReview && (
+            <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
+              <ErrorBoundary fallbackTitle="Peer Review crashed">
+                <PeerReviewPanel
+                  projectId={projectId}
+                  onClose={() => setShowPeerReview(false)}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
 
           {/* Manuscript AI panel (right rail) */}
           {showManuscriptAI && (
