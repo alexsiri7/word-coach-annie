@@ -52,9 +52,9 @@ process.stdin.on('end', () => {
   const allow = fs.existsSync(allowlist)
     ? fs.readFileSync(allowlist, 'utf8').split('\n').filter(l => l && !l.startsWith('#'))
     : [];
-  const d = JSON.parse(chunks.join(''));
-  const ids = Object.keys(d.vulnerabilities || {})
-    .flatMap(k => (d.vulnerabilities[k].via || []))
+  const audit = JSON.parse(chunks.join(''));
+  const ids = Object.keys(audit.vulnerabilities || {})
+    .flatMap(k => (audit.vulnerabilities[k].via || []))
     .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical'))
     .map(v => v.url.split('/').pop());
   const novel = [...new Set(ids)].filter(id => !allow.includes(id));
