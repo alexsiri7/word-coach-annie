@@ -54,6 +54,28 @@ export default function TermsPage() {
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-text-primary">
+              Prohibited content
+            </h2>
+            <p>
+              You may not upload, store, or share through Word Coach Annie any
+              of the following:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Child sexual abuse material (CSAM)</li>
+              <li>Content that violates applicable laws</li>
+              <li>Copyrighted content you do not own or have rights to distribute</li>
+              <li>Content designed to harass, threaten, or defame real individuals</li>
+            </ul>
+            <p>
+              Sharing content via the reader view or exporting it constitutes
+              distribution. Word Coach Annie will remove prohibited content
+              without notice and may cooperate with law enforcement where
+              required by law.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text-primary">
               Acceptable use
             </h2>
             <p>
@@ -64,6 +86,24 @@ export default function TermsPage() {
               <li>Attempt to gain unauthorized access to other users&apos; accounts or data</li>
               <li>Use automated tools to scrape or overload the service</li>
               <li>Upload malicious content or code</li>
+              <li>Upload or share child sexual abuse material (CSAM)</li>
+              <li>Upload content that infringes third-party copyrights or other intellectual property rights</li>
+              <li>Upload content that constitutes harassment, threats, or defamation of real individuals</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Your content representations
+            </h2>
+            <p>
+              By uploading content to Word Coach Annie, you represent and
+              warrant that:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>You own or have sufficient rights to all content you upload</li>
+              <li>Your content does not infringe any third-party intellectual property rights</li>
+              <li>Your content complies with all applicable laws</li>
             </ul>
           </section>
 
@@ -100,7 +140,27 @@ export default function TermsPage() {
             <p>
               You may request deletion of your account and data at any time by
               contacting the instance administrator. We reserve the right to
-              suspend accounts that violate these terms.
+              suspend or terminate accounts and remove content that violates
+              these terms, including content that infringes third-party
+              copyrights or other prohibited content. We will comply with valid
+              DMCA takedown notices as described in our{" "}
+              <Link href="/dmca" className="text-accent hover:underline">
+                DMCA Policy
+              </Link>
+              .
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Indemnification
+            </h2>
+            <p>
+              You agree to indemnify and hold harmless Word Coach Annie, its
+              operators, and contributors from any claims, damages, losses, or
+              expenses (including reasonable legal fees) arising from your
+              content, your use of the service, or your violation of these
+              terms.
             </p>
           </section>
 
@@ -117,7 +177,10 @@ export default function TermsPage() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-border text-xs text-text-muted">
-          Questions? Contact the instance administrator.
+          Questions? Contact the instance administrator. &middot;{" "}
+          <Link href="/dmca" className="text-accent hover:underline">
+            DMCA Policy
+          </Link>
         </div>
       </div>
     </main>
