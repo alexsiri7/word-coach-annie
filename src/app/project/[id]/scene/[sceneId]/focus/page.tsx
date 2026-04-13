@@ -114,7 +114,12 @@ export default function FocusModePage() {
     }
 
     return (
-        <div className="flex h-screen w-full bg-background overflow-hidden">
+        <div
+            className="flex h-screen w-full overflow-hidden"
+            style={{
+                background: 'radial-gradient(ellipse 80% 60% at 50% -10%, hsl(var(--accent)/0.06) 0%, hsl(var(--surface)) 70%)',
+            }}
+        >
             <SceneInfoSidebar
                 scene={{ ...sceneContext, wordCount: sceneContext.wordCount ?? 0 }}
                 navigation={{
@@ -125,6 +130,7 @@ export default function FocusModePage() {
                 onNavigate={handleNavigate}
                 collapsed={leftCollapsed}
                 onToggle={() => setLeftCollapsed(!leftCollapsed)}
+                relatedElements={relatedElements}
             />
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -137,15 +143,36 @@ export default function FocusModePage() {
                         ]}
                     />
                 </div>
-                <main className="flex-1 overflow-y-auto w-full max-w-3xl mx-auto px-8 py-12">
-                    <ErrorBoundary fallbackTitle="Scene editor crashed">
-                        <SceneEditor
-                            node={{ ...sceneContext, type: "SCENE" }}
-                            projectId={projectId}
-                            showFocusButton={false}
-                        />
-                    </ErrorBoundary>
+                <main className="flex-1 overflow-y-auto w-full">
+                    <div className="max-w-3xl mx-auto px-8 py-12">
+                        <ErrorBoundary fallbackTitle="Scene editor crashed">
+                            <SceneEditor
+                                node={{ ...sceneContext, type: "SCENE" }}
+                                projectId={projectId}
+                                showFocusButton={false}
+                            />
+                        </ErrorBoundary>
+                    </div>
                 </main>
+                {/* Focus Mode Status Bar */}
+                <div className="flex-shrink-0 px-8 py-2 flex items-center gap-3 bg-surface-raised/60 backdrop-blur-md border-t border-border/10">
+                    <span className="font-label text-[10px] uppercase font-bold tracking-widest text-accent">
+                        Focus Mode Active
+                    </span>
+                    <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-50">&middot;</span>
+                    <span className="stamp-chip">Draft #1</span>
+                    {sceneContext && (
+                        <>
+                            <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-50">&middot;</span>
+                            <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">
+                                {sceneContext.wordCount ?? 0} words
+                            </span>
+                        </>
+                    )}
+                    <div className="ml-auto">
+                        <span className="stamp-chip">Mildly Critical</span>
+                    </div>
+                </div>
             </div>
 
             <RelatedElementsPanel
