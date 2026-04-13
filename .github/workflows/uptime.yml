@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check health + data integrity
+        id: check
         run: |
           BODY=$(curl -s --max-time 10 https://annie.interstellarai.net/api/health)
           STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "Response: $BODY"
           if [ "$STATUS" = "error" ]; then
             echo "::error::Production health check failed — DB unreachable"
@@ -27,12 +29,12 @@ jobs:
 
       - name: Notify on failure
         if: failure()
+        continue-on-error: true
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
         run: |
           if [ -z "$NTFY_URL" ]; then exit 0; fi
-          STATUS=$(curl -s --max-time 10 https://annie.interstellarai.net/api/health \
-            | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
+          STATUS="${{ steps.check.outputs.status }}"
           curl -s \
             -H "Priority: urgent" \
             -H "Tags: warning,rotating_light" \
@@ -45,9 +47,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check health endpoint
+        id: check
         run: |
           BODY=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health)
           STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "Response: $BODY"
           if [ "$STATUS" = "error" ]; then
             echo "::error::Staging health check failed — DB unreachable"
@@ -57,12 +61,12 @@ jobs:
 
       - name: Notify on failure
         if: failure()
+        continue-on-error: true
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
         run: |
           if [ -z "$NTFY_URL" ]; then exit 0; fi
-          STATUS=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health \
-            | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
+          STATUS="${{ steps.check.outputs.status }}"
           curl -s \
             -H "Priority: urgent" \
             -H "Tags: warning,rotating_light" \

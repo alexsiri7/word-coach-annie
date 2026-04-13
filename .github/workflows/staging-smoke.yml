@@ -225,6 +225,7 @@ jobs:
 
       - name: Send ntfy alert
         if: always()
+        continue-on-error: true
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
         run: |
