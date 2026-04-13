@@ -67,7 +67,7 @@ export function SceneEditor({
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
-  const [consistencyAlertCount, _setConsistencyAlertCount] = useState(0);
+  const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
   const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
@@ -522,6 +522,7 @@ export function SceneEditor({
               projectId={projectId}
               sceneId={node.id}
               onClose={() => setShowConsistencyAlerts(false)}
+              onAlertsLoaded={setConsistencyAlertCount}
             />
           </div>
         )}
