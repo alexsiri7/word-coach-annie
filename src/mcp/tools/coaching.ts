@@ -201,7 +201,13 @@ export async function getSceneFocus(sceneId: string) {
       resolved: a.resolved,
       selectedText: a.selectedText,
     })),
-    timelineScenes: siblings.map((s) => ({ id: s.id, title: s.title, status: s.status, orderIndex: s.orderIndex, chapterTitle: s.parent?.title ?? undefined })),
+    timelineScenes: siblings.map((s) => ({
+      id: s.id,
+      title: s.title,
+      status: s.status,
+      orderIndex: s.orderIndex,
+      chapterTitle: s.parent?.title ?? undefined,
+    })),
   };
 }
 
