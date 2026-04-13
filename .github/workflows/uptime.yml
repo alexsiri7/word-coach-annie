@@ -43,6 +43,8 @@ jobs:
   check-backup-freshness:
     name: Backup Freshness Check
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Check Supabase backup age
         id: backup-check
