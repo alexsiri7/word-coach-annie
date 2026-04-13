@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
+import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 /**
@@ -8,9 +9,9 @@ import { logger } from "@/lib/logger";
  */
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const proto = request.headers.get("x-forwarded-proto") || "https";
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
-    const origin = `${proto}://${host}`;
+    const origin = env.GOOGLE_REDIRECT_URI
+        ? new URL(env.GOOGLE_REDIRECT_URI).origin
+        : new URL(request.url).origin;
 
     const code = searchParams.get("code");
     const state = searchParams.get("state");
