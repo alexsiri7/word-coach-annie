@@ -34,6 +34,10 @@ jobs:
       - name: Lint & Typecheck
         run: ./scripts/gates.sh lint & ./scripts/gates.sh typecheck & wait
 
+      - name: Audit
+        run: ./scripts/gates.sh audit
+        continue-on-error: true  # @google/adk transitive deps have unfixable high vulns; remove when upstream fixes land
+
   test:
     name: Test
     runs-on: ubuntu-latest

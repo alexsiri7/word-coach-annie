@@ -36,6 +36,11 @@ run_build() {
     docker build -t word-coach-annie:gate-check .
 }
 
+run_audit() {
+    echo "=== Audit ==="
+    npm audit --audit-level=high
+}
+
 run_screenshots() {
     echo "=== Screenshots (Visual Regression) ==="
     npx playwright test e2e/visual.spec.ts
