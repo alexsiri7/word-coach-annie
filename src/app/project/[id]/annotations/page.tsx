@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardList, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,28 +26,44 @@ export default function AnnotationsPage({ params }: { params: Promise<{ id: stri
   const [annotations, setAnnotations] = useState<AnnotationItem[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/annotations?projectId=${projectId}`).then((r) => r.json()),
-      fetch(`/api/projects/${projectId}`).then((r) => r.json()),
-    ]).then(([annots, proj]) => {
-      setAnnotations(annots);
-      setProjectTitle(proj.title ?? "");
-      setLoading(false);
-    });
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [annotsRes, projectRes] = await Promise.all([
+          fetch(`/api/annotations?projectId=${projectId}`),
+          fetch(`/api/projects/${projectId}`),
+        ]);
+        if (!annotsRes.ok) throw new Error("Failed to load annotations");
+        const [annots, proj] = await Promise.all([annotsRes.json(), projectRes.json()]);
+        setAnnotations(Array.isArray(annots) ? annots : []);
+        setProjectTitle(proj.title ?? "");
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load annotations. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, [projectId]);
 
   // Group annotations by scene (nodeId), preserving server order
-  const grouped = new Map<string, { nodeTitle: string; items: AnnotationItem[] }>();
-  for (const a of annotations) {
-    const existing = grouped.get(a.nodeId);
-    if (existing) {
-      existing.items.push(a);
-    } else {
-      grouped.set(a.nodeId, { nodeTitle: a.nodeTitle, items: [a] });
+  const grouped = useMemo(() => {
+    const map = new Map<string, { nodeTitle: string; items: AnnotationItem[] }>();
+    for (const a of annotations) {
+      const existing = map.get(a.nodeId);
+      if (existing) {
+        existing.items.push(a);
+      } else {
+        map.set(a.nodeId, { nodeTitle: a.nodeTitle, items: [a] });
+      }
     }
-  }
+    return map;
+  }, [annotations]);
 
   return (
     <div className="flex flex-col h-screen bg-surface">
@@ -87,6 +103,10 @@ export default function AnnotationsPage({ params }: { params: Promise<{ id: stri
                   <div key={i} className="h-16 bg-surface-overlay rounded" />
                 ))}
               </div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 text-text-muted">
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           ) : annotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-text-muted">
