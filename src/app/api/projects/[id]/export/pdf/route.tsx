@@ -1,3 +1,4 @@
+import React from "react";
 import { NextRequest, NextResponse } from "next/server";
 import {
   renderToBuffer,
@@ -46,6 +47,9 @@ function stripHtml(html: string): string {
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// NOTE: buildOutlineTree is duplicated in epub/route.ts and export/route.ts — intentionally
+// kept self-contained per-route. If logic changes, update all three copies.
+// TODO: Extract to src/lib/outline-tree.ts (see follow-up issue).
 async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   const nodes = await prisma.structureNode.findMany({
     where: { projectId },
@@ -181,7 +185,7 @@ export async function GET(
           </View>
         </Page>
         <Page size="A4" style={styles.page}>
-          {contentElements.map((el) => el)}
+          {contentElements}
         </Page>
       </Document>
     );

@@ -24,6 +24,9 @@ function isEmptyContent(content: string | undefined): boolean {
   return stripped.length === 0;
 }
 
+// NOTE: buildOutlineTree is duplicated in pdf/route.tsx and export/route.ts — intentionally
+// kept self-contained per-route. If logic changes, update all three copies.
+// TODO: Extract to src/lib/outline-tree.ts (see follow-up issue).
 async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   const nodes = await prisma.structureNode.findMany({
     where: { projectId },
@@ -92,7 +95,7 @@ function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
 
   function walk(node: OutlineNode) {
     if (node.type === "PART") {
-      // Add part as separator chapter
+      // PART becomes a chapter: title-only when no direct scenes, or title + scenes when present
       const partSceneHtml = collectSceneHtml(node);
       if (partSceneHtml) {
         chapters.push({
