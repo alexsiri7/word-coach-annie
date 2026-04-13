@@ -5,6 +5,8 @@ import { Users, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Local copies of the API types from peer-review/route.ts — kept in sync manually.
+// TODO: extract to src/types/peer-review.ts to avoid duplication.
 interface ReviewFeedback {
   overallImpression: string;
   strengths: string[];
@@ -47,17 +49,25 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("publisher");
+  const [error, setError] = useState<string | null>(null);
 
   const runReview = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/peer-review`, { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        if (!data.warning) {
+        if (data.warning) {
+          setError(data.warning);
+        } else {
           setReview(data);
         }
+      } else {
+        setError(`Request failed (${res.status})`);
       }
+    } catch {
+      setError("Network error — please try again");
     } finally {
       setLoading(false);
       setRan(true);
@@ -211,7 +221,9 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
 
         {ran && !loading && !review && (
           <div className="p-4 text-center">
-            <p className="text-sm text-muted-foreground">No review results available.</p>
+            <p className="text-sm text-muted-foreground">
+              {error ?? "No review results available."}
+            </p>
           </div>
         )}
 

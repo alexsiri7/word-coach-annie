@@ -80,6 +80,7 @@ Return ONLY valid JSON (no markdown fences):
 
 function parseJson<T>(raw: string): T | null {
   try {
+    // Extract the first {...} block — handles cases where the model wraps JSON in markdown fences.
     const match = raw.match(/\{[\s\S]*\}/);
     return match ? JSON.parse(match[0]) : null;
   } catch {
@@ -127,6 +128,8 @@ export async function POST(
       return NextResponse.json({ warning: "Manuscript is empty" });
     }
 
+    // Limit to ~50 k chars to stay within prompt budget for 3 × 800-token completions.
+    // Users with longer manuscripts get a review of the opening; no truncation warning is shown.
     const truncated = manuscript.slice(0, 50000);
 
     const [publisherRaw, readerRaw, writerRaw] = await Promise.all([
@@ -135,19 +138,27 @@ export async function POST(
       runSimpleCompletion({ userMessage: buildWriterPrompt(truncated), aiConfig, maxTokens: 800, temperature: 0.3 }),
     ]);
 
-    const publisher = parseJson<ReviewFeedback>(publisherRaw) || DEFAULT_REVIEW;
-    const reader = parseJson<ReviewFeedback>(readerRaw) || DEFAULT_REVIEW;
-    const writer = parseJson<ReviewFeedback>(writerRaw) || DEFAULT_REVIEW;
+    const publisherParsed = parseJson<ReviewFeedback>(publisherRaw);
+    const readerParsed = parseJson<ReviewFeedback>(readerRaw);
+    const writerParsed = parseJson<ReviewFeedback>(writerRaw);
+    if (!publisherParsed) logger.error("Peer review: failed to parse publisher JSON");
+    if (!readerParsed) logger.error("Peer review: failed to parse reader JSON");
+    if (!writerParsed) logger.error("Peer review: failed to parse writer JSON");
+    const publisher = publisherParsed || DEFAULT_REVIEW;
+    const reader = readerParsed || DEFAULT_REVIEW;
+    const writer = writerParsed || DEFAULT_REVIEW;
 
     let consensus: ConsensusFeedback = DEFAULT_CONSENSUS;
     try {
       const synthesisRaw = await runSimpleCompletion({
         userMessage: buildSynthesisPrompt(publisherRaw, readerRaw, writerRaw),
         aiConfig,
-        maxTokens: 600,
+        maxTokens: 1000, // was 600 — synthesis embeds all 3 raw reviews; needs more headroom
         temperature: 0.3,
       });
-      consensus = parseJson<ConsensusFeedback>(synthesisRaw) || DEFAULT_CONSENSUS;
+      const consensusParsed = parseJson<ConsensusFeedback>(synthesisRaw);
+      if (!consensusParsed) logger.error("Peer review: failed to parse synthesis JSON");
+      consensus = consensusParsed || DEFAULT_CONSENSUS;
     } catch (err) {
       logger.error("Peer review synthesis failed", err);
     }

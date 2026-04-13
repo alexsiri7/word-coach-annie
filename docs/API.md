@@ -514,6 +514,42 @@ Run a manuscript-level AI analysis across the full project.
 
 ---
 
+## Peer Review
+
+### `POST /api/projects/:id/peer-review`
+Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer) against
+the full manuscript and synthesize a consensus.
+
+No request body required.
+
+**Response**:
+```json
+{
+  "publisher": {
+    "overallImpression": "string",
+    "strengths": ["string"],
+    "weaknesses": ["string"],
+    "detailedFeedback": "string",
+    "recommendation": "publish | revise | pass"
+  },
+  "reader": { "...same shape as publisher..." },
+  "writer": { "...same shape as publisher..." },
+  "consensus": {
+    "pointsOfAgreement": ["string"],
+    "pointsOfDisagreement": ["string"],
+    "topPriorities": ["string"],
+    "synthesizedRecommendation": "string"
+  }
+}
+```
+
+Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" }` if
+preconditions are not met. Manuscript is truncated to 50,000 characters before analysis.
+
+**Errors**: `401` unauthorized, `403` forbidden, `500` internal server error
+
+---
+
 ## Integrations
 
 ### `GET /api/integrations/google-docs`
