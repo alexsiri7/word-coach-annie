@@ -95,19 +95,11 @@ function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
 
   function walk(node: OutlineNode) {
     if (node.type === "PART") {
-      // PART becomes a chapter: title-only when no direct scenes, or title + scenes when present
       const partSceneHtml = collectSceneHtml(node);
-      if (partSceneHtml) {
-        chapters.push({
-          title: node.title,
-          content: `<h1>${node.title}</h1>${partSceneHtml}`,
-        });
-      } else {
-        chapters.push({
-          title: node.title,
-          content: `<h1>${node.title}</h1>`,
-        });
-      }
+      chapters.push({
+        title: node.title,
+        content: `<h1>${node.title}</h1>${partSceneHtml}`,
+      });
       for (const child of node.children) {
         if (child.type !== "SCENE") walk(child);
       }

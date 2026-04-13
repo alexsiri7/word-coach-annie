@@ -53,7 +53,7 @@ function countWords(outline: OutlineNode[]): number {
   let count = 0;
   for (const node of outline) {
     if (node.type === "SCENE" && node.content) {
-      const text = node.content.replace(/<[^>]+>/g, "").replace(/<!-- beat:[\s\S]*?-->/g, "");
+      const text = stripBeats(node.content).replace(/<[^>]+>/g, "");
       count += text.split(/\s+/).filter(Boolean).length;
     }
     count += countWords(node.children);
@@ -83,12 +83,6 @@ function collectTocEntries(nodes: OutlineNode[], depth: number = 0): TocEntry[] 
     }
   }
   return entries;
-}
-
-/** Check if a node (or its descendants) has any content */
-function _hasContent(node: OutlineNode): boolean {
-  if (node.type === "SCENE" && node.content && node.content !== "<p></p>") return true;
-  return node.children.some(_hasContent);
 }
 
 function SceneContent({ content }: { content: string }) {
@@ -205,10 +199,7 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
 
   const handleTocClick = (id: string) => {
     setTocOpen(false);
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   async function downloadAs(format: "pdf" | "epub") {
