@@ -28,7 +28,7 @@ import { AnnieCritiquePanel } from "@/components/editor/annie-critique-panel";
 import { SceneContextSidebar } from "@/components/editor/scene-context-sidebar";
 import { useWritingSession } from "@/hooks/use-writing-session";
 
-interface TimelineSceneItem {
+export interface TimelineSceneItem {
   id: string;
   title: string;
   status: string;

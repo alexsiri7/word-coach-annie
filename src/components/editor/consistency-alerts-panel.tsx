@@ -43,23 +43,28 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsCh
   const [alerts, setAlerts] = useState<ConsistencyAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   const runCheck = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/consistency-check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sceneId }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const newAlerts: ConsistencyAlert[] = data.alerts ?? [];
-        setAlerts(newAlerts);
-        onAlertsChange?.(newAlerts.filter((a) => !a.dismissed).length);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || "Consistency check failed. Try again.");
+        return;
       }
+      const data = await res.json();
+      const newAlerts: ConsistencyAlert[] = data.alerts ?? [];
+      setAlerts(newAlerts);
+      onAlertsChange?.(newAlerts.filter((a) => !a.dismissed).length);
     } finally {
       setLoading(false);
       setRan(true);
@@ -135,7 +140,14 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsCh
           </div>
         )}
 
-        {ran && !loading && visibleAlerts.length === 0 && (
+        {ran && !loading && error && (
+          <div className="p-4 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button size="sm" variant="outline" className="mt-2" onClick={runCheck}>Retry</Button>
+          </div>
+        )}
+
+        {ran && !loading && !error && visibleAlerts.length === 0 && (
           <div className="p-4 text-center">
             <p className="text-sm text-muted-foreground">No inconsistencies found.</p>
           </div>

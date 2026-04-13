@@ -398,7 +398,7 @@ Get the timeline matrix for a project.
 ### `GET /api/focus/:sceneId`
 Get all context needed for focus mode.
 
-**Response**: `{ context: SceneContext, related: RelatedElement[], annotations: Annotation[] }`
+**Response**: `{ context: SceneContext, related: RelatedElement[], annotations: Annotation[], timelineScenes: { id: string; title: string; status: string; orderIndex: number; chapterTitle?: string }[] }`
 
 ---
 
