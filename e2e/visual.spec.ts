@@ -382,6 +382,16 @@ test.describe('Visual regression – Annie', () => {
     })
   })
 
+  test('dmca page', async ({ page }) => {
+    await page.goto('/dmca')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    await expect(page).toHaveScreenshot('dmca.png', {
+      animations: 'disabled',
+    })
+  })
+
   test('universe list populated', async ({ page }) => {
     await mockUniverseApi(page)
     await page.goto('/universe')

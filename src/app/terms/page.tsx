@@ -86,9 +86,7 @@ export default function TermsPage() {
               <li>Attempt to gain unauthorized access to other users&apos; accounts or data</li>
               <li>Use automated tools to scrape or overload the service</li>
               <li>Upload malicious content or code</li>
-              <li>Upload or share child sexual abuse material (CSAM)</li>
-              <li>Upload content that infringes third-party copyrights or other intellectual property rights</li>
-              <li>Upload content that constitutes harassment, threats, or defamation of real individuals</li>
+              <li>Upload or distribute any content described in the Prohibited content section above</li>
             </ul>
           </section>
 

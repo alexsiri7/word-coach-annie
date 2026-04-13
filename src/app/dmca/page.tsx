@@ -59,10 +59,6 @@ export default function DmcaPage() {
                 dmca@wordcoachannie.com
               </a>
             </p>
-            <p>
-              Our DMCA agent is registered with the U.S. Copyright Office as
-              required by 17 U.S.C. &sect; 512(c)(2).
-            </p>
           </section>
 
           <section className="space-y-3">
@@ -129,7 +125,9 @@ export default function DmcaPage() {
               <li>
                 Your name, address, and telephone number, and a statement that
                 you consent to the jurisdiction of the federal district court for
-                the judicial district in which your address is located, and that
+                the judicial district in which your address is located, or if
+                your address is outside the United States, for any judicial
+                district in which the service provider may be found, and that
                 you will accept service of process from the person who provided
                 the original takedown notification
               </li>
@@ -137,8 +135,9 @@ export default function DmcaPage() {
             <p>
               Upon receipt of a valid counter-notice, we will forward it to the
               original complainant. If the complainant does not file a court
-              action within 10 business days, we will restore the removed
-              material.
+              action within the statutory period, we will restore the removed
+              material no sooner than 10 and no later than 14 business days
+              after receiving your counter-notice.
             </p>
           </section>
 
