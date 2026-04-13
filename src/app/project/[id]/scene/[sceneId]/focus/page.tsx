@@ -35,6 +35,7 @@ export default function FocusModePage() {
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
+    const [timelineScenes, setTimelineScenes] = useState<{ id: string; title: string; status: string; orderIndex: number }[]>([]);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
     const [rightCollapsed, setRightCollapsed] = useState(true);
 
@@ -70,6 +71,7 @@ export default function FocusModePage() {
                 setSceneContext(data.context);
                 setRelatedElements(data.related);
                 setAnnotations(data.annotations || []);
+                setTimelineScenes(data.timelineScenes || []);
 
                 if (projectRes.ok) {
                     const projectData = await projectRes.json();
@@ -143,6 +145,7 @@ export default function FocusModePage() {
                             node={{ ...sceneContext, type: "SCENE" }}
                             projectId={projectId}
                             showFocusButton={false}
+                            timelineScenes={timelineScenes}
                         />
                     </ErrorBoundary>
                 </main>

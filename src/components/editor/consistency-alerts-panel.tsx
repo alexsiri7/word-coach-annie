@@ -23,6 +23,7 @@ interface ConsistencyAlertsPanelProps {
   projectId: string;
   sceneId?: string;
   onClose: () => void;
+  onAlertsChange?: (count: number) => void;
 }
 
 const TYPE_LABELS: Record<ConsistencyAlert["type"], string> = {
@@ -38,7 +39,7 @@ const SEVERITY_COLORS: Record<ConsistencyAlert["severity"], string> = {
   low: "text-muted-foreground border-border bg-muted/30",
 };
 
-export function ConsistencyAlertsPanel({ projectId, sceneId, onClose }: ConsistencyAlertsPanelProps) {
+export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsChange }: ConsistencyAlertsPanelProps) {
   const [alerts, setAlerts] = useState<ConsistencyAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
@@ -55,16 +56,22 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose }: Consiste
       });
       if (res.ok) {
         const data = await res.json();
-        setAlerts(data.alerts ?? []);
+        const newAlerts: ConsistencyAlert[] = data.alerts ?? [];
+        setAlerts(newAlerts);
+        onAlertsChange?.(newAlerts.filter((a) => !a.dismissed).length);
       }
     } finally {
       setLoading(false);
       setRan(true);
     }
-  }, [projectId, sceneId]);
+  }, [projectId, sceneId, onAlertsChange]);
 
   const dismissAlert = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      onAlertsChange?.(updated.filter((a) => !a.dismissed).length);
+      return updated;
+    });
   };
 
   const toggleExpand = (id: string) => {
