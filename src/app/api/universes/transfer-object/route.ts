@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
-import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyUniverseAccess, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
@@ -19,6 +20,17 @@ export async function POST(request: NextRequest) {
         const userId = getCurrentUserId(request);
         const access = await verifyUniverseAccess(universeId, userId);
         if (!access.authorized) return access.response;
+
+        // Verify user owns the source story object's project
+        const storyObject = await prisma.storyObject.findUnique({
+            where: { id: storyObjectId },
+            select: { projectId: true },
+        });
+        if (!storyObject) {
+            return NextResponse.json({ error: "Story object not found" }, { status: 404 });
+        }
+        const sourceAccess = await verifyProjectAccess(storyObject.projectId, userId);
+        if (!sourceAccess.authorized) return sourceAccess.response;
 
         const result = await UniversesController.transferStoryObjectToUniverse(
             storyObjectId,
