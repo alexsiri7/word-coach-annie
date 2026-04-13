@@ -1,0 +1,145 @@
+name: Supabase Disk Monitor
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+  workflow_dispatch: # Manual trigger
+
+env:
+  QUOTA_BYTES: 524288000  # 500 MB in bytes
+  THRESHOLD_PCT: 70
+
+jobs:
+  check-annie:
+    name: Annie Disk Usage Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query disk usage
+        id: usage
+        env:
+          DATABASE_URL: ${{ secrets.ANNIE_DATABASE_URL }}
+        run: |
+          BYTES=$(psql "$DATABASE_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
+          if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
+            echo "::error::Failed to query Annie disk usage: $BYTES"
+            exit 1
+          fi
+          PCT=$(( BYTES * 100 / QUOTA_BYTES ))
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "Annie disk usage: ${BYTES} bytes (${PCT}% of 500MB quota)"
+
+      - name: Alert if above threshold
+        if: fromJSON(steps.usage.outputs.pct) >= fromJSON(env.THRESHOLD_PCT)
+        uses: actions/github-script@v7
+        env:
+          BYTES: ${{ steps.usage.outputs.bytes }}
+          PCT: ${{ steps.usage.outputs.pct }}
+        with:
+          script: |
+            const bytes = parseInt(process.env.BYTES);
+            const pct = parseInt(process.env.PCT);
+            const mb = (bytes / 1024 / 1024).toFixed(1);
+
+            // Check for existing open alert to avoid duplicates
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'disk-usage',
+            });
+            const annieAlert = existing.data.find(i => i.title.includes('Annie'));
+            if (annieAlert) {
+              console.log(`Open disk-usage issue already exists (#${annieAlert.number}), skipping creation.`);
+              return;
+            }
+
+            const body = [
+              `## Supabase Disk Usage Alert — Annie Instance`,
+              ``,
+              `Current usage is **${mb} MB (${pct}%)** of the 500 MB free tier quota.`,
+              ``,
+              `### Recommended Actions`,
+              `- Check for WAL bloat: \`SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0'));\``,
+              `- Find large tables: \`SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class ORDER BY pg_total_relation_size(oid) DESC LIMIT 10;\``,
+              `- Consider running \`VACUUM FULL\` on large tables`,
+              `- Review [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/database) for storage breakdown`,
+              `- If consistently above 70%, consider upgrading to a paid tier`,
+              ``,
+              `Triggered by: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Supabase disk usage at ${pct}% — Annie instance`,
+              body: body,
+              labels: ['infrastructure', 'disk-usage'],
+            });
+
+  check-reli:
+    name: Reli Disk Usage Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query disk usage
+        id: usage
+        env:
+          DATABASE_URL: ${{ secrets.RELI_DATABASE_URL }}
+        run: |
+          BYTES=$(psql "$DATABASE_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
+          if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
+            echo "::error::Failed to query Reli disk usage: $BYTES"
+            exit 1
+          fi
+          PCT=$(( BYTES * 100 / QUOTA_BYTES ))
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "Reli disk usage: ${BYTES} bytes (${PCT}% of 500MB quota)"
+
+      - name: Alert if above threshold
+        if: fromJSON(steps.usage.outputs.pct) >= fromJSON(env.THRESHOLD_PCT)
+        uses: actions/github-script@v7
+        env:
+          BYTES: ${{ steps.usage.outputs.bytes }}
+          PCT: ${{ steps.usage.outputs.pct }}
+        with:
+          script: |
+            const bytes = parseInt(process.env.BYTES);
+            const pct = parseInt(process.env.PCT);
+            const mb = (bytes / 1024 / 1024).toFixed(1);
+
+            // Check for existing open alert to avoid duplicates
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'disk-usage',
+            });
+            const reliAlert = existing.data.find(i => i.title.includes('Reli'));
+            if (reliAlert) {
+              console.log(`Open disk-usage issue already exists (#${reliAlert.number}), skipping creation.`);
+              return;
+            }
+
+            const body = [
+              `## Supabase Disk Usage Alert — Reli Instance`,
+              ``,
+              `Current usage is **${mb} MB (${pct}%)** of the 500 MB free tier quota.`,
+              ``,
+              `### Recommended Actions`,
+              `- Check for WAL bloat: \`SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0'));\``,
+              `- Find large tables: \`SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class ORDER BY pg_total_relation_size(oid) DESC LIMIT 10;\``,
+              `- Consider running \`VACUUM FULL\` on large tables`,
+              `- Review [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/database) for storage breakdown`,
+              `- If consistently above 70%, consider upgrading to a paid tier`,
+              ``,
+              `Triggered by: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Supabase disk usage at ${pct}% — Reli instance`,
+              body: body,
+              labels: ['infrastructure', 'disk-usage'],
+            });
