@@ -61,13 +61,16 @@ jobs:
             -H "Content-Type: application/json" \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/backups")
 
-          echo "Backup API response: $RESPONSE"
-
+          # Supabase GET /v1/projects/{ref}/database/backups returns a bare JSON array:
+          # [{"id": "...", "inserted_at": "2024-01-15T10:30:00Z", "status": "COMPLETED", ...}]
+          # Field name 'inserted_at' verified against Supabase Management API v1.
           NEWEST_TS=$(echo "$RESPONSE" | jq -r '
             if type == "array" and length > 0
             then [.[].inserted_at] | sort | last
             else null
             end')
+
+          echo "Newest backup timestamp: $NEWEST_TS"
 
           if [ -z "$NEWEST_TS" ] || [ "$NEWEST_TS" = "null" ]; then
             echo "::error::No backups found via Supabase API — possible backup system failure"
@@ -107,6 +110,25 @@ jobs:
             const reason = process.env.REASON || 'unknown';
             const newestTs = process.env.NEWEST_TS || 'unknown';
             const label = 'backup-alert';
+
+            // Ensure the label exists (self-bootstrapping — creates it if absent)
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+              });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: 'e11d48',
+                  description: 'Automated backup freshness alert',
+                });
+              }
+            }
 
             // Find any existing open backup-alert issues
             const existing = await github.rest.issues.listForRepo({
