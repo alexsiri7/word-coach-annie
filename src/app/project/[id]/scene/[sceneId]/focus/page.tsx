@@ -161,14 +161,10 @@ export default function FocusModePage() {
                     </span>
                     <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-50">&middot;</span>
                     <span className="stamp-chip">Draft #1</span>
-                    {sceneContext && (
-                        <>
-                            <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-50">&middot;</span>
-                            <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">
-                                {sceneContext.wordCount ?? 0} words
-                            </span>
-                        </>
-                    )}
+                    <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant opacity-50">&middot;</span>
+                    <span className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">
+                        {sceneContext.wordCount ?? 0} words
+                    </span>
                     <div className="ml-auto">
                         <span className="stamp-chip">Mildly Critical</span>
                     </div>
