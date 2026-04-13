@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { RelatedElements } from "@/app/project/[id]/scene/[sceneId]/focus/page";
 
 interface SceneInfoSidebarProps {
     scene: {
@@ -20,7 +21,7 @@ interface SceneInfoSidebarProps {
     onNavigate: (sceneId: string) => void;
     collapsed: boolean;
     onToggle: () => void;
-    relatedElements?: Record<string, { id: string; name: string; role?: string; description?: string }[]> | null;
+    relatedElements?: RelatedElements | null;
 }
 
 export function SceneInfoSidebar({
@@ -118,11 +119,11 @@ export function SceneInfoSidebar({
                         </span>
                         {scene.synopsis ? (
                             <div className="space-y-2">
-                                {scene.synopsis.split('.').filter(s => s.trim().length > 0).slice(0, 4).map((beat, i) => (
-                                    <label key={i} className="flex items-start gap-2 cursor-pointer group">
-                                        <div className="w-4 h-4 mt-0.5 border border-outline-variant/30 flex-shrink-0 group-hover:border-accent transition-colors" />
+                                {scene.synopsis.split('.').filter(s => s.trim().length > 0).slice(0, 4).map((beat) => (
+                                    <div key={beat.trim().slice(0, 30)} className="flex items-start gap-2">
+                                        <div className="w-4 h-4 mt-0.5 border border-outline-variant/30 flex-shrink-0" />
                                         <span className="font-body text-xs text-on-surface-variant leading-snug">{beat.trim()}</span>
-                                    </label>
+                                    </div>
                                 ))}
                             </div>
                         ) : (

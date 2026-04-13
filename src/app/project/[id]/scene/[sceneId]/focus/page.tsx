@@ -22,7 +22,7 @@ interface SceneContext extends StructureNode {
     nextScene: { id: string; title: string } | null;
 }
 
-type RelatedElements = Record<string, { id: string; name: string; role?: string; description?: string; notes?: string }[]>;
+export type RelatedElements = Record<string, { id: string; name: string; role?: string; description?: string; notes?: string }[]>;
 
 export default function FocusModePage() {
     const params = useParams();
