@@ -1,9 +1,23 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { List, X as XIcon, BookOpen, Clock, ArrowLeft, Flag } from "lucide-react";
+import {
+  List,
+  X as XIcon,
+  BookOpen,
+  Clock,
+  ArrowLeft,
+  Flag,
+  Download,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ReportContentDialog } from "@/components/report-content-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface OutlineNode {
@@ -197,6 +211,18 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
     }
   };
 
+  async function downloadAs(format: "pdf" | "epub") {
+    const res = await fetch(`/api/projects/${project.id}/export/${format}`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.title}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="min-h-screen bg-surface">
       {/* Translucent top bar */}
@@ -223,6 +249,24 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
               </div>
             )}
             <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-9 w-9 rounded-full flex items-center justify-center transition-colors hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
+                  aria-label="Download manuscript"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => downloadAs("pdf")}>
+                  Download PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadAs("epub")}>
+                  Download EPUB
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {tocEntries.length > 0 && (
               <button
                 onClick={() => setTocOpen(!tocOpen)}
