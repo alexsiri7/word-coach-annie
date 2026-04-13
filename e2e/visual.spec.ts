@@ -298,6 +298,12 @@ async function mockFocusModeApi(page: Page) {
   await page.route('**/api/focus/sc-1', route =>
     route.fulfill({ json: MOCK_FOCUS_CONTEXT, status: 200 })
   )
+  await page.route('**/api/projects/proj-1/nodes', route =>
+    route.fulfill({ json: { tree: MOCK_OUTLINE }, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/story-objects*', route =>
+    route.fulfill({ json: { data: MOCK_STORY_OBJECTS.storyObjects, total: MOCK_STORY_OBJECTS.total }, status: 200 })
+  )
   await page.route('**/api/nodes/sc-1/content', route =>
     route.fulfill({ json: MOCK_SCENE_CONTENT, status: 200 })
   )

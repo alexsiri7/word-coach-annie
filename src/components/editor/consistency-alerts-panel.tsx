@@ -43,11 +43,13 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
   const [alerts, setAlerts] = useState<ConsistencyAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   const runCheck = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/consistency-check`, {
         method: "POST",
@@ -59,19 +61,22 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
         const found: ConsistencyAlert[] = data.alerts ?? [];
         setAlerts(found);
         onAlertsLoaded?.(found.filter((a) => !a.dismissed).length);
+      } else {
+        setError(`Check failed (${res.status}). Please try again.`);
       }
+    } catch (err) {
+      console.error("[consistency-alerts-panel] runCheck failed:", err);
+      setError("Check failed. Please try again.");
     } finally {
       setLoading(false);
       setRan(true);
     }
-  }, [projectId, sceneId]);
+  }, [projectId, sceneId, onAlertsLoaded]);
 
   const dismissAlert = (id: string) => {
-    setAlerts((prev) => {
-      const next = prev.filter((a) => a.id !== id);
-      onAlertsLoaded?.(next.filter((a) => !a.dismissed).length);
-      return next;
-    });
+    const next = alerts.filter((a) => a.id !== id);
+    setAlerts(next);
+    onAlertsLoaded?.(next.length);
   };
 
   const toggleExpand = (id: string) => {
@@ -135,7 +140,13 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
           </div>
         )}
 
-        {ran && !loading && visibleAlerts.length === 0 && (
+        {error && (
+          <div className="p-4 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        {ran && !loading && !error && visibleAlerts.length === 0 && (
           <div className="p-4 text-center">
             <p className="text-sm text-muted-foreground">No inconsistencies found.</p>
           </div>

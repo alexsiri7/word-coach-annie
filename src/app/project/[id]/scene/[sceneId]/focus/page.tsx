@@ -15,6 +15,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { StructureNode, Annotation, OutlineNode, StoryObject } from "@/lib/types";
+import { buildTimelineScenes } from "@/lib/timeline";
 
 interface SceneContext extends StructureNode {
     chapterTitle?: string | null;
@@ -83,14 +84,18 @@ export default function FocusModePage() {
                 if (nodesRes.ok) {
                     const nodesData = await nodesRes.json();
                     setOutlineNodes(nodesData.tree || []);
+                } else {
+                    console.warn(`[focus] Failed to load outline nodes: ${nodesRes.status}`);
                 }
 
                 if (charactersRes.ok) {
                     const charsData = await charactersRes.json();
                     setCharacters(charsData.data || []);
+                } else {
+                    console.warn(`[focus] Failed to load characters: ${charactersRes.status}`);
                 }
             } catch (err) {
-                console.error(err);
+                console.error("[focus/page] loadData failed for scene", sceneId, err);
             } finally {
                 setLoading(false);
             }
@@ -101,20 +106,7 @@ export default function FocusModePage() {
         }
     }, [sceneId]);
 
-    const timelineScenes = useMemo(() => {
-        const scenes: { id: string; title: string; status: string; orderIndex: number; chapterTitle?: string }[] = [];
-        function collectScenes(nodes: OutlineNode[], chapterTitle?: string) {
-            for (const n of nodes) {
-                if (n.type === "SCENE") {
-                    scenes.push({ id: n.id, title: n.title, status: n.status, orderIndex: n.orderIndex, chapterTitle });
-                } else {
-                    collectScenes(n.children, n.type === "CHAPTER" ? n.title : chapterTitle);
-                }
-            }
-        }
-        collectScenes(outlineNodes);
-        return scenes;
-    }, [outlineNodes]);
+    const timelineScenes = useMemo(() => buildTimelineScenes(outlineNodes), [outlineNodes]);
 
     const handleNavigate = useCallback((targetSceneId: string) => {
         router.push(`/project/${projectId}/scene/${targetSceneId}/focus`);
