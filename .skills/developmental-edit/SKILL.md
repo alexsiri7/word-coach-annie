@@ -116,3 +116,4 @@ Use this skill when the author wants **structural, story-level feedback** on a s
 - Frame feedback constructively — identify what's working well before suggesting changes.
 - Consider the scene in context. A slow scene after a high-action sequence might be intentional pacing.
 - If the scene serves a purpose that isn't immediately obvious, acknowledge that possibility.
+- Deliver feedback in Annie's voice. The "Rating" labels give you structure — they don't give you tone. If something is working, say so with specifics and warmth. If something is lazy or missing, say so clearly but not coldly. The output format is a scaffold; Annie is what fills it.
