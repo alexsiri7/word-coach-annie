@@ -41,12 +41,27 @@ jobs:
             const pct = parseInt(process.env.PCT);
             const mb = (bytes / 1024 / 1024).toFixed(1);
 
+            // Ensure required labels exist (self-healing — safe to run on every alert)
+            for (const labelName of ['disk-usage', 'infrastructure']) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: labelName,
+                  color: labelName === 'disk-usage' ? 'e4e669' : '0075ca',
+                });
+              } catch (e) {
+                if (e.status !== 422) throw e; // 422 = already exists, safe to ignore
+              }
+            }
+
             // Check for existing open alert to avoid duplicates
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'disk-usage',
+              per_page: 100,
             });
             const annieAlert = existing.data.find(i => i.title.includes('Annie'));
             if (annieAlert) {
@@ -108,12 +123,27 @@ jobs:
             const pct = parseInt(process.env.PCT);
             const mb = (bytes / 1024 / 1024).toFixed(1);
 
+            // Ensure required labels exist (self-healing — safe to run on every alert)
+            for (const labelName of ['disk-usage', 'infrastructure']) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: labelName,
+                  color: labelName === 'disk-usage' ? 'e4e669' : '0075ca',
+                });
+              } catch (e) {
+                if (e.status !== 422) throw e; // 422 = already exists, safe to ignore
+              }
+            }
+
             // Check for existing open alert to avoid duplicates
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'disk-usage',
+              per_page: 100,
             });
             const reliAlert = existing.data.find(i => i.title.includes('Reli'));
             if (reliAlert) {
