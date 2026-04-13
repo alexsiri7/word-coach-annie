@@ -54,15 +54,6 @@ export default function FocusModePage() {
         async function loadData() {
             try {
                 setLoading(true);
-                // We'll need API routes for these since we're in "use client"
-                // Or we can fetch from the existing generic node API + relationship API
-                // For now, let's assume we add specific endpoints or reuse existing ones.
-                // Actually, since we're in a client component, we should fetch from API.
-
-                // Let's implement a specific API route for focus mode data OR misuse existing ones.
-                // To stick to the plan, we should have created an API route. 
-                // Let's create `src/app/api/focus/[sceneId]/route.ts` next.
-
                 const [focusRes, projectRes, nodesRes, charactersRes] = await Promise.all([
                     fetch(`/api/focus/${sceneId}`),
                     fetch(`/api/projects/${projectId}`),
