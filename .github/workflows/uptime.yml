@@ -25,6 +25,21 @@ jobs:
           fi
           echo "Production health check passed (status: $STATUS)"
 
+      - name: Notify on failure
+        if: failure()
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+        run: |
+          if [ -z "$NTFY_URL" ]; then exit 0; fi
+          STATUS=$(curl -s --max-time 10 https://annie.interstellarai.net/api/health \
+            | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
+          curl -s \
+            -H "Priority: urgent" \
+            -H "Tags: warning,rotating_light" \
+            -H "Title: Annie Production Down" \
+            -d "Health check failed (status: ${STATUS}). Check: https://annie.interstellarai.net/api/health" \
+            "$NTFY_URL"
+
   check-staging:
     name: Staging Health Check
     runs-on: ubuntu-latest
@@ -39,3 +54,18 @@ jobs:
             exit 1
           fi
           echo "Staging health check passed (status: $STATUS)"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+        run: |
+          if [ -z "$NTFY_URL" ]; then exit 0; fi
+          STATUS=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health \
+            | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
+          curl -s \
+            -H "Priority: urgent" \
+            -H "Tags: warning,rotating_light" \
+            -H "Title: Annie Staging Down" \
+            -d "Health check failed (status: ${STATUS}). Check: https://word-coach-annie-staging.up.railway.app/api/health" \
+            "$NTFY_URL"

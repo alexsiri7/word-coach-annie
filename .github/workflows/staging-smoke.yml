@@ -223,6 +223,28 @@ jobs:
             echo "rollback_succeeded=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Send ntfy alert
+        if: always()
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+        run: |
+          if [ -z "$NTFY_URL" ]; then exit 0; fi
+          STATUS="${{ needs.health-check.outputs.status }}"
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          ROLLBACK="${{ steps.rollback.outputs.rollback_succeeded }}"
+          if [ "$ROLLBACK" = "true" ]; then
+            MSG="Rollback initiated. Verify production is healthy."
+          else
+            MSG="Rollback failed or not attempted. Manual intervention required."
+          fi
+          curl -s \
+            -H "Priority: urgent" \
+            -H "Tags: warning,rotating_light" \
+            -H "Title: Annie Deploy Failed (${SHORT_SHA})" \
+            -d "Health check: ${STATUS}. ${MSG} https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "$NTFY_URL"
+
       - name: Create failure issue
         if: always()
         uses: actions/github-script@v7
