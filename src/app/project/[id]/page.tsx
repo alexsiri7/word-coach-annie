@@ -20,6 +20,7 @@ import {
   BookOpen,
   TrendingUp,
   Eye,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -369,6 +370,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-expanded={showSearch}
         >
           <Search className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/annotations`)}
+          aria-label="Annotations"
+        >
+          <ClipboardList className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
