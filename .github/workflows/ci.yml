@@ -36,7 +36,7 @@ jobs:
 
       - name: Audit
         run: ./scripts/gates.sh audit
-        continue-on-error: true  # @google/adk transitive deps have unfixable high vulns; remove when upstream fixes land
+        # Fails only on advisories not in .audit-allowlist — known @google/adk transitive vulns are allowlisted
 
   test:
     name: Test
