@@ -147,10 +147,8 @@ export default function AnnotationsPage({ params }: { params: Promise<{ id: stri
                             </div>
                           </div>
                           {a.selectedText && (
-                            <div className="mb-2 pl-7 mt-2">
-                              <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic truncate border border-border-subtle">
-                                &quot;{a.selectedText}&quot;
-                              </div>
+                            <div className="mt-2 mb-2 pl-7 bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic truncate border border-border-subtle">
+                              &quot;{a.selectedText}&quot;
                             </div>
                           )}
                           <div className="text-xs text-text-muted pl-7 mt-2">
