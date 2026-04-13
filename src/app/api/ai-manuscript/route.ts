@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
-import { getCurrentUserId } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = getCurrentUserId(request);
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access.response;
+
     const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       return NextResponse.json(
