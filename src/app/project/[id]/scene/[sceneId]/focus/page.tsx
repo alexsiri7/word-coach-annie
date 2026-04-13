@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/error-boundary";
-import type { StructureNode, Annotation } from "@/lib/types";
+import type { StructureNode, Annotation, OutlineNode, StoryObject } from "@/lib/types";
 
 interface SceneContext extends StructureNode {
     chapterTitle?: string | null;
@@ -35,6 +35,8 @@ export default function FocusModePage() {
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
+    const [outlineNodes, setOutlineNodes] = useState<OutlineNode[]>([]);
+    const [characters, setCharacters] = useState<StoryObject[]>([]);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
     const [rightCollapsed, setRightCollapsed] = useState(true);
 
@@ -60,9 +62,11 @@ export default function FocusModePage() {
                 // To stick to the plan, we should have created an API route. 
                 // Let's create `src/app/api/focus/[sceneId]/route.ts` next.
 
-                const [focusRes, projectRes] = await Promise.all([
+                const [focusRes, projectRes, nodesRes, charactersRes] = await Promise.all([
                     fetch(`/api/focus/${sceneId}`),
                     fetch(`/api/projects/${projectId}`),
+                    fetch(`/api/projects/${projectId}/nodes`),
+                    fetch(`/api/projects/${projectId}/story-objects?type=CHARACTER`),
                 ]);
                 if (!focusRes.ok) throw new Error("Failed to load scene data");
 
@@ -75,6 +79,16 @@ export default function FocusModePage() {
                     const projectData = await projectRes.json();
                     setProjectTitle(projectData.title || "");
                 }
+
+                if (nodesRes.ok) {
+                    const nodesData = await nodesRes.json();
+                    setOutlineNodes(nodesData.tree || []);
+                }
+
+                if (charactersRes.ok) {
+                    const charsData = await charactersRes.json();
+                    setCharacters(charsData.data || []);
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -86,6 +100,21 @@ export default function FocusModePage() {
             loadData();
         }
     }, [sceneId]);
+
+    const timelineScenes = useMemo(() => {
+        const scenes: { id: string; title: string; status: string; orderIndex: number; chapterTitle?: string }[] = [];
+        function collectScenes(nodes: OutlineNode[], chapterTitle?: string) {
+            for (const n of nodes) {
+                if (n.type === "SCENE") {
+                    scenes.push({ id: n.id, title: n.title, status: n.status, orderIndex: n.orderIndex, chapterTitle });
+                } else {
+                    collectScenes(n.children, n.type === "CHAPTER" ? n.title : chapterTitle);
+                }
+            }
+        }
+        collectScenes(outlineNodes);
+        return scenes;
+    }, [outlineNodes]);
 
     const handleNavigate = useCallback((targetSceneId: string) => {
         router.push(`/project/${projectId}/scene/${targetSceneId}/focus`);
@@ -143,6 +172,8 @@ export default function FocusModePage() {
                             node={{ ...sceneContext, type: "SCENE" }}
                             projectId={projectId}
                             showFocusButton={false}
+                            timelineScenes={timelineScenes}
+                            linkedCharacters={characters}
                         />
                     </ErrorBoundary>
                 </main>
