@@ -103,6 +103,12 @@ const DEFAULT_CONSENSUS: ConsensusFeedback = {
   synthesizedRecommendation: "Unable to synthesize consensus",
 };
 
+function parseReview(raw: string, role: string): ReviewFeedback {
+  const parsed = parseJson<ReviewFeedback>(raw);
+  if (!parsed) logger.error(`Peer review: failed to parse ${role} JSON`);
+  return parsed ?? DEFAULT_REVIEW;
+}
+
 /**
  * POST /api/projects/[id]/peer-review
  *
@@ -138,15 +144,9 @@ export async function POST(
       runSimpleCompletion({ userMessage: buildWriterPrompt(truncated), aiConfig, maxTokens: 800, temperature: 0.3 }),
     ]);
 
-    const publisherParsed = parseJson<ReviewFeedback>(publisherRaw);
-    const readerParsed = parseJson<ReviewFeedback>(readerRaw);
-    const writerParsed = parseJson<ReviewFeedback>(writerRaw);
-    if (!publisherParsed) logger.error("Peer review: failed to parse publisher JSON");
-    if (!readerParsed) logger.error("Peer review: failed to parse reader JSON");
-    if (!writerParsed) logger.error("Peer review: failed to parse writer JSON");
-    const publisher = publisherParsed || DEFAULT_REVIEW;
-    const reader = readerParsed || DEFAULT_REVIEW;
-    const writer = writerParsed || DEFAULT_REVIEW;
+    const publisher = parseReview(publisherRaw, "publisher");
+    const reader = parseReview(readerRaw, "reader");
+    const writer = parseReview(writerRaw, "writer");
 
     let consensus: ConsensusFeedback = DEFAULT_CONSENSUS;
     try {
