@@ -18,6 +18,12 @@ let encryptionWarningLogged = false;
 function getEncryptionKey(): Buffer | null {
     const keySource = env.ENCRYPTION_KEY || env.API_TOKEN;
     if (!keySource) {
+        if (process.env.NODE_ENV === "production") {
+            throw new Error(
+                "[crypto] ENCRYPTION_KEY or API_TOKEN must be set in production. " +
+                "Refusing to store credentials as plaintext."
+            );
+        }
         if (!encryptionWarningLogged) {
             console.warn(
                 "[crypto] No ENCRYPTION_KEY or API_TOKEN set — " +
