@@ -1,13 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
+import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
+async function verifyWorldObjectAccess(worldObjectId: string, userId: string | null) {
+    const wo = await prisma.worldObject.findUnique({
+        where: { id: worldObjectId },
+        select: { universeId: true },
+    });
+    if (!wo) {
+        return { authorized: false as const, response: NextResponse.json({ error: "World object not found" }, { status: 404 }) };
+    }
+    return verifyUniverseAccess(wo.universeId, userId);
+}
+
 export async function POST(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const userId = getCurrentUserId(request);
+        const access = await verifyWorldObjectAccess(id, userId);
+        if (!access.authorized) return access.response;
+
         const { orderedIds } = await request.json();
         if (!Array.isArray(orderedIds)) {
             return NextResponse.json(
