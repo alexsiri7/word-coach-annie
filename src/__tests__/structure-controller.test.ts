@@ -304,6 +304,23 @@ describe("StructureController", () => {
                 const all = await StructureController.getOpenAnnotations();
                 expect(all).toHaveLength(2);
             });
+
+            it("getOpenAnnotations includes selectedText in returned shape", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.addAnnotation(scene.id, "With text", "", "some selected passage");
+                await StructureController.addAnnotation(scene.id, "Without text");
+
+                const open = await StructureController.getOpenAnnotations(projectId);
+                expect(open).toHaveLength(2);
+
+                const withText = open.find((a) => a.content === "With text");
+                expect(withText).toBeDefined();
+                expect(withText!.selectedText).toBe("some selected passage");
+
+                const withoutText = open.find((a) => a.content === "Without text");
+                expect(withoutText).toBeDefined();
+                expect(withoutText!.selectedText).toBeNull();
+            });
         });
 
         describe("writeSceneContentFromBlocks", () => {

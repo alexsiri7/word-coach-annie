@@ -302,6 +302,21 @@ List open (unresolved) annotations.
 
 **Query params**: `projectId` (optional filter)
 
+**Response**: Array of annotation objects:
+```json
+[
+  {
+    "id": "string",
+    "content": "string",
+    "nodeId": "string",
+    "nodeTitle": "string",
+    "projectTitle": "string",
+    "selectedText": "string | null",
+    "createdAt": "ISO 8601 timestamp"
+  }
+]
+```
+
 ---
 
 ### `POST /api/annotations`

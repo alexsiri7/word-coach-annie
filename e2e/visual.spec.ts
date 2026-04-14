@@ -219,6 +219,36 @@ const MOCK_FOCUS_CONTEXT = {
   },
 }
 
+const MOCK_ANNOTATIONS = [
+  {
+    id: 'ann-1',
+    content: 'Strengthen the tension when the messenger enters — too passive right now.',
+    nodeId: 'sc-1',
+    nodeTitle: 'Throne Room',
+    projectTitle: 'The Amber Throne',
+    selectedText: 'The doors swung open and a figure stumbled in.',
+    createdAt: '2026-03-10T09:00:00Z',
+  },
+  {
+    id: 'ann-2',
+    content: 'Consider adding a physical reaction from Mira here.',
+    nodeId: 'sc-1',
+    nodeTitle: 'Throne Room',
+    projectTitle: 'The Amber Throne',
+    selectedText: null,
+    createdAt: '2026-03-11T14:00:00Z',
+  },
+  {
+    id: 'ann-3',
+    content: 'The advisors feel too uniform — differentiate their voices.',
+    nodeId: 'sc-2',
+    nodeTitle: 'War Council',
+    projectTitle: 'The Amber Throne',
+    selectedText: null,
+    createdAt: '2026-03-12T10:00:00Z',
+  },
+]
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function disableAnimations(page: Page) {
@@ -293,6 +323,17 @@ async function mockUniverseApi(page: Page) {
   })
 }
 
+/** Intercept API calls for the annotations page */
+async function mockAnnotationsApi(page: Page) {
+  await page.route('**/api/annotations*', route =>
+    route.fulfill({ json: MOCK_ANNOTATIONS, status: 200 })
+  )
+  await page.route(
+    url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
+  )
+}
+
 /** Intercept API calls for the focus mode page */
 async function mockFocusModeApi(page: Page) {
   await page.route('**/api/focus/sc-1', route =>
@@ -323,7 +364,7 @@ async function mockFocusModeApi(page: Page) {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
-// 4 screens × 3 projects (desktop, mobile, dark-desktop) = 12 screenshots
+// 5 screens × 3 viewports (desktop, mobile, dark-desktop) = 15 screenshots
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
@@ -407,6 +448,19 @@ test.describe('Visual regression – Annie', () => {
     await page.getByTestId('universe-card').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('universe-list.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('annotations page populated', async ({ page }) => {
+    await mockAnnotationsApi(page)
+    await page.goto('/project/proj-1/annotations')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    // Wait for annotations to render
+    await page.getByText('Annotations').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('annotations.png', {
       animations: 'disabled',
     })
   })
