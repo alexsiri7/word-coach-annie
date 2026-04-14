@@ -522,7 +522,7 @@ export function SceneEditor({
               projectId={projectId}
               sceneId={node.id}
               onClose={() => setShowConsistencyAlerts(false)}
-              onAlertsChange={setConsistencyAlertCount}
+              onAlertsLoaded={setConsistencyAlertCount}
             />
           </div>
         )}

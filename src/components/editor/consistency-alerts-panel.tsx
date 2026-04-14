@@ -23,7 +23,7 @@ interface ConsistencyAlertsPanelProps {
   projectId: string;
   sceneId?: string;
   onClose: () => void;
-  onAlertsChange?: (count: number) => void;
+  onAlertsLoaded?: (count: number) => void;
 }
 
 const TYPE_LABELS: Record<ConsistencyAlert["type"], string> = {
@@ -39,7 +39,7 @@ const SEVERITY_COLORS: Record<ConsistencyAlert["severity"], string> = {
   low: "text-muted-foreground border-border bg-muted/30",
 };
 
-export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsChange }: ConsistencyAlertsPanelProps) {
+export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLoaded }: ConsistencyAlertsPanelProps) {
   const [alerts, setAlerts] = useState<ConsistencyAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
@@ -58,23 +58,26 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsCh
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error || "Consistency check failed. Try again.");
+        setError(body.error || `Check failed (${res.status}). Please try again.`);
         return;
       }
       const data = await res.json();
       const newAlerts: ConsistencyAlert[] = data.alerts ?? [];
       setAlerts(newAlerts);
-      onAlertsChange?.(newAlerts.filter((a) => !a.dismissed).length);
+      onAlertsLoaded?.(newAlerts.filter((a) => !a.dismissed).length);
+    } catch (err) {
+      console.error("[consistency-alerts-panel] runCheck failed:", err);
+      setError("Check failed. Please try again.");
     } finally {
       setLoading(false);
       setRan(true);
     }
-  }, [projectId, sceneId, onAlertsChange]);
+  }, [projectId, sceneId, onAlertsLoaded]);
 
   const dismissAlert = (id: string) => {
     setAlerts((prev) => {
       const updated = prev.filter((a) => a.id !== id);
-      onAlertsChange?.(updated.filter((a) => !a.dismissed).length);
+      onAlertsLoaded?.(updated.filter((a) => !a.dismissed).length);
       return updated;
     });
   };
@@ -140,7 +143,7 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsCh
           </div>
         )}
 
-        {ran && !loading && error && (
+        {error && (
           <div className="p-4 text-center">
             <p className="text-sm text-destructive">{error}</p>
             <Button size="sm" variant="outline" className="mt-2" onClick={runCheck}>Retry</Button>
