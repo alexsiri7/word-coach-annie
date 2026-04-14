@@ -56,14 +56,15 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sceneId }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const found: ConsistencyAlert[] = data.alerts ?? [];
-        setAlerts(found);
-        onAlertsLoaded?.(found.filter((a) => !a.dismissed).length);
-      } else {
-        setError(`Check failed (${res.status}). Please try again.`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `Check failed (${res.status}). Please try again.`);
+        return;
       }
+      const data = await res.json();
+      const newAlerts: ConsistencyAlert[] = data.alerts ?? [];
+      setAlerts(newAlerts);
+      onAlertsLoaded?.(newAlerts.filter((a) => !a.dismissed).length);
     } catch (err) {
       console.error("[consistency-alerts-panel] runCheck failed:", err);
       setError("Check failed. Please try again.");
@@ -74,9 +75,11 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
   }, [projectId, sceneId, onAlertsLoaded]);
 
   const dismissAlert = (id: string) => {
-    const next = alerts.filter((a) => a.id !== id);
-    setAlerts(next);
-    onAlertsLoaded?.(next.length);
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      onAlertsLoaded?.(updated.filter((a) => !a.dismissed).length);
+      return updated;
+    });
   };
 
   const toggleExpand = (id: string) => {
@@ -143,6 +146,7 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLo
         {error && (
           <div className="p-4 text-center">
             <p className="text-sm text-destructive">{error}</p>
+            <Button size="sm" variant="outline" className="mt-2" onClick={runCheck}>Retry</Button>
           </div>
         )}
 
