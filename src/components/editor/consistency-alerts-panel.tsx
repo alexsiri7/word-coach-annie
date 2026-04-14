@@ -23,6 +23,7 @@ interface ConsistencyAlertsPanelProps {
   projectId: string;
   sceneId?: string;
   onClose: () => void;
+  onAlertsLoaded?: (count: number) => void;
 }
 
 const TYPE_LABELS: Record<ConsistencyAlert["type"], string> = {
@@ -38,15 +39,17 @@ const SEVERITY_COLORS: Record<ConsistencyAlert["severity"], string> = {
   low: "text-muted-foreground border-border bg-muted/30",
 };
 
-export function ConsistencyAlertsPanel({ projectId, sceneId, onClose }: ConsistencyAlertsPanelProps) {
+export function ConsistencyAlertsPanel({ projectId, sceneId, onClose, onAlertsLoaded }: ConsistencyAlertsPanelProps) {
   const [alerts, setAlerts] = useState<ConsistencyAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   const runCheck = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/consistency-check`, {
         method: "POST",
@@ -55,16 +58,25 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose }: Consiste
       });
       if (res.ok) {
         const data = await res.json();
-        setAlerts(data.alerts ?? []);
+        const found: ConsistencyAlert[] = data.alerts ?? [];
+        setAlerts(found);
+        onAlertsLoaded?.(found.filter((a) => !a.dismissed).length);
+      } else {
+        setError(`Check failed (${res.status}). Please try again.`);
       }
+    } catch (err) {
+      console.error("[consistency-alerts-panel] runCheck failed:", err);
+      setError("Check failed. Please try again.");
     } finally {
       setLoading(false);
       setRan(true);
     }
-  }, [projectId, sceneId]);
+  }, [projectId, sceneId, onAlertsLoaded]);
 
   const dismissAlert = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    const next = alerts.filter((a) => a.id !== id);
+    setAlerts(next);
+    onAlertsLoaded?.(next.length);
   };
 
   const toggleExpand = (id: string) => {
@@ -128,7 +140,13 @@ export function ConsistencyAlertsPanel({ projectId, sceneId, onClose }: Consiste
           </div>
         )}
 
-        {ran && !loading && visibleAlerts.length === 0 && (
+        {error && (
+          <div className="p-4 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        {ran && !loading && !error && visibleAlerts.length === 0 && (
           <div className="p-4 text-center">
             <p className="text-sm text-muted-foreground">No inconsistencies found.</p>
           </div>
