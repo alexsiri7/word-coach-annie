@@ -112,7 +112,7 @@ export async function getSceneFocus(sceneId: string) {
   const siblings = await prisma.structureNode.findMany({
     where: { projectId: scene.projectId, type: "SCENE" },
     orderBy: [{ parent: { orderIndex: "asc" } }, { orderIndex: "asc" }],
-    select: { id: true, title: true, orderIndex: true },
+    select: { id: true, title: true, orderIndex: true, status: true, parent: { select: { title: true } } },
   });
 
   const currentIndex = siblings.findIndex((s) => s.id === sceneId);
@@ -200,6 +200,13 @@ export async function getSceneFocus(sceneId: string) {
       content: a.content,
       resolved: a.resolved,
       selectedText: a.selectedText,
+    })),
+    timelineScenes: siblings.map((s) => ({
+      id: s.id,
+      title: s.title,
+      status: s.status,
+      orderIndex: s.orderIndex,
+      chapterTitle: s.parent?.title ?? undefined,
     })),
   };
 }

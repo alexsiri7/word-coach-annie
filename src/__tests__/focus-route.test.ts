@@ -49,6 +49,15 @@ describe("Focus API route", () => {
         expect(body.context).toBeDefined();
         expect(body.related).toBeDefined();
         expect(body.annotations).toBeDefined();
+        expect(body.timelineScenes).toBeDefined();
+        expect(Array.isArray(body.timelineScenes)).toBe(true);
+        expect(body.timelineScenes.length).toBeGreaterThan(0);
+        expect(body.timelineScenes[0]).toMatchObject({
+            id: expect.any(String),
+            title: expect.any(String),
+            status: expect.any(String),
+            orderIndex: expect.any(Number),
+        });
     });
 
     it("GET returns 500 for non-existent scene", async () => {
