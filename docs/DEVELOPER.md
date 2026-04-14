@@ -204,9 +204,12 @@ The `src/lib/env.ts` module validates environment variables at startup with Zod 
 GitHub Actions runs on every push:
 
 1. **Quality gates** (parallel): typecheck → lint → build → test with coverage
-2. **Deploy** (main only, after gates): SSH via Tailscale to pull latest image
+2. **Security audit**: `npm audit --audit-level=high` — fails on new high/critical advisories not in `.audit-allowlist` (known unfixable `@google/adk` transitive vulns are pre-allowlisted)
+3. **Deploy** (main only, after gates): SSH via Tailscale to pull latest image
 
 Branch protection on `main` requires all gates to pass. The deploy job uses `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, and `TAILSCALE_AUTH_KEY` secrets.
+
+**Dependabot** opens weekly PRs for npm dependency updates (label: `dependencies`, prefix: `chore(deps)`). When upstream ships a fix for allowlisted advisories, remove the corresponding entries from `.audit-allowlist`.
 
 ---
 
