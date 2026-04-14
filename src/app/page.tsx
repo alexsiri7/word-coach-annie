@@ -505,6 +505,17 @@ export default function Dashboard() {
                       &ldquo;If you don&apos;t write 200 words in the next 10 minutes, I might have to&hellip; remind you again!&rdquo;
                     </blockquote>
                   </div>
+                  <div className="relative z-10 mt-6">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="font-label text-xs uppercase tracking-widest"
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      Accept Challenge
+                      <ArrowRight className="h-3 w-3 ml-1.5" />
+                    </Button>
+                  </div>
                   {/* Decorative ink splash */}
                   <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-on-tertiary-container opacity-5 rounded-full blur-3xl" />
                 </div>
@@ -680,21 +691,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Floating Action Button ────────────────────────── */}
-      <div className="fixed bottom-8 right-8 hidden lg:block">
-        <button
-          onClick={() => {
-            if (heroProject) router.push(`/project/${heroProject.id}`);
-            else setCreateOpen(true);
-          }}
-          className="bg-accent text-accent-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform group"
-        >
-          <PenLine className="h-5 w-5" />
-          <div className="absolute right-full mr-4 bg-primary text-primary-foreground px-3 py-1 font-label text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Open Editor
-          </div>
-        </button>
-      </div>
+      {/* Floating compose FAB */}
+      <button
+        onClick={() => setCreateOpen(true)}
+        aria-label="New project"
+        className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-accent text-accent-foreground flex items-center justify-center shadow-[0_8px_32px_hsl(var(--accent)/0.35)] hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
       {/* ── Create Project Dialog ──────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
