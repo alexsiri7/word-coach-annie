@@ -32,6 +32,7 @@ export default function FocusModePage() {
     const sceneId = params.sceneId as string;
 
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [projectTitle, setProjectTitle] = useState<string>("");
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
@@ -87,6 +88,7 @@ export default function FocusModePage() {
                 }
             } catch (err) {
                 console.error("[focus/page] loadData failed for scene", sceneId, err);
+                setLoadError("Failed to load scene. Please refresh and try again.");
             } finally {
                 setLoading(false);
             }
@@ -119,6 +121,10 @@ export default function FocusModePage() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         );
+    }
+
+    if (loadError) {
+        return <div className="p-8 text-destructive">{loadError}</div>;
     }
 
     if (!sceneContext) {
