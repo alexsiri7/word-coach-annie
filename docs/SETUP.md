@@ -229,6 +229,16 @@ GitHub Actions runs on every push to `main`:
 
 Branch protection on `main` requires all quality gates to pass.
 
+### Monitoring Secrets (optional)
+
+These secrets enable the backup freshness monitoring job in `.github/workflows/uptime.yml`.
+If absent, the job skips silently with a warning.
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `SUPABASE_PROJECT_REF` | No | Supabase project ref for backup freshness monitoring |
+| `SUPABASE_ACCESS_TOKEN` | No | Supabase Management API access token for backup freshness monitoring |
+
 ---
 
 ## MCP Server (for AI Agents)
