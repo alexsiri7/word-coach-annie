@@ -159,6 +159,24 @@ Export all projects as a ZIP archive.
 
 ---
 
+### `GET /api/projects/:id/export/pdf`
+Export the project manuscript as a PDF file.
+
+**Auth**: Project owner or shared reader access required.
+
+**Response**: Binary PDF file (`Content-Type: application/pdf`, `Content-Disposition: attachment; filename="<title>.pdf"`).
+
+---
+
+### `GET /api/projects/:id/export/epub`
+Export the project manuscript as an EPUB file.
+
+**Auth**: Project owner or shared reader access required.
+
+**Response**: Binary EPUB file (`Content-Type: application/epub+zip`, `Content-Disposition: attachment; filename="<title>.epub"`).
+
+---
+
 ## Structure Nodes
 
 ### `GET /api/nodes/:id`
