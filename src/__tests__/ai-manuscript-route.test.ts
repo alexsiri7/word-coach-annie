@@ -48,6 +48,11 @@ vi.mock("@/lib/ai/settings", () => ({
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn().mockReturnValue("user-1"),
+  verifyProjectAccess: vi.fn().mockResolvedValue({
+    authorized: true,
+    project: { id: "proj-1", userId: "user-1" },
+    role: "OWNER" as const,
+  }),
 }));
 
 vi.mock("@/lib/ai/adk-agent", () => ({

@@ -28,6 +28,9 @@ FROM node:20-slim AS runner
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -43,6 +46,8 @@ COPY --from=builder /app/.skills ./.skills
 # Migration runner + migration SQL files
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
+
+USER nextjs
 
 EXPOSE 3000
 

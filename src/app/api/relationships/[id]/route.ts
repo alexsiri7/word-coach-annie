@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUserId, verifyProjectAccess, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 const VALID_RELATIONSHIP_TYPES = [
@@ -13,12 +14,66 @@ const VALID_RELATIONSHIP_TYPES = [
   "FOLLOWS",
 ] as const;
 
+async function verifyRelationshipAccess(
+  relationshipId: string,
+  userId: string | null
+): Promise<{ authorized: true } | { authorized: false; response: NextResponse }> {
+  const rel = await prisma.relationship.findUnique({
+    where: { id: relationshipId },
+    select: {
+      fromNode: { select: { projectId: true } },
+      toNode: { select: { projectId: true } },
+      fromObject: { select: { projectId: true } },
+      toObject: { select: { projectId: true } },
+      fromWorldObject: { select: { universeId: true } },
+      toWorldObject: { select: { universeId: true } },
+    },
+  });
+
+  if (!rel) {
+    return {
+      authorized: false,
+      response: NextResponse.json({ error: "Relationship not found" }, { status: 404 }),
+    };
+  }
+
+  // Check ownership via whichever endpoint exists
+  const projectId =
+    rel.fromNode?.projectId ||
+    rel.toNode?.projectId ||
+    rel.fromObject?.projectId ||
+    rel.toObject?.projectId;
+  if (projectId) {
+    const access = await verifyProjectAccess(projectId, userId);
+    if (!access.authorized) return access;
+    return { authorized: true };
+  }
+
+  const universeId =
+    rel.fromWorldObject?.universeId ||
+    rel.toWorldObject?.universeId;
+  if (universeId) {
+    const access = await verifyUniverseAccess(universeId, userId);
+    if (!access.authorized) return access;
+    return { authorized: true };
+  }
+
+  // Orphaned relationship — deny by default
+  return {
+    authorized: false,
+    response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+  };
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const userId = getCurrentUserId(request);
+    const access = await verifyRelationshipAccess(id, userId);
+    if (!access.authorized) return access.response;
 
     const relationship = await prisma.relationship.findUnique({
       where: { id },
@@ -53,18 +108,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-
-    const existing = await prisma.relationship.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Relationship not found" },
-        { status: 404 }
-      );
-    }
+    const userId = getCurrentUserId(request);
+    const access = await verifyRelationshipAccess(id, userId);
+    if (!access.authorized) return access.response;
 
     let body: Record<string, unknown>;
     try {
@@ -129,23 +175,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-
-    const existing = await prisma.relationship.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Relationship not found" },
-        { status: 404 }
-      );
-    }
+    const userId = getCurrentUserId(request);
+    const access = await verifyRelationshipAccess(id, userId);
+    if (!access.authorized) return access.response;
 
     await prisma.relationship.delete({ where: { id } });
 
