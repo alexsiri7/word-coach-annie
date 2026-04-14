@@ -188,6 +188,7 @@ docker compose exec app npx prisma generate
 The database is backed up automatically every 6 hours:
 - **Local**: `/mnt/steam-fast/backups/annie/` (7-day rotation)
 - **Cloud**: Google Drive via rclone (`gdrive:backups/gas-town/annie/`)
+- **Failure alerts** (optional): Export `NTFY_URL` in the cron/server environment to receive a push notification via ntfy.sh when the backup git push fails.
 
 Manual backup:
 ```bash
@@ -220,6 +221,11 @@ GitHub Actions runs on every push to `main`:
    - Connect to server via Tailscale VPN
    - SSH to `100.120.193.82`
    - Pull latest image + restart containers
+
+3. **Monitoring & alerting** (continuous):
+   - `uptime.yml` — polls production and staging health endpoints every 5 minutes; fires ntfy.sh alert on failure
+   - `staging-smoke.yml` — runs after every deploy; triggers automatic rollback and ntfy.sh alert if staging health check fails
+   - Set the `NTFY_URL` GitHub Actions secret to enable push notifications for both workflows
 
 Branch protection on `main` requires all quality gates to pass.
 
