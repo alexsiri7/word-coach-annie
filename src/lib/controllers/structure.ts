@@ -664,12 +664,13 @@ export class StructureController {
             orderBy: { createdAt: "desc" }
         });
 
-        return annotations.map((a: { id: string; content: string; nodeId: string; createdAt: Date; node: { title: string; project: { title: string } } }) => ({
+        return annotations.map((a: { id: string; content: string; nodeId: string; selectedText: string | null; createdAt: Date; node: { title: string; project: { title: string } } }) => ({
             id: a.id,
             content: a.content,
             nodeId: a.nodeId,
             nodeTitle: a.node.title,
             projectTitle: a.node.project.title,
+            selectedText: a.selectedText,
             createdAt: a.createdAt.toISOString()
         }));
     }
