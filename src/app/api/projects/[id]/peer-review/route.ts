@@ -158,7 +158,7 @@ export async function POST(
       });
       const consensusParsed = parseJson<ConsensusFeedback>(synthesisRaw);
       if (!consensusParsed) logger.error("Peer review: failed to parse synthesis JSON");
-      consensus = consensusParsed || DEFAULT_CONSENSUS;
+      consensus = consensusParsed ?? DEFAULT_CONSENSUS;
     } catch (err) {
       logger.error("Peer review synthesis failed", err);
     }

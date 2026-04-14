@@ -119,8 +119,8 @@ export function SceneInfoSidebar({
                         </span>
                         {scene.synopsis ? (
                             <div className="space-y-2">
-                                {scene.synopsis.split('.').filter(s => s.trim().length > 0).slice(0, 4).map((beat) => (
-                                    <div key={beat.trim().slice(0, 30)} className="flex items-start gap-2">
+                                {scene.synopsis.split('.').filter(s => s.trim().length > 0).slice(0, 4).map((beat, i) => (
+                                    <div key={i} className="flex items-start gap-2">
                                         <div className="w-4 h-4 mt-0.5 border border-outline-variant/30 flex-shrink-0" />
                                         <span className="font-body text-xs text-on-surface-variant leading-snug">{beat.trim()}</span>
                                     </div>
