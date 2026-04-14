@@ -209,6 +209,9 @@ GitHub Actions runs on every push:
 
 Branch protection on `main` requires all gates to pass. The deploy job uses `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, and `TAILSCALE_AUTH_KEY` secrets.
 
+A separate **scheduled workflow** (`supabase-disk-monitor.yml`) checks Supabase disk usage every 6 hours and opens a GitHub Issue if usage exceeds 70% of the 500 MB free-tier quota. It requires two additional repository secrets: `ANNIE_DATABASE_URL` and `RELI_DATABASE_URL` (direct-port psql URLs — see `.env.example` for format).
+
+
 **Dependabot** opens weekly PRs for npm dependency updates (label: `dependencies`, prefix: `chore(deps)`). When upstream ships a fix for allowlisted advisories, remove the corresponding entries from `.audit-allowlist`.
 
 ---
