@@ -26,6 +26,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets[matrix.secret] }}
         run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "::warning::${{ matrix.instance }} DATABASE_URL secret not configured — skipping disk check"
+            exit 0
+          fi
           BYTES=$(psql "$DATABASE_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
           if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
             echo "::error::Failed to query ${{ matrix.instance }} disk usage: $BYTES"
