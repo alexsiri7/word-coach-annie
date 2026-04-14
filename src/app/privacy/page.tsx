@@ -130,7 +130,14 @@ export default function PrivacyPage() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-border text-xs text-text-muted">
-          Questions? Contact the instance administrator.
+          Questions? Contact the instance administrator. &middot;{" "}
+          <Link href="/terms" className="text-accent hover:underline">
+            Terms of Service
+          </Link>{" "}
+          &middot;{" "}
+          <Link href="/dmca" className="text-accent hover:underline">
+            DMCA Policy
+          </Link>
         </div>
       </div>
     </main>
