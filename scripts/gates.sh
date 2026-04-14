@@ -5,7 +5,8 @@
 # Usage:
 #   ./scripts/gates.sh [STAGE...]
 #
-# Stages: setup, lint, typecheck, test, build
+# Stages (default): setup, lint, typecheck, test, build
+# Stages (opt-in, not run by default): audit, screenshots
 # No args = run all stages in order.
 set -euo pipefail
 
@@ -36,12 +37,42 @@ run_build() {
     docker build -t word-coach-annie:gate-check .
 }
 
+run_audit() {
+    echo "=== Audit ==="
+    ALLOWLIST=".audit-allowlist"
+    # Capture audit JSON regardless of exit code (non-zero = vulns found)
+    AUDIT_JSON=$(npm audit --json --audit-level=high 2>/dev/null || true)
+    # Fail only on high/critical advisories NOT in the allowlist
+    echo "$AUDIT_JSON" | node -e "
+const chunks = [];
+process.stdin.on('data', d => chunks.push(d));
+process.stdin.on('end', () => {
+  const fs = require('fs');
+  const allowlist = '${ALLOWLIST}';
+  const allow = fs.existsSync(allowlist)
+    ? fs.readFileSync(allowlist, 'utf8').split('\n').filter(l => l && !l.startsWith('#'))
+    : [];
+  const audit = JSON.parse(chunks.join(''));
+  const ids = Object.keys(audit.vulnerabilities || {})
+    .flatMap(k => (audit.vulnerabilities[k].via || []))
+    .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical'))
+    .map(v => v.url.split('/').pop());
+  const novel = [...new Set(ids)].filter(id => !allow.includes(id));
+  if (novel.length) {
+    console.error('New high/critical vulnerabilities not in allowlist: ' + novel.join(', '));
+    process.exit(1);
+  }
+  console.log('No new high/critical vulnerabilities (allowlisted: ' + allow.length + ' known advisories).');
+});
+"
+}
+
 run_screenshots() {
     echo "=== Screenshots (Visual Regression) ==="
     npx playwright test e2e/visual.spec.ts
 }
 
-# If no args, run all stages
+# If no args, run all stages (audit and screenshots are opt-in only)
 if [ $# -eq 0 ]; then
     STAGES=(setup lint typecheck test build)
 else
