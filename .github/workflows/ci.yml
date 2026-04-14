@@ -34,6 +34,10 @@ jobs:
       - name: Lint & Typecheck
         run: ./scripts/gates.sh lint & ./scripts/gates.sh typecheck & wait
 
+      - name: Audit
+        run: ./scripts/gates.sh audit
+        # Fails only on advisories not in .audit-allowlist — known @google/adk transitive vulns are allowlisted
+
   test:
     name: Test
     runs-on: ubuntu-latest
