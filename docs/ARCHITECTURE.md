@@ -176,6 +176,14 @@ The database at `data/word-coach-annie.db` is volume-mounted. Git-based snapshot
 ### Markdown / Medium
 Handled by `ProjectsController` — templates assembled from structure nodes and story objects.
 
+### PDF
+`src/app/api/projects/[id]/export/pdf/route.tsx` — server-side binary rendering using `@react-pdf/renderer`. The route fetches the project's outline tree with latest scene content, converts HTML to plain text via `stripHtml`, and renders a two-page `Document` (title page + body). Returns `application/pdf` with `Content-Disposition: attachment`.
+
+### EPUB
+`src/app/api/projects/[id]/export/epub/route.ts` — server-side EPUB generation using `epub-gen-memory`. The route assembles `EpubChapter` objects from the outline tree (PART → CHAPTER → SCENE hierarchy), strips beat annotations via `stripBeats`, and returns `application/epub+zip` with `Content-Disposition: attachment`. Scenes with empty content are excluded.
+
+Both PDF and EPUB routes require project owner or shared reader access (`verifyProjectReadAccess`).
+
 ### Google Docs
 `src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document.
 

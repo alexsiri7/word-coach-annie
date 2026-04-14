@@ -35,6 +35,8 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | Database | PostgreSQL 16 | Via Supabase (connection pooler, port 6543) |
 | Validation | Zod 3.24.2 | Schema validation |
 | AI | Google AI + @google/adk 0.6 | Gemini 2.0 Flash via native ADK integration |
+| PDF Export | @react-pdf/renderer | Server-side PDF generation from React components |
+| EPUB Export | epub-gen-memory | Server-side EPUB 3 generation from HTML chapters |
 | Google APIs | googleapis | Google Docs export, Drive |
 | OAuth | google-auth-library | Google authentication |
 | MCP | @modelcontextprotocol/sdk | AI tool integration server |
@@ -79,6 +81,7 @@ Core models for hierarchical story structure:
 - Focus mode for distraction-free writing
 - World-building panels (characters, locations, timelines)
 - AI chat panel per project
+- PDF and EPUB download from reader view
 - Google Docs export
 - Medium publishing (draft/public/unlisted)
 - Search across scenes and story objects
