@@ -26,6 +26,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets[matrix.secret] }}
         run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "::warning::${{ matrix.instance }} DATABASE_URL secret not configured — skipping disk check"
+            exit 0
+          fi
           BYTES=$(psql "$DATABASE_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
           if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
             echo "::error::Failed to query ${{ matrix.instance }} disk usage: $BYTES"
@@ -37,7 +41,7 @@ jobs:
           echo "${{ matrix.instance }} disk usage: ${BYTES} bytes (${PCT}% of 500MB quota)"
 
       - name: Alert if above threshold
-        if: fromJSON(steps.usage.outputs.pct) >= fromJSON(env.THRESHOLD_PCT)
+        if: steps.usage.outputs.pct != '' && fromJSON(steps.usage.outputs.pct) >= fromJSON(env.THRESHOLD_PCT)
         uses: actions/github-script@v7
         env:
           BYTES: ${{ steps.usage.outputs.bytes }}
