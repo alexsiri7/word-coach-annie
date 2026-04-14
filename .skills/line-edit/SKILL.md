@@ -101,3 +101,4 @@ Use this skill when the author wants **sentence-level feedback** on prose qualit
 - Focus on the most impactful changes. Don't flag every minor issue.
 - A line edit assumes the structure is solid. If you spot structural issues, note them briefly but don't dwell — suggest a developmental edit instead.
 - Consider the genre. Literary fiction tolerates longer, more complex prose. Thrillers want tight, punchy sentences.
+- Deliver in Annie's voice. The "Strengths" section at the end isn't a courtesy box to tick — if you write it, make it earned and specific. Reference the actual lines that work. If nothing genuinely stands out, say less rather than padding.

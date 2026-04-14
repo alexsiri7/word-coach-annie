@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/error-boundary";
-import type { StructureNode, Annotation } from "@/lib/types";
+import type { StructureNode, Annotation, OutlineNode, StoryObject } from "@/lib/types";
+import { buildTimelineScenes } from "@/lib/timeline";
 
 interface SceneContext extends StructureNode {
     chapterTitle?: string | null;
@@ -35,6 +36,8 @@ export default function FocusModePage() {
     const [sceneContext, setSceneContext] = useState<SceneContext | null>(null);
     const [relatedElements, setRelatedElements] = useState<RelatedElements | null>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
+    const [outlineNodes, setOutlineNodes] = useState<OutlineNode[]>([]);
+    const [characters, setCharacters] = useState<StoryObject[]>([]);
     const [leftCollapsed, setLeftCollapsed] = useState(true);
     const [rightCollapsed, setRightCollapsed] = useState(true);
 
@@ -51,18 +54,11 @@ export default function FocusModePage() {
         async function loadData() {
             try {
                 setLoading(true);
-                // We'll need API routes for these since we're in "use client"
-                // Or we can fetch from the existing generic node API + relationship API
-                // For now, let's assume we add specific endpoints or reuse existing ones.
-                // Actually, since we're in a client component, we should fetch from API.
-
-                // Let's implement a specific API route for focus mode data OR misuse existing ones.
-                // To stick to the plan, we should have created an API route. 
-                // Let's create `src/app/api/focus/[sceneId]/route.ts` next.
-
-                const [focusRes, projectRes] = await Promise.all([
+                const [focusRes, projectRes, nodesRes, charactersRes] = await Promise.all([
                     fetch(`/api/focus/${sceneId}`),
                     fetch(`/api/projects/${projectId}`),
+                    fetch(`/api/projects/${projectId}/nodes`),
+                    fetch(`/api/projects/${projectId}/story-objects?type=CHARACTER`),
                 ]);
                 if (!focusRes.ok) throw new Error("Failed to load scene data");
 
@@ -75,8 +71,22 @@ export default function FocusModePage() {
                     const projectData = await projectRes.json();
                     setProjectTitle(projectData.title || "");
                 }
+
+                if (nodesRes.ok) {
+                    const nodesData = await nodesRes.json();
+                    setOutlineNodes(nodesData.tree || []);
+                } else {
+                    console.warn(`[focus] Failed to load outline nodes: ${nodesRes.status}`);
+                }
+
+                if (charactersRes.ok) {
+                    const charsData = await charactersRes.json();
+                    setCharacters(charsData.data || []);
+                } else {
+                    console.warn(`[focus] Failed to load characters: ${charactersRes.status}`);
+                }
             } catch (err) {
-                console.error(err);
+                console.error("[focus/page] loadData failed for scene", sceneId, err);
             } finally {
                 setLoading(false);
             }
@@ -86,6 +96,8 @@ export default function FocusModePage() {
             loadData();
         }
     }, [sceneId]);
+
+    const timelineScenes = useMemo(() => buildTimelineScenes(outlineNodes), [outlineNodes]);
 
     const handleNavigate = useCallback((targetSceneId: string) => {
         router.push(`/project/${projectId}/scene/${targetSceneId}/focus`);
@@ -143,6 +155,8 @@ export default function FocusModePage() {
                             node={{ ...sceneContext, type: "SCENE" }}
                             projectId={projectId}
                             showFocusButton={false}
+                            timelineScenes={timelineScenes}
+                            linkedCharacters={characters}
                         />
                     </ErrorBoundary>
                 </main>
