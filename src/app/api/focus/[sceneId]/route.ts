@@ -28,6 +28,7 @@ export async function GET(
             context: result.scene,
             related: groupByType(result.relatedElements),
             annotations: result.annotations,
+            timelineScenes: result.timelineScenes,
         });
     } catch (error) {
         logger.error("Focus API error", error);
