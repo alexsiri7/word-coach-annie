@@ -89,15 +89,12 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     await page.goto('/project/proj-1')
 
     // When project fetch returns 401, the page stays in loading state
-    // (spinner div without main element). Wait for it to stabilize.
-    await page.waitForTimeout(3000)
+    // (spinner div without main element). Wait for spinner to appear.
+    await expect(page.locator('.animate-spin').first()).toBeVisible({ timeout: 10_000 })
 
     // The project page should NOT have rendered the full UI with main
     const mainCount = await page.locator('main').count()
     expect(mainCount).toBe(0)
-
-    // A loading spinner should be visible instead
-    await expect(page.locator('.animate-spin').first()).toBeVisible()
   })
 
   // ── 403 Forbidden ──────────────────────────────────────────────────
@@ -112,14 +109,12 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     await page.goto('/project/proj-forbidden')
 
     // When project fetch returns 403, the page stays in loading state
-    await page.waitForTimeout(3000)
+    // Wait for spinner to appear instead of fixed delay
+    await expect(page.locator('.animate-spin').first()).toBeVisible({ timeout: 10_000 })
 
     // The project page should NOT have rendered the full UI
     const mainCount = await page.locator('main').count()
     expect(mainCount).toBe(0)
-
-    // Loading spinner should be visible
-    await expect(page.locator('.animate-spin').first()).toBeVisible()
   })
 
   test('403: forbidden share endpoint does not crash the project page', async ({
@@ -187,10 +182,9 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     const shareButtonCount = await shareButton.count()
     if (shareButtonCount > 0) {
       await shareButton.first().click()
-      await page.waitForTimeout(2000)
 
-      // The page should still be functional (no crash)
-      await expect(page.locator('main')).toBeVisible()
+      // Wait for the page to remain functional after clicking share (no crash)
+      await expect(page.locator('main')).toBeVisible({ timeout: 5_000 })
     }
   })
 
@@ -246,14 +240,12 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     await page.goto('/project/proj-1')
 
     // When project fetch returns 500, the page stays in loading state
-    await page.waitForTimeout(3000)
+    // Wait for spinner to appear instead of fixed delay
+    await expect(page.locator('.animate-spin').first()).toBeVisible({ timeout: 10_000 })
 
     // The project page should NOT have rendered the full UI
     const mainCount = await page.locator('main').count()
     expect(mainCount).toBe(0)
-
-    // A loading spinner should be visible
-    await expect(page.locator('.animate-spin').first()).toBeVisible()
   })
 
   test('500: server error on content save does not crash focus mode editor', async ({
@@ -362,8 +354,11 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     await page.keyboard.press('End')
     await page.keyboard.type(' Additional text.')
 
-    // Wait for debounced auto-save attempt (will fail with 500)
-    await page.waitForTimeout(3000)
+    // Wait for the debounced auto-save POST to fire and fail with 500
+    await page.waitForResponse(
+      (res) => res.url().includes('/api/nodes/sc-1/content') && res.request().method() === 'POST',
+      { timeout: 10_000 },
+    ).catch(() => {/* save may have already fired */})
 
     // Editor should still be functional — content should still be visible
     await expect(
