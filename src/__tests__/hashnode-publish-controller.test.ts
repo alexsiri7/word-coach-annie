@@ -240,6 +240,22 @@ describe("HashnodePublishController", () => {
             ]);
         });
 
+        it("slugifies multi-word and uppercase tags", async () => {
+            mockFetchDraft();
+
+            await HashnodePublishController.publish(projectId, null, {
+                tags: ["My Tag", "Science Fiction", "UPPER"],
+            });
+
+            const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+            const requestBody = JSON.parse(fetchCall[1].body);
+            expect(requestBody.variables.input.tags).toEqual([
+                { name: "My Tag", slug: "my-tag" },
+                { name: "Science Fiction", slug: "science-fiction" },
+                { name: "UPPER", slug: "upper" },
+            ]);
+        });
+
         it("sends canonicalUrl as originalArticleURL", async () => {
             mockFetchDraft();
 

@@ -110,7 +110,7 @@ function makeRequest(
 }
 
 async function createOwnerAndProject(suffix: string = "") {
-  const id = `${Date.now()}-${suffix}`;
+  const id = `${crypto.randomUUID()}-${suffix}`;
   const owner = await testPrisma.user.create({
     data: { email: `owner-${id}@example.com`, googleId: `google-owner-${id}`, name: "Owner" },
   });

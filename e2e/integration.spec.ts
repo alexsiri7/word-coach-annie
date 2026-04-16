@@ -369,9 +369,8 @@ test.describe('Integration tests — real server, real data', () => {
       await page.waitForSelector('main', { timeout: 20_000 })
       // The project should NOT be in the active cards
       const activeCards = page.locator('main').locator(`text=${project.title}`)
-      // It should only appear in the archived section (if expanded)
-      // First, check it's not immediately visible as an active project card
-      await page.waitForTimeout(1000)
+      // Wait for the page to settle, then verify the archived project is not visible
+      await expect(activeCards).toHaveCount(0, { timeout: 10_000 })
 
       // 7. Verify archiving an already-archived project returns 400
       const doubleArchive = await request.post(

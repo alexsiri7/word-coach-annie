@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // JWT_SECRET must be set before importing the module
 const origJwt = process.env.JWT_SECRET;
@@ -78,17 +78,22 @@ describe("MCP OAuth Tokens", () => {
     });
 
     it("rejects expired token", async () => {
-      // Create a token that expires in 1 second
-      const token = await createMcpToken(
-        { userId: "user-123", email: "test@example.com", type: "mcp_access" },
-        0 // 0 seconds TTL — already expired
-      );
+      vi.useFakeTimers();
+      try {
+        // Create a token with a 1-second TTL
+        const token = await createMcpToken(
+          { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+          1 // 1 second TTL
+        );
 
-      // Small delay to ensure it's past expiry
-      await new Promise((r) => setTimeout(r, 100));
+        // Advance time past expiry
+        vi.advanceTimersByTime(2000);
 
-      const payload = await verifyMcpToken(token, "mcp_access");
-      expect(payload).toBeNull();
+        const payload = await verifyMcpToken(token, "mcp_access");
+        expect(payload).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
