@@ -9,9 +9,7 @@ import { logger } from "@/lib/logger";
  */
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const origin = env.GOOGLE_REDIRECT_URI
-        ? new URL(env.GOOGLE_REDIRECT_URI).origin
-        : new URL(request.url).origin;
+    const origin = new URL(env.GOOGLE_REDIRECT_URI || request.url).origin;
 
     const code = searchParams.get("code");
     const state = searchParams.get("state");
