@@ -10,3 +10,6 @@ GHSA-83g3-92jg-28cx
 GHSA-qffp-2rhf-9h96
 GHSA-9ppj-qmqm-q256
 GHSA-r6q2-hw4h-h46w
+#
+# Source: protobufjs (via @google/genai → @grpc/proto-loader transitive chain)
+GHSA-xq3m-2v4x-88gg
