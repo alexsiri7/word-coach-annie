@@ -44,6 +44,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "consensus", label: "Consensus" },
 ];
 
+const SECTION_HEADING = "text-xs font-semibold text-text-muted uppercase tracking-wider mb-1";
+
 export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
   const [review, setReview] = useState<PeerReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,12 +79,12 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
   const renderReviewTab = (feedback: ReviewFeedback) => (
     <div className="space-y-3">
       <div>
-        <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Overall Impression</h4>
+        <h4 className={SECTION_HEADING}>Overall Impression</h4>
         <p className="text-sm text-foreground">{feedback.overallImpression}</p>
       </div>
       {feedback.strengths.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Strengths</h4>
+          <h4 className={SECTION_HEADING}>Strengths</h4>
           <ul className="list-disc list-inside space-y-0.5">
             {feedback.strengths.map((s, i) => (
               <li key={i} className="text-sm text-foreground">{s}</li>
@@ -92,7 +94,7 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
       )}
       {feedback.weaknesses.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Weaknesses</h4>
+          <h4 className={SECTION_HEADING}>Weaknesses</h4>
           <ul className="list-disc list-inside space-y-0.5">
             {feedback.weaknesses.map((w, i) => (
               <li key={i} className="text-sm text-foreground">{w}</li>
@@ -102,12 +104,12 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
       )}
       {feedback.detailedFeedback && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Detailed Feedback</h4>
+          <h4 className={SECTION_HEADING}>Detailed Feedback</h4>
           <p className="text-sm text-foreground whitespace-pre-wrap">{feedback.detailedFeedback}</p>
         </div>
       )}
       <div>
-        <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Recommendation</h4>
+        <h4 className={SECTION_HEADING}>Recommendation</h4>
         <span className="text-xs font-semibold px-2 py-1 rounded bg-accent/10 text-accent">{feedback.recommendation}</span>
       </div>
     </div>
@@ -117,7 +119,7 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
     <div className="space-y-3">
       {consensus.pointsOfAgreement.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Points of Agreement</h4>
+          <h4 className={SECTION_HEADING}>Points of Agreement</h4>
           <ul className="list-disc list-inside space-y-0.5">
             {consensus.pointsOfAgreement.map((p, i) => (
               <li key={i} className="text-sm text-foreground">{p}</li>
@@ -127,7 +129,7 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
       )}
       {consensus.pointsOfDisagreement.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Points of Disagreement</h4>
+          <h4 className={SECTION_HEADING}>Points of Disagreement</h4>
           <ul className="list-disc list-inside space-y-0.5">
             {consensus.pointsOfDisagreement.map((p, i) => (
               <li key={i} className="text-sm text-foreground">{p}</li>
@@ -137,7 +139,7 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
       )}
       {consensus.topPriorities.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Top Priorities</h4>
+          <h4 className={SECTION_HEADING}>Top Priorities</h4>
           <ol className="list-decimal list-inside space-y-0.5">
             {consensus.topPriorities.map((p, i) => (
               <li key={i} className="text-sm text-foreground">{p}</li>
@@ -147,7 +149,7 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
       )}
       {consensus.synthesizedRecommendation && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Synthesized Recommendation</h4>
+          <h4 className={SECTION_HEADING}>Synthesized Recommendation</h4>
           <p className="text-sm text-foreground whitespace-pre-wrap">{consensus.synthesizedRecommendation}</p>
         </div>
       )}

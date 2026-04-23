@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RelatedElements } from "@/app/project/[id]/scene/[sceneId]/focus/page";
 
+const SECTION_LABEL = "font-label text-[10px] uppercase font-bold tracking-widest text-on-surface-variant block mb-3";
+
 interface SceneInfoSidebarProps {
     scene: {
         title: string;
@@ -61,7 +63,7 @@ export function SceneInfoSidebar({
                 <div className="flex-1 overflow-y-auto">
                     {/* IN THIS SCENE */}
                     <div className="p-4 border-b border-outline-variant/10">
-                        <span className="font-label text-[10px] uppercase font-bold tracking-widest text-on-surface-variant block mb-3">
+                        <span className={SECTION_LABEL}>
                             In This Scene
                         </span>
                         {/* Characters */}
@@ -95,7 +97,7 @@ export function SceneInfoSidebar({
 
                     {/* ANNIE'S ADVICE */}
                     <div className="p-4 border-b border-outline-variant/10">
-                        <span className="font-label text-[10px] uppercase font-bold tracking-widest text-on-surface-variant block mb-3">
+                        <span className={SECTION_LABEL}>
                             Annie&apos;s Advice
                         </span>
                         <div className="glass-card p-3 space-y-2">
@@ -114,7 +116,7 @@ export function SceneInfoSidebar({
 
                     {/* NARRATIVE BEATS */}
                     <div className="p-4">
-                        <span className="font-label text-[10px] uppercase font-bold tracking-widest text-on-surface-variant block mb-3">
+                        <span className={SECTION_LABEL}>
                             Narrative Beats
                         </span>
                         {scene.synopsis ? (
