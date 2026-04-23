@@ -53,12 +53,25 @@ jobs:
       - name: Check health endpoint
         id: check
         run: |
-          BODY=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health || echo '{"status":"unreachable"}')
-          STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+          MAX_ATTEMPTS=3
+          ATTEMPT=0
+          STATUS="unreachable"
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$(( ATTEMPT + 1 ))
+            BODY=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health || echo '{"status":"unreachable"}')
+            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — Response: $BODY"
+            if [ "$STATUS" != "unreachable" ]; then
+              break
+            fi
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "Server unreachable, retrying in 15s..."
+              sleep 15
+            fi
+          done
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          echo "Response: $BODY"
           if [ "$STATUS" = "unreachable" ]; then
-            echo "::error::Staging health check failed — server unreachable (timeout or DNS failure)"
+            echo "::error::Staging health check failed — server unreachable after $MAX_ATTEMPTS attempts (timeout or DNS failure)"
             exit 1
           fi
           if [ "$STATUS" = "error" ]; then
