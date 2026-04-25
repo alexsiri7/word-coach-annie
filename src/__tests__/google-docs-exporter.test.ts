@@ -38,11 +38,12 @@ describe("GoogleDocsExporter", () => {
 
             expect(result.googleDocId).toBe("new-doc-id");
             expect(result.googleDocUrl).toContain("new-doc-id");
-            expect(GoogleDocsApi.createDocument).toHaveBeenCalledWith("My Novel - Reader Copy");
+            expect(GoogleDocsApi.createDocument).toHaveBeenCalledWith("My Novel - Reader Copy", undefined);
             expect(exportManuscript).toHaveBeenCalledWith(project.id, { includeBeats: false });
             expect(GoogleDocsApi.replaceContent).toHaveBeenCalledWith(
                 "new-doc-id",
-                "Chapter 1\n\nOnce upon a time..."
+                "Chapter 1\n\nOnce upon a time...",
+                undefined
             );
         });
     });
@@ -60,7 +61,8 @@ describe("GoogleDocsExporter", () => {
 
             expect(result.googleDocId).toBe("doc-internal");
             expect(GoogleDocsApi.createDocument).toHaveBeenCalledWith(
-                "My Novel - Internal Draft (with Notes)"
+                "My Novel - Internal Draft (with Notes)",
+                undefined
             );
             expect(exportStoryBible).toHaveBeenCalledWith(project.id);
             expect(exportManuscript).toHaveBeenCalledWith(project.id, { includeBeats: true });
@@ -80,7 +82,7 @@ describe("GoogleDocsExporter", () => {
             const result = await GoogleDocsExporter.exportToGoogleDocs(universe.id, "UNIVERSE");
 
             expect(result.googleDocId).toBe("doc-universe");
-            expect(GoogleDocsApi.createDocument).toHaveBeenCalledWith("My Universe - World Bible");
+            expect(GoogleDocsApi.createDocument).toHaveBeenCalledWith("My Universe - World Bible", undefined);
             expect(exportUniverse).toHaveBeenCalledWith(universe.id);
         });
     });

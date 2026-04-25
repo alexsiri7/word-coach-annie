@@ -13,19 +13,20 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const projectId = searchParams.get('projectId');
 
+        const userId = getCurrentUserId(request);
+
         // If no projectId, return connection status only (used by global settings page)
         if (!projectId) {
-            const status = await GoogleAuthController.getStatus();
+            const status = await GoogleAuthController.getStatus(userId);
             return NextResponse.json({ connected: status.connected });
         }
 
-        const userId = getCurrentUserId(request);
         const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get('x-user-email'));
         if (!access.authorized) return access.response;
 
         const [exports, status] = await Promise.all([
             GoogleDocsCommentSync.getExportInfo(projectId),
-            GoogleAuthController.getStatus(),
+            GoogleAuthController.getStatus(userId),
         ]);
         return NextResponse.json({ exports, connected: status.connected });
     } catch (error) {
@@ -36,11 +37,12 @@ export async function GET(request: NextRequest) {
 
 /**
  * DELETE /api/integrations/google-docs
- * Disconnects Google Docs by removing the stored credential.
+ * Disconnects Google Docs by removing the stored credential for the current user.
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
     try {
-        await GoogleAuthController.disconnect();
+        const userId = getCurrentUserId(request);
+        await GoogleAuthController.disconnect(userId);
         return NextResponse.json({ disconnected: true });
     } catch (error) {
         logger.error('DELETE /api/integrations/google-docs error', error);
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
         const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get('x-user-email'));
         if (!access.authorized) return access.response;
 
-        const result = await GoogleDocsCommentSync.syncComments(projectId);
+        const result = await GoogleDocsCommentSync.syncComments(projectId, userId);
         return NextResponse.json(result);
     } catch (error) {
         logger.error('POST /api/integrations/google-docs error', error);

@@ -143,8 +143,8 @@ function buildDocsRequests(markdown: string, insertIndex: number): { plainText: 
 
 export class GoogleDocsApi {
 
-    static async createDocument(title: string): Promise<string> {
-        const auth = await GoogleAuthController.getValidClient();
+    static async createDocument(title: string, userId?: string | null): Promise<string> {
+        const auth = await GoogleAuthController.getValidClient(userId);
         if (!auth) throw new Error("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
@@ -155,8 +155,8 @@ export class GoogleDocsApi {
         return res.data.documentId!;
     }
 
-    static async getDocument(documentId: string): Promise<docs_v1.Schema$Document> {
-        const auth = await GoogleAuthController.getValidClient();
+    static async getDocument(documentId: string, userId?: string | null): Promise<docs_v1.Schema$Document> {
+        const auth = await GoogleAuthController.getValidClient(userId);
         if (!auth) throw new Error("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
@@ -164,8 +164,8 @@ export class GoogleDocsApi {
         return res.data;
     }
 
-    static async updateDocument(documentId: string, requests: docs_v1.Schema$Request[]) {
-        const auth = await GoogleAuthController.getValidClient();
+    static async updateDocument(documentId: string, requests: docs_v1.Schema$Request[], userId?: string | null) {
+        const auth = await GoogleAuthController.getValidClient(userId);
         if (!auth) throw new Error("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
@@ -175,8 +175,8 @@ export class GoogleDocsApi {
         });
     }
 
-    static async fetchComments(documentId: string): Promise<drive_v3.Schema$Comment[]> {
-        const auth = await GoogleAuthController.getValidClient();
+    static async fetchComments(documentId: string, userId?: string | null): Promise<drive_v3.Schema$Comment[]> {
+        const auth = await GoogleAuthController.getValidClient(userId);
         if (!auth) throw new Error("Not authenticated");
 
         const drive = google.drive({ version: 'v3', auth });
@@ -197,8 +197,8 @@ export class GoogleDocsApi {
         return allComments;
     }
 
-    static async replaceContent(documentId: string, markdown: string) {
-        const doc = await this.getDocument(documentId);
+    static async replaceContent(documentId: string, markdown: string, userId?: string | null) {
+        const doc = await this.getDocument(documentId, userId);
         const endIndex = doc.body?.content?.[doc.body.content.length - 1]?.endIndex || 1;
 
         const requests: docs_v1.Schema$Request[] = [];
@@ -226,7 +226,7 @@ export class GoogleDocsApi {
         }
 
         if (requests.length > 0) {
-            await this.updateDocument(documentId, requests);
+            await this.updateDocument(documentId, requests, userId);
         }
     }
 }

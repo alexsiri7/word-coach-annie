@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get('x-user-email'));
         if (!access.authorized) return access.response;
 
-        const result = await GoogleDocsExporter.exportToGoogleDocs(projectId, exportMode as ExportMode);
+        const result = await GoogleDocsExporter.exportToGoogleDocs(projectId, exportMode as ExportMode, userId);
         return NextResponse.json(result);
     } catch (error) {
         logger.error('POST /api/integrations/google-docs/export error', error);

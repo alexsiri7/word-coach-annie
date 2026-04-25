@@ -201,6 +201,7 @@ model WorldObjectTimelineEntry {
 
 model GoogleCredential {
   id           String   @id @default(cuid())
+  userId       String   @unique  // "local" in single-user mode, actual user ID in multi-user
   accessToken  String
   refreshToken String
   expiresAt    DateTime

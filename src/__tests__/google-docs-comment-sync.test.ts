@@ -75,7 +75,7 @@ describe("GoogleDocsCommentSync", () => {
             expect(result.imported).toBe(1);
             expect(result.skipped).toBe(0);
             expect(result.unresolvable).toBe(0);
-            expect(GoogleDocsApi.fetchComments).toHaveBeenCalledWith("doc-abc");
+            expect(GoogleDocsApi.fetchComments).toHaveBeenCalledWith("doc-abc", undefined);
 
             // Verify annotation was created
             const annotations = await prisma.annotation.findMany({

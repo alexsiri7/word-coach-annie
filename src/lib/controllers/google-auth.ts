@@ -25,15 +25,17 @@ export class GoogleAuthController {
         });
     }
 
-    static async handleCallback(code: string, redirectUri?: string) {
+    static async handleCallback(code: string, redirectUri?: string, userId?: string | null) {
         const client = this.getClient(redirectUri ?? env.GOOGLE_REDIRECT_URI);
         const { tokens } = await client.getToken(code);
+        const resolvedUserId = userId ?? 'local';
 
-        // In local single-user mode, we replace any existing credentials
-        await prisma.googleCredential.deleteMany();
+        // Replace existing credentials for this user only
+        await prisma.googleCredential.deleteMany({ where: { userId: resolvedUserId } });
 
         await prisma.googleCredential.create({
             data: {
+                userId: resolvedUserId,
                 accessToken: encrypt(tokens.access_token!),
                 refreshToken: encrypt(tokens.refresh_token!), // This might be undefined if not first time/consent
                 expiresAt: new Date(tokens.expiry_date!),
@@ -44,8 +46,9 @@ export class GoogleAuthController {
         return tokens;
     }
 
-    static async getValidClient(): Promise<OAuth2Client | null> {
-        const cred = await prisma.googleCredential.findFirst();
+    static async getValidClient(userId?: string | null): Promise<OAuth2Client | null> {
+        const resolvedUserId = userId ?? 'local';
+        const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return null;
 
         const client = this.getClient(undefined);
@@ -74,8 +77,9 @@ export class GoogleAuthController {
         return client;
     }
 
-    static async getStatus() {
-        const cred = await prisma.googleCredential.findFirst();
+    static async getStatus(userId?: string | null) {
+        const resolvedUserId = userId ?? 'local';
+        const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
 
         // Check if token is expired, though client handles refresh
@@ -87,8 +91,8 @@ export class GoogleAuthController {
         };
     }
 
-    static async disconnect() {
-        // Optionally revoke token here
-        await prisma.googleCredential.deleteMany();
+    static async disconnect(userId?: string | null) {
+        const resolvedUserId = userId ?? 'local';
+        await prisma.googleCredential.deleteMany({ where: { userId: resolvedUserId } });
     }
 }
