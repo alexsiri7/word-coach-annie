@@ -64,7 +64,7 @@ export class GoogleDocsCommentSync {
      * Skips comments already imported (tracked via Annotation.externalId).
      * Returns a summary of what happened.
      */
-    static async syncComments(projectId: string): Promise<CommentSyncResult> {
+    static async syncComments(projectId: string, userId?: string | null): Promise<CommentSyncResult> {
         const result: CommentSyncResult = {
             imported: 0,
             skipped: 0,
@@ -87,7 +87,7 @@ export class GoogleDocsCommentSync {
 
         let comments;
         try {
-            comments = await GoogleDocsApi.fetchComments(exportRecord.googleDocId);
+            comments = await GoogleDocsApi.fetchComments(exportRecord.googleDocId, userId);
         } catch (error) {
             throw new Error(`Failed to fetch comments from Google Docs: ${error instanceof Error ? error.message : error}`);
         }

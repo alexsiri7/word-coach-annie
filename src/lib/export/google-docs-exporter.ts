@@ -9,7 +9,8 @@ export class GoogleDocsExporter {
 
     static async exportToGoogleDocs(
         entityId: string,
-        mode: ExportMode
+        mode: ExportMode,
+        userId?: string | null
     ): Promise<{ googleDocId: string; googleDocUrl: string }> {
 
         // 1. Resolve Project/Universe
@@ -43,7 +44,7 @@ export class GoogleDocsExporter {
         // 3. Create Doc if not exists
         if (!googleDocId) {
             const docTitle = `${title} - ${this.getModeLabel(mode)}`;
-            googleDocId = await GoogleDocsApi.createDocument(docTitle);
+            googleDocId = await GoogleDocsApi.createDocument(docTitle, userId);
 
             // Save mapping
             exportRecord = await prisma.googleDocExport.create({
@@ -83,7 +84,7 @@ export class GoogleDocsExporter {
 
         // 5. Update Doc Content
         try {
-            await GoogleDocsApi.replaceContent(googleDocId, content);
+            await GoogleDocsApi.replaceContent(googleDocId, content, userId);
         } catch (error: unknown) {
             // Handle 404 (doc deleted externally) -> remove mapping and retry?
             // For now, just throw.

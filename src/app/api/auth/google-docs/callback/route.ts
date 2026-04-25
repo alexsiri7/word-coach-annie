@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
 
     try {
         const redirectUri = `${origin}/api/auth/google-docs/callback`;
-        await GoogleAuthController.handleCallback(code, redirectUri);
+        const userId = getCurrentUserId(request);
+        await GoogleAuthController.handleCallback(code, redirectUri, userId);
 
         const response = NextResponse.redirect(new URL("/settings?google_docs=connected", origin));
         response.cookies.set("google_docs_oauth_state", "", {
