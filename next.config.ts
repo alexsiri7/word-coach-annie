@@ -51,7 +51,15 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // SEC-011: 'unsafe-eval' removed — not required by Next.js in production.
+              // 'unsafe-inline' is retained for script-src because next-themes injects an
+              // inline FOUC-prevention script at render time that cannot be hashed without
+              // nonce-based middleware. Tracking removal as a follow-up requiring a
+              // custom middleware layer to inject per-request nonces.
+              "script-src 'self' 'unsafe-inline'",
+              // SEC-011: 'unsafe-inline' retained for style-src — 22+ component-level
+              // inline style= attributes and styled-jsx require it. Full removal needs a
+              // separate refactor to eliminate inline styles or add nonces.
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
               "font-src 'self' https://fonts.gstatic.com",
@@ -59,7 +67,9 @@ const nextConfig: NextConfig = {
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
-              "form-action *",
+              // SEC-012: Replaced wildcard form-action with explicit self-origin only.
+              // The only form POST in this app is oauth/authorize posting to itself.
+              "form-action 'self'",
             ].join("; "),
           },
           {
@@ -73,6 +83,14 @@ const nextConfig: NextConfig = {
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
+          },
+          // SEC-013: HSTS — 2-year max-age with includeSubDomains.
+          // preload omitted intentionally: requires HSTS preload list submission
+          // and is irreversible without a long lead time. Add preload once the
+          // domain is confirmed stable.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
           },
         ],
       },
