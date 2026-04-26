@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions, getCompressionSettings } from "@/lib/ai/settings";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent } from "@/lib/ai/adk-agent";
+import { compressConversation } from "@/lib/ai/chat-compression";
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
@@ -83,25 +84,57 @@ ${objectsSummary || "(No characters/locations yet)"}
 - You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
 }
 
-// GET /api/chat?projectId=X — load chat history
+// GET /api/chat?conversationId=X or ?projectId=X — load conversation + chat history
 export async function GET(request: NextRequest) {
   try {
+    const conversationId = request.nextUrl.searchParams.get("conversationId");
     const projectId = request.nextUrl.searchParams.get("projectId");
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+
+    if (!conversationId && !projectId) {
+      return NextResponse.json({ error: "conversationId or projectId is required" }, { status: 400 });
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    let conversation;
+    if (conversationId) {
+      conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { project: true },
+      });
+      if (!conversation) {
+        return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      }
+    } else {
+      const access = await verifyProjectWriteAccess(projectId!, userId, request.headers.get("x-user-email"));
+      if (!access.authorized) return access.response;
+
+      conversation = await prisma.conversation.findFirst({
+        where: { projectId: projectId! },
+        orderBy: { createdAt: "desc" },
+        include: { project: true },
+      });
+      if (!conversation) {
+        conversation = await prisma.conversation.create({
+          data: { projectId: projectId!, title: "Chat" },
+          include: { project: true },
+        });
+      }
+    }
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
     const messages = await prisma.chatMessage.findMany({
-      where: { projectId },
+      where: { conversationId: conversation.id },
       orderBy: { createdAt: "asc" },
-      take: 100,
     });
 
-    return NextResponse.json({ messages });
+    return NextResponse.json({ conversation, messages });
   } catch (error) {
     logger.error("GET /api/chat error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -112,50 +145,36 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, message, sceneContext } = body as {
-      projectId: string;
+    const { conversationId, message, sceneContext } = body as {
+      conversationId: string;
       message: string;
       sceneContext?: string;
     };
 
-    if (!projectId || !message) {
+    if (!conversationId || !message) {
       return NextResponse.json(
-        { error: "projectId and message are required" },
+        { error: "conversationId and message are required" },
         { status: 400 }
       );
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    const conversation = await prisma.conversation.findUniqueOrThrow({
+      where: { id: conversationId },
+    });
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
     // Sanitize user input to prevent stored XSS
     const sanitizedMessage = sanitizeInput(message);
 
-    // Save user message
-    await prisma.chatMessage.create({
-      data: { projectId, role: "user", content: sanitizedMessage },
-    });
-
-    // Build context
-    const systemPrompt = await buildSystemPrompt(projectId);
-    const sceneNote = sceneContext
-      ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
-      : "";
-
-    // Load user preferences and add to system prompt
-    const prefs = await getAiPreferences(userId);
-    const prefInstructions = buildPreferenceInstructions(prefs);
-
-    // Get recent chat history for context
-    const recentMessages = await prisma.chatMessage.findMany({
-      where: { projectId },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
-    recentMessages.reverse();
-
-    // Load AI provider config (user DB > global DB > env vars > defaults)
+    // Load AI provider config (needed before compression and agent call)
     const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       return NextResponse.json(
@@ -164,10 +183,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Save user message
+    await prisma.chatMessage.create({
+      data: { conversationId, role: "user", content: sanitizedMessage },
+    });
+
+    // Load all messages since last compaction
+    const allMessages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId,
+        ...(conversation.summarizedThroughMessageId
+          ? {
+              createdAt: {
+                gt: (
+                  await prisma.chatMessage.findUnique({
+                    where: { id: conversation.summarizedThroughMessageId },
+                    select: { createdAt: true },
+                  })
+                )?.createdAt ?? new Date(0),
+              },
+            }
+          : {}),
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Load compression settings and trigger if needed (fire and forget)
+    const compressionSettings = await getCompressionSettings(userId);
+    const { chatWindowSize, messagesUntilCompression } = compressionSettings;
+
+    if (allMessages.length > messagesUntilCompression + chatWindowSize) {
+      compressConversation(conversation, allMessages, compressionSettings, aiConfig).catch(
+        (err) => logger.error("compressConversation failed", err)
+      );
+    }
+
+    // Build context: summary block + last windowSize messages
+    const windowMessages = allMessages.slice(-chatWindowSize);
+
+    const systemPrompt = await buildSystemPrompt(conversation.projectId);
+    const summaryBlock = conversation.summary
+      ? `\n\n## Conversation so far\n${conversation.summary}`
+      : "";
+    const sceneNote = sceneContext
+      ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
+      : "";
+
+    // Load user preferences and add to system prompt
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
+
     // Run ADK agent (handles tool loop, dynamic tool loading internally)
     const { finalContent, toolLog } = await runChatAgent({
-      systemPrompt: systemPrompt + sceneNote + "\n\n" + prefInstructions,
-      chatHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+      systemPrompt: systemPrompt + summaryBlock + sceneNote + "\n\n" + prefInstructions,
+      chatHistory: windowMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,
     });
@@ -179,7 +248,7 @@ export async function POST(request: NextRequest) {
         .join("\n---\n");
       await prisma.chatMessage.create({
         data: {
-          projectId,
+          conversationId,
           role: "system",
           content: `[Tool interactions]\n${toolSummary}`,
         },
@@ -231,7 +300,7 @@ export async function POST(request: NextRequest) {
           // Save assistant response
           if (finalContent) {
             await prisma.chatMessage.create({
-              data: { projectId, role: "assistant", content: finalContent },
+              data: { conversationId, role: "assistant", content: finalContent },
             });
           }
 
@@ -258,19 +327,31 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/chat?projectId=X — clear chat history
+// DELETE /api/chat?conversationId=X — clear chat history
 export async function DELETE(request: NextRequest) {
   try {
-    const projectId = request.nextUrl.searchParams.get("projectId");
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+    const conversationId = request.nextUrl.searchParams.get("conversationId");
+    if (!conversationId) {
+      return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    }
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
-    await prisma.chatMessage.deleteMany({ where: { projectId } });
+    await prisma.chatMessage.deleteMany({ where: { conversationId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("DELETE /api/chat error", error);
