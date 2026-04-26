@@ -244,7 +244,22 @@ describe("MCP Project Tools", () => {
         });
         const p = await projectTools.createProject({ title: "With User", userId: "user-123" });
         const stored = await prisma.project.findUnique({ where: { id: p.id } });
-        expect(stored?.userId).toBe("user-123");
+        expect(stored).not.toBeNull();
+        expect(stored!.userId).toBe("user-123");
+    });
+
+    it("createProject stores null userId when omitted", async () => {
+        const p = await projectTools.createProject({ title: "No User" });
+        const stored = await prisma.project.findUnique({ where: { id: p.id } });
+        expect(stored).not.toBeNull();
+        expect(stored!.userId).toBeNull();
+    });
+
+    it("createProject discards empty-string userId", async () => {
+        const p = await projectTools.createProject({ title: "Empty User", userId: "" });
+        const stored = await prisma.project.findUnique({ where: { id: p.id } });
+        expect(stored).not.toBeNull();
+        expect(stored!.userId).toBeNull();
     });
 
     it("updateProject with valid contentHash succeeds", async () => {
