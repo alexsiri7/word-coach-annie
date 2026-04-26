@@ -4,7 +4,7 @@ import { getAiConfig, getAiPreferences, buildPreferenceInstructions, getCompress
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
-import { runChatAgent } from "@/lib/ai/adk-agent";
+import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { compressConversation } from "@/lib/ai/chat-compression";
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
@@ -302,6 +302,42 @@ export async function POST(request: NextRequest) {
             await prisma.chatMessage.create({
               data: { conversationId, role: "assistant", content: finalContent },
             });
+          }
+
+          // Auto-title: fire-and-forget on first assistant reply
+          if (conversation.title === "New chat" && finalContent) {
+            (async () => {
+              const assistantCount = await prisma.chatMessage.count({
+                where: { conversationId, role: "assistant" },
+              });
+              if (assistantCount === 1) {
+                const firstUserMsg = await prisma.chatMessage.findFirst({
+                  where: { conversationId, role: "user" },
+                  orderBy: { createdAt: "asc" },
+                  select: { content: true },
+                });
+                if (firstUserMsg) {
+                  const title = await runSimpleCompletion({
+                    systemPrompt:
+                      "Generate a short title (3–6 words) for a writing coach conversation. Return only the title, no quotes, no punctuation at the end.",
+                    userMessage: firstUserMsg.content.slice(0, 500),
+                    aiConfig,
+                    maxTokens: 20,
+                    temperature: 0.3,
+                  });
+                  const cleanTitle = title
+                    .replace(/^["']|["']$/g, "")
+                    .trim()
+                    .slice(0, 100);
+                  if (cleanTitle) {
+                    await prisma.conversation.update({
+                      where: { id: conversationId },
+                      data: { title: cleanTitle },
+                    });
+                  }
+                }
+              }
+            })().catch((err) => logger.error("autoTitle failed", err));
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
