@@ -24,7 +24,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
 
   if (!project) throw new Error("Project not found");
 
-  // Build outline summary
   const chapters = project.structureNodes.filter((n) => n.type === "CHAPTER");
   const scenes = project.structureNodes.filter((n) => n.type === "SCENE");
   const outlineSummary = chapters
@@ -37,7 +36,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
     })
     .join("\n");
 
-  // Group story objects by type
   const grouped: Record<string, typeof project.storyObjects> = {};
   for (const obj of project.storyObjects) {
     if (!grouped[obj.type]) grouped[obj.type] = [];
@@ -52,6 +50,47 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
       return `${type}:\n${items}`;
     })
     .join("\n\n");
+
+  let universeSummary = "";
+  if (project.universeId) {
+    const universe = await prisma.universe.findUnique({
+      where: { id: project.universeId },
+      include: {
+        worldObjects: {
+          include: { timeline: { orderBy: { orderIndex: "asc" } } },
+          orderBy: [{ type: "asc" }, { name: "asc" }],
+        },
+      },
+    });
+    if (!universe) {
+      logger.warn("Universe not found for project — universe context omitted", {
+        projectId,
+        universeId: project.universeId,
+      });
+    } else if (universe.worldObjects.length > 0) {
+      const groupedWO: Record<string, typeof universe.worldObjects> = {};
+      for (const wo of universe.worldObjects) {
+        if (!groupedWO[wo.type]) groupedWO[wo.type] = [];
+        groupedWO[wo.type].push(wo);
+      }
+      const woSections = Object.entries(groupedWO)
+        .map(([type, objs]) => {
+          const items = objs
+            .map((o) => {
+              const base = `  - ${o.name}${o.description ? `: ${o.description.slice(0, 150)}` : ""}`;
+              if (o.timeline.length === 0) return base;
+              const states = o.timeline
+                .map((e) => `    [${e.label}]${e.description ? ` ${e.description.slice(0, 100)}` : ""}`)
+                .join("\n");
+              return `${base}\n${states}`;
+            })
+            .join("\n");
+          return `${type}:\n${items}`;
+        })
+        .join("\n\n");
+      universeSummary = `\n\n## Shared Universe: ${universe.title}${universe.description ? `\n${universe.description.slice(0, 200)}` : ""}\n\n${woSections}`;
+    }
+  }
 
   return `You are Annie — a writing coach, not a ghostwriter. You're helping with "${project.title}"${project.genre ? ` (${project.genre})` : ""}.
 
@@ -73,7 +112,7 @@ ${project.synopsis ? `SYNOPSIS: ${project.synopsis}\n` : ""}
 STORY STRUCTURE:
 ${outlineSummary || "(No chapters yet)"}
 
-${objectsSummary || "(No characters/locations yet)"}
+${objectsSummary || "(No characters/locations yet)"}${universeSummary}
 
 ## Your Role
 - Discuss plot, characters, pacing, themes, and structure
