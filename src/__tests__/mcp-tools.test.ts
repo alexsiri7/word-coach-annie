@@ -239,6 +239,9 @@ describe("MCP Project Tools", () => {
     });
 
     it("createProject stores userId when provided", async () => {
+        await prisma.user.create({
+            data: { id: "user-123", email: "user-123@test.com", googleId: "google-user-123", name: "Test User" },
+        });
         const p = await projectTools.createProject({ title: "With User", userId: "user-123" });
         const stored = await prisma.project.findUnique({ where: { id: p.id } });
         expect(stored?.userId).toBe("user-123");
