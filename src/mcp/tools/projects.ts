@@ -34,6 +34,7 @@ export async function createProject(params: {
     author?: string;
     synopsis?: string;
     genre?: string;
+    userId?: string | null;
 }) {
     const result = await ProjectsController.createProject(params);
     mcpCache.invalidatePrefix("projects:");

@@ -4,7 +4,8 @@ import { logger } from "@/lib/logger";
 
 async function handleMcpRequest(req: Request): Promise<Response> {
     try {
-        const server = createServer();
+        const userId = req.headers.get("x-user-id");
+        const server = createServer({ userId });
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined, // stateless mode
             enableJsonResponse: true,

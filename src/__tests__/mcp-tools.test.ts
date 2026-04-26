@@ -6,6 +6,7 @@ import * as projectTools from "@/mcp/tools/projects";
 import * as storyObjectTools from "@/mcp/tools/story-objects";
 import * as universeTools from "@/mcp/tools/universes";
 import { StaleWriteError } from "@/mcp/content-hash";
+import { prisma } from "@/lib/db";
 
 describe("MCP Structure Tools", () => {
     let projectId: string;
@@ -235,6 +236,12 @@ describe("MCP Project Tools", () => {
     it("createProject delegates to ProjectsController", async () => {
         const p = await projectTools.createProject({ title: "New Project" });
         expect(p.title).toBe("New Project");
+    });
+
+    it("createProject stores userId when provided", async () => {
+        const p = await projectTools.createProject({ title: "With User", userId: "user-123" });
+        const stored = await prisma.project.findUnique({ where: { id: p.id } });
+        expect(stored?.userId).toBe("user-123");
     });
 
     it("updateProject with valid contentHash succeeds", async () => {
