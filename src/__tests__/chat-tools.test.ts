@@ -5,8 +5,10 @@ const { mockRunChatAgent, mockPrisma, mockGetAiConfig } = vi.hoisted(() => ({
   mockRunChatAgent: vi.fn(),
   mockPrisma: {
     project: { findUnique: vi.fn() },
+    conversation: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
     chatMessage: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
@@ -30,6 +32,15 @@ vi.mock("@/lib/ai/settings", () => ({
     responseLength: "moderate",
   }),
   buildPreferenceInstructions: vi.fn().mockReturnValue(""),
+  getCompressionSettings: vi.fn().mockResolvedValue({
+    chatWindowSize: 5,
+    messagesUntilCompression: 15,
+    compressionModel: "",
+  }),
+}));
+
+vi.mock("@/lib/ai/chat-compression", () => ({
+  compressConversation: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Import after mocks
@@ -69,6 +80,16 @@ const fakeProject = {
   storyObjects: [],
 };
 
+const fakeConversation = {
+  id: "conv-1",
+  projectId: "proj-1",
+  title: "Test chat",
+  summary: null,
+  summarizedThroughMessageId: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 
@@ -78,9 +99,12 @@ beforeEach(() => {
     model: "test-model",
   });
   mockPrisma.project.findUnique.mockResolvedValue(fakeProject);
+  mockPrisma.conversation.findUnique.mockResolvedValue(fakeConversation);
+  mockPrisma.conversation.findUniqueOrThrow.mockResolvedValue(fakeConversation);
   mockPrisma.chatMessage.findMany.mockResolvedValue([
     { role: "user", content: "Hello", createdAt: new Date() },
   ]);
+  mockPrisma.chatMessage.findUnique.mockResolvedValue(null);
   mockPrisma.chatMessage.create.mockResolvedValue({});
 });
 
@@ -88,7 +112,7 @@ describe("Chat route with tool use", () => {
   it("calls ADK agent with correct parameters", async () => {
     mockRunChatAgent.mockResolvedValueOnce({ finalContent: "Hello!", toolLog: [] });
 
-    const req = makeRequest({ projectId: "proj-1", message: "Hi" });
+    const req = makeRequest({ conversationId: "conv-1", message: "Hi" });
     await POST(req as any);
 
     expect(mockRunChatAgent).toHaveBeenCalledTimes(1);
@@ -114,7 +138,7 @@ describe("Chat route with tool use", () => {
       ],
     });
 
-    const req = makeRequest({ projectId: "proj-1", message: "Show me the outline" });
+    const req = makeRequest({ conversationId: "conv-1", message: "Show me the outline" });
     const response = await POST(req as any);
     const chunks = await readSSE(response);
 
@@ -152,7 +176,7 @@ describe("Chat route with tool use", () => {
       ],
     });
 
-    const req = makeRequest({ projectId: "proj-1", message: "Add a new chapter" });
+    const req = makeRequest({ conversationId: "conv-1", message: "Add a new chapter" });
     const response = await POST(req as any);
     const chunks = await readSSE(response);
 
@@ -181,7 +205,7 @@ describe("Chat route with tool use", () => {
       ],
     });
 
-    const req = makeRequest({ projectId: "proj-1", message: "Get nonexistent project" });
+    const req = makeRequest({ conversationId: "conv-1", message: "Get nonexistent project" });
     const response = await POST(req as any);
     const chunks = await readSSE(response);
 
@@ -204,7 +228,7 @@ describe("Chat route with tool use", () => {
       ],
     });
 
-    const req = makeRequest({ projectId: "proj-1", message: "List my projects" });
+    const req = makeRequest({ conversationId: "conv-1", message: "List my projects" });
     await POST(req as any);
 
     // Should save: user message, system (tool log), assistant response = 3 creates
@@ -240,7 +264,7 @@ describe("Chat route with tool use", () => {
       ],
     });
 
-    const req = makeRequest({ projectId: "proj-1", message: "Give me an overview" });
+    const req = makeRequest({ conversationId: "conv-1", message: "Give me an overview" });
     const response = await POST(req as any);
     const chunks = await readSSE(response);
 
@@ -253,7 +277,7 @@ describe("Chat route with tool use", () => {
   it("passes chat history to ADK agent", async () => {
     mockRunChatAgent.mockResolvedValueOnce({ finalContent: "Response", toolLog: [] });
 
-    const req = makeRequest({ projectId: "proj-1", message: "test" });
+    const req = makeRequest({ conversationId: "conv-1", message: "test" });
     await POST(req as any);
 
     const args = mockRunChatAgent.mock.calls[0][0];

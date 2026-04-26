@@ -16,6 +16,18 @@ export interface AiPreferences {
   responseLength: ResponseLength;
 }
 
+export interface ChatCompressionSettings {
+  chatWindowSize: number;
+  messagesUntilCompression: number;
+  compressionModel: string;
+}
+
+const DEFAULT_COMPRESSION: ChatCompressionSettings = {
+  chatWindowSize: 5,
+  messagesUntilCompression: 15,
+  compressionModel: "",
+};
+
 const DEFAULT_PREFERENCES: AiPreferences = {
   customInstructions: "",
   coachingStyle: "balanced",
@@ -91,6 +103,25 @@ export async function getAiPreferences(userId?: string | null): Promise<AiPrefer
     // Table may not exist yet
   }
   return DEFAULT_PREFERENCES;
+}
+
+export async function getCompressionSettings(
+  userId?: string | null
+): Promise<ChatCompressionSettings> {
+  if (!userId) return DEFAULT_COMPRESSION;
+  try {
+    const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
+    if (userSettings) {
+      return {
+        chatWindowSize: userSettings.chatWindowSize,
+        messagesUntilCompression: userSettings.messagesUntilCompression,
+        compressionModel: userSettings.compressionModel || "",
+      };
+    }
+  } catch {
+    // Table may not exist yet
+  }
+  return DEFAULT_COMPRESSION;
 }
 
 const COACHING_STYLE_INSTRUCTIONS: Record<CoachingStyle, string> = {

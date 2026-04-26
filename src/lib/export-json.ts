@@ -16,7 +16,7 @@ export async function exportProjectJson(projectId: string) {
         orderBy: [{ type: "asc" }, { name: "asc" }],
       }),
       prisma.chatMessage.findMany({
-        where: { projectId },
+        where: { conversation: { projectId } },
         orderBy: { createdAt: "asc" },
       }),
       prisma.annotation.findMany({

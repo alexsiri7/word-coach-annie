@@ -114,12 +114,15 @@ describe("exportProjectJson", () => {
   });
 
   it("exports chat history in chronological order", async () => {
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId, title: "Test chat" },
+    });
     await testPrisma.chatMessage.create({
-      data: { projectId, role: "user", content: "Help me with chapter 1" },
+      data: { conversationId: conversation.id, role: "user", content: "Help me with chapter 1" },
     });
     await testPrisma.chatMessage.create({
       data: {
-        projectId,
+        conversationId: conversation.id,
         role: "assistant",
         content: "Here are some suggestions...",
       },
