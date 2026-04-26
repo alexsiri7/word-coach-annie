@@ -129,8 +129,9 @@ export class ProjectsController {
         synopsis?: string;
         genre?: string;
         projectType?: string;
+        userId?: string | null;
     }) {
-        const { title, author, synopsis, genre, projectType } = params;
+        const { title, author, synopsis, genre, projectType, userId } = params;
 
         if (!title || title.trim().length === 0) {
             throw new Error("Title is required");
@@ -143,6 +144,7 @@ export class ProjectsController {
                 ...(synopsis && { synopsis: synopsis.trim() }),
                 ...(genre && { genre: genre.trim() }),
                 ...(projectType && { projectType }),
+                ...(userId && { userId }),
             },
         });
 

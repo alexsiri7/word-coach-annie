@@ -17,9 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const baseUrl = env.GOOGLE_REDIRECT_URI
-            ? new URL(env.GOOGLE_REDIRECT_URI).origin
-            : new URL(request.url).origin;
+        const baseUrl = new URL(env.GOOGLE_REDIRECT_URI || request.url).origin;
         const redirectUri = `${baseUrl}/api/auth/google-docs/callback`;
 
         const state = crypto.randomUUID();
