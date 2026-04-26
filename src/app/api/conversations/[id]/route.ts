@@ -9,8 +9,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string | undefined;
   try {
-    const { id } = await params;
+    ({ id } = await params);
     const body = await request.json();
     const parsed = ConversationUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -34,7 +35,7 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
-    logger.error("PATCH /api/conversations/[id] error", error);
+    logger.error("PATCH /api/conversations/[id] error", { id, error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -43,8 +44,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string | undefined;
   try {
-    const { id } = await params;
+    ({ id } = await params);
     const conversation = await prisma.conversation.findUnique({ where: { id } });
     if (!conversation) {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -57,7 +59,7 @@ export async function DELETE(
     await prisma.conversation.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error("DELETE /api/conversations/[id] error", error);
+    logger.error("DELETE /api/conversations/[id] error", { id, error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

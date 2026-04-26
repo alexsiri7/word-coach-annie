@@ -250,6 +250,10 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
     setThreadsOpen(false);
     try {
       const res = await fetch(`/api/chat?conversationId=${id}`);
+      if (!res.ok) {
+        console.error("switchThread failed", res.status);
+        return;
+      }
       const data = await res.json();
       if (data.messages) setMessages(data.messages);
     } catch (err) {
@@ -267,6 +271,11 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("createThread failed", res.status, body);
+        return;
+      }
       const conv = await res.json();
       setConversations((prev) => [conv, ...prev]);
       setConversationId(conv.id);
@@ -288,6 +297,10 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
       });
+      if (!res.ok) {
+        console.error("submitRename failed", res.status);
+        return;
+      }
       const updated = await res.json();
       setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title: updated.title, updatedAt: updated.updatedAt } : c));
     } catch (err) {
@@ -301,7 +314,12 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
     if (!deleteTarget) return;
     const { id } = deleteTarget;
     try {
-      await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        console.error("handleDelete failed", res.status);
+        setDeleteTarget(null);
+        return;
+      }
       const remaining = conversations.filter((c) => c.id !== id);
       setConversations(remaining);
       setDeleteTarget(null);
@@ -314,6 +332,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
       }
     } catch (err) {
       console.error(err);
+      setDeleteTarget(null);
     }
   }, [deleteTarget, conversations, conversationId, switchThread, createThread]);
 

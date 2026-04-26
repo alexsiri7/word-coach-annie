@@ -24,12 +24,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ conversations });
   } catch (error) {
-    logger.error("GET /api/conversations error", error);
+    logger.error("GET /api/conversations error", { projectId: request.nextUrl.searchParams.get("projectId"), error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  let projectId: string | undefined;
   try {
     const body = await request.json();
     const parsed = ConversationCreateSchema.safeParse(body);
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { projectId, title } = parsed.data;
+    ({ projectId } = parsed.data);
+    const { title } = parsed.data;
     const userId = getCurrentUserId(request);
     const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(conversation, { status: 201 });
   } catch (error) {
-    logger.error("POST /api/conversations error", error);
+    logger.error("POST /api/conversations error", { projectId, error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

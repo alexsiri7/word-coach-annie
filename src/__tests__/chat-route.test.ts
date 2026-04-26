@@ -13,6 +13,7 @@ vi.mock("@/lib/ai/adk-agent", () => ({
     finalContent: "Annie says hello!",
     toolLog: [],
   })),
+  runSimpleCompletion: vi.fn(async () => "Draft and Revision"),
 }));
 
 vi.mock("@/lib/ai/settings", () => ({

@@ -134,6 +134,28 @@ describe("POST /api/conversations", () => {
     const body = await res.json();
     expect(body.title).toBe("My Thread");
   });
+
+  it("returns 403 for forbidden project", async () => {
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({
+      authorized: false,
+      response: new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    } as never);
+
+    const { POST } = await import("@/app/api/conversations/route");
+    const res = await POST(makePostRequest({ projectId }));
+    expect(res.status).toBe(403);
+  });
+
+  it("sanitizes title before saving", async () => {
+    const { POST } = await import("@/app/api/conversations/route");
+    const res = await POST(makePostRequest({ projectId, title: "<script>alert('xss')</script>Thread" }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.title).not.toContain("<script>");
+  });
 });
 
 describe("PATCH /api/conversations/[id]", () => {
@@ -177,6 +199,30 @@ describe("PATCH /api/conversations/[id]", () => {
 
     const body = await res.json();
     expect(body.title).toBe("Renamed Thread");
+  });
+
+  it("returns 403 for forbidden project", async () => {
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({
+      authorized: false,
+      response: new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    } as never);
+
+    const { PATCH } = await import("@/app/api/conversations/[id]/route");
+    const req = makePatchRequest(conversationId, { title: "Attempt" });
+    const res = await PATCH(req, { params: Promise.resolve({ id: conversationId }) });
+    expect(res.status).toBe(403);
+  });
+
+  it("sanitizes title before saving", async () => {
+    const { PATCH } = await import("@/app/api/conversations/[id]/route");
+    const req = makePatchRequest(conversationId, { title: "<script>alert('xss')</script>Renamed" });
+    const res = await PATCH(req, { params: Promise.resolve({ id: conversationId }) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.title).not.toContain("<script>");
   });
 });
 
@@ -224,5 +270,20 @@ describe("DELETE /api/conversations/[id]", () => {
 
     const messages = await testPrisma.chatMessage.findMany({ where: { conversationId } });
     expect(messages).toHaveLength(0);
+  });
+
+  it("returns 403 for forbidden project", async () => {
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({
+      authorized: false,
+      response: new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    } as never);
+
+    const { DELETE } = await import("@/app/api/conversations/[id]/route");
+    const req = makeDeleteRequest(conversationId);
+    const res = await DELETE(req, { params: Promise.resolve({ id: conversationId }) });
+    expect(res.status).toBe(403);
   });
 });

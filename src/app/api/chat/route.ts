@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
                   }
                 }
               }
-            })().catch((err) => logger.error("autoTitle failed", err));
+            })().catch((err) => logger.error("autoTitle failed", { conversationId, error: err }));
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
