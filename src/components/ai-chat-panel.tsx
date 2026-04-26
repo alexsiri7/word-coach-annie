@@ -103,6 +103,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialMessageFiredRef = useRef(false);
+  const titleRefreshFiredRef = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -281,6 +282,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
       setConversationId(conv.id);
       setMessages([]);
       setThreadsOpen(false);
+      titleRefreshFiredRef.current = null;
     } catch (err) {
       console.error(err);
     } finally {
@@ -336,18 +338,26 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
     }
   }, [deleteTarget, conversations, conversationId, switchThread, createThread]);
 
-  // Refresh conversation title after first assistant reply completes
+  // Refresh conversation title once after first assistant reply completes.
+  // The ref guards against unbounded polling when auto-title silently fails
+  // (runSimpleCompletion returns "" on model failure — title stays "New chat").
   useEffect(() => {
     if (!conversationId || isStreaming) return;
+    if (titleRefreshFiredRef.current === conversationId) return;
     const active = conversations.find((c) => c.id === conversationId);
     if (!active || active.title !== "New chat") return;
     const hasAssistantMsg = messages.some((m) => m.role === "assistant");
     if (!hasAssistantMsg) return;
+
+    titleRefreshFiredRef.current = conversationId;
     const timer = setTimeout(() => {
       fetch(`/api/conversations?projectId=${projectId}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
         .then((d) => { if (d.conversations) setConversations(d.conversations); })
-        .catch(console.error);
+        .catch((err) => console.error("title refresh failed:", err));
     }, 2000);
     return () => clearTimeout(timer);
   }, [isStreaming, conversationId, conversations, messages, projectId]);

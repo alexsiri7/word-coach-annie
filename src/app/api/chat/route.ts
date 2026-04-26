@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { compressConversation } from "@/lib/ai/chat-compression";
+import type { AiProviderConfig } from "@/lib/ai/settings";
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
@@ -82,6 +83,36 @@ ${objectsSummary || "(No characters/locations yet)"}
 - Keep responses concise unless asked to elaborate
 - Use the story's existing characters and locations — don't invent new ones unless asked
 - You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
+}
+
+async function autoTitleConversation(conversationId: string, aiConfig: AiProviderConfig): Promise<void> {
+  const assistantCount = await prisma.chatMessage.count({
+    where: { conversationId, role: "assistant" },
+  });
+  if (assistantCount !== 1) return;
+
+  const firstUserMsg = await prisma.chatMessage.findFirst({
+    where: { conversationId, role: "user" },
+    orderBy: { createdAt: "asc" },
+    select: { content: true },
+  });
+  if (!firstUserMsg) return;
+
+  const title = await runSimpleCompletion({
+    systemPrompt:
+      "Generate a short title (3–6 words) for a writing coach conversation. Return only the title, no quotes, no punctuation at the end.",
+    userMessage: firstUserMsg.content.slice(0, 500),
+    aiConfig,
+    maxTokens: 20,
+    temperature: 0.3,
+  });
+  const cleanTitle = title.replace(/^["']|["']$/g, "").trim().slice(0, 100);
+  if (cleanTitle) {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { title: cleanTitle },
+    });
+  }
 }
 
 // GET /api/chat?conversationId=X or ?projectId=X — load conversation + chat history
@@ -189,21 +220,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Load all messages since last compaction
+    let afterDate: Date | undefined;
+    if (conversation.summarizedThroughMessageId) {
+      const pivot = await prisma.chatMessage.findUnique({
+        where: { id: conversation.summarizedThroughMessageId },
+        select: { createdAt: true },
+      });
+      afterDate = pivot?.createdAt ?? new Date(0);
+    }
+
     const allMessages = await prisma.chatMessage.findMany({
       where: {
         conversationId,
-        ...(conversation.summarizedThroughMessageId
-          ? {
-              createdAt: {
-                gt: (
-                  await prisma.chatMessage.findUnique({
-                    where: { id: conversation.summarizedThroughMessageId },
-                    select: { createdAt: true },
-                  })
-                )?.createdAt ?? new Date(0),
-              },
-            }
-          : {}),
+        ...(afterDate ? { createdAt: { gt: afterDate } } : {}),
       },
       orderBy: { createdAt: "asc" },
     });
@@ -306,38 +335,9 @@ export async function POST(request: NextRequest) {
 
           // Auto-title: fire-and-forget on first assistant reply
           if (conversation.title === "New chat" && finalContent) {
-            (async () => {
-              const assistantCount = await prisma.chatMessage.count({
-                where: { conversationId, role: "assistant" },
-              });
-              if (assistantCount === 1) {
-                const firstUserMsg = await prisma.chatMessage.findFirst({
-                  where: { conversationId, role: "user" },
-                  orderBy: { createdAt: "asc" },
-                  select: { content: true },
-                });
-                if (firstUserMsg) {
-                  const title = await runSimpleCompletion({
-                    systemPrompt:
-                      "Generate a short title (3–6 words) for a writing coach conversation. Return only the title, no quotes, no punctuation at the end.",
-                    userMessage: firstUserMsg.content.slice(0, 500),
-                    aiConfig,
-                    maxTokens: 20,
-                    temperature: 0.3,
-                  });
-                  const cleanTitle = title
-                    .replace(/^["']|["']$/g, "")
-                    .trim()
-                    .slice(0, 100);
-                  if (cleanTitle) {
-                    await prisma.conversation.update({
-                      where: { id: conversationId },
-                      data: { title: cleanTitle },
-                    });
-                  }
-                }
-              }
-            })().catch((err) => logger.error("autoTitle failed", { conversationId, error: err }));
+            autoTitleConversation(conversationId, aiConfig).catch(
+              (err) => logger.error("autoTitle failed", { conversationId, error: err })
+            );
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
