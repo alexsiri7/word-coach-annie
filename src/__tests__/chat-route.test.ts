@@ -154,10 +154,58 @@ describe("POST /api/chat", () => {
     const { POST } = await import("@/app/api/chat/route");
     await POST(makePostRequest({ conversationId: linkedConversation.id, message: "Tell me about the Hero" }));
 
-    const call = vi.mocked(runChatAgent).mock.calls[0][0];
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
     expect(call.systemPrompt).toContain("Shared Universe: The Realm");
     expect(call.systemPrompt).toContain("The Hero");
     expect(call.systemPrompt).toContain("[Origin]");
+  });
+
+  it("includes world objects without timeline entries without brackets", async () => {
+    const universe = await testPrisma.universe.create({
+      data: { title: "The Realm", description: "A vast shared world" },
+    });
+    const wo1 = await testPrisma.worldObject.create({
+      data: { universeId: universe.id, type: "CHARACTER", name: "The Hero", description: "An ancient champion" },
+    });
+    await testPrisma.worldObjectTimelineEntry.create({
+      data: { worldObjectId: wo1.id, label: "Origin", description: "Born of fire", orderIndex: 0 },
+    });
+    await testPrisma.worldObject.create({
+      data: { universeId: universe.id, type: "CHARACTER", name: "The Sidekick", description: "A plucky companion" },
+    });
+    const linkedProject = await testPrisma.project.create({
+      data: { title: "Linked Novel", author: "Author", universeId: universe.id },
+    });
+    const linkedConversation = await testPrisma.conversation.create({
+      data: { projectId: linkedProject.id, title: "Chat" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: linkedConversation.id, message: "Hello" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("The Hero");
+    expect(call.systemPrompt).toContain("[Origin]");
+    expect(call.systemPrompt).toContain("The Sidekick");
+    expect(call.systemPrompt).not.toMatch(/The Sidekick[\s\S]*?\[/);
+  });
+
+  it("omits universe section when linked universe has no world objects", async () => {
+    const emptyUniverse = await testPrisma.universe.create({
+      data: { title: "Empty World", description: "" },
+    });
+    const linkedProject = await testPrisma.project.create({
+      data: { title: "Sparse Novel", author: "Author", universeId: emptyUniverse.id },
+    });
+    const linkedConversation = await testPrisma.conversation.create({
+      data: { projectId: linkedProject.id, title: "Chat" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: linkedConversation.id, message: "hello" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).not.toContain("Shared Universe");
   });
 });
 

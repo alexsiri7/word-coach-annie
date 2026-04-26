@@ -24,7 +24,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
 
   if (!project) throw new Error("Project not found");
 
-  // Build outline summary
   const chapters = project.structureNodes.filter((n) => n.type === "CHAPTER");
   const scenes = project.structureNodes.filter((n) => n.type === "SCENE");
   const outlineSummary = chapters
@@ -37,7 +36,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
     })
     .join("\n");
 
-  // Group story objects by type
   const grouped: Record<string, typeof project.storyObjects> = {};
   for (const obj of project.storyObjects) {
     if (!grouped[obj.type]) grouped[obj.type] = [];
@@ -64,7 +62,12 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
         },
       },
     });
-    if (universe && universe.worldObjects.length > 0) {
+    if (!universe) {
+      logger.warn("Universe not found for project — universe context omitted", {
+        projectId,
+        universeId: project.universeId,
+      });
+    } else if (universe.worldObjects.length > 0) {
       const groupedWO: Record<string, typeof universe.worldObjects> = {};
       for (const wo of universe.worldObjects) {
         if (!groupedWO[wo.type]) groupedWO[wo.type] = [];
