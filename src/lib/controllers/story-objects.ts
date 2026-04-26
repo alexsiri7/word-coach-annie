@@ -250,7 +250,7 @@ export class StoryObjectController {
 
         try {
             autoSnapshot("delete_story_object", obj.name);
-        } catch (e) {
+        } catch {
             // ignore snapshot issues in pure execution context if necessary
         }
 
@@ -364,7 +364,7 @@ export class StoryObjectController {
 
         try {
             autoSnapshot("batch_delete_story_objects", `${objectIds.length} objects`);
-        } catch (e) {
+        } catch {
             // ignore snapshot issues
         }
 
