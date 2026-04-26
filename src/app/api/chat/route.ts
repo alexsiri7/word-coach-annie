@@ -175,6 +175,12 @@ export async function GET(request: NextRequest) {
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
+      const access = await verifyProjectWriteAccess(
+        conversation.projectId,
+        userId,
+        request.headers.get("x-user-email")
+      );
+      if (!access.authorized) return access.response;
     } else {
       const access = await verifyProjectWriteAccess(projectId!, userId, request.headers.get("x-user-email"));
       if (!access.authorized) return access.response;
@@ -191,13 +197,6 @@ export async function GET(request: NextRequest) {
         });
       }
     }
-
-    const access = await verifyProjectWriteAccess(
-      conversation.projectId,
-      userId,
-      request.headers.get("x-user-email")
-    );
-    if (!access.authorized) return access.response;
 
     const messages = await prisma.chatMessage.findMany({
       where: { conversationId: conversation.id },

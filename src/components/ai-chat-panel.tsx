@@ -304,7 +304,9 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
         return;
       }
       const updated = await res.json();
-      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title: updated.title, updatedAt: updated.updatedAt } : c));
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: updated.title, updatedAt: updated.updatedAt } : c))
+      );
     } catch (err) {
       console.error(err);
     } finally {
@@ -363,7 +365,6 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
   }, [isStreaming, conversationId, conversations, messages, projectId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Enter (without Shift) or Cmd/Ctrl+Enter sends the message
     if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       sendMessage();
