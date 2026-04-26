@@ -36,7 +36,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
-import { runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
 import { NextRequest } from "next/server";
 
@@ -122,6 +122,42 @@ describe("POST /api/chat", () => {
     const userMsg = messages.find((m) => m.role === "user");
     expect(userMsg).toBeDefined();
     expect(userMsg!.content).not.toContain("<script>");
+  });
+
+  it("includes shared universe section in system prompt when project has universeId", async () => {
+    const universe = await testPrisma.universe.create({
+      data: { title: "The Realm", description: "A vast shared world" },
+    });
+    const wo = await testPrisma.worldObject.create({
+      data: {
+        universeId: universe.id,
+        type: "CHARACTER",
+        name: "The Hero",
+        description: "An ancient champion",
+      },
+    });
+    await testPrisma.worldObjectTimelineEntry.create({
+      data: {
+        worldObjectId: wo.id,
+        label: "Origin",
+        description: "Born of fire",
+        orderIndex: 0,
+      },
+    });
+    const linkedProject = await testPrisma.project.create({
+      data: { title: "Linked Novel", author: "Author", universeId: universe.id },
+    });
+    const linkedConversation = await testPrisma.conversation.create({
+      data: { projectId: linkedProject.id, title: "Chat" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: linkedConversation.id, message: "Tell me about the Hero" }));
+
+    const call = vi.mocked(runChatAgent).mock.calls[0][0];
+    expect(call.systemPrompt).toContain("Shared Universe: The Realm");
+    expect(call.systemPrompt).toContain("The Hero");
+    expect(call.systemPrompt).toContain("[Origin]");
   });
 });
 

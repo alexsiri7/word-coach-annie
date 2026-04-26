@@ -53,6 +53,42 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
     })
     .join("\n\n");
 
+  let universeSummary = "";
+  if (project.universeId) {
+    const universe = await prisma.universe.findUnique({
+      where: { id: project.universeId },
+      include: {
+        worldObjects: {
+          include: { timeline: { orderBy: { orderIndex: "asc" } } },
+          orderBy: [{ type: "asc" }, { name: "asc" }],
+        },
+      },
+    });
+    if (universe && universe.worldObjects.length > 0) {
+      const groupedWO: Record<string, typeof universe.worldObjects> = {};
+      for (const wo of universe.worldObjects) {
+        if (!groupedWO[wo.type]) groupedWO[wo.type] = [];
+        groupedWO[wo.type].push(wo);
+      }
+      const woSections = Object.entries(groupedWO)
+        .map(([type, objs]) => {
+          const items = objs
+            .map((o) => {
+              const base = `  - ${o.name}${o.description ? `: ${o.description.slice(0, 150)}` : ""}`;
+              if (o.timeline.length === 0) return base;
+              const states = o.timeline
+                .map((e) => `    [${e.label}]${e.description ? ` ${e.description.slice(0, 100)}` : ""}`)
+                .join("\n");
+              return `${base}\n${states}`;
+            })
+            .join("\n");
+          return `${type}:\n${items}`;
+        })
+        .join("\n\n");
+      universeSummary = `\n\n## Shared Universe: ${universe.title}${universe.description ? `\n${universe.description.slice(0, 200)}` : ""}\n\n${woSections}`;
+    }
+  }
+
   return `You are Annie — a writing coach, not a ghostwriter. You're helping with "${project.title}"${project.genre ? ` (${project.genre})` : ""}.
 
 ## Who You Are
@@ -73,7 +109,7 @@ ${project.synopsis ? `SYNOPSIS: ${project.synopsis}\n` : ""}
 STORY STRUCTURE:
 ${outlineSummary || "(No chapters yet)"}
 
-${objectsSummary || "(No characters/locations yet)"}
+${objectsSummary || "(No characters/locations yet)"}${universeSummary}
 
 ## Your Role
 - Discuss plot, characters, pacing, themes, and structure
