@@ -435,17 +435,78 @@ Get all context needed for focus mode.
 
 ---
 
-## AI Chat
+## Chat Threads
 
-### `POST /api/chat`
-Stream an AI chat response for a project.
+Conversations are named thread containers scoped to a project. Each project has one or more threads; `POST /api/chat` messages are always sent to a specific thread via `conversationId`.
+
+### `GET /api/conversations`
+List all conversation threads for a project, ordered by most recently updated.
+
+**Query params**: `projectId=<id>` (required)
+
+**Response**: `{ conversations: [{ id, title, updatedAt }] }`
+
+**Errors**: `400` if `projectId` missing; `403` if not authorized.
+
+---
+
+### `POST /api/conversations`
+Create a new conversation thread.
 
 **Body**:
 ```json
 {
   "projectId": "string",
+  "title": "string (optional — defaults to \"New chat\")"
+}
+```
+
+**Response** (`201`): `{ id, title, projectId, createdAt, updatedAt }`
+
+**Errors**: `400` if `projectId` missing; `403` if not authorized.
+
+---
+
+### `PATCH /api/conversations/[id]`
+Rename a conversation thread.
+
+**Body**: `{ "title": "string" }`
+
+**Response**: `{ id, title, updatedAt }`
+
+**Errors**: `400` if title missing; `404` if conversation not found; `403` if not authorized.
+
+---
+
+### `DELETE /api/conversations/[id]`
+Delete a conversation thread and cascade-delete all its messages.
+
+**Response**: `{ success: true }`
+
+**Errors**: `404` if conversation not found; `403` if not authorized.
+
+---
+
+## AI Chat
+
+### `GET /api/chat`
+Load conversation metadata and message history.
+
+**Query params**: `conversationId=<id>` — OR — `projectId=<id>` (returns or creates the default conversation for the project)
+
+**Response**: `{ conversation: { id, title, projectId, ... }, messages: [...] }`
+
+---
+
+### `POST /api/chat`
+Stream an AI chat response within a conversation thread.
+
+**Body**:
+```json
+{
+  "conversationId": "string",
   "message": "string",
-  "sceneId": "string (optional — injects scene content into context)"
+  "sceneContext": "string (optional — injects scene content into context)"
 }
 ```
 

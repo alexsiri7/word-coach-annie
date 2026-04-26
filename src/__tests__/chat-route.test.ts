@@ -13,6 +13,7 @@ vi.mock("@/lib/ai/adk-agent", () => ({
     finalContent: "Annie says hello!",
     toolLog: [],
   })),
+  runSimpleCompletion: vi.fn(async () => "Draft and Revision"),
 }));
 
 vi.mock("@/lib/ai/settings", () => ({
@@ -35,6 +36,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { logger } from "@/lib/logger";
 import { NextRequest } from "next/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -119,6 +122,99 @@ describe("POST /api/chat", () => {
     const userMsg = messages.find((m) => m.role === "user");
     expect(userMsg).toBeDefined();
     expect(userMsg!.content).not.toContain("<script>");
+  });
+});
+
+describe("POST /api/chat — auto-title", () => {
+  let projectId: string;
+  let conversationId: string;
+
+  async function drainStream(res: Response) {
+    const reader = res.body!.getReader();
+    while (!(await reader.read()).done) {}
+    // Allow the fire-and-forget IIFE microtasks to settle.
+    await new Promise((r) => setTimeout(r, 50));
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true } as never);
+    vi.mocked(runSimpleCompletion).mockResolvedValue("Generated title");
+
+    const project = await testPrisma.project.create({
+      data: { title: "Auto-title Test", author: "Author" },
+    });
+    projectId = project.id;
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId, title: "New chat" },
+    });
+    conversationId = conversation.id;
+  });
+
+  it("auto-titles the conversation on first assistant reply", async () => {
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Help me outline" }));
+    await drainStream(res);
+
+    expect(runSimpleCompletion).toHaveBeenCalledTimes(1);
+    const updated = await testPrisma.conversation.findUnique({ where: { id: conversationId } });
+    expect(updated!.title).toBe("Generated title");
+  });
+
+  it("does NOT auto-title when conversation already has a custom title", async () => {
+    await testPrisma.conversation.update({
+      where: { id: conversationId },
+      data: { title: "User-renamed thread" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Another message" }));
+    await drainStream(res);
+
+    expect(runSimpleCompletion).not.toHaveBeenCalled();
+    const after = await testPrisma.conversation.findUnique({ where: { id: conversationId } });
+    expect(after!.title).toBe("User-renamed thread");
+  });
+
+  it("does NOT auto-title on the second assistant reply", async () => {
+    await testPrisma.chatMessage.create({
+      data: { conversationId, role: "assistant", content: "earlier reply" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Follow-up" }));
+    await drainStream(res);
+
+    expect(runSimpleCompletion).not.toHaveBeenCalled();
+  });
+
+  it("strips wrapping quotes and clamps to 100 chars", async () => {
+    vi.mocked(runSimpleCompletion).mockResolvedValueOnce(`"${"x".repeat(150)}"`);
+
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Long titler" }));
+    await drainStream(res);
+
+    const updated = await testPrisma.conversation.findUnique({ where: { id: conversationId } });
+    expect(updated!.title).toHaveLength(100);
+    expect(updated!.title.startsWith('"')).toBe(false);
+    expect(updated!.title.endsWith('"')).toBe(false);
+  });
+
+  it("leaves title unchanged and logs when runSimpleCompletion rejects", async () => {
+    vi.mocked(runSimpleCompletion).mockRejectedValueOnce(new Error("rate limited"));
+
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Will fail to title" }));
+    await drainStream(res);
+
+    const updated = await testPrisma.conversation.findUnique({ where: { id: conversationId } });
+    expect(updated!.title).toBe("New chat");
+    expect(vi.mocked(logger).error).toHaveBeenCalledWith(
+      "autoTitle failed",
+      expect.objectContaining({ conversationId }),
+    );
   });
 });
 
