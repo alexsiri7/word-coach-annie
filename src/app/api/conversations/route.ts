@@ -6,8 +6,8 @@ import { sanitizeInput } from "@/lib/sanitize-server";
 import { ConversationCreateSchema } from "@/schemas/conversations";
 
 export async function GET(request: NextRequest) {
+  const projectId = request.nextUrl.searchParams.get("projectId");
   try {
-    const projectId = request.nextUrl.searchParams.get("projectId");
     if (!projectId) {
       return NextResponse.json({ error: "projectId required" }, { status: 400 });
     }
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ conversations });
   } catch (error) {
-    logger.error("GET /api/conversations error", { projectId: request.nextUrl.searchParams.get("projectId"), error });
+    logger.error("GET /api/conversations error", { projectId, error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

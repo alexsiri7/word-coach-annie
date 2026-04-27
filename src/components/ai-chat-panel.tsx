@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Trash2, Loader2, ChevronDown, ChevronRight, Wrench, WifiOff, Plus, Pencil } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { AiSettingsDialog } from "@/components/ai-settings-dialog";
@@ -55,6 +55,16 @@ function formatTime(dateStr: string): string {
 function formatToolName(name: string): string {
   return name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
+
+const markdownComponents: Components = {
+  pre: ({ children }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
+  code: ({ children, className }) =>
+    className
+      ? <code className={className}>{children}</code>
+      : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
+  h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
+  h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
+};
 
 function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   const [expanded, setExpanded] = useState(false);
@@ -533,14 +543,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
                 <div className="prose-chat [&_pre]:my-1 [&_li]:list-none">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
-                    components={{
-                      pre: ({ children }: { children?: React.ReactNode }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
-                      code: ({ children, className }: { children?: React.ReactNode; className?: string }) => className
-                        ? <code className={className}>{children}</code>
-                        : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
-                      h2: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
-                      h3: ({ children }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
-                    }}
+                    components={markdownComponents}
                   >
                     {sanitizeMessageContent(msg.content)}
                   </ReactMarkdown>
@@ -573,14 +576,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
               <div className="prose-chat [&_pre]:my-1 [&_li]:list-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  components={{
-                    pre: ({ children }) => <pre className="bg-surface-sunken rounded p-2 my-1 text-xs overflow-x-auto">{children}</pre>,
-                    code: ({ children, className }) => className
-                      ? <code className={className}>{children}</code>
-                      : <code className="bg-surface-sunken px-1 rounded text-xs">{children}</code>,
-                    h2: ({ children }: { children?: React.ReactNode }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
-                    h3: ({ children }: { children?: React.ReactNode }) => <h4 className="font-semibold mt-2 mb-1">{children}</h4>,
-                  }}
+                  components={markdownComponents}
                 >
                   {sanitizeMessageContent(streamingContent)}
                 </ReactMarkdown>
