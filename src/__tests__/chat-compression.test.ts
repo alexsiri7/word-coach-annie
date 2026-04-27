@@ -16,6 +16,7 @@ const baseConversation = {
   id: "conv-1",
   projectId: "proj-1",
   title: "Test chat",
+  type: "chat",
   summary: null,
   summarizedThroughMessageId: null,
   createdAt: new Date(),

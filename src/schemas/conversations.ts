@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ConversationCreateSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
   title: z.string().optional(),
+  type: z.enum(["chat", "review"]).optional(),
 });
 
 export const ConversationUpdateSchema = z.object({

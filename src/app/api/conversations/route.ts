@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         title: true,
+        type: true,
         updatedAt: true,
         createdAt: true,
         _count: { select: { messages: true } },
@@ -49,14 +50,14 @@ export async function POST(request: NextRequest) {
     }
 
     ({ projectId } = parsed.data);
-    const { title } = parsed.data;
+    const { title, type } = parsed.data;
     const userId = getCurrentUserId(request);
     const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
     const conversation = await prisma.conversation.create({
-      data: { projectId, title: title ? sanitizeInput(title.trim()) : "New chat" },
-      select: { id: true, title: true, updatedAt: true, createdAt: true },
+      data: { projectId, title: title ? sanitizeInput(title.trim()) : "New chat", type: type ?? "chat" },
+      select: { id: true, title: true, type: true, updatedAt: true, createdAt: true },
     });
 
     return NextResponse.json({ ...conversation, messageCount: 0 }, { status: 201 });
