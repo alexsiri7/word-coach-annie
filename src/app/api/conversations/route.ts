@@ -16,11 +16,21 @@ export async function GET(request: NextRequest) {
     const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
-    const conversations = await prisma.conversation.findMany({
+    const raw = await prisma.conversation.findMany({
       where: { projectId },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, updatedAt: true },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        createdAt: true,
+        _count: { select: { messages: true } },
+      },
     });
+    const conversations = raw.map(({ _count, ...rest }) => ({
+      ...rest,
+      messageCount: _count.messages,
+    }));
 
     return NextResponse.json({ conversations });
   } catch (error) {

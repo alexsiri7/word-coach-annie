@@ -94,7 +94,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
-  const [conversations, setConversations] = useState<{id: string; title: string; updatedAt: string}[]>([]);
+  const [conversations, setConversations] = useState<{id: string; title: string; updatedAt: string; createdAt: string; messageCount: number}[]>([]);
   const [threadsOpen, setThreadsOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");

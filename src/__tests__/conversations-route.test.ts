@@ -79,6 +79,30 @@ describe("GET /api/conversations", () => {
     expect(body.conversations).toHaveLength(2);
     expect(body.conversations[0].title).toBe("Newer chat");
     expect(body.conversations[1].title).toBe("Older chat");
+    expect(body.conversations[0].messageCount).toBeDefined();
+    expect(body.conversations[0].messageCount).toBe(0);
+    expect(body.conversations[0].createdAt).toBeDefined();
+  });
+
+  it("includes messageCount reflecting actual message count", async () => {
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId, title: "Chat with messages" },
+    });
+    await testPrisma.chatMessage.create({
+      data: { conversationId: conversation.id, role: "user", content: "Hello" },
+    });
+    await testPrisma.chatMessage.create({
+      data: { conversationId: conversation.id, role: "assistant", content: "Hi there" },
+    });
+
+    const { GET } = await import("@/app/api/conversations/route");
+    const res = await GET(makeGetRequest(projectId));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    const found = body.conversations.find((c: { id: string }) => c.id === conversation.id);
+    expect(found).toBeDefined();
+    expect(found.messageCount).toBe(2);
   });
 
   it("returns 403 for forbidden project", async () => {
