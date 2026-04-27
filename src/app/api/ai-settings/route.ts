@@ -87,8 +87,8 @@ export async function PUT(request: NextRequest) {
           update: data,
           create: {
             userId,
-            apiKey: (data.apiKey as string) ?? "",
-            model: (data.model as string) ?? "",
+            apiKey: apiKey ? encrypt(apiKey.trim()) : "",
+            model: model?.trim() ?? "",
           },
         });
 
@@ -117,8 +117,8 @@ export async function PUT(request: NextRequest) {
       update: data,
       create: {
         id: "default",
-        apiKey: (data.apiKey as string) ?? "",
-        model: (data.model as string) ?? "",
+        apiKey: apiKey ? encrypt(apiKey.trim()) : "",
+        model: model?.trim() ?? "",
       },
     });
 
