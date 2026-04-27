@@ -136,24 +136,38 @@ jobs:
             exit 1
           fi
 
-          echo "Fetching latest staging deployment..."
-          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
-            }")
+          MAX_ATTEMPTS=20
+          INTERVAL=30
+          echo "Polling staging deployment status every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
 
-          STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
-          COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
+              }")
 
-          if [ "$STAGING_STATUS" != "SUCCESS" ]; then
-            echo "::error::Latest staging deployment status is '$STAGING_STATUS', expected 'SUCCESS'"
-            exit 1
-          fi
+            STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
+            COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
 
-          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
-          echo "✓ Staging deployment succeeded (commit: ${COMMIT:0:7})"
+            echo "Attempt $i/$MAX_ATTEMPTS: staging status is '$STAGING_STATUS'"
+
+            if [ "$STAGING_STATUS" = "SUCCESS" ]; then
+              echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+              echo "✓ Staging deployment succeeded (commit: ${COMMIT:0:7})"
+              exit 0
+            elif [ "$STAGING_STATUS" = "FAILED" ] || [ "$STAGING_STATUS" = "CRASHED" ] || [ "$STAGING_STATUS" = "REMOVED" ]; then
+              echo "::error::Staging deployment is in terminal failure state: '$STAGING_STATUS'"
+              exit 1
+            fi
+
+            if [ "$i" = "$MAX_ATTEMPTS" ]; then
+              echo "::error::Staging deployment did not reach SUCCESS after $MAX_ATTEMPTS attempts (last status: '$STAGING_STATUS')"
+              exit 1
+            fi
+            sleep $INTERVAL
+          done
 
       - name: Deploy staging commit to production
         env:
