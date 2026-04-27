@@ -296,7 +296,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build context: summary block + last windowSize messages
     const windowMessages = allMessages.slice(-chatWindowSize);
 
     const systemPrompt = conversation.type === "review"
@@ -384,7 +383,6 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // Auto-title: fire-and-forget on first assistant reply
           if (conversation.title === "New chat" && finalContent) {
             autoTitleConversation(conversationId, aiConfig).catch(
               (err) => logger.error("autoTitle failed", { conversationId, error: err })

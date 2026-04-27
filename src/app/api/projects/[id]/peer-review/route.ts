@@ -109,11 +109,6 @@ function parseReview(raw: string, role: string): ReviewFeedback {
   return parsed ?? DEFAULT_REVIEW;
 }
 
-/**
- * POST /api/projects/[id]/peer-review
- *
- * Runs three parallel AI reviewer personas and synthesises a consensus.
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

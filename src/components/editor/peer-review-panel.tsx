@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Local copies of the API types from peer-review/route.ts — kept in sync manually.
-// TODO: extract to src/types/peer-review.ts to avoid duplication.
 interface ReviewFeedback {
   overallImpression: string;
   strengths: string[];
