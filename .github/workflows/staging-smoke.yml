@@ -136,9 +136,12 @@ jobs:
             exit 1
           fi
 
-          MAX_ATTEMPTS=20
+          echo "Polling Railway for staging deployment status..."
+          MAX_ATTEMPTS=10
           INTERVAL=30
-          echo "Polling staging deployment status every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
+
+          STAGING_STATUS=""
+          COMMIT=""
 
           for i in $(seq 1 $MAX_ATTEMPTS); do
             RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
@@ -147,6 +150,12 @@ jobs:
               -d "{
                 \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
               }")
+
+            if [ -z "$RESPONSE" ]; then
+              echo "::warning::Attempt $i/$MAX_ATTEMPTS: curl returned empty response (network error?), retrying..."
+              sleep $INTERVAL
+              continue
+            fi
 
             API_ERRORS=$(echo "$RESPONSE" | jq -r '.errors // empty')
             if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
@@ -157,11 +166,7 @@ jobs:
             STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
             COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
 
-            if [ -z "$STAGING_STATUS" ]; then
-              echo "::warning::Empty status from Railway API (response: $RESPONSE)"
-            fi
-
-            echo "Attempt $i/$MAX_ATTEMPTS: staging status is '$STAGING_STATUS'"
+            echo "Attempt $i/$MAX_ATTEMPTS: Railway staging status = '$STAGING_STATUS'"
 
             if [ "$STAGING_STATUS" = "SUCCESS" ]; then
               echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
@@ -176,6 +181,8 @@ jobs:
               echo "::error::Staging deployment did not reach SUCCESS after $MAX_ATTEMPTS attempts (last status: '$STAGING_STATUS')"
               exit 1
             fi
+
+            echo "Status is '$STAGING_STATUS', retrying in ${INTERVAL}s..."
             sleep $INTERVAL
           done
 
