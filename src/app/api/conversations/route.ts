@@ -56,10 +56,10 @@ export async function POST(request: NextRequest) {
 
     const conversation = await prisma.conversation.create({
       data: { projectId, title: title ? sanitizeInput(title.trim()) : "New chat" },
-      select: { id: true, title: true, updatedAt: true },
+      select: { id: true, title: true, updatedAt: true, createdAt: true },
     });
 
-    return NextResponse.json(conversation, { status: 201 });
+    return NextResponse.json({ ...conversation, messageCount: 0 }, { status: 201 });
   } catch (error) {
     logger.error("POST /api/conversations error", { projectId, error });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

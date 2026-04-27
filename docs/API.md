@@ -444,7 +444,7 @@ List all conversation threads for a project, ordered by most recently updated.
 
 **Query params**: `projectId=<id>` (required)
 
-**Response**: `{ conversations: [{ id, title, updatedAt }] }`
+**Response**: `{ conversations: [{ id, title, updatedAt, createdAt, messageCount }] }`
 
 **Errors**: `400` if `projectId` missing; `403` if not authorized.
 

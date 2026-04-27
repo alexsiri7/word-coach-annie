@@ -23,6 +23,14 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface ConversationSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  createdAt: string;
+  messageCount: number;
+}
+
 interface ToolActivity {
   id: string;
   name: string;
@@ -94,7 +102,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
-  const [conversations, setConversations] = useState<{id: string; title: string; updatedAt: string; createdAt: string; messageCount: number}[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [threadsOpen, setThreadsOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");

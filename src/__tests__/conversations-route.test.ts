@@ -79,7 +79,6 @@ describe("GET /api/conversations", () => {
     expect(body.conversations).toHaveLength(2);
     expect(body.conversations[0].title).toBe("Newer chat");
     expect(body.conversations[1].title).toBe("Older chat");
-    expect(body.conversations[0].messageCount).toBeDefined();
     expect(body.conversations[0].messageCount).toBe(0);
     expect(body.conversations[0].createdAt).toBeDefined();
   });
@@ -103,6 +102,19 @@ describe("GET /api/conversations", () => {
     const found = body.conversations.find((c: { id: string }) => c.id === conversation.id);
     expect(found).toBeDefined();
     expect(found.messageCount).toBe(2);
+  });
+
+  it("returns createdAt as a parseable ISO date", async () => {
+    await testPrisma.conversation.create({
+      data: { projectId, title: "Date test" },
+    });
+
+    const { GET } = await import("@/app/api/conversations/route");
+    const res = await GET(makeGetRequest(projectId));
+    const body = await res.json();
+
+    expect(body.conversations[0].createdAt).toBeDefined();
+    expect(new Date(body.conversations[0].createdAt).getTime()).not.toBeNaN();
   });
 
   it("returns 403 for forbidden project", async () => {
@@ -148,6 +160,17 @@ describe("POST /api/conversations", () => {
     const body = await res.json();
     expect(body.title).toBe("New chat");
     expect(body.id).toBeDefined();
+  });
+
+  it("returns createdAt and messageCount in POST response", async () => {
+    const { POST } = await import("@/app/api/conversations/route");
+    const res = await POST(makePostRequest({ projectId }));
+    expect(res.status).toBe(201);
+
+    const body = await res.json();
+    expect(body.messageCount).toBe(0);
+    expect(body.createdAt).toBeDefined();
+    expect(new Date(body.createdAt).getTime()).not.toBeNaN();
   });
 
   it("creates conversation with supplied title", async () => {
