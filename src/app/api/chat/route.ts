@@ -124,6 +124,16 @@ ${objectsSummary || "(No characters/locations yet)"}${universeSummary}
 - You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
 }
 
+async function buildReviewSystemPrompt(projectId: string): Promise<string> {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new Error("Project not found");
+  return `You are an experienced story editor. The writer has shared their full manuscript from "${project.title}" for editorial review.
+Your role: provide honest, constructive feedback on the story as a whole.
+Focus on: narrative arc, pacing, character development, theme, opening and closing strength, any structural issues.
+Do NOT rewrite sentences. Flag specific passages by quoting a short excerpt when relevant.
+After your initial review, stay in conversation — answer follow-up questions, go deeper on any area the writer wants to explore.`;
+}
+
 async function autoTitleConversation(conversationId: string, aiConfig: AiProviderConfig): Promise<void> {
   const assistantCount = await prisma.chatMessage.count({
     where: { conversationId, role: "assistant" },
@@ -289,7 +299,9 @@ export async function POST(request: NextRequest) {
     // Build context: summary block + last windowSize messages
     const windowMessages = allMessages.slice(-chatWindowSize);
 
-    const systemPrompt = await buildSystemPrompt(conversation.projectId);
+    const systemPrompt = conversation.type === "review"
+      ? await buildReviewSystemPrompt(conversation.projectId)
+      : await buildSystemPrompt(conversation.projectId);
     const summaryBlock = conversation.summary
       ? `\n\n## Conversation so far\n${conversation.summary}`
       : "";

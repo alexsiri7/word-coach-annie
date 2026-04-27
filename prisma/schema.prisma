@@ -214,6 +214,7 @@ model Conversation {
   id                         String        @id @default(cuid())
   projectId                  String
   title                      String        @default("New chat")
+  type                       String        @default("chat")
   summary                    String?       @db.Text
   summarizedThroughMessageId String?
   createdAt                  DateTime      @default(now())

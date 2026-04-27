@@ -29,6 +29,7 @@ interface ConversationSummary {
   updatedAt: string;
   createdAt: string;
   messageCount: number;
+  type: string;
 }
 
 interface ToolActivity {
@@ -44,6 +45,7 @@ interface AIChatPanelProps {
   sceneContext?: string;
   initialMessage?: string;
   onPromptConsumed?: () => void;
+  initialConversationId?: string;
 }
 
 function formatTime(dateStr: string): string {
@@ -93,7 +95,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   );
 }
 
-export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptConsumed }: AIChatPanelProps) {
+export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptConsumed, initialConversationId }: AIChatPanelProps) {
   const { isOnline } = useNetworkStatus();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -126,7 +128,11 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
       .then((d) => { if (d.conversations) setConversations(d.conversations); })
       .catch(console.error);
 
-    fetch(`/api/chat?projectId=${projectId}`)
+    const fetchUrl = initialConversationId
+      ? `/api/chat?conversationId=${initialConversationId}`
+      : `/api/chat?projectId=${projectId}`;
+
+    fetch(fetchUrl)
       .then((res) => res.json())
       .then((data) => {
         if (data.conversation) setConversationId(data.conversation.id);
@@ -439,6 +445,11 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
                 ) : (
                   <>
                     <span className="flex-1 truncate text-text-secondary">{conv.title}</span>
+                    {conv.type === "review" && (
+                      <span className="text-[10px] font-medium bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                        Review
+                      </span>
+                    )}
                     <span className="text-text-muted/60 whitespace-nowrap tabular-nums">{timeAgo(conv.updatedAt)}</span>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
