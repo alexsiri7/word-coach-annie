@@ -148,8 +148,18 @@ jobs:
                 \"query\": \"query { deployments(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status meta } } } }\"
               }")
 
+            API_ERRORS=$(echo "$RESPONSE" | jq -r '.errors // empty')
+            if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
+              echo "::error::Railway API returned errors: $API_ERRORS"
+              exit 1
+            fi
+
             STAGING_STATUS=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.status // empty')
             COMMIT=$(echo "$RESPONSE" | jq -r '.data.deployments.edges[0].node.meta.commitHash // empty')
+
+            if [ -z "$STAGING_STATUS" ]; then
+              echo "::warning::Empty status from Railway API (response: $RESPONSE)"
+            fi
 
             echo "Attempt $i/$MAX_ATTEMPTS: staging status is '$STAGING_STATUS'"
 
