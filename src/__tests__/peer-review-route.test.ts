@@ -136,7 +136,8 @@ describe("POST /api/projects/:id/peer-review", () => {
       expect(body.publisher.overallImpression).toBe("Unable to parse review");
       expect(body.reader.overallImpression).toBe("OK");
       expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
-        expect.stringContaining("publisher")
+        expect.stringContaining("publisher"),
+        expect.objectContaining({ raw: expect.any(String) })
       );
     });
   });
