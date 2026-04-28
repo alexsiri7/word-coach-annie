@@ -320,9 +320,9 @@ export async function POST(request: NextRequest) {
 
     const windowMessages = allMessages.slice(-chatWindowSize);
 
-    const isReview = conversation.type.startsWith("review");
+    const isReview = (conversation.type ?? "").startsWith("review");
     const systemPrompt = isReview
-      ? await buildReviewSystemPrompt(conversation.projectId, conversation.type)
+      ? await buildReviewSystemPrompt(conversation.projectId, conversation.type ?? "review-editor")
       : await buildSystemPrompt(conversation.projectId);
     const summaryBlock = conversation.summary
       ? `\n\n## Conversation so far\n${conversation.summary}`
