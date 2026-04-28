@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Users, X, RefreshCw } from "lucide-react";
+import { Users, RefreshCw, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ interface PeerReviewResult {
 
 interface PeerReviewPanelProps {
   projectId: string;
-  onClose: () => void;
+  onStartChat: (message: string) => void;
 }
 
 type TabKey = "publisher" | "reader" | "writer" | "consensus";
@@ -45,7 +45,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const SECTION_HEADING = "text-xs font-semibold text-text-muted uppercase tracking-wider mb-1";
 
-export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
+export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps) {
   const [review, setReview] = useState<PeerReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
@@ -111,6 +111,24 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
         <h4 className={SECTION_HEADING}>Recommendation</h4>
         <span className="text-xs font-semibold px-2 py-1 rounded bg-accent/10 text-accent">{feedback.recommendation}</span>
       </div>
+      <div className="pt-2 border-t border-border mt-3">
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full gap-1.5"
+          onClick={() => onStartChat(
+            `I got feedback from a reviewer on my manuscript:\n\n` +
+            `Overall: ${feedback.overallImpression}\n\n` +
+            `Strengths:\n${feedback.strengths.map(s => `- ${s}`).join('\n')}\n\n` +
+            `Weaknesses:\n${feedback.weaknesses.map(w => `- ${w}`).join('\n')}\n\n` +
+            `Recommendation: ${feedback.recommendation}\n\n` +
+            `Can you help me address the weaknesses?`
+          )}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          Discuss with AI
+        </Button>
+      </div>
     </div>
   );
 
@@ -152,11 +170,28 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
           <p className="text-sm text-foreground whitespace-pre-wrap">{consensus.synthesizedRecommendation}</p>
         </div>
       )}
+      <div className="pt-2 border-t border-border mt-3">
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full gap-1.5"
+          onClick={() => onStartChat(
+            `I just got a peer review of my manuscript. Here's the consensus:\n\n` +
+            `Points of agreement:\n${consensus.pointsOfAgreement.map(p => `- ${p}`).join('\n')}\n\n` +
+            `Top priorities:\n${consensus.topPriorities.map(p => `- ${p}`).join('\n')}\n\n` +
+            `Synthesized recommendation: ${consensus.synthesizedRecommendation}\n\n` +
+            `Can you help me address these points?`
+          )}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          Discuss with AI
+        </Button>
+      </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full max-h-[400px] overflow-hidden rounded-lg border border-border bg-background shadow-md">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/20 shrink-0">
         <div className="flex items-center gap-2">
@@ -173,9 +208,6 @@ export function PeerReviewPanel({ projectId, onClose }: PeerReviewPanelProps) {
             aria-label="Run peer review"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label="Close">
-            <X className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
