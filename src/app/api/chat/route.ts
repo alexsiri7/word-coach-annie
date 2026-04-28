@@ -313,12 +313,16 @@ export async function POST(request: NextRequest) {
     const prefInstructions = buildPreferenceInstructions(prefs);
 
     // Run ADK agent (handles tool loop, dynamic tool loading internally)
-    const { finalContent, toolLog } = await runChatAgent({
+    const agentPromise = runChatAgent({
       systemPrompt: systemPrompt + summaryBlock + sceneNote + "\n\n" + prefInstructions,
       chatHistory: windowMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,
     });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`AI request timed out (model: ${aiConfig.model})`)), 60_000)
+    );
+    const { finalContent, toolLog } = await Promise.race([agentPromise, timeoutPromise]);
 
     // Save tool interactions as a system message if any tools were used
     if (toolLog.length > 0) {

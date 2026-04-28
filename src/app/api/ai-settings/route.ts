@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
             compressionModel: userSettings.compressionModel,
           });
         }
-      } catch {
-        // Table may not exist yet — fall through
+      } catch (err) {
+        logger.warn("GET /api/ai-settings: userAiSettings lookup failed, falling through to global", err);
       }
     }
 
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
       hasApiKey: !!decryptedKey,
       scope: "global",
     });
-  } catch {
-    // Table may not exist yet
+  } catch (err) {
+    logger.warn("GET /api/ai-settings: aiSettings lookup failed, returning empty defaults", err);
     return NextResponse.json({ apiKey: "", model: "", scope: "global" });
   }
 }
