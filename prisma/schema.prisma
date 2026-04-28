@@ -62,7 +62,7 @@ model Project {
   user           User?           @relation(fields: [userId], references: [id])
   projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   isSample       Boolean         @default(false)
-  chatMessages   ChatMessage[]
+  conversations  Conversation[]
   googleDocExports GoogleDocExport[]
   hashnodeExports HashnodeExport[]
   writingSessions WritingSession[]
@@ -210,15 +210,31 @@ model GoogleCredential {
   updatedAt    DateTime @updatedAt
 }
 
-model ChatMessage {
-  id        String   @id @default(cuid())
-  projectId String
-  role      String   // "user" | "assistant"
-  content   String   @default("")
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+model Conversation {
+  id                         String        @id @default(cuid())
+  projectId                  String
+  title                      String        @default("New chat")
+  type                       String        @default("chat")
+  summary                    String?       @db.Text
+  summarizedThroughMessageId String?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
 
   @@index([projectId, createdAt])
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String       // "user" | "assistant"
+  content        String       @default("")
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 model AiSettings {
@@ -237,9 +253,12 @@ model UserAiSettings {
   apiKey             String   @default("")
   model              String   @default("")
   customInstructions String   @default("")
-  coachingStyle      String   @default("balanced")
-  responseLength     String   @default("moderate")
-  createdAt          DateTime @default(now())
+  coachingStyle              String   @default("balanced")
+  responseLength             String   @default("moderate")
+  chatWindowSize             Int      @default(5)
+  messagesUntilCompression   Int      @default(15)
+  compressionModel           String   @default("")
+  createdAt                  DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

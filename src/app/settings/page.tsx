@@ -34,6 +34,9 @@ interface AiSettingsData {
   customInstructions?: string;
   coachingStyle?: string;
   responseLength?: string;
+  chatWindowSize?: number;
+  messagesUntilCompression?: number;
+  compressionModel?: string;
 }
 
 export default function SettingsPage() {
@@ -53,6 +56,11 @@ export default function SettingsPage() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [coachingStyle, setCoachingStyle] = useState("balanced");
   const [responseLength, setResponseLength] = useState("moderate");
+
+  // Chat compression settings
+  const [chatWindowSize, setChatWindowSize] = useState(5);
+  const [messagesUntilCompression, setMessagesUntilCompression] = useState(15);
+  const [compressionModel, setCompressionModel] = useState("");
 
   // Google Docs integration state
   const [googleDocsLoading, setGoogleDocsLoading] = useState(true);
@@ -82,6 +90,9 @@ export default function SettingsPage() {
         setCustomInstructions(data.customInstructions || "");
         setCoachingStyle(data.coachingStyle || "balanced");
         setResponseLength(data.responseLength || "moderate");
+        setChatWindowSize(data.chatWindowSize ?? 5);
+        setMessagesUntilCompression(data.messagesUntilCompression ?? 15);
+        setCompressionModel(data.compressionModel ?? "");
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -152,11 +163,14 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    const body: Record<string, string> = {
+    const body: Record<string, string | number> = {
       model,
       customInstructions,
       coachingStyle,
       responseLength,
+      chatWindowSize,
+      messagesUntilCompression,
+      compressionModel,
     };
     if (apiKey) {
       body.apiKey = apiKey;
@@ -176,6 +190,9 @@ export default function SettingsPage() {
         setCustomInstructions(data.customInstructions || "");
         setCoachingStyle(data.coachingStyle || "balanced");
         setResponseLength(data.responseLength || "moderate");
+        setChatWindowSize(data.chatWindowSize ?? 5);
+        setMessagesUntilCompression(data.messagesUntilCompression ?? 15);
+        setCompressionModel(data.compressionModel ?? "");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
@@ -329,6 +346,69 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-text-muted mt-1">
                   Additional instructions the AI will follow in all interactions. Be specific about your writing goals or preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Story Chat Settings */}
+        {!loading && (
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="h-4 w-4 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">Story Chat</h2>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-text-muted">
+                Control how the chat keeps context. The window is the number of recent messages
+                sent verbatim; compression summarises older messages once the threshold is reached.
+              </p>
+
+              <div>
+                <label htmlFor="settings-chat-window-size" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Messages kept verbatim
+                </label>
+                <Input
+                  id="settings-chat-window-size"
+                  type="number"
+                  min={3}
+                  max={20}
+                  value={chatWindowSize}
+                  onChange={(e) => setChatWindowSize(Number(e.target.value))}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="settings-messages-until-compression" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Messages before compression
+                </label>
+                <Input
+                  id="settings-messages-until-compression"
+                  type="number"
+                  min={5}
+                  max={50}
+                  value={messagesUntilCompression}
+                  onChange={(e) => setMessagesUntilCompression(Number(e.target.value))}
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  A new summary is generated once this many messages accumulate beyond the window.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="settings-compression-model" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Summarisation model
+                </label>
+                <Input
+                  id="settings-compression-model"
+                  value={compressionModel}
+                  onChange={(e) => setCompressionModel(e.target.value)}
+                  placeholder="gemini-2.0-flash-001 (leave empty to use main model)"
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  A cheaper/faster model for generating summaries. Leave empty to use the same model as chat.
                 </p>
               </div>
             </div>

@@ -37,6 +37,7 @@ src/
 │   │   ├── annotations/        # Scene annotations (inline comments)
 │   │   ├── auth/               # Authentication (login, Google OAuth)
 │   │   ├── chat/               # Streaming AI chat
+│   │   ├── conversations/      # Chat thread CRUD
 │   │   ├── feedback/           # GitHub issue feedback
 │   │   ├── focus/              # Focus mode scene context
 │   │   ├── health/             # Health check
@@ -93,7 +94,8 @@ Project (1) ──────────────────┬─── (
                               │         └─── (N) ContentVersion (versioned content)
                               │         └─── (N) Annotation (inline comments)
                               └─── (N) StoryObject (CHARACTER | LOCATION | PLOTLINE | WORLD_ELEMENT | NOTE)
-                              └─── (N) ChatMessage (AI chat history)
+                              └─── (N) Conversation (named chat thread)
+                                        └─── (N) ChatMessage (AI chat history)
 
 Universe (1) ─────────────────┬─── (N) WorldObject (CHARACTER | LOCATION | WORLD_ELEMENT)
                               │         └─── (N) WorldObjectTimelineEntry

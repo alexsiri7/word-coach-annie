@@ -1,10 +1,13 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import * as Sentry from "@sentry/nextjs";
 import { createServer } from "@/mcp";
 import { logger } from "@/lib/logger";
 
 async function handleMcpRequest(req: Request): Promise<Response> {
     try {
-        const server = createServer();
+        const userId = req.headers.get("x-user-id");
+        if (userId) Sentry.setUser({ id: userId });
+        const server = createServer({ userId });
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined, // stateless mode
             enableJsonResponse: true,

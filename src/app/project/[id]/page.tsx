@@ -21,6 +21,8 @@ import {
   TrendingUp,
   Eye,
   ClipboardList,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,6 +122,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [addObjectName, setAddObjectName] = useState("");
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
   const [showPeerReview, setShowPeerReview] = useState(false);
+  const [isSendingToReview, setIsSendingToReview] = useState(false);
+  const [reviewConversationId, setReviewConversationId] = useState<string | null>(null);
+  const [reviewManuscript, setReviewManuscript] = useState<string | null>(null);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -285,6 +290,30 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const totalWordCount = project?.wordCount || 0;
 
+  const hasScenes = useMemo(() => outline.some(n => n.type === "SCENE" || n.children.some(c => c.type === "SCENE")), [outline]);
+
+  const handleSendToReview = useCallback(async () => {
+    setIsSendingToReview(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/send-to-review`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("send-to-review failed", res.status, body);
+        return;
+      }
+      const { conversationId, manuscriptText } = await res.json();
+      setReviewConversationId(conversationId);
+      setReviewManuscript(`Please review this manuscript:\n\n${manuscriptText}`);
+      setActiveTab("ai-chat");
+      setSelectedNodeId(null);
+      setSelectedObjectId(null);
+    } catch (err) {
+      console.error("send-to-review error", err);
+    } finally {
+      setIsSendingToReview(false);
+    }
+  }, [projectId]);
+
   // Map story object types to sidebar tabs
   const OBJECT_TYPE_TO_TAB: Record<string, SidebarTab> = {
     CHARACTER: "characters",
@@ -419,6 +448,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Eye className="h-4 w-4" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleSendToReview}
+          disabled={!hasScenes || isSendingToReview}
+          aria-label="Send to review"
+          title={hasScenes ? "Send to Review" : "Add scenes with content to enable review"}
+        >
+          {isSendingToReview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
         <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button
           variant="ghost"
@@ -548,6 +588,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   sceneStatus={selectedNode?.type === "SCENE" ? (selectedNode.status as SceneStatus) : undefined}
                   sceneTitle={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
                   sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
+                  initialConversationId={reviewConversationId ?? undefined}
+                  initialMessage={reviewManuscript ?? undefined}
+                  onPromptConsumed={() => {
+                    setReviewConversationId(null);
+                    setReviewManuscript(null);
+                  }}
                 />
               </ErrorBoundary>
             ) : activeTab === "outline" ? (

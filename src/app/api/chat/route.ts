@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
+import { getAiConfig, getAiPreferences, buildPreferenceInstructions, getCompressionSettings } from "@/lib/ai/settings";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
-import { runChatAgent } from "@/lib/ai/adk-agent";
+import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { compressConversation } from "@/lib/ai/chat-compression";
+import type { AiProviderConfig } from "@/lib/ai/settings";
 
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
@@ -22,7 +24,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
 
   if (!project) throw new Error("Project not found");
 
-  // Build outline summary
   const chapters = project.structureNodes.filter((n) => n.type === "CHAPTER");
   const scenes = project.structureNodes.filter((n) => n.type === "SCENE");
   const outlineSummary = chapters
@@ -35,7 +36,6 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
     })
     .join("\n");
 
-  // Group story objects by type
   const grouped: Record<string, typeof project.storyObjects> = {};
   for (const obj of project.storyObjects) {
     if (!grouped[obj.type]) grouped[obj.type] = [];
@@ -50,6 +50,47 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
       return `${type}:\n${items}`;
     })
     .join("\n\n");
+
+  let universeSummary = "";
+  if (project.universeId) {
+    const universe = await prisma.universe.findUnique({
+      where: { id: project.universeId },
+      include: {
+        worldObjects: {
+          include: { timeline: { orderBy: { orderIndex: "asc" } } },
+          orderBy: [{ type: "asc" }, { name: "asc" }],
+        },
+      },
+    });
+    if (!universe) {
+      logger.warn("Universe not found for project — universe context omitted", {
+        projectId,
+        universeId: project.universeId,
+      });
+    } else if (universe.worldObjects.length > 0) {
+      const groupedWO: Record<string, typeof universe.worldObjects> = {};
+      for (const wo of universe.worldObjects) {
+        if (!groupedWO[wo.type]) groupedWO[wo.type] = [];
+        groupedWO[wo.type].push(wo);
+      }
+      const woSections = Object.entries(groupedWO)
+        .map(([type, objs]) => {
+          const items = objs
+            .map((o) => {
+              const base = `  - ${o.name}${o.description ? `: ${o.description.slice(0, 150)}` : ""}`;
+              if (o.timeline.length === 0) return base;
+              const states = o.timeline
+                .map((e) => `    [${e.label}]${e.description ? ` ${e.description.slice(0, 100)}` : ""}`)
+                .join("\n");
+              return `${base}\n${states}`;
+            })
+            .join("\n");
+          return `${type}:\n${items}`;
+        })
+        .join("\n\n");
+      universeSummary = `\n\n## Shared Universe: ${universe.title}${universe.description ? `\n${universe.description.slice(0, 200)}` : ""}\n\n${woSections}`;
+    }
+  }
 
   return `You are Annie — a writing coach, not a ghostwriter. You're helping with "${project.title}"${project.genre ? ` (${project.genre})` : ""}.
 
@@ -71,7 +112,7 @@ ${project.synopsis ? `SYNOPSIS: ${project.synopsis}\n` : ""}
 STORY STRUCTURE:
 ${outlineSummary || "(No chapters yet)"}
 
-${objectsSummary || "(No characters/locations yet)"}
+${objectsSummary || "(No characters/locations yet)"}${universeSummary}
 
 ## Your Role
 - Discuss plot, characters, pacing, themes, and structure
@@ -83,25 +124,97 @@ ${objectsSummary || "(No characters/locations yet)"}
 - You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
 }
 
-// GET /api/chat?projectId=X — load chat history
+async function buildReviewSystemPrompt(projectId: string): Promise<string> {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new Error("Project not found");
+  return `You are an experienced story editor. The writer has shared their full manuscript from "${project.title}" for editorial review.
+Your role: provide honest, constructive feedback on the story as a whole.
+Focus on: narrative arc, pacing, character development, theme, opening and closing strength, any structural issues.
+Do NOT rewrite sentences. Flag specific passages by quoting a short excerpt when relevant.
+After your initial review, stay in conversation — answer follow-up questions, go deeper on any area the writer wants to explore.`;
+}
+
+async function autoTitleConversation(conversationId: string, aiConfig: AiProviderConfig): Promise<void> {
+  const assistantCount = await prisma.chatMessage.count({
+    where: { conversationId, role: "assistant" },
+  });
+  if (assistantCount !== 1) return;
+
+  const firstUserMsg = await prisma.chatMessage.findFirst({
+    where: { conversationId, role: "user" },
+    orderBy: { createdAt: "asc" },
+    select: { content: true },
+  });
+  if (!firstUserMsg) return;
+
+  const title = await runSimpleCompletion({
+    systemPrompt:
+      "Generate a short title (3–6 words) for a writing coach conversation. Return only the title, no quotes, no punctuation at the end.",
+    userMessage: firstUserMsg.content.slice(0, 500),
+    aiConfig,
+    maxTokens: 20,
+    temperature: 0.3,
+  });
+  const cleanTitle = title.replace(/^["']|["']$/g, "").trim().slice(0, 100);
+  if (cleanTitle) {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { title: cleanTitle },
+    });
+  }
+}
+
+// GET /api/chat?conversationId=X or ?projectId=X — load conversation + chat history
 export async function GET(request: NextRequest) {
   try {
+    const conversationId = request.nextUrl.searchParams.get("conversationId");
     const projectId = request.nextUrl.searchParams.get("projectId");
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+
+    if (!conversationId && !projectId) {
+      return NextResponse.json({ error: "conversationId or projectId is required" }, { status: 400 });
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    let conversation;
+    if (conversationId) {
+      conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { project: true },
+      });
+      if (!conversation) {
+        return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      }
+    } else {
+      const access = await verifyProjectWriteAccess(projectId!, userId, request.headers.get("x-user-email"));
+      if (!access.authorized) return access.response;
+
+      conversation = await prisma.conversation.findFirst({
+        where: { projectId: projectId! },
+        orderBy: { createdAt: "desc" },
+        include: { project: true },
+      });
+      if (!conversation) {
+        conversation = await prisma.conversation.create({
+          data: { projectId: projectId!, title: "Chat" },
+          include: { project: true },
+        });
+      }
+    }
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
     const messages = await prisma.chatMessage.findMany({
-      where: { projectId },
+      where: { conversationId: conversation.id },
       orderBy: { createdAt: "asc" },
-      take: 100,
     });
 
-    return NextResponse.json({ messages });
+    return NextResponse.json({ conversation, messages });
   } catch (error) {
     logger.error("GET /api/chat error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -112,50 +225,36 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, message, sceneContext } = body as {
-      projectId: string;
+    const { conversationId, message, sceneContext } = body as {
+      conversationId: string;
       message: string;
       sceneContext?: string;
     };
 
-    if (!projectId || !message) {
+    if (!conversationId || !message) {
       return NextResponse.json(
-        { error: "projectId and message are required" },
+        { error: "conversationId and message are required" },
         { status: 400 }
       );
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    const conversation = await prisma.conversation.findUniqueOrThrow({
+      where: { id: conversationId },
+    });
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
     // Sanitize user input to prevent stored XSS
     const sanitizedMessage = sanitizeInput(message);
 
-    // Save user message
-    await prisma.chatMessage.create({
-      data: { projectId, role: "user", content: sanitizedMessage },
-    });
-
-    // Build context
-    const systemPrompt = await buildSystemPrompt(projectId);
-    const sceneNote = sceneContext
-      ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
-      : "";
-
-    // Load user preferences and add to system prompt
-    const prefs = await getAiPreferences(userId);
-    const prefInstructions = buildPreferenceInstructions(prefs);
-
-    // Get recent chat history for context
-    const recentMessages = await prisma.chatMessage.findMany({
-      where: { projectId },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
-    recentMessages.reverse();
-
-    // Load AI provider config (user DB > global DB > env vars > defaults)
+    // Load AI provider config (needed before compression and agent call)
     const aiConfig = await getAiConfig(userId);
     if (!aiConfig.apiKey) {
       return NextResponse.json(
@@ -164,10 +263,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Save user message
+    await prisma.chatMessage.create({
+      data: { conversationId, role: "user", content: sanitizedMessage },
+    });
+
+    // Load all messages since last compaction
+    let afterDate: Date | undefined;
+    if (conversation.summarizedThroughMessageId) {
+      const pivot = await prisma.chatMessage.findUnique({
+        where: { id: conversation.summarizedThroughMessageId },
+        select: { createdAt: true },
+      });
+      afterDate = pivot?.createdAt ?? new Date(0);
+    }
+
+    const allMessages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId,
+        ...(afterDate ? { createdAt: { gt: afterDate } } : {}),
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Load compression settings and trigger if needed (fire and forget)
+    const compressionSettings = await getCompressionSettings(userId);
+    const { chatWindowSize, messagesUntilCompression } = compressionSettings;
+
+    if (allMessages.length > messagesUntilCompression + chatWindowSize) {
+      compressConversation(conversation, allMessages, compressionSettings, aiConfig).catch(
+        (err) => logger.error("compressConversation failed", err)
+      );
+    }
+
+    const windowMessages = allMessages.slice(-chatWindowSize);
+
+    const systemPrompt = conversation.type === "review"
+      ? await buildReviewSystemPrompt(conversation.projectId)
+      : await buildSystemPrompt(conversation.projectId);
+    const summaryBlock = conversation.summary
+      ? `\n\n## Conversation so far\n${conversation.summary}`
+      : "";
+    const sceneNote = sceneContext
+      ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
+      : "";
+
+    // Load user preferences and add to system prompt
+    const prefs = await getAiPreferences(userId);
+    const prefInstructions = buildPreferenceInstructions(prefs);
+
     // Run ADK agent (handles tool loop, dynamic tool loading internally)
     const { finalContent, toolLog } = await runChatAgent({
-      systemPrompt: systemPrompt + sceneNote + "\n\n" + prefInstructions,
-      chatHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+      systemPrompt: systemPrompt + summaryBlock + sceneNote + "\n\n" + prefInstructions,
+      chatHistory: windowMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,
     });
@@ -179,7 +327,7 @@ export async function POST(request: NextRequest) {
         .join("\n---\n");
       await prisma.chatMessage.create({
         data: {
-          projectId,
+          conversationId,
           role: "system",
           content: `[Tool interactions]\n${toolSummary}`,
         },
@@ -231,8 +379,14 @@ export async function POST(request: NextRequest) {
           // Save assistant response
           if (finalContent) {
             await prisma.chatMessage.create({
-              data: { projectId, role: "assistant", content: finalContent },
+              data: { conversationId, role: "assistant", content: finalContent },
             });
+          }
+
+          if (conversation.title === "New chat" && finalContent) {
+            autoTitleConversation(conversationId, aiConfig).catch(
+              (err) => logger.error("autoTitle failed", { conversationId, error: err })
+            );
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -258,19 +412,31 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/chat?projectId=X — clear chat history
+// DELETE /api/chat?conversationId=X — clear chat history
 export async function DELETE(request: NextRequest) {
   try {
-    const projectId = request.nextUrl.searchParams.get("projectId");
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+    const conversationId = request.nextUrl.searchParams.get("conversationId");
+    if (!conversationId) {
+      return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
     }
 
     const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    }
+
+    const access = await verifyProjectWriteAccess(
+      conversation.projectId,
+      userId,
+      request.headers.get("x-user-email")
+    );
     if (!access.authorized) return access.response;
 
-    await prisma.chatMessage.deleteMany({ where: { projectId } });
+    await prisma.chatMessage.deleteMany({ where: { conversationId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("DELETE /api/chat error", error);

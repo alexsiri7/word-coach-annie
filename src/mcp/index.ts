@@ -93,6 +93,8 @@ try {
 interface McpServerOptions {
     /** Allow destructive tools (delete, restore). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
     allowDestructive?: boolean;
+    /** Authenticated user ID, extracted from x-user-id header by the MCP route handler. */
+    userId?: string | null;
 }
 
 // ─── Annie's Voice & Hard Rule ──────────────────────────────────────────────
@@ -144,6 +146,7 @@ If you use \`write_scene_content\`, you produce **BEAT blocks only** — never C
 function createServer(options?: McpServerOptions): McpServer {
 
 const allowDestructive = options?.allowDestructive ?? env.MCP_ALLOW_DESTRUCTIVE;
+const userId = options?.userId ?? null;
 
 const server = new McpServer({
     name: "word-coach-annie",
@@ -231,7 +234,7 @@ server.tool(
         genre: z.string().optional().describe("Genre"),
     },
     async (params) => {
-        const result = await createProject(params);
+        const result = await createProject({ ...params, userId });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

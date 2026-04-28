@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
             customInstructions: userSettings.customInstructions,
             coachingStyle: userSettings.coachingStyle,
             responseLength: userSettings.responseLength,
+            chatWindowSize: userSettings.chatWindowSize,
+            messagesUntilCompression: userSettings.messagesUntilCompression,
+            compressionModel: userSettings.compressionModel,
           });
         }
       } catch {
@@ -53,21 +56,28 @@ export async function PUT(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
     const body = await request.json();
-    const { apiKey, model, customInstructions, coachingStyle, responseLength } = body as {
+    const { apiKey, model, customInstructions, coachingStyle, responseLength,
+            chatWindowSize, messagesUntilCompression, compressionModel } = body as {
       apiKey?: string;
       model?: string;
       customInstructions?: string;
       coachingStyle?: string;
       responseLength?: string;
+      chatWindowSize?: number;
+      messagesUntilCompression?: number;
+      compressionModel?: string;
     };
 
     // Build update data — only include fields that were actually sent
-    const data: Record<string, string> = {};
+    const data: Record<string, string | number> = {};
     if (apiKey !== undefined) data.apiKey = encrypt(apiKey.trim());
     if (model !== undefined) data.model = model.trim();
     if (customInstructions !== undefined) data.customInstructions = customInstructions;
     if (coachingStyle !== undefined) data.coachingStyle = coachingStyle;
     if (responseLength !== undefined) data.responseLength = responseLength;
+    if (chatWindowSize !== undefined) data.chatWindowSize = chatWindowSize;
+    if (messagesUntilCompression !== undefined) data.messagesUntilCompression = messagesUntilCompression;
+    if (compressionModel !== undefined) data.compressionModel = compressionModel;
 
     // Save to user-level settings if authenticated
     if (userId) {
@@ -77,8 +87,8 @@ export async function PUT(request: NextRequest) {
           update: data,
           create: {
             userId,
-            apiKey: data.apiKey ?? "",
-            model: data.model ?? "",
+            apiKey: apiKey ? encrypt(apiKey.trim()) : "",
+            model: model?.trim() ?? "",
           },
         });
 
@@ -91,6 +101,9 @@ export async function PUT(request: NextRequest) {
           customInstructions: settings.customInstructions,
           coachingStyle: settings.coachingStyle,
           responseLength: settings.responseLength,
+          chatWindowSize: settings.chatWindowSize,
+          messagesUntilCompression: settings.messagesUntilCompression,
+          compressionModel: settings.compressionModel,
         });
       } catch (userSettingsError) {
         // Table may not exist yet — fall through to global settings
@@ -104,8 +117,8 @@ export async function PUT(request: NextRequest) {
       update: data,
       create: {
         id: "default",
-        apiKey: data.apiKey ?? "",
-        model: data.model ?? "",
+        apiKey: apiKey ? encrypt(apiKey.trim()) : "",
+        model: model?.trim() ?? "",
       },
     });
 

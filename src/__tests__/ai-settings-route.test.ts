@@ -108,6 +108,41 @@ describe("PUT /api/ai-settings", () => {
     expect(prisma.aiSettings.upsert).not.toHaveBeenCalled();
   });
 
+  it("saves compression settings when provided", async () => {
+    vi.mocked(prisma.userAiSettings.upsert).mockResolvedValue({
+      userId: "user-123",
+      baseUrl: "",
+      apiKey: "enc:key",
+      model: "user-model",
+      customInstructions: "",
+      coachingStyle: "balanced",
+      responseLength: "moderate",
+      chatWindowSize: 3,
+      messagesUntilCompression: 10,
+      compressionModel: "gemini-flash",
+    } as never);
+
+    const req = makePutRequest(
+      { chatWindowSize: 3, messagesUntilCompression: 10, compressionModel: "gemini-flash" },
+      "user-123"
+    );
+    const res = await PUT(req);
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.chatWindowSize).toBe(3);
+    expect(data.messagesUntilCompression).toBe(10);
+    expect(data.compressionModel).toBe("gemini-flash");
+    expect(data.scope).toBe("user");
+
+    const upsertCall = vi.mocked(prisma.userAiSettings.upsert).mock.calls[0][0];
+    expect(upsertCall.update).toMatchObject({
+      chatWindowSize: 3,
+      messagesUntilCompression: 10,
+      compressionModel: "gemini-flash",
+    });
+  });
+
   it("saves to global settings when unauthenticated", async () => {
     vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
       id: "default",

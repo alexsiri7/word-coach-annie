@@ -50,6 +50,9 @@ interface SceneAwareChatPanelProps {
   sceneStatus?: SceneStatus;
   sceneTitle?: string;
   sceneContext?: string;
+  initialConversationId?: string;
+  initialMessage?: string;
+  onPromptConsumed?: () => void;
 }
 
 export function SceneAwareChatPanel({
@@ -57,6 +60,9 @@ export function SceneAwareChatPanel({
   sceneStatus,
   sceneTitle,
   sceneContext,
+  initialConversationId,
+  initialMessage: externalMessage,
+  onPromptConsumed: onExternalPromptConsumed,
 }: SceneAwareChatPanelProps) {
   const [injectedPrompt, setInjectedPrompt] = useState<string | undefined>();
   const [chatKey, setChatKey] = useState(0);
@@ -109,8 +115,12 @@ export function SceneAwareChatPanel({
           key={chatKey}
           projectId={projectId}
           sceneContext={sceneContext}
-          initialMessage={injectedPrompt}
-          onPromptConsumed={() => setInjectedPrompt(undefined)}
+          initialConversationId={initialConversationId}
+          initialMessage={externalMessage || injectedPrompt}
+          onPromptConsumed={() => {
+            setInjectedPrompt(undefined);
+            onExternalPromptConsumed?.();
+          }}
         />
       </div>
     </div>
