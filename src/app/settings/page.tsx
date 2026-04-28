@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare,
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AiModelSelect } from "@/components/ai-model-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -51,9 +52,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"user" | "global">("global");
-  const [models, setModels] = useState<{ id: string; displayName: string }[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
-
   // AI behavior preferences
   const [customInstructions, setCustomInstructions] = useState("");
   const [coachingStyle, setCoachingStyle] = useState("balanced");
@@ -114,19 +112,6 @@ export default function SettingsPage() {
       .catch(console.error)
       .finally(() => setGoogleDocsLoading(false));
   }, []);
-
-  // Fetch model list once settings are loaded (requires a saved API key)
-  useEffect(() => {
-    if (loading) return;
-    setModelsLoading(true);
-    fetch("/api/ai-settings/models")
-      .then((res) => res.json())
-      .then((data: { models?: { id: string; displayName: string }[]; error?: string }) => {
-        if (data.models) setModels(data.models);
-      })
-      .catch(console.error)
-      .finally(() => setModelsLoading(false));
-  }, [loading]);
 
   const handleHashnodeConnect = async () => {
     const trimmed = hashnodeToken.trim();
@@ -288,43 +273,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="settings-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Model
-                  {modelsLoading && (
-                    <span className="ml-2 inline-block h-3 w-3 border border-text-muted border-t-transparent rounded-full animate-spin align-middle" />
-                  )}
-                </label>
-                {models.length > 0 ? (
-                  <Select value={model} onValueChange={setModel}>
-                    <SelectTrigger id="settings-model">
-                      <SelectValue placeholder="Select a model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.id}
-                          {m.displayName !== m.id && (
-                            <span className="text-text-muted ml-1 text-xs">— {m.displayName}</span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    id="settings-model"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    placeholder="gemini-2.0-flash-001, gemini-2.5-flash, gemini-2.5-pro..."
-                  />
-                )}
-                {!modelsLoading && models.length === 0 && (
-                  <p className="text-xs text-text-muted mt-1">
-                    Save a valid API key to load models from Google.
-                  </p>
-                )}
-              </div>
+              <AiModelSelect id="settings-model" value={model} onChange={setModel} />
             </div>
           )}
         </div>
