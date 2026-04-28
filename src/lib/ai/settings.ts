@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 export interface AiProviderConfig {
   apiKey: string;
@@ -50,8 +51,8 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
           };
         }
       }
-    } catch {
-      // Table may not exist yet — fall through
+    } catch (err) {
+      logger.warn("Failed to load user AI settings, falling back", err);
     }
   }
 
@@ -65,8 +66,8 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
         model: settings.model || envDefaults.model,
       };
     }
-  } catch {
-    // Table may not exist yet — fall through to env defaults
+  } catch (err) {
+    logger.warn("Failed to load global AI settings, falling back to env", err);
   }
   return envDefaults;
 }
@@ -87,8 +88,8 @@ export async function getAiPreferences(userId?: string | null): Promise<AiPrefer
         responseLength: (userSettings.responseLength as ResponseLength) || "moderate",
       };
     }
-  } catch {
-    // Table may not exist yet
+  } catch (err) {
+    logger.warn("Failed to load user AI preferences, using defaults", err);
   }
   return DEFAULT_PREFERENCES;
 }
