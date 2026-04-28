@@ -17,6 +17,7 @@ import {
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AiModelSelect } from "@/components/ai-model-select";
 import {
   Dialog,
   DialogContent,
@@ -178,17 +179,7 @@ export function SetupWizard() {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="setup-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Model
-                </label>
-                <Input
-                  id="setup-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gemini-2.0-flash-001"
-                />
-              </div>
+              <AiModelSelect id="setup-model" value={model} onChange={setModel} />
 
               <div className="flex items-center justify-between pt-2">
                 <Button variant="ghost" onClick={handleSkipKey} className="text-text-muted">
