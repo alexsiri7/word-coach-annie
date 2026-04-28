@@ -35,6 +35,7 @@ export async function runSimpleCompletion(params: {
   aiConfig: { apiKey: string; model: string };
   maxTokens?: number;
   temperature?: number;
+  responseMimeType?: string;
 }): Promise<string> {
   const llm = new Gemini({
     model: params.aiConfig.model,
@@ -49,6 +50,7 @@ export async function runSimpleCompletion(params: {
     generateContentConfig: {
       temperature: params.temperature,
       maxOutputTokens: params.maxTokens,
+      ...(params.responseMimeType ? { responseMimeType: params.responseMimeType } : {}),
     } as Record<string, unknown>,
   });
 
