@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -258,6 +259,7 @@ export default function Dashboard() {
     : [];
 
   return (
+    <>
     <main id="main-content" className="min-h-screen">
       <SetupWizard />
 
@@ -865,5 +867,7 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
     </main>
+    <SiteFooter />
+    </>
   );
 }

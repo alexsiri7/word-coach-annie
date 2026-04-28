@@ -6,7 +6,6 @@ import { UpdateBanner } from "@/components/update-banner";
 import { SwLifecycle } from "@/components/sw-lifecycle";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
-import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: {
@@ -66,7 +65,6 @@ export default function RootLayout({
             {children}
             <SyncToast />
           </ToastProvider>
-          <SiteFooter />
           <OfflineIndicator />
           <SwLifecycle />
         </ThemeProvider>
