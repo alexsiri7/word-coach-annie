@@ -12,24 +12,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AiModelSelect } from "@/components/ai-model-select";
 
 interface AiSettingsData {
   apiKey: string;
   model: string;
   hasApiKey?: boolean;
   scope?: "user" | "global";
-}
-
-interface GeminiModel {
-  id: string;
-  displayName: string;
 }
 
 export function AiSettingsDialog() {
@@ -41,8 +30,6 @@ export function AiSettingsDialog() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [models, setModels] = useState<GeminiModel[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -57,19 +44,6 @@ export function AiSettingsDialog() {
       })
       .catch(console.error);
   }, [open]);
-
-  // Fetch model list once settings are loaded (requires a saved API key)
-  useEffect(() => {
-    if (!loaded) return;
-    setModelsLoading(true);
-    fetch("/api/ai-settings/models")
-      .then((res) => res.json())
-      .then((data: { models?: GeminiModel[]; error?: string }) => {
-        if (data.models) setModels(data.models);
-      })
-      .catch(console.error)
-      .finally(() => setModelsLoading(false));
-  }, [loaded]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -151,43 +125,7 @@ export function AiSettingsDialog() {
               )}
             </div>
 
-            <div>
-              <label htmlFor="ai-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                Model
-                {modelsLoading && (
-                  <span className="ml-2 inline-block h-3 w-3 border border-text-muted border-t-transparent rounded-full animate-spin align-middle" />
-                )}
-              </label>
-              {models.length > 0 ? (
-                <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger id="ai-model">
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.id}
-                        {m.displayName !== m.id && (
-                          <span className="text-text-muted ml-1 text-xs">— {m.displayName}</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id="ai-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gemini-2.0-flash"
-                />
-              )}
-              {!modelsLoading && models.length === 0 && (
-                <p className="text-xs text-text-muted mt-1">
-                  Save a valid API key to load models from Google.
-                </p>
-              )}
-            </div>
+            <AiModelSelect id="ai-model" value={model} onChange={setModel} />
 
             <div className="flex items-center gap-2 pt-2">
               <Button onClick={handleSave} disabled={saving} className="gap-1.5">

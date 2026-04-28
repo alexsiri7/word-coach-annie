@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare,
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AiModelSelect } from "@/components/ai-model-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -51,7 +52,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"user" | "global">("global");
-
   // AI behavior preferences
   const [customInstructions, setCustomInstructions] = useState("");
   const [coachingStyle, setCoachingStyle] = useState("balanced");
@@ -273,17 +273,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="settings-model" className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Model
-                </label>
-                <Input
-                  id="settings-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gemini-2.0-flash-001, gemini-2.5-flash, gemini-2.5-pro..."
-                />
-              </div>
+              <AiModelSelect id="settings-model" value={model} onChange={setModel} />
             </div>
           )}
         </div>
