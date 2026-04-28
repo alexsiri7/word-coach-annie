@@ -124,14 +124,36 @@ ${objectsSummary || "(No characters/locations yet)"}${universeSummary}
 - You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
 }
 
-async function buildReviewSystemPrompt(projectId: string): Promise<string> {
+async function buildReviewSystemPrompt(projectId: string, conversationType: string): Promise<string> {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error("Project not found");
-  return `You are an experienced story editor. The writer has shared their full manuscript from "${project.title}" for editorial review.
-Your role: provide honest, constructive feedback on the story as a whole.
-Focus on: narrative arc, pacing, character development, theme, opening and closing strength, any structural issues.
-Do NOT rewrite sentences. Flag specific passages by quoting a short excerpt when relevant.
-After your initial review, stay in conversation — answer follow-up questions, go deeper on any area the writer wants to explore.`;
+
+  const personaInstructions: Record<string, string> = {
+    "review-editor": `You are a seasoned acquisitions editor evaluating "${project.title}" for publication. Be direct, professional, and commercially minded.
+
+Your focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.
+
+Tone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.`,
+
+    "review-fan": `You are an avid fan of this genre who just finished reading "${project.title}". React like a real reader — enthusiastic, personal, opinionated.
+
+Your focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."
+
+Tone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.`,
+
+    "review-author": `You are a published author in the same genre as "${project.title}", giving craft-level peer feedback.
+
+Your focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.
+
+Tone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.`,
+  };
+
+  const instruction = personaInstructions[conversationType] ?? personaInstructions["review-editor"];
+
+  return `${instruction}
+The writer has shared their full manuscript. Provide honest, constructive feedback.
+Do NOT rewrite sentences. Quote short excerpts when flagging specific passages.
+After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`;
 }
 
 async function autoTitleConversation(conversationId: string, aiConfig: AiProviderConfig): Promise<void> {
@@ -298,8 +320,9 @@ export async function POST(request: NextRequest) {
 
     const windowMessages = allMessages.slice(-chatWindowSize);
 
-    const systemPrompt = conversation.type === "review"
-      ? await buildReviewSystemPrompt(conversation.projectId)
+    const isReview = (conversation.type ?? "").startsWith("review");
+    const systemPrompt = isReview
+      ? await buildReviewSystemPrompt(conversation.projectId, conversation.type ?? "review-editor")
       : await buildSystemPrompt(conversation.projectId);
     const summaryBlock = conversation.summary
       ? `\n\n## Conversation so far\n${conversation.summary}`

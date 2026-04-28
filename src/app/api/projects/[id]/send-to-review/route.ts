@@ -14,6 +14,10 @@ export async function POST(
     const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
+    const body = await request.json().catch(() => ({}));
+    const persona = (body.persona as "editor" | "fan" | "author") ?? "editor";
+    const type = `review-${persona}` as "review-editor" | "review-fan" | "review-author";
+
     const manuscript = await exportManuscript(projectId);
     const wordCount = manuscript.split(/\s+/).filter(Boolean).length;
     if (wordCount < 10) {
@@ -25,7 +29,7 @@ export async function POST(
       data: {
         projectId,
         title: `Editorial Review — ${date}`,
-        type: "review",
+        type,
       },
       select: { id: true },
     });

@@ -445,7 +445,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
                 ) : (
                   <>
                     <span className="flex-1 truncate text-text-secondary">{conv.title}</span>
-                    {conv.type === "review" && (
+                    {conv.type.startsWith("review") && (
                       <span className="text-[10px] font-medium bg-accent/15 text-accent px-1.5 py-0.5 rounded">
                         Review
                       </span>

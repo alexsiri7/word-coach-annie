@@ -64,9 +64,16 @@ import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ReviewPersonaDialog } from "@/components/review-persona-dialog";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
+
+const PERSONA_LABELS: Record<"editor" | "fan" | "author", string> = {
+  editor: "an editor/publisher",
+  fan: "a genre fan",
+  author: "a professional author in this genre",
+};
 
 function mergeIndicators(
   nodes: OutlineNode[],
@@ -125,6 +132,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [isSendingToReview, setIsSendingToReview] = useState(false);
   const [reviewConversationId, setReviewConversationId] = useState<string | null>(null);
   const [reviewManuscript, setReviewManuscript] = useState<string | null>(null);
+  const [reviewPersonaOpen, setReviewPersonaOpen] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -292,10 +300,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const hasScenes = useMemo(() => outline.some(n => n.type === "SCENE" || n.children.some(c => c.type === "SCENE")), [outline]);
 
-  const handleSendToReview = useCallback(async () => {
+  const handleSendToReview = useCallback(() => {
+    setReviewPersonaOpen(true);
+  }, []);
+
+  const handlePersonaSelected = useCallback(async (persona: "editor" | "fan" | "author") => {
+    setReviewPersonaOpen(false);
     setIsSendingToReview(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/send-to-review`, { method: "POST" });
+      const res = await fetch(`/api/projects/${projectId}/send-to-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona }),
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         console.error("send-to-review failed", res.status, body);
@@ -303,7 +320,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       }
       const { conversationId, manuscriptText } = await res.json();
       setReviewConversationId(conversationId);
-      setReviewManuscript(`Please review this manuscript:\n\n${manuscriptText}`);
+      setReviewManuscript(`Review this manuscript as ${PERSONA_LABELS[persona]}.\n\n${manuscriptText}`);
       setActiveTab("ai-chat");
       setSelectedNodeId(null);
       setSelectedObjectId(null);
@@ -766,6 +783,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           )}
         </main>
       </div>
+
+      {/* Review Persona Picker */}
+      <ReviewPersonaDialog
+        open={reviewPersonaOpen}
+        onSelect={handlePersonaSelected}
+        onCancel={() => setReviewPersonaOpen(false)}
+      />
 
       {/* Add Node Dialog */}
       <Dialog open={addNodeDialogOpen} onOpenChange={setAddNodeDialogOpen}>
