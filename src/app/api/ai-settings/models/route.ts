@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1/models?key=${aiConfig.apiKey}&pageSize=100`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${aiConfig.apiKey}&pageSize=200`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -41,8 +41,14 @@ export async function GET(request: NextRequest) {
 
     const data = (await res.json()) as GoogleModelsResponse;
 
+    const EXCLUDE_PATTERNS = ["tts", "image", "robotics", "computer-use", "deep-research", "nano-", "lyria"];
+
     const models = (data.models ?? [])
       .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .filter((m) => {
+        const id = m.name.replace("models/", "").toLowerCase();
+        return !EXCLUDE_PATTERNS.some((p) => id.includes(p));
+      })
       .map((m) => ({
         id: m.name.replace("models/", ""),
         displayName: m.displayName,
