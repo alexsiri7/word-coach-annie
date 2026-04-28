@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
+    <>
     <main id="main-content" className="min-h-screen">
       <div className="h-1 accent-gradient" />
 
@@ -141,5 +143,7 @@ export default function PrivacyPage() {
         </div>
       </div>
     </main>
+    <SiteFooter />
+    </>
   );
 }
