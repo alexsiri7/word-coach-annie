@@ -21,8 +21,6 @@ import {
   TrendingUp,
   Eye,
   ClipboardList,
-  Send,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,16 +62,10 @@ import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { ReviewPersonaDialog } from "@/components/review-persona-dialog";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
 
-type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat";
+type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat" | "peer-review";
 
-const PERSONA_LABELS: Record<"editor" | "fan" | "author", string> = {
-  editor: "an editor/publisher",
-  fan: "a genre fan",
-  author: "a professional author in this genre",
-};
 
 function mergeIndicators(
   nodes: OutlineNode[],
@@ -128,11 +120,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [addObjectName, setAddObjectName] = useState("");
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
-  const [showPeerReview, setShowPeerReview] = useState(false);
-  const [isSendingToReview, setIsSendingToReview] = useState(false);
   const [reviewConversationId, setReviewConversationId] = useState<string | null>(null);
   const [reviewManuscript, setReviewManuscript] = useState<string | null>(null);
-  const [reviewPersonaOpen, setReviewPersonaOpen] = useState(false);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -298,39 +287,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const totalWordCount = project?.wordCount || 0;
 
-  const hasScenes = useMemo(() => outline.some(n => n.type === "SCENE" || n.children.some(c => c.type === "SCENE")), [outline]);
-
-  const handleSendToReview = useCallback(() => {
-    setReviewPersonaOpen(true);
-  }, []);
-
-  const handlePersonaSelected = useCallback(async (persona: "editor" | "fan" | "author") => {
-    setReviewPersonaOpen(false);
-    setIsSendingToReview(true);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/send-to-review`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("send-to-review failed", res.status, body);
-        return;
-      }
-      const { conversationId, manuscriptText } = await res.json();
-      setReviewConversationId(conversationId);
-      setReviewManuscript(`Review this manuscript as ${PERSONA_LABELS[persona]}.\n\n${manuscriptText}`);
-      setActiveTab("ai-chat");
-      setSelectedNodeId(null);
-      setSelectedObjectId(null);
-    } catch (err) {
-      console.error("send-to-review error", err);
-    } finally {
-      setIsSendingToReview(false);
-    }
-  }, [projectId]);
-
   // Map story object types to sidebar tabs
   const OBJECT_TYPE_TO_TAB: Record<string, SidebarTab> = {
     CHARACTER: "characters",
@@ -465,29 +421,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Eye className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={handleSendToReview}
-          disabled={!hasScenes || isSendingToReview}
-          aria-label="Send to review"
-          title={hasScenes ? "Send to Review" : "Add scenes with content to enable review"}
-        >
-          {isSendingToReview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
         <ShareButton projectId={projectId} projectTitle={project.title} />
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn("h-8 w-8", showPeerReview && "text-accent bg-accent/10")}
-          onClick={() => setShowPeerReview(!showPeerReview)}
-          aria-label="Peer review"
-          aria-pressed={showPeerReview}
-          title="Peer Review"
-        >
-          <Users className="h-4 w-4" />
-        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -533,7 +467,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
         {/* Sidebar */}
         <aside className={cn(
-          "absolute inset-y-0 left-0 z-50 w-80 border-r border-border bg-surface-raised flex flex-col flex-shrink-0 transition-transform duration-200 ease-in-out",
+          "absolute inset-y-0 left-0 z-50 border-r border-border bg-surface-raised flex flex-col flex-shrink-0 transition-all duration-200 ease-in-out",
+          activeTab === "peer-review" ? "md:w-1/2 w-full" : "w-80",
           sidebarHidden ? "hidden" : "md:relative md:translate-x-0",
           !sidebarHidden && (sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full")
         )}>
@@ -593,11 +528,37 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="text-xs font-medium hidden lg:inline">AI</span>
             </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "peer-review"}
+              onClick={() => { setActiveTab("peer-review"); setSelectedNodeId(null); setSelectedObjectId(null); }}
+              className={cn(
+                "px-2 py-1.5 rounded-md transition-all flex items-center gap-1 whitespace-nowrap",
+                activeTab === "peer-review"
+                  ? "bg-accent/15 text-accent"
+                  : "text-text-muted hover:text-text-secondary hover:bg-surface-overlay/50"
+              )}
+              aria-label="Peer Review"
+            >
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="text-xs font-medium hidden lg:inline">Review</span>
+            </button>
           </div>
 
           {/* Sidebar content */}
           <div className="flex-1 overflow-y-auto flex flex-col">
-            {activeTab === "ai-chat" ? (
+            {activeTab === "peer-review" ? (
+              <ErrorBoundary fallbackTitle="Peer Review crashed">
+                <PeerReviewPanel
+                  projectId={projectId}
+                  onStartChat={(message) => {
+                    setReviewManuscript(message);
+                    setReviewConversationId(null);
+                    setActiveTab("ai-chat");
+                  }}
+                />
+              </ErrorBoundary>
+            ) : activeTab === "ai-chat" ? (
               <ErrorBoundary fallbackTitle="Chat panel crashed">
                 <SceneAwareChatPanel
                   projectId={projectId}
@@ -758,18 +719,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             )}
           </div>
 
-          {/* Peer Review panel (right rail) */}
-          {showPeerReview && (
-            <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
-              <ErrorBoundary fallbackTitle="Peer Review crashed">
-                <PeerReviewPanel
-                  projectId={projectId}
-                  onClose={() => setShowPeerReview(false)}
-                />
-              </ErrorBoundary>
-            </div>
-          )}
-
           {/* Manuscript AI panel (right rail) */}
           {showManuscriptAI && (
             <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
@@ -783,13 +732,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           )}
         </main>
       </div>
-
-      {/* Review Persona Picker */}
-      <ReviewPersonaDialog
-        open={reviewPersonaOpen}
-        onSelect={handlePersonaSelected}
-        onCancel={() => setReviewPersonaOpen(false)}
-      />
 
       {/* Add Node Dialog */}
       <Dialog open={addNodeDialogOpen} onOpenChange={setAddNodeDialogOpen}>
