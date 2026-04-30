@@ -410,9 +410,9 @@ test.describe('Visual regression – Annie', () => {
     // Wait for the editor to load the scene (breadcrumb updates)
     await page.getByText('Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
 
-    // Editor must not render <SiteFooter />: the footer overlapped the
-    // word-count bar / chat input prior to PR #537. Asserting the absence of
-    // <footer> guards against the regression independently of pixel diffs.
+    // Editor must not render <SiteFooter />: it would overlap the word-count
+    // bar / chat input. Asserting absence guards against regression
+    // independently of pixel diffs.
     await expect(page.locator('footer')).toHaveCount(0)
 
     await expect(page).toHaveScreenshot('project-editor.png', {
