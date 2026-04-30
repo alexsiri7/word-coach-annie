@@ -364,7 +364,7 @@ async function mockFocusModeApi(page: Page) {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
-// 5 screens × 3 viewports (desktop, mobile, dark-desktop) = 15 screenshots
+// 7 screens × 3 viewports (desktop, mobile, dark-desktop) = 21 screenshots
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
@@ -410,6 +410,11 @@ test.describe('Visual regression – Annie', () => {
     // Wait for the editor to load the scene (breadcrumb updates)
     await page.getByText('Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
 
+    // Editor must not render <SiteFooter />: the footer overlapped the
+    // word-count bar / chat input prior to PR #537. Asserting the absence of
+    // <footer> guards against the regression independently of pixel diffs.
+    await expect(page.locator('footer')).toHaveCount(0)
+
     await expect(page).toHaveScreenshot('project-editor.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
@@ -424,6 +429,9 @@ test.describe('Visual regression – Annie', () => {
     // Wait for focus mode content to load
     await page.getByText('Throne Room').first().waitFor({ state: 'visible', timeout: 5_000 })
 
+    // Same invariant as the editor: focus mode must not render the footer.
+    await expect(page.locator('footer')).toHaveCount(0)
+
     await expect(page).toHaveScreenshot('focus-mode.png', {
       animations: 'disabled',
     })
@@ -435,6 +443,26 @@ test.describe('Visual regression – Annie', () => {
     await disableAnimations(page)
 
     await expect(page).toHaveScreenshot('dmca.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('privacy page', async ({ page }) => {
+    await page.goto('/privacy')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    await expect(page).toHaveScreenshot('privacy.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('terms page', async ({ page }) => {
+    await page.goto('/terms')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    await expect(page).toHaveScreenshot('terms.png', {
       animations: 'disabled',
     })
   })
