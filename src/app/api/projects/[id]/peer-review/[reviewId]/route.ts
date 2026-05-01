@@ -15,6 +15,14 @@ export async function GET(
   try {
     const review = await prisma.peerReview.findFirst({
       where: { id: reviewId, projectId },
+      select: {
+        id: true,
+        createdAt: true,
+        publisher: true,
+        reader: true,
+        writer: true,
+        consensus: true,
+      },
     });
     if (!review) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });

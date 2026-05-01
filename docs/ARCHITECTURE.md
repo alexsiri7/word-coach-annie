@@ -95,7 +95,8 @@ Project (1) ──────────────────┬─── (
                               │         └─── (N) Annotation (inline comments)
                               └─── (N) StoryObject (CHARACTER | LOCATION | PLOTLINE | WORLD_ELEMENT | NOTE)
                               └─── (N) Conversation (named chat thread)
-                                        └─── (N) ChatMessage (AI chat history)
+                              │         └─── (N) ChatMessage (AI chat history)
+                              └─── (N) PeerReview (persisted multi-persona review snapshots)
 
 Universe (1) ─────────────────┬─── (N) WorldObject (CHARACTER | LOCATION | WORLD_ELEMENT)
                               │         └─── (N) WorldObjectTimelineEntry

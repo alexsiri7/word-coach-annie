@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Users, RefreshCw, MessageSquare, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { timeAgo } from "./editor-config";
 
 // Local copies of the API types from peer-review/route.ts — kept in sync manually.
 interface ReviewFeedback {
@@ -29,11 +30,6 @@ interface PeerReviewResult {
   warning?: string;
 }
 
-interface ReviewMeta {
-  id: string;
-  createdAt: string;
-}
-
 interface HistoryRow {
   id: string;
   createdAt: string;
@@ -56,23 +52,9 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const SECTION_HEADING = "text-xs font-semibold text-text-muted uppercase tracking-wider mb-1";
 
-const TIMESTAMP_FMT = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-function formatTimestamp(value: string | null): string {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return TIMESTAMP_FMT.format(d);
-}
-
 export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps) {
   const [review, setReview] = useState<PeerReviewResult | null>(null);
-  const [currentMeta, setCurrentMeta] = useState<ReviewMeta | null>(null);
+  const [currentMeta, setCurrentMeta] = useState<Pick<HistoryRow, "id" | "createdAt"> | null>(null);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("publisher");
@@ -82,6 +64,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const applyReviewDetail = useCallback((detail: {
     id: string;
@@ -102,26 +85,34 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
   }, []);
 
   // Load latest saved review on mount / project change.
+  // Does NOT show the spinner up front — the empty-state CTA renders until a saved review is found,
+  // so brand-new projects don't briefly show "Analysing manuscript…" copy on mount.
   useEffect(() => {
     let ignore = false;
-    setLoading(true);
     (async () => {
       try {
         const listRes = await fetch(`/api/projects/${projectId}/peer-review?limit=1`);
-        if (!listRes.ok) return;
+        if (!listRes.ok) {
+          console.warn("[PeerReviewPanel] mount list fetch failed", listRes.status);
+          return;
+        }
         const list = await listRes.json();
         const latestId = list?.data?.[0]?.id;
         if (!latestId) {
           if (!ignore) setRan(false);
           return;
         }
+        if (!ignore) setLoading(true);
         const detailRes = await fetch(`/api/projects/${projectId}/peer-review/${latestId}`);
-        if (!detailRes.ok) return;
+        if (!detailRes.ok) {
+          console.warn("[PeerReviewPanel] mount detail fetch failed", detailRes.status);
+          return;
+        }
         const detail = await detailRes.json();
         if (ignore) return;
         applyReviewDetail(detail);
-      } catch {
-        // Mount fetch failures are silent — user can still click "Run Peer Review".
+      } catch (e) {
+        console.warn("[PeerReviewPanel] mount fetch threw", e);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -149,9 +140,17 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
           setHistory(null);
         }
       } else {
-        setError(`Request failed (${res.status})`);
+        let serverMsg: string | null = null;
+        try {
+          const body = await res.json();
+          if (body && typeof body.error === "string") serverMsg = body.error;
+        } catch {
+          // non-JSON body; fall through to status-code message
+        }
+        setError(serverMsg ?? `Request failed (${res.status})`);
       }
-    } catch {
+    } catch (e) {
+      console.warn("[PeerReviewPanel] runReview failed", e);
       setError("Network error — please try again");
     } finally {
       setLoading(false);
@@ -161,14 +160,19 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
+    setHistoryError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/peer-review?limit=20`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setHistoryError(`Failed to load history (${res.status})`);
+        return;
+      }
       const data = await res.json();
       setHistory(data.data ?? []);
       setHistoryTotal(data.total ?? 0);
-    } catch {
-      setHistory([]);
+    } catch (e) {
+      console.warn("[PeerReviewPanel] fetchHistory failed", e);
+      setHistoryError("Network error — please try again");
     } finally {
       setHistoryLoading(false);
     }
@@ -186,13 +190,26 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
 
   const loadFromHistory = useCallback(async (id: string) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/peer-review/${id}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setError(
+          res.status === 404
+            ? "Review no longer exists"
+            : res.status === 403
+              ? "You no longer have access to this review"
+              : `Failed to load review (${res.status})`
+        );
+        return;
+      }
       const detail = await res.json();
       applyReviewDetail(detail);
       setHistoryOpen(false);
       setActiveTab("publisher");
+    } catch (e) {
+      console.warn("[PeerReviewPanel] loadFromHistory failed", e);
+      setError("Network error — please try again");
     } finally {
       setLoading(false);
     }
@@ -313,7 +330,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     </div>
   );
 
-  const savedLabel = currentMeta ? `Saved ${formatTimestamp(currentMeta.createdAt)}` : null;
+  const savedLabel = currentMeta ? `Saved ${timeAgo(currentMeta.createdAt)}` : null;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -356,12 +373,20 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
               <span className="text-sm text-muted-foreground">Loading history…</span>
             </div>
           )}
-          {!historyLoading && history && history.length === 0 && (
+          {!historyLoading && historyError && (
+            <div className="p-4 text-center">
+              <p className="text-sm text-destructive">{historyError}</p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={fetchHistory}>
+                Retry
+              </Button>
+            </div>
+          )}
+          {!historyLoading && !historyError && history && history.length === 0 && (
             <div className="p-4 text-center">
               <p className="text-sm text-muted-foreground">No saved reviews yet.</p>
             </div>
           )}
-          {!historyLoading && history && history.length > 0 && (
+          {!historyLoading && !historyError && history && history.length > 0 && (
             <ul className="divide-y divide-border">
               {history.map((row) => (
                 <li key={row.id}>
@@ -374,7 +399,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                     )}
                   >
                     <div className="text-xs font-medium text-foreground">
-                      {formatTimestamp(row.createdAt)}
+                      {timeAgo(row.createdAt)}
                     </div>
                     {row.synthesizedRecommendation && (
                       <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
@@ -446,6 +471,12 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
 
           {review && !loading && (
             <div className="p-3">
+              {/* Inline error strip — shown when an error occurred while a review is already loaded
+                  (e.g. loadFromHistory failure on a stale row). The "ran && !loading && !review"
+                  branch above only fires when no review is available. */}
+              {error && (
+                <p className="text-xs text-destructive mb-2">{error}</p>
+              )}
               {savedLabel && (
                 <p className="text-[11px] text-muted-foreground mb-2">{savedLabel}</p>
               )}

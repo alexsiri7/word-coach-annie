@@ -247,6 +247,9 @@ describe("POST /api/projects/:id/peer-review", () => {
     const body = await res.json();
     expect(body.warning).toMatch(/AI not configured/i);
     expect(vi.mocked(runSimpleCompletion)).not.toHaveBeenCalled();
+    // Persistence must NOT happen on the warning early-return path — otherwise
+    // unconfigured users would accumulate empty DEFAULT_REVIEW rows.
+    expect(vi.mocked(prisma.peerReview.create)).not.toHaveBeenCalled();
   });
 
   it("returns warning when manuscript is empty", async () => {
@@ -256,6 +259,7 @@ describe("POST /api/projects/:id/peer-review", () => {
     const body = await res.json();
     expect(body.warning).toMatch(/empty/i);
     expect(vi.mocked(runSimpleCompletion)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.peerReview.create)).not.toHaveBeenCalled();
   });
 
   // ─── DEFAULT fallback wiring ───────────────────────────────────────────────
@@ -361,6 +365,66 @@ describe("GET /api/projects/:id/peer-review (list)", () => {
     expect(findManyArg.skip).toBe(10);
   });
 
+  // Pin the actual clamping behaviour at the boundaries — without this, a regression
+  // that removed Math.min(_, 100) would let callers request `?limit=999999` and dump
+  // the entire history table.
+  it.each([
+    ["limit=999&offset=0", 100, 0],   // oversized limit clamps to 100
+    ["limit=abc&offset=0", 20, 0],    // non-numeric falls back to default 20
+    ["limit=10&offset=-5", 10, 0],    // negative offset clamps to 0
+    ["limit=-3&offset=0", 1, 0],      // negative limit clamps to 1
+  ])("clamps query=%s to take=%i skip=%i", async (qs, expectedTake, expectedSkip) => {
+    vi.mocked(prisma.peerReview.findMany).mockResolvedValueOnce([] as never);
+    vi.mocked(prisma.peerReview.count).mockResolvedValueOnce(0 as never);
+
+    await GET_LIST(
+      makeListRequest(`http://localhost/api/projects/proj-1/peer-review?${qs}`),
+      makeParams()
+    );
+    const arg = vi.mocked(prisma.peerReview.findMany).mock.calls[0][0]!;
+    expect(arg.take).toBe(expectedTake);
+    expect(arg.skip).toBe(expectedSkip);
+  });
+
+  it("does not leak publisher/reader/writer in list response", async () => {
+    // The list route's `select` is the only thing keeping heavy reviewer feedback out of
+    // the list payload. Pass a fully-populated row through the mock to verify the route
+    // strips it (instead of relying on the mock data being narrow).
+    vi.mocked(prisma.peerReview.findMany).mockResolvedValueOnce([
+      {
+        id: "r1",
+        createdAt: new Date("2026-05-01T10:00:00Z"),
+        consensus: { synthesizedRecommendation: "OK" },
+        publisher: { overallImpression: "should-not-leak" },
+        reader: { overallImpression: "should-not-leak" },
+        writer: { overallImpression: "should-not-leak" },
+      },
+    ] as never);
+    vi.mocked(prisma.peerReview.count).mockResolvedValueOnce(1 as never);
+
+    const res = await GET_LIST(makeListRequest(), makeParams());
+    const body = await res.json();
+    expect(body.data[0]).not.toHaveProperty("publisher");
+    expect(body.data[0]).not.toHaveProperty("reader");
+    expect(body.data[0]).not.toHaveProperty("writer");
+    // Pin the select clause as the load-bearing constraint.
+    const arg = vi.mocked(prisma.peerReview.findMany).mock.calls[0][0]!;
+    expect(arg.select).toEqual({ id: true, createdAt: true, consensus: true });
+  });
+
+  it("falls back to empty string when consensus is null or missing the recommendation", async () => {
+    vi.mocked(prisma.peerReview.findMany).mockResolvedValueOnce([
+      { id: "r1", createdAt: new Date("2026-05-01T10:00:00Z"), consensus: null },
+      { id: "r2", createdAt: new Date("2026-05-01T11:00:00Z"), consensus: { somethingElse: "x" } },
+    ] as never);
+    vi.mocked(prisma.peerReview.count).mockResolvedValueOnce(2 as never);
+
+    const res = await GET_LIST(makeListRequest(), makeParams());
+    const body = await res.json();
+    expect(body.data[0].synthesizedRecommendation).toBe("");
+    expect(body.data[1].synthesizedRecommendation).toBe("");
+  });
+
   it("returns the auth response when read access is denied", async () => {
     const denyResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 });
     vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
@@ -413,5 +477,52 @@ describe("GET /api/projects/:id/peer-review/:reviewId (detail)", () => {
     await GET_DETAIL(makeDetailRequest("proj-A", "rev-from-B"), makeDetailParams("proj-A", "rev-from-B"));
     const where = vi.mocked(prisma.peerReview.findFirst).mock.calls[0][0]?.where;
     expect(where).toEqual({ id: "rev-from-B", projectId: "proj-A" });
+  });
+
+  // Behavioural cross-project test: drives the leak scenario via mockImplementation so that
+  // a refactor to (e.g.) findUnique({ id }) without the projectId filter would surface as
+  // a leak of the row, not just a where-clause mismatch.
+  it("returns 404 when the review belongs to a different project (no leak)", async () => {
+    const rowFromProjectB = {
+      id: "rev-from-B",
+      projectId: "proj-B",
+      createdAt: new Date("2026-05-01T10:00:00Z"),
+      publisher: {},
+      reader: {},
+      writer: {},
+      consensus: {},
+    };
+    vi.mocked(prisma.peerReview.findFirst).mockImplementation(
+      ((args: { where: { id: string; projectId: string } }) =>
+        args.where.id === rowFromProjectB.id && args.where.projectId === rowFromProjectB.projectId
+          ? Promise.resolve(rowFromProjectB)
+          : Promise.resolve(null)) as never
+    );
+
+    const res = await GET_DETAIL(
+      makeDetailRequest("proj-A", "rev-from-B"),
+      makeDetailParams("proj-A", "rev-from-B")
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns the auth response when read access is denied", async () => {
+    const denyResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
+      authorized: false,
+      response: denyResponse,
+    } as never);
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(403);
+    expect(vi.mocked(prisma.peerReview.findFirst)).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when prisma throws", async () => {
+    vi.mocked(prisma.peerReview.findFirst).mockRejectedValueOnce(new Error("db down"));
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(500);
+    expect(vi.mocked(logger.error)).toHaveBeenCalled();
   });
 });

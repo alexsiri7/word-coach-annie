@@ -610,9 +610,15 @@ Run a manuscript-level AI analysis across the full project.
 
 ## Peer Review
 
+Peer reviews are persisted as `PeerReview` rows tied to a project. The POST endpoint
+runs the three personas + consensus and saves the result; the GET endpoints page
+through saved reviews and load a specific one without re-running the LLMs.
+
 ### `POST /api/projects/:id/peer-review`
-Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer) against
-the full manuscript and synthesize a consensus.
+Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer)
+against the full manuscript, synthesize a consensus, and persist the result.
+
+**Auth**: Project write access (`verifyProjectWriteAccess`).
 
 No request body required.
 
@@ -626,21 +632,88 @@ No request body required.
     "detailedFeedback": "string",
     "recommendation": "publish | revise | pass"
   },
-  "reader": { "...same shape as publisher..." },
-  "writer": { "...same shape as publisher..." },
+  "reader":   { "...same shape as publisher..." },
+  "writer":   { "...same shape as publisher..." },
   "consensus": {
     "pointsOfAgreement": ["string"],
     "pointsOfDisagreement": ["string"],
     "topPriorities": ["string"],
     "synthesizedRecommendation": "string"
-  }
+  },
+  "id": "string | null",
+  "createdAt": "ISO 8601 timestamp | null"
 }
 ```
 
-Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" }` if
-preconditions are not met. Manuscript is truncated to 50,000 characters before analysis.
+`id` and `createdAt` are present when the review row was successfully persisted. If the
+DB write fails, both fall back to `null` and the LLM result is still returned (the call
+is non-fatal — the user has already paid for four LLM calls).
 
-**Errors**: `401` unauthorized, `403` forbidden, `500` internal server error
+Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" }` if
+preconditions are not met (no row is created in the warning paths). Manuscript is
+truncated to 50,000 characters before analysis.
+
+**Errors**: `401` unauthorized, `403` forbidden, `500` internal server error.
+
+---
+
+### `GET /api/projects/:id/peer-review`
+List saved peer reviews for a project, newest first.
+
+**Auth**: Project read access (`verifyProjectReadAccess`).
+
+**Query params**:
+- `limit` (default `20`, clamped to `[1, 100]`)
+- `offset` (default `0`, clamped to `>= 0`)
+
+Non-numeric / non-finite inputs fall back to the defaults.
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "createdAt": "ISO 8601 timestamp",
+      "synthesizedRecommendation": "string"
+    }
+  ],
+  "total": 0,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+The list view projects only `id`, `createdAt`, and `consensus.synthesizedRecommendation` —
+publisher / reader / writer feedback is NOT included. Use the detail endpoint to load a
+full review.
+
+**Errors**: `403` forbidden, `500` internal server error.
+
+---
+
+### `GET /api/projects/:id/peer-review/:reviewId`
+Get a single saved peer review with all four feedback objects.
+
+**Auth**: Project read access (`verifyProjectReadAccess`).
+
+The lookup is scoped to both `reviewId` and `projectId`, so a review belonging to a
+different project returns `404` (not `403`) — this prevents cross-tenant existence leaks.
+
+**Response**:
+```json
+{
+  "id": "string",
+  "createdAt": "ISO 8601 timestamp",
+  "publisher": { "...ReviewFeedback..." },
+  "reader":    { "...ReviewFeedback..." },
+  "writer":    { "...ReviewFeedback..." },
+  "consensus": { "...ConsensusFeedback..." }
+}
+```
+
+**Errors**: `403` forbidden (no read access to project), `404` review not found OR
+review belongs to a different project, `500` internal server error.
 
 ---
 
