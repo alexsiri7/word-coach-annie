@@ -33,7 +33,7 @@ jobs:
           done
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           if [ "$STATUS" = "unreachable" ]; then
-            echo "::error::Production health check failed — server unreachable after $MAX_ATTEMPTS attempts (timeout or DNS failure)"
+            echo "::error::Production health check failed — server unreachable or response unparseable after $MAX_ATTEMPTS attempts"
             exit 1
           fi
           if [ "$STATUS" = "error" ]; then
@@ -135,7 +135,7 @@ jobs:
           done
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           if [ "$STATUS" = "unreachable" ]; then
-            echo "::error::Staging health check failed — server unreachable after $MAX_ATTEMPTS attempts (timeout or DNS failure)"
+            echo "::error::Staging health check failed — server unreachable or response unparseable after $MAX_ATTEMPTS attempts"
             exit 1
           fi
           if [ "$STATUS" = "error" ]; then
