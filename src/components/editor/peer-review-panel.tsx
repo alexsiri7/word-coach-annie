@@ -91,13 +91,9 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     writer: ReviewFeedback;
     consensus: ConsensusFeedback;
   }) => {
-    setReview({
-      publisher: detail.publisher,
-      reader: detail.reader,
-      writer: detail.writer,
-      consensus: detail.consensus,
-    });
-    setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
+    const { id, createdAt, ...review } = detail;
+    setReview(review);
+    setCurrentMeta({ id, createdAt });
     setRan(true);
   }, []);
 
