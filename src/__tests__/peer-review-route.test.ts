@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn().mockReturnValue("user-1"),
   verifyProjectWriteAccess: vi.fn().mockResolvedValue({ authorized: true }),
+  verifyProjectReadAccess: vi.fn().mockResolvedValue({ authorized: true }),
 }));
 
 vi.mock("@/lib/ai/settings", () => ({
@@ -30,11 +31,25 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
-import { POST } from "@/app/api/projects/[id]/peer-review/route";
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    peerReview: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      count: vi.fn(),
+    },
+  },
+}));
+
+import { POST, GET as GET_LIST } from "@/app/api/projects/[id]/peer-review/route";
+import { GET as GET_DETAIL } from "@/app/api/projects/[id]/peer-review/[reviewId]/route";
 import { getAiConfig } from "@/lib/ai/settings";
 import { exportManuscript } from "@/mcp/tools/export";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
+import { verifyProjectReadAccess } from "@/lib/api-auth";
+import { prisma } from "@/lib/db";
 
 function makeRequest(projectId: string = "proj-1") {
   return new NextRequest(`http://localhost/api/projects/${projectId}/peer-review`, {
@@ -42,8 +57,22 @@ function makeRequest(projectId: string = "proj-1") {
   });
 }
 
+function makeListRequest(url: string = "http://localhost/api/projects/proj-1/peer-review") {
+  return new NextRequest(url, { method: "GET" });
+}
+
+function makeDetailRequest(projectId: string = "proj-1", reviewId: string = "rev-1") {
+  return new NextRequest(`http://localhost/api/projects/${projectId}/peer-review/${reviewId}`, {
+    method: "GET",
+  });
+}
+
 function makeParams(id: string = "proj-1") {
   return { params: Promise.resolve({ id }) };
+}
+
+function makeDetailParams(id: string = "proj-1", reviewId: string = "rev-1") {
+  return { params: Promise.resolve({ id, reviewId }) };
 }
 
 describe("POST /api/projects/:id/peer-review", () => {
@@ -61,6 +90,10 @@ describe("POST /api/projects/:id/peer-review", () => {
         recommendation: "publish",
       })
     );
+    vi.mocked(prisma.peerReview.create).mockResolvedValue({
+      id: "rev-default",
+      createdAt: new Date("2026-05-01T00:00:00Z"),
+    } as never);
   });
 
   // ─── parseJson unit tests ──────────────────────────────────────────────────
@@ -246,5 +279,139 @@ describe("POST /api/projects/:id/peer-review", () => {
       "Peer review synthesis failed",
       expect.any(Error)
     );
+  });
+
+  // ─── Persistence ──────────────────────────────────────────────────────────
+
+  it("persists the review and returns id + createdAt", async () => {
+    const createdAt = new Date("2026-05-01T12:00:00Z");
+    vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
+      id: "rev-1",
+      createdAt,
+    } as never);
+
+    const res = await POST(makeRequest("proj-7"), makeParams("proj-7"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe("rev-1");
+    expect(new Date(body.createdAt).toISOString()).toBe(createdAt.toISOString());
+    expect(vi.mocked(prisma.peerReview.create)).toHaveBeenCalledTimes(1);
+    const callArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+    expect(callArg.data.projectId).toBe("proj-7");
+    expect(callArg.data.publisher).toBeDefined();
+    expect(callArg.data.reader).toBeDefined();
+    expect(callArg.data.writer).toBeDefined();
+    expect(callArg.data.consensus).toBeDefined();
+  });
+
+  it("does not 500 when persistence fails", async () => {
+    vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
+
+    const res = await POST(makeRequest(), makeParams());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.publisher).toBeDefined();
+    expect(body.id).toBeNull();
+    expect(body.createdAt).toBeNull();
+    expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+      "Failed to persist peer review",
+      expect.objectContaining({ projectId: "proj-1" })
+    );
+  });
+});
+
+describe("GET /api/projects/:id/peer-review (list)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(verifyProjectReadAccess).mockResolvedValue({ authorized: true } as never);
+  });
+
+  it("returns paginated list newest-first", async () => {
+    const r1 = { id: "r1", createdAt: new Date("2026-05-01T10:00:00Z"), consensus: { synthesizedRecommendation: "Tighten" } };
+    const r2 = { id: "r2", createdAt: new Date("2026-04-28T09:00:00Z"), consensus: { synthesizedRecommendation: "Revise" } };
+    vi.mocked(prisma.peerReview.findMany).mockResolvedValueOnce([r1, r2] as never);
+    vi.mocked(prisma.peerReview.count).mockResolvedValueOnce(2 as never);
+
+    const res = await GET_LIST(makeListRequest(), makeParams());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBe(2);
+    expect(body.limit).toBe(20);
+    expect(body.offset).toBe(0);
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0]).toEqual({
+      id: "r1",
+      createdAt: r1.createdAt.toISOString(),
+      synthesizedRecommendation: "Tighten",
+    });
+    expect(body.data[1].synthesizedRecommendation).toBe("Revise");
+  });
+
+  it("clamps limit and offset and forwards them to Prisma", async () => {
+    vi.mocked(prisma.peerReview.findMany).mockResolvedValueOnce([] as never);
+    vi.mocked(prisma.peerReview.count).mockResolvedValueOnce(0 as never);
+
+    const res = await GET_LIST(
+      makeListRequest("http://localhost/api/projects/proj-1/peer-review?limit=5&offset=10"),
+      makeParams()
+    );
+    expect(res.status).toBe(200);
+    const findManyArg = vi.mocked(prisma.peerReview.findMany).mock.calls[0][0]!;
+    expect(findManyArg.take).toBe(5);
+    expect(findManyArg.skip).toBe(10);
+  });
+
+  it("returns the auth response when read access is denied", async () => {
+    const denyResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
+      authorized: false,
+      response: denyResponse,
+    } as never);
+
+    const res = await GET_LIST(makeListRequest(), makeParams());
+    expect(res.status).toBe(403);
+    expect(vi.mocked(prisma.peerReview.findMany)).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/projects/:id/peer-review/:reviewId (detail)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(verifyProjectReadAccess).mockResolvedValue({ authorized: true } as never);
+  });
+
+  it("returns the full review row when found", async () => {
+    const review = {
+      id: "rev-1",
+      projectId: "proj-1",
+      createdAt: new Date("2026-05-01T10:00:00Z"),
+      publisher: { overallImpression: "P" },
+      reader: { overallImpression: "R" },
+      writer: { overallImpression: "W" },
+      consensus: { synthesizedRecommendation: "S" },
+    };
+    vi.mocked(prisma.peerReview.findFirst).mockResolvedValueOnce(review as never);
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe("rev-1");
+    expect(body.publisher.overallImpression).toBe("P");
+    expect(body.consensus.synthesizedRecommendation).toBe("S");
+  });
+
+  it("returns 404 when the review is not found", async () => {
+    vi.mocked(prisma.peerReview.findFirst).mockResolvedValueOnce(null as never);
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(404);
+  });
+
+  it("scopes the lookup to both reviewId and projectId (cross-project safety)", async () => {
+    vi.mocked(prisma.peerReview.findFirst).mockResolvedValueOnce(null as never);
+
+    await GET_DETAIL(makeDetailRequest("proj-A", "rev-from-B"), makeDetailParams("proj-A", "rev-from-B"));
+    const where = vi.mocked(prisma.peerReview.findFirst).mock.calls[0][0]?.where;
+    expect(where).toEqual({ id: "rev-from-B", projectId: "proj-A" });
   });
 });
