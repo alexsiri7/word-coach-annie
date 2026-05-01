@@ -21,7 +21,7 @@ jobs:
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             ATTEMPT=$(( ATTEMPT + 1 ))
             BODY=$(curl -s --max-time 10 https://annie.interstellarai.net/api/health || echo '{"status":"unreachable"}')
-            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
             echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — Response: $BODY"
             if [ "$STATUS" != "unreachable" ]; then
               break
@@ -123,7 +123,7 @@ jobs:
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             ATTEMPT=$(( ATTEMPT + 1 ))
             BODY=$(curl -s --max-time 10 https://word-coach-annie-staging.up.railway.app/api/health || echo '{"status":"unreachable"}')
-            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            STATUS=$(echo "$BODY" | jq -r '.status // "unknown"' 2>/dev/null || echo "unreachable")
             echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — Response: $BODY"
             if [ "$STATUS" != "unreachable" ]; then
               break
