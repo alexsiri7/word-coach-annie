@@ -83,6 +83,24 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  const applyReviewDetail = useCallback((detail: {
+    id: string;
+    createdAt: string;
+    publisher: ReviewFeedback;
+    reader: ReviewFeedback;
+    writer: ReviewFeedback;
+    consensus: ConsensusFeedback;
+  }) => {
+    setReview({
+      publisher: detail.publisher,
+      reader: detail.reader,
+      writer: detail.writer,
+      consensus: detail.consensus,
+    });
+    setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
+    setRan(true);
+  }, []);
+
   // Load latest saved review on mount / project change.
   useEffect(() => {
     let ignore = false;
@@ -101,14 +119,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
         if (!detailRes.ok) return;
         const detail = await detailRes.json();
         if (ignore) return;
-        setReview({
-          publisher: detail.publisher,
-          reader: detail.reader,
-          writer: detail.writer,
-          consensus: detail.consensus,
-        });
-        setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
-        setRan(true);
+        applyReviewDetail(detail);
       } catch {
         // Mount fetch failures are silent — user can still click "Run Peer Review".
       } finally {
@@ -118,7 +129,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     return () => {
       ignore = true;
     };
-  }, [projectId]);
+  }, [projectId, applyReviewDetail]);
 
   const runReview = useCallback(async () => {
     setLoading(true);
@@ -179,20 +190,13 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
       const res = await fetch(`/api/projects/${projectId}/peer-review/${id}`);
       if (!res.ok) return;
       const detail = await res.json();
-      setReview({
-        publisher: detail.publisher,
-        reader: detail.reader,
-        writer: detail.writer,
-        consensus: detail.consensus,
-      });
-      setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
-      setRan(true);
+      applyReviewDetail(detail);
       setHistoryOpen(false);
       setActiveTab("publisher");
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, applyReviewDetail]);
 
   const renderReviewTab = (feedback: ReviewFeedback) => (
     <div className="space-y-3">

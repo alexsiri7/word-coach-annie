@@ -105,10 +105,10 @@ const DEFAULT_CONSENSUS: ConsensusFeedback = {
   synthesizedRecommendation: "Unable to synthesize consensus",
 };
 
-function parseReview(raw: string, role: string): ReviewFeedback {
-  const parsed = parseJson<ReviewFeedback>(raw);
+function parseOrLog<T>(raw: string, role: string, fallback: T): T {
+  const parsed = parseJson<T>(raw);
   if (!parsed) logger.error(`Peer review: failed to parse ${role} JSON`, { raw: raw.slice(0, 300) });
-  return parsed ?? DEFAULT_REVIEW;
+  return parsed ?? fallback;
 }
 
 export async function POST(
@@ -141,9 +141,9 @@ export async function POST(
       runSimpleCompletion({ userMessage: buildWriterPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
     ]);
 
-    const publisher = parseReview(publisherRaw, "publisher");
-    const reader = parseReview(readerRaw, "reader");
-    const writer = parseReview(writerRaw, "writer");
+    const publisher = parseOrLog(publisherRaw, "publisher", DEFAULT_REVIEW);
+    const reader = parseOrLog(readerRaw, "reader", DEFAULT_REVIEW);
+    const writer = parseOrLog(writerRaw, "writer", DEFAULT_REVIEW);
 
     let consensus: ConsensusFeedback = DEFAULT_CONSENSUS;
     try {
@@ -153,9 +153,7 @@ export async function POST(
         maxTokens: 2000,
         ...JSON_OPTS,
       });
-      const consensusParsed = parseJson<ConsensusFeedback>(synthesisRaw);
-      if (!consensusParsed) logger.error("Peer review: failed to parse synthesis JSON", { raw: synthesisRaw.slice(0, 300) });
-      consensus = consensusParsed ?? DEFAULT_CONSENSUS;
+      consensus = parseOrLog(synthesisRaw, "synthesis", DEFAULT_CONSENSUS);
     } catch (err) {
       logger.error("Peer review synthesis failed", err);
     }
