@@ -414,4 +414,16 @@ describe("GET /api/projects/:id/peer-review/:reviewId (detail)", () => {
     const where = vi.mocked(prisma.peerReview.findFirst).mock.calls[0][0]?.where;
     expect(where).toEqual({ id: "rev-from-B", projectId: "proj-A" });
   });
+
+  it("returns the auth response when read access is denied", async () => {
+    const denyResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
+      authorized: false,
+      response: denyResponse,
+    } as never);
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(403);
+    expect(vi.mocked(prisma.peerReview.findFirst)).not.toHaveBeenCalled();
+  });
 });

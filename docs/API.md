@@ -610,9 +610,15 @@ Run a manuscript-level AI analysis across the full project.
 
 ## Peer Review
 
+Peer reviews are persisted server-side. The POST endpoint runs the three reviewer
+personas, synthesizes a consensus, and writes the result to the `PeerReview` table;
+the GET endpoints expose the resulting history.
+
 ### `POST /api/projects/:id/peer-review`
-Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer) against
-the full manuscript and synthesize a consensus.
+Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer)
+against the full manuscript, synthesize a consensus, and persist the result.
+
+**Auth**: Project write access (`verifyProjectWriteAccess`).
 
 No request body required.
 
@@ -626,21 +632,76 @@ No request body required.
     "detailedFeedback": "string",
     "recommendation": "publish | revise | pass"
   },
-  "reader": { "...same shape as publisher..." },
-  "writer": { "...same shape as publisher..." },
+  "reader":    { "...same shape as publisher..." },
+  "writer":    { "...same shape as publisher..." },
   "consensus": {
     "pointsOfAgreement": ["string"],
     "pointsOfDisagreement": ["string"],
     "topPriorities": ["string"],
     "synthesizedRecommendation": "string"
-  }
+  },
+  "id":        "string | null",
+  "createdAt": "ISO8601 | null"
 }
 ```
 
-Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" }` if
-preconditions are not met. Manuscript is truncated to 50,000 characters before analysis.
+Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" }`
+if preconditions are not met. Manuscript is truncated to 50,000 characters before
+analysis.
+
+**Persistence**: The review is persisted *after* the LLM calls succeed. If the
+database write fails, the synthesized review is still returned, but `id` and
+`createdAt` will be `null` and the failure is logged. POST never 500s due to a
+persistence failure alone.
 
 **Errors**: `401` unauthorized, `403` forbidden, `500` internal server error
+(LLM/manuscript-export failures only).
+
+---
+
+### `GET /api/projects/:id/peer-review`
+List persisted peer reviews for a project, newest first.
+
+**Auth**: Project read access (`verifyProjectReadAccess`).
+
+**Query params**:
+- `limit` (default: 20, clamped to 1–100)
+- `offset` (default: 0, clamped to ≥ 0)
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "createdAt": "ISO8601",
+      "synthesizedRecommendation": "string"
+    }
+  ],
+  "total": 0,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+Each row is a projection — only `id`, `createdAt`, and `consensus.synthesizedRecommendation`
+are returned. Use the detail endpoint to fetch full reviewer feedback.
+
+**Errors**: `401` unauthorized, `403` forbidden, `500` internal server error.
+
+---
+
+### `GET /api/projects/:id/peer-review/:reviewId`
+Get a single persisted peer review with full reviewer feedback.
+
+**Auth**: Project read access (`verifyProjectReadAccess`). Lookup is scoped to
+both `reviewId` *and* `projectId` to prevent cross-project leakage.
+
+**Response**: Full `PeerReview` row including `publisher`, `reader`, `writer`,
+`consensus`, `id`, `projectId`, `createdAt`.
+
+**Errors**: `401` unauthorized, `403` forbidden, `404` if the review does not exist
+or belongs to a different project, `500` internal server error.
 
 ---
 
