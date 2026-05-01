@@ -158,32 +158,27 @@ export async function POST(
       logger.error("Peer review synthesis failed", err);
     }
 
-    let savedReviewId: string | null = null;
-    let savedCreatedAt: Date | null = null;
-    try {
-      const saved = await prisma.peerReview.create({
-        data: {
-          projectId,
-          publisher: publisher as unknown as Prisma.InputJsonValue,
-          reader: reader as unknown as Prisma.InputJsonValue,
-          writer: writer as unknown as Prisma.InputJsonValue,
-          consensus: consensus as unknown as Prisma.InputJsonValue,
-        },
-        select: { id: true, createdAt: true },
-      });
-      savedReviewId = saved.id;
-      savedCreatedAt = saved.createdAt;
-    } catch (err) {
+    const saved = await prisma.peerReview.create({
+      data: {
+        projectId,
+        publisher: publisher as unknown as Prisma.InputJsonValue,
+        reader: reader as unknown as Prisma.InputJsonValue,
+        writer: writer as unknown as Prisma.InputJsonValue,
+        consensus: consensus as unknown as Prisma.InputJsonValue,
+      },
+      select: { id: true, createdAt: true },
+    }).catch((err) => {
       logger.error("Failed to persist peer review", { err, projectId });
-    }
+      return null;
+    });
 
     return NextResponse.json({
       publisher,
       reader,
       writer,
       consensus,
-      id: savedReviewId,
-      createdAt: savedCreatedAt,
+      id: saved?.id ?? null,
+      createdAt: saved?.createdAt ?? null,
     });
   } catch (error) {
     logger.error("POST /api/projects/[id]/peer-review error", error);
