@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Users, RefreshCw, MessageSquare } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Users, RefreshCw, MessageSquare, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,17 @@ interface PeerReviewResult {
   warning?: string;
 }
 
+interface ReviewMeta {
+  id: string;
+  createdAt: string;
+}
+
+interface HistoryRow {
+  id: string;
+  createdAt: string;
+  synthesizedRecommendation: string;
+}
+
 interface PeerReviewPanelProps {
   projectId: string;
   onStartChat: (message: string) => void;
@@ -45,12 +56,69 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const SECTION_HEADING = "text-xs font-semibold text-text-muted uppercase tracking-wider mb-1";
 
+const TIMESTAMP_FMT = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function formatTimestamp(value: string | null): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return TIMESTAMP_FMT.format(d);
+}
+
 export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps) {
   const [review, setReview] = useState<PeerReviewResult | null>(null);
+  const [currentMeta, setCurrentMeta] = useState<ReviewMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("publisher");
   const [error, setError] = useState<string | null>(null);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryRow[] | null>(null);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Load latest saved review on mount / project change.
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const listRes = await fetch(`/api/projects/${projectId}/peer-review?limit=1`);
+        if (!listRes.ok) return;
+        const list = await listRes.json();
+        const latestId = list?.data?.[0]?.id;
+        if (!latestId) {
+          if (!ignore) setRan(false);
+          return;
+        }
+        const detailRes = await fetch(`/api/projects/${projectId}/peer-review/${latestId}`);
+        if (!detailRes.ok) return;
+        const detail = await detailRes.json();
+        if (ignore) return;
+        setReview({
+          publisher: detail.publisher,
+          reader: detail.reader,
+          writer: detail.writer,
+          consensus: detail.consensus,
+        });
+        setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
+        setRan(true);
+      } catch {
+        // Mount fetch failures are silent — user can still click "Run Peer Review".
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [projectId]);
 
   const runReview = useCallback(async () => {
     setLoading(true);
@@ -63,6 +131,11 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
           setError(data.warning);
         } else {
           setReview(data);
+          if (data.id && data.createdAt) {
+            setCurrentMeta({ id: data.id, createdAt: data.createdAt });
+          }
+          // Force history list to refetch on next open so the new review is visible.
+          setHistory(null);
         }
       } else {
         setError(`Request failed (${res.status})`);
@@ -72,6 +145,52 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     } finally {
       setLoading(false);
       setRan(true);
+    }
+  }, [projectId]);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/peer-review?limit=20`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setHistory(data.data ?? []);
+      setHistoryTotal(data.total ?? 0);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [projectId]);
+
+  const toggleHistory = useCallback(() => {
+    setHistoryOpen((open) => {
+      const next = !open;
+      if (next && history === null) {
+        void fetchHistory();
+      }
+      return next;
+    });
+  }, [history, fetchHistory]);
+
+  const loadFromHistory = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/peer-review/${id}`);
+      if (!res.ok) return;
+      const detail = await res.json();
+      setReview({
+        publisher: detail.publisher,
+        reader: detail.reader,
+        writer: detail.writer,
+        consensus: detail.consensus,
+      });
+      setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
+      setRan(true);
+      setHistoryOpen(false);
+      setActiveTab("publisher");
+    } finally {
+      setLoading(false);
     }
   }, [projectId]);
 
@@ -190,6 +309,8 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     </div>
   );
 
+  const savedLabel = currentMeta ? `Saved ${formatTimestamp(currentMeta.createdAt)}` : null;
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -199,6 +320,16 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
           <span className="text-sm font-medium">Peer Review</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-7 w-7", historyOpen && "bg-accent/15 text-accent")}
+            onClick={toggleHistory}
+            aria-label="Toggle review history"
+            aria-pressed={historyOpen}
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -212,8 +343,56 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
         </div>
       </div>
 
+      {/* History view */}
+      {historyOpen && (
+        <div className="flex-1 overflow-y-auto">
+          {historyLoading && (
+            <div className="p-4 flex items-center justify-center gap-2">
+              <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading history…</span>
+            </div>
+          )}
+          {!historyLoading && history && history.length === 0 && (
+            <div className="p-4 text-center">
+              <p className="text-sm text-muted-foreground">No saved reviews yet.</p>
+            </div>
+          )}
+          {!historyLoading && history && history.length > 0 && (
+            <ul className="divide-y divide-border">
+              {history.map((row) => (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => loadFromHistory(row.id)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors",
+                      currentMeta?.id === row.id && "bg-accent/10"
+                    )}
+                  >
+                    <div className="text-xs font-medium text-foreground">
+                      {formatTimestamp(row.createdAt)}
+                    </div>
+                    {row.synthesizedRecommendation && (
+                      <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                        {row.synthesizedRecommendation.slice(0, 80)}
+                        {row.synthesizedRecommendation.length > 80 ? "…" : ""}
+                      </div>
+                    )}
+                  </button>
+                </li>
+              ))}
+              {historyTotal > history.length && (
+                <li className="px-3 py-2 text-center text-xs text-muted-foreground">
+                  Showing {history.length} of {historyTotal}
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Tabs */}
-      {review && (
+      {!historyOpen && review && (
         <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border shrink-0">
           {TABS.map(({ key, label }) => (
             <button
@@ -233,41 +412,46 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {!ran && !loading && (
-          <div className="p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
-              Get feedback from three AI reviewers: a Publisher, an Avid Reader, and an Experienced Writer.
-            </p>
-            <Button size="sm" onClick={runReview}>
-              Run Peer Review
-            </Button>
-          </div>
-        )}
+      {!historyOpen && (
+        <div className="flex-1 overflow-y-auto">
+          {!ran && !loading && (
+            <div className="p-4 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Get feedback from three AI reviewers: a Publisher, an Avid Reader, and an Experienced Writer.
+              </p>
+              <Button size="sm" onClick={runReview}>
+                Run Peer Review
+              </Button>
+            </div>
+          )}
 
-        {loading && (
-          <div className="p-4 flex items-center justify-center gap-2">
-            <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm text-muted-foreground">Analysing manuscript…</span>
-          </div>
-        )}
+          {loading && (
+            <div className="p-4 flex items-center justify-center gap-2">
+              <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Analysing manuscript…</span>
+            </div>
+          )}
 
-        {ran && !loading && !review && (
-          <div className="p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              {error ?? "No review results available."}
-            </p>
-          </div>
-        )}
+          {ran && !loading && !review && (
+            <div className="p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {error ?? "No review results available."}
+              </p>
+            </div>
+          )}
 
-        {review && !loading && (
-          <div className="p-3">
-            {activeTab === "consensus"
-              ? renderConsensusTab(review.consensus)
-              : renderReviewTab(review[activeTab])}
-          </div>
-        )}
-      </div>
+          {review && !loading && (
+            <div className="p-3">
+              {savedLabel && (
+                <p className="text-[11px] text-muted-foreground mb-2">{savedLabel}</p>
+              )}
+              {activeTab === "consensus"
+                ? renderConsensusTab(review.consensus)
+                : renderReviewTab(review[activeTab])}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

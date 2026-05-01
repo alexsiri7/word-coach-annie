@@ -7,66 +7,67 @@ datasource db {
 }
 
 model Annotation {
-  id            String        @id @default(cuid())
-  nodeId        String
-  content       String        @default("")
-  resolved      Boolean       @default(false)
-  range         String        @default("")
-  selectedText  String?
-  externalId    String?       @unique // Google Docs comment ID for imported annotations
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  node          StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  nodeId       String
+  content      String        @default("")
+  resolved     Boolean       @default(false)
+  range        String        @default("")
+  selectedText String?
+  externalId   String?       @unique // Google Docs comment ID for imported annotations
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  node         StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@index([nodeId])
 }
 
 model ContentVersion {
-  id            String        @id @default(cuid())
-  nodeId        String
-  content       String        @default("")
-  wordCount     Int           @default(0)
-  createdAt     DateTime      @default(now())
-  node          StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  id        String        @id @default(cuid())
+  nodeId    String
+  content   String        @default("")
+  wordCount Int           @default(0)
+  createdAt DateTime      @default(now())
+  node      StructureNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@index([nodeId, createdAt(sort: Desc)])
 }
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  googleId          String             @unique
-  name              String             @default("")
-  picture           String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  projects          Project[]
-  universes         Universe[]
-  aiSettings        UserAiSettings?
+  id         String          @id @default(cuid())
+  email      String          @unique
+  googleId   String          @unique
+  name       String          @default("")
+  picture    String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  projects   Project[]
+  universes  Universe[]
+  aiSettings UserAiSettings?
 }
 
 model Project {
-  id             String          @id @default(cuid())
-  universeId     String?
-  userId         String?
-  title          String
-  author         String          @default("")
-  synopsis       String          @default("")
-  genre          String          @default("")
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  archivedAt     DateTime?
-  storyObjects   StoryObject[]
-  structureNodes StructureNode[]
-  universe       Universe?       @relation(fields: [universeId], references: [id])
-  user           User?           @relation(fields: [userId], references: [id])
-  projectType    String          @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
-  isSample       Boolean         @default(false)
-  conversations  Conversation[]
+  id               String            @id @default(cuid())
+  universeId       String?
+  userId           String?
+  title            String
+  author           String            @default("")
+  synopsis         String            @default("")
+  genre            String            @default("")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  archivedAt       DateTime?
+  storyObjects     StoryObject[]
+  structureNodes   StructureNode[]
+  universe         Universe?         @relation(fields: [universeId], references: [id])
+  user             User?             @relation(fields: [userId], references: [id])
+  projectType      String            @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
+  isSample         Boolean           @default(false)
+  conversations    Conversation[]
   googleDocExports GoogleDocExport[]
-  hashnodeExports HashnodeExport[]
-  writingSessions WritingSession[]
-  shares         ProjectShare[]
+  hashnodeExports  HashnodeExport[]
+  writingSessions  WritingSession[]
+  shares           ProjectShare[]
+  peerReviews      PeerReview[]
 
   @@index([userId])
 }
@@ -78,28 +79,28 @@ model ProjectShare {
   role      String   @default("READER")
   createdAt DateTime @default(now())
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, email])
 }
 
 model Relationship {
-  id           String         @id @default(cuid())
-  type         String
-  label        String         @default("")
-  fromNodeId   String?
-  fromObjectId String?
+  id                String         @id @default(cuid())
+  type              String
+  label             String         @default("")
+  fromNodeId        String?
+  fromObjectId      String?
   fromWorldObjectId String?
-  toNodeId     String?
-  toObjectId   String?
+  toNodeId          String?
+  toObjectId        String?
   toWorldObjectId   String?
-  createdAt    DateTime       @default(now())
-  toObject     StoryObject?   @relation("Relationship_toObjectIdToStoryObject", fields: [toObjectId], references: [id], onDelete: Cascade)
-  toNode       StructureNode? @relation("Relationship_toNodeIdToStructureNode", fields: [toNodeId], references: [id], onDelete: Cascade)
-  toWorldObject WorldObject?  @relation("Relationship_toWorldObjectIdToWorldObject", fields: [toWorldObjectId], references: [id], onDelete: Cascade)
-  fromObject   StoryObject?   @relation("Relationship_fromObjectIdToStoryObject", fields: [fromObjectId], references: [id], onDelete: Cascade)
-  fromNode     StructureNode? @relation("Relationship_fromNodeIdToStructureNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
-  fromWorldObject WorldObject? @relation("Relationship_fromWorldObjectIdToWorldObject", fields: [fromWorldObjectId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  toObject          StoryObject?   @relation("Relationship_toObjectIdToStoryObject", fields: [toObjectId], references: [id], onDelete: Cascade)
+  toNode            StructureNode? @relation("Relationship_toNodeIdToStructureNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  toWorldObject     WorldObject?   @relation("Relationship_toWorldObjectIdToWorldObject", fields: [toWorldObjectId], references: [id], onDelete: Cascade)
+  fromObject        StoryObject?   @relation("Relationship_fromObjectIdToStoryObject", fields: [fromObjectId], references: [id], onDelete: Cascade)
+  fromNode          StructureNode? @relation("Relationship_fromNodeIdToStructureNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  fromWorldObject   WorldObject?   @relation("Relationship_fromWorldObjectIdToWorldObject", fields: [fromWorldObjectId], references: [id], onDelete: Cascade)
 
   @@index([toObjectId])
   @@index([toNodeId])
@@ -110,19 +111,19 @@ model Relationship {
 }
 
 model StoryObject {
-  id             String         @id @default(cuid())
-  projectId      String
-  type           String
-  name           String
-  description    String         @default("")
-  notes          String         @default("")
-  role           String?
-  tags           String         @default("")
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  relationships  Relationship[] @relation("Relationship_toObjectIdToStoryObject")
-  relatedBy      Relationship[] @relation("Relationship_fromObjectIdToStoryObject")
-  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  projectId     String
+  type          String
+  name          String
+  description   String         @default("")
+  notes         String         @default("")
+  role          String?
+  tags          String         @default("")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  relationships Relationship[] @relation("Relationship_toObjectIdToStoryObject")
+  relatedBy     Relationship[] @relation("Relationship_fromObjectIdToStoryObject")
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, type])
 }
@@ -152,34 +153,34 @@ model StructureNode {
 }
 
 model Universe {
-  id           String        @id @default(cuid())
-  userId       String?
-  title        String
-  description  String        @default("")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  projects     Project[]
-  worldObjects WorldObject[]
+  id               String            @id @default(cuid())
+  userId           String?
+  title            String
+  description      String            @default("")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  projects         Project[]
+  worldObjects     WorldObject[]
   googleDocExports GoogleDocExport[]
-  user         User?         @relation(fields: [userId], references: [id])
+  user             User?             @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model WorldObject {
-  id          String                     @id @default(cuid())
-  universeId  String
-  type        String // CHARACTER, LOCATION, WORLD_ELEMENT
-  name        String
-  description String                     @default("")
-  notes       String                     @default("")
-  tags        String                     @default("")
-  createdAt   DateTime                   @default(now())
-  updatedAt   DateTime                   @updatedAt
-  universe    Universe                   @relation(fields: [universeId], references: [id], onDelete: Cascade)
-  timeline    WorldObjectTimelineEntry[]
-  relationships Relationship[]           @relation("Relationship_toWorldObjectIdToWorldObject")
-  relatedBy     Relationship[]           @relation("Relationship_fromWorldObjectIdToWorldObject")
+  id            String                     @id @default(cuid())
+  universeId    String
+  type          String // CHARACTER, LOCATION, WORLD_ELEMENT
+  name          String
+  description   String                     @default("")
+  notes         String                     @default("")
+  tags          String                     @default("")
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  universe      Universe                   @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  timeline      WorldObjectTimelineEntry[]
+  relationships Relationship[]             @relation("Relationship_toWorldObjectIdToWorldObject")
+  relatedBy     Relationship[]             @relation("Relationship_fromWorldObjectIdToWorldObject")
 
   @@index([universeId, type])
 }
@@ -201,7 +202,7 @@ model WorldObjectTimelineEntry {
 
 model GoogleCredential {
   id           String   @id @default(cuid())
-  userId       String   @unique  // "local" in single-user mode, actual user ID in multi-user
+  userId       String   @unique // "local" in single-user mode, actual user ID in multi-user
   accessToken  String
   refreshToken String
   expiresAt    DateTime
@@ -211,17 +212,17 @@ model GoogleCredential {
 }
 
 model Conversation {
-  id                         String        @id @default(cuid())
+  id                         String   @id @default(cuid())
   projectId                  String
-  title                      String        @default("New chat")
-  type                       String        @default("chat")
-  summary                    String?       @db.Text
+  title                      String   @default("New chat")
+  type                       String   @default("chat")
+  summary                    String?  @db.Text
   summarizedThroughMessageId String?
-  createdAt                  DateTime      @default(now())
-  updatedAt                  DateTime      @updatedAt
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
-  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  messages  ChatMessage[]
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
 
   @@index([projectId, createdAt])
 }
@@ -229,7 +230,7 @@ model Conversation {
 model ChatMessage {
   id             String       @id @default(cuid())
   conversationId String
-  role           String       // "user" | "assistant"
+  role           String // "user" | "assistant"
   content        String       @default("")
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -237,44 +238,58 @@ model ChatMessage {
   @@index([conversationId, createdAt])
 }
 
+model PeerReview {
+  id        String   @id @default(cuid())
+  projectId String
+  publisher Json
+  reader    Json
+  writer    Json
+  consensus Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
 model AiSettings {
-  id         String   @id @default("default")
-  baseUrl    String   @default("")
-  apiKey     String   @default("")
-  model      String   @default("")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default("default")
+  baseUrl   String   @default("")
+  apiKey    String   @default("")
+  model     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model UserAiSettings {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  baseUrl            String   @default("")
-  apiKey             String   @default("")
-  model              String   @default("")
-  customInstructions String   @default("")
-  coachingStyle              String   @default("balanced")
-  responseLength             String   @default("moderate")
-  chatWindowSize             Int      @default(5)
-  messagesUntilCompression   Int      @default(15)
-  compressionModel           String   @default("")
-  createdAt                  DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  baseUrl                  String   @default("")
+  apiKey                   String   @default("")
+  model                    String   @default("")
+  customInstructions       String   @default("")
+  coachingStyle            String   @default("balanced")
+  responseLength           String   @default("moderate")
+  chatWindowSize           Int      @default(5)
+  messagesUntilCompression Int      @default(15)
+  compressionModel         String   @default("")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GoogleDocExport {
-  id                  String    @id @default(cuid())
-  projectId           String?
-  universeId          String?
-  exportMode          String    // UNIVERSE, STORY_INTERNAL, STORY_READER
-  googleDocId         String
-  googleDocUrl        String
-  lastSyncedAt        DateTime
-  lastCommentSyncAt   DateTime? // Last time comments were pulled from Google Docs
-  createdAt           DateTime  @default(now())
-  project             Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  universe            Universe? @relation(fields: [universeId], references: [id], onDelete: SetNull)
+  id                String    @id @default(cuid())
+  projectId         String?
+  universeId        String?
+  exportMode        String // UNIVERSE, STORY_INTERNAL, STORY_READER
+  googleDocId       String
+  googleDocUrl      String
+  lastSyncedAt      DateTime
+  lastCommentSyncAt DateTime? // Last time comments were pulled from Google Docs
+  createdAt         DateTime  @default(now())
+  project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  universe          Universe? @relation(fields: [universeId], references: [id], onDelete: SetNull)
 
   @@unique([projectId, universeId, exportMode])
   @@index([projectId])
@@ -282,15 +297,15 @@ model GoogleDocExport {
 }
 
 model WritingSession {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   projectId       String
   nodeId          String?
-  startedAt       DateTime      @default(now())
+  startedAt       DateTime       @default(now())
   endedAt         DateTime?
-  wordsWritten    Int           @default(0)
-  durationSeconds Int           @default(0)
-  date            String        @default("") // YYYY-MM-DD for heatmap grouping
-  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wordsWritten    Int            @default(0)
+  durationSeconds Int            @default(0)
+  date            String         @default("") // YYYY-MM-DD for heatmap grouping
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   node            StructureNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
 
   @@index([projectId, date])
@@ -301,15 +316,15 @@ model WritingSession {
 model OAuthClient {
   id           String   @id
   clientName   String   @default("")
-  redirectUris String   // JSON array stored as string
+  redirectUris String // JSON array stored as string
   grantTypes   String   @default("[\"authorization_code\",\"refresh_token\"]")
   createdAt    DateTime @default(now())
 }
 
 model HashnodeCredential {
   id            String           @id @default(cuid())
-  userId        String           @unique  // "local" in single-user mode, actual user ID in multi-user
-  accessToken   String           // stored encrypted via lib/crypto
+  userId        String           @unique // "local" in single-user mode, actual user ID in multi-user
+  accessToken   String // stored encrypted via lib/crypto
   publicationId String           @default("")
   username      String           @default("")
   createdAt     DateTime         @default(now())

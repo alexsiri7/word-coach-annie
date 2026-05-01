@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
-import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { exportManuscript } from "@/mcp/tools/export";
+import { prisma } from "@/lib/db";
 
 export interface ReviewFeedback {
   overallImpression: string;
@@ -158,12 +160,77 @@ export async function POST(
       logger.error("Peer review synthesis failed", err);
     }
 
-    return NextResponse.json({ publisher, reader, writer, consensus });
+    let savedReviewId: string | null = null;
+    let savedCreatedAt: Date | null = null;
+    try {
+      const saved = await prisma.peerReview.create({
+        data: {
+          projectId,
+          publisher: publisher as unknown as Prisma.InputJsonValue,
+          reader: reader as unknown as Prisma.InputJsonValue,
+          writer: writer as unknown as Prisma.InputJsonValue,
+          consensus: consensus as unknown as Prisma.InputJsonValue,
+        },
+        select: { id: true, createdAt: true },
+      });
+      savedReviewId = saved.id;
+      savedCreatedAt = saved.createdAt;
+    } catch (err) {
+      logger.error("Failed to persist peer review", { err, projectId });
+    }
+
+    return NextResponse.json({
+      publisher,
+      reader,
+      writer,
+      consensus,
+      id: savedReviewId,
+      createdAt: savedCreatedAt,
+    });
   } catch (error) {
     logger.error("POST /api/projects/[id]/peer-review error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: projectId } = await params;
+  const userId = getCurrentUserId(request);
+  const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
+  if (!access.authorized) return access.response;
+
+  try {
+    const { searchParams } = request.nextUrl;
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10) || 20, 1), 100);
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
+
+    const [rows, total] = await Promise.all([
+      prisma.peerReview.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, createdAt: true, consensus: true },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.peerReview.count({ where: { projectId } }),
+    ]);
+
+    const data = rows.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      synthesizedRecommendation:
+        (r.consensus as { synthesizedRecommendation?: string } | null)?.synthesizedRecommendation ?? "",
+    }));
+
+    return NextResponse.json({ data, total, limit, offset });
+  } catch (error) {
+    logger.error("GET /api/projects/[id]/peer-review error", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
