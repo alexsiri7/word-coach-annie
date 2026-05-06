@@ -5,6 +5,7 @@ import {
     deriveSessionToken,
     verifySessionToken,
     isAuthEnabled,
+    safeEqual,
 } from "@/lib/auth";
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
@@ -21,7 +22,6 @@ const PUBLIC_PATHS = [
     "/privacy",
     "/terms",
     "/.well-known/oauth-authorization-server",
-    "/oauth/register",
     "/oauth/token",
     "/version.json",
 ];
@@ -67,8 +67,14 @@ function applyRateLimit(
     const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
-    // Allow E2E / CI environments to bypass rate limiting
-    if (process.env.DISABLE_RATE_LIMIT === "true") return null;
+    // Allow E2E / CI environments to bypass rate limiting (not honoured in production)
+    if (process.env.DISABLE_RATE_LIMIT === "true") {
+        if (process.env.NODE_ENV === "production") {
+            console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
+        } else {
+            return null;
+        }
+    }
 
     const method = request.method;
 
@@ -146,6 +152,19 @@ export async function middleware(request: NextRequest) {
 
     const { pathname } = request.nextUrl;
 
+    // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
+    // This prevents brute-force attacks on /api/auth/login even though that path is public.
+    const AUTH_RATE_LIMITED = ["/api/auth/login"];
+    const rateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
+    if (AUTH_RATE_LIMITED.includes(pathname) && !rateLimitDisabled) {
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+        const result = checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
+        if (!result.allowed) {
+            return makeRateLimitResponse(RATE_LIMITS.auth, result.retryAfterMs!, result.resetMs);
+        }
+        return NextResponse.next();
+    }
+
     // Allow public paths through
     if (isPublicPath(pathname)) {
         return NextResponse.next();
@@ -159,8 +178,8 @@ export async function middleware(request: NextRequest) {
             ? authHeader.slice(7)
             : null;
 
-        // 1. Check static API_TOKEN
-        if (token && apiToken && token === apiToken) {
+        // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks)
+        if (token && apiToken && safeEqual(token, apiToken)) {
             const rateLimited = applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
             return NextResponse.next();

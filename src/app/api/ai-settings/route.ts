@@ -106,12 +106,12 @@ export async function PUT(request: NextRequest) {
           compressionModel: settings.compressionModel,
         });
       } catch (userSettingsError) {
-        // Table may not exist yet — fall through to global settings
-        logger.error("PUT /api/ai-settings: userAiSettings upsert failed, falling back to global", userSettingsError);
+        logger.error("PUT /api/ai-settings: userAiSettings upsert failed", userSettingsError);
+        return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
       }
     }
 
-    // Fall back to global settings for unauthenticated/dev mode
+    // Reach here only when userId is null (dev / no-auth mode)
     const settings = await prisma.aiSettings.upsert({
       where: { id: "default" },
       update: data,

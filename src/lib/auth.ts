@@ -29,12 +29,14 @@ export interface SessionPayload {
  * Throws if auth is enabled but no secret is configured.
  */
 export function resolveJwtSecret(): string {
-    const secret = env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY;
+    // Use only JWT_SECRET — do not reuse API_TOKEN or ENCRYPTION_KEY as a JWT seed.
+    // Those serve distinct purposes and reuse allows key-confusion attacks.
+    const secret = env.JWT_SECRET;
     if (secret) return secret;
     if (isAuthEnabled()) {
         throw new Error(
-            "JWT secret is required when auth is enabled. " +
-            "Set JWT_SECRET, API_TOKEN, or ENCRYPTION_KEY."
+            "JWT_SECRET is required when auth is enabled. " +
+            "Set JWT_SECRET to a random string of at least 32 characters."
         );
     }
     return "annie-dev-secret";
@@ -102,6 +104,20 @@ export async function deriveSessionToken(apiToken: string): Promise<string> {
     return Array.from(new Uint8Array(hash))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks on secrets.
+ * Returns false when lengths differ (no timing info leaks there).
+ * Pure JS implementation — works in Edge Runtime (no node:crypto).
+ */
+export function safeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+        diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return diff === 0;
 }
 
 /** Check if auth is configured at all (any auth mode). */

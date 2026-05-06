@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
 
 const VALID_CATEGORIES = ["copyright", "illegal", "harassment", "other"] as const;
 
@@ -56,22 +57,35 @@ export async function POST(
   const reporterEmail = request.headers.get("x-user-email");
   const reporterId = request.headers.get("x-user-id");
 
-  // Build GitHub issue
-  const categoryLabel = CATEGORY_LABELS[category] || category;
-  const title = `Content Report: ${categoryLabel} — "${project.title}"`;
+  // Build GitHub issue — escape all user-controlled fields to prevent markdown injection
+  const categoryLabel = CATEGORY_LABELS[category] || escapeMarkdown(category);
+  const safeTitle = escapeMarkdown(project.title ?? "");
+  const safeAuthor = project.author ? escapeMarkdown(project.author) : "";
+  const safeUrl = (() => {
+    if (!url || typeof url !== "string") return "";
+    try {
+      const u = new URL(url);
+      return ["http:", "https:"].includes(u.protocol) ? escapeMarkdown(u.toString()) : "";
+    } catch { return ""; }
+  })();
+  const safeDetails = details?.trim() ? sanitizeInput(details.trim()).slice(0, 4000) : "";
+  const safeReporterEmail = reporterEmail ? escapeMarkdown(reporterEmail) : null;
+  const safeReporterId = reporterId ? escapeMarkdown(reporterId) : null;
+
+  const title = `Content Report: ${categoryLabel} — "${safeTitle}"`;
 
   const bodyParts = [
     `### Content Report: ${categoryLabel}`,
     "",
-    `**Project:** ${project.title} (ID: \`${project.id}\`)`,
+    `**Project:** ${safeTitle} (ID: \`${project.id}\`)`,
   ];
-  if (project.author) bodyParts.push(`**Author:** ${project.author}`);
-  if (url) bodyParts.push(`**URL:** ${url}`);
-  if (reporterEmail) bodyParts.push(`**Reporter:** ${reporterEmail}`);
-  else if (reporterId) bodyParts.push(`**Reporter ID:** ${reporterId}`);
+  if (safeAuthor) bodyParts.push(`**Author:** ${safeAuthor}`);
+  if (safeUrl) bodyParts.push(`**URL:** ${safeUrl}`);
+  if (safeReporterEmail) bodyParts.push(`**Reporter:** ${safeReporterEmail}`);
+  else if (safeReporterId) bodyParts.push(`**Reporter ID:** ${safeReporterId}`);
 
-  if (details?.trim()) {
-    bodyParts.push("", "### Details", details.trim());
+  if (safeDetails) {
+    bodyParts.push("", "### Details", safeDetails);
   }
 
   bodyParts.push(

@@ -3,6 +3,7 @@ import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     deriveSessionToken,
+    safeEqual,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const token = body?.token;
 
-    if (!token || token !== apiToken) {
+    if (!token || !safeEqual(token, apiToken)) {
         return NextResponse.json(
             { error: "Invalid token" },
             { status: 401 }

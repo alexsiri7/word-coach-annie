@@ -89,10 +89,10 @@ function SceneContent({ content }: { content: string }) {
   const cleaned = stripBeats(content);
   if (!cleaned || cleaned === "<p></p>") return null;
 
-  // Sanitize HTML to prevent XSS — content may come from another user via sharing
+  // Sanitize HTML to prevent XSS — content may come from another user via sharing.
+  // isomorphic-dompurify works on both SSR and client, so no window guard needed.
   const sanitized = useMemo(() => {
-    if (typeof window === "undefined") return cleaned;
-    const DOMPurify = require("dompurify");
+    const DOMPurify = require("isomorphic-dompurify");
     return DOMPurify.sanitize(cleaned);
   }, [cleaned]);
 

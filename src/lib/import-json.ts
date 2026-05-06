@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 
 interface ExportData {
   exportVersion: number;
@@ -84,10 +85,10 @@ export async function importProjectJson(
     await tx.project.create({
       data: {
         id: projectId,
-        title: data.project.title,
-        author: data.project.author || "",
-        synopsis: data.project.synopsis || "",
-        genre: data.project.genre || "",
+        title: sanitizeInput(data.project.title ?? ""),
+        author: sanitizeInput(data.project.author ?? ""),
+        synopsis: sanitizeInput(data.project.synopsis ?? ""),
+        genre: sanitizeInput(data.project.genre ?? ""),
         projectType: data.project.projectType || "FICTION",
         isSample: options?.isSample ?? false,
         ...(options?.userId && { userId: options.userId }),
@@ -109,8 +110,8 @@ export async function importProjectJson(
           projectId,
           parentId: node.parentId ? nodeIdMap.get(node.parentId) ?? null : null,
           type: node.type,
-          title: node.title,
-          synopsis: node.synopsis || "",
+          title: sanitizeInput(node.title ?? ""),
+          synopsis: sanitizeInput(node.synopsis ?? ""),
           status: node.status || "OUTLINE",
           orderIndex: node.orderIndex,
         },
@@ -124,7 +125,7 @@ export async function importProjectJson(
       await tx.contentVersion.create({
         data: {
           nodeId: newNodeId,
-          content: cv.content,
+          content: sanitizeHtml(cv.content ?? ""),
           wordCount: cv.wordCount,
         },
       });
@@ -137,11 +138,11 @@ export async function importProjectJson(
           id: objectIdMap.get(obj.id)!,
           projectId,
           type: obj.type,
-          name: obj.name,
-          description: obj.description || "",
-          notes: obj.notes || "",
+          name: sanitizeInput(obj.name ?? ""),
+          description: sanitizeInput(obj.description ?? ""),
+          notes: sanitizeInput(obj.notes ?? ""),
           role: obj.role,
-          tags: obj.tags || "",
+          tags: sanitizeInput(obj.tags ?? ""),
         },
       });
     }
@@ -153,10 +154,10 @@ export async function importProjectJson(
       await tx.annotation.create({
         data: {
           nodeId: newNodeId,
-          content: ann.content || "",
+          content: sanitizeInput(ann.content ?? ""),
           resolved: ann.resolved ?? false,
           range: ann.range || "",
-          selectedText: ann.selectedText,
+          selectedText: ann.selectedText ? sanitizeInput(ann.selectedText) : null,
         },
       });
     }
@@ -166,7 +167,7 @@ export async function importProjectJson(
       await tx.relationship.create({
         data: {
           type: rel.type,
-          label: rel.label || "",
+          label: sanitizeInput(rel.label ?? ""),
           fromNodeId: rel.fromNodeId ? nodeIdMap.get(rel.fromNodeId) ?? null : null,
           fromObjectId: rel.fromObjectId ? objectIdMap.get(rel.fromObjectId) ?? null : null,
           toNodeId: rel.toNodeId ? nodeIdMap.get(rel.toNodeId) ?? null : null,

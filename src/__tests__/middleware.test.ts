@@ -14,6 +14,7 @@ vi.mock("@/lib/auth", () => ({
     deriveSessionToken: vi.fn(async (token: string) => `hashed_${token}`),
     verifySessionToken: vi.fn(async () => null),
     isAuthEnabled: vi.fn(() => false),
+    safeEqual: (a: string, b: string) => a === b,
 }));
 
 import { isAuthEnabled, deriveSessionToken, verifySessionToken } from "@/lib/auth";

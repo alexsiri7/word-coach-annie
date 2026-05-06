@@ -46,11 +46,18 @@ export function sanitizeHtml(input: string): string {
  * when user-provided values are interpolated into issue bodies.
  */
 export function escapeMarkdown(input: string): string {
-  // Replace characters that have meaning in Markdown/HTML
   return input
+    .replace(/\\/g, "\\\\")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/\*/g, "\\*")
+    .replace(/_/g, "\\_")
+    .replace(/~/g, "\\~")
+    .replace(/#/g, "\\#")
+    .replace(/\|/g, "\\|")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}")
     .replace(/\[/g, "\\[")
     .replace(/\]/g, "\\]")
     .replace(/\(/g, "\\(")
