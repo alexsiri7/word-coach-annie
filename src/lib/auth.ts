@@ -8,7 +8,6 @@
  * When neither API_TOKEN nor GOOGLE_CLIENT_ID is set, auth is disabled (local dev).
  */
 import { SignJWT, jwtVerify } from "jose";
-import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 
 const SESSION_COOKIE_NAME = "annie_session";
@@ -110,12 +109,15 @@ export async function deriveSessionToken(apiToken: string): Promise<string> {
 /**
  * Constant-time string comparison to prevent timing attacks on secrets.
  * Returns false when lengths differ (no timing info leaks there).
+ * Pure JS implementation — works in Edge Runtime (no node:crypto).
  */
 export function safeEqual(a: string, b: string): boolean {
-    const ab = Buffer.from(a);
-    const bb = Buffer.from(b);
-    if (ab.length !== bb.length) return false;
-    return timingSafeEqual(ab, bb);
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+        diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return diff === 0;
 }
 
 /** Check if auth is configured at all (any auth mode). */

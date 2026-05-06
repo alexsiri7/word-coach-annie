@@ -51,24 +51,19 @@ describe("PUT /api/ai-settings", () => {
     vi.clearAllMocks();
   });
 
-  it("falls through to global settings when userAiSettings table is missing", async () => {
+  it("returns 500 (does not fall through to global) when userAiSettings upsert fails for an authenticated user", async () => {
+    // HIGH-04: a per-user upsert failure must not silently write to the
+    // shared global row — that would let one user's failure poison settings
+    // for everyone. Verify we surface the error and skip the global write.
     vi.mocked(prisma.userAiSettings.upsert).mockRejectedValue(
       new Error("table 'UserAiSettings' doesn't exist")
     );
-    vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
-      id: "default",
-      baseUrl: "https://global.example.com",
-      apiKey: "global-key",
-      model: "global-model",
-    } as never);
 
     const req = makePutRequest({ model: "gpt-4" }, "user-123");
     const res = await PUT(req);
 
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.scope).toBe("global");
-    expect(prisma.aiSettings.upsert).toHaveBeenCalled();
+    expect(res.status).toBe(500);
+    expect(prisma.aiSettings.upsert).not.toHaveBeenCalled();
   });
 
   it("logs an error when userAiSettings upsert fails", async () => {

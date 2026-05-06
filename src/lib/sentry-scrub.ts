@@ -1,4 +1,4 @@
-import type { Event } from "@sentry/nextjs";
+import type { ErrorEvent } from "@sentry/nextjs";
 
 const SENSITIVE_KEY = /token|secret|password|api[-_]?key|cookie|authorization|email/i;
 
@@ -16,7 +16,7 @@ function redact<T>(node: T, depth = 0): T {
     return out as T;
 }
 
-export function beforeSend(event: Event): Event {
+export function beforeSend(event: ErrorEvent): ErrorEvent {
     if (event.request?.cookies) {
         (event.request as Record<string, unknown>).cookies = "[REDACTED]";
     }
@@ -28,6 +28,6 @@ export function beforeSend(event: Event): Event {
         }
     }
     if (event.extra) event.extra = redact(event.extra);
-    if (event.contexts) event.contexts = redact(event.contexts) as Event["contexts"];
+    if (event.contexts) event.contexts = redact(event.contexts) as ErrorEvent["contexts"];
     return event;
 }
