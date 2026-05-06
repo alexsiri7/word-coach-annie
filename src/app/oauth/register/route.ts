@@ -32,28 +32,37 @@ export async function POST(request: NextRequest) {
   }
 
   // DB-persisted per-IP limit (24h rolling window, survives deploys)
-  const ipCount = await countClientsByIpInWindow(ip);
-  if (ipCount >= IP_REGISTRATION_LIMIT) {
-    logger.warn("oauth-registration-rejected", { reason: "ip_limit", ip, ipCount });
-    return NextResponse.json(
-      { error: "rate_limited", error_description: "too many registrations from this IP" },
-      { status: 429 }
-    );
-  }
+  try {
+    const ipCount = await countClientsByIpInWindow(ip);
+    if (ipCount >= IP_REGISTRATION_LIMIT) {
+      logger.warn("oauth-registration-rejected", { reason: "ip_limit", ip, ipCount });
+      return NextResponse.json(
+        { error: "rate_limited", error_description: "too many registrations from this IP" },
+        { status: 429 }
+      );
+    }
 
-  // Global client cap
-  const totalCount = await countTotalClients();
-  if (totalCount >= GLOBAL_CLIENT_LIMIT) {
-    logger.warn("oauth-registration-rejected", { reason: "global_limit", totalCount });
+    // Global client cap
+    const totalCount = await countTotalClients();
+    if (totalCount >= GLOBAL_CLIENT_LIMIT) {
+      logger.warn("oauth-registration-rejected", { reason: "global_limit", totalCount });
+      return NextResponse.json(
+        { error: "server_error", error_description: "registration capacity reached" },
+        { status: 503 }
+      );
+    }
+  } catch (error) {
+    logger.error("oauth-register db-check failed", { ip, error });
     return NextResponse.json(
-      { error: "server_error", error_description: "registration capacity reached" },
+      { error: "server_error", error_description: "service temporarily unavailable" },
       { status: 503 }
     );
   }
 
   // Require an authenticated session when auth is enabled
-  const userId = isAuthEnabled() ? getCurrentUserId(request) : null;
-  if (isAuthEnabled() && !userId) {
+  const authEnabled = isAuthEnabled();
+  const userId = authEnabled ? getCurrentUserId(request) : null;
+  if (authEnabled && !userId) {
     return NextResponse.json(
       { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
       { status: 401 }
@@ -144,8 +153,16 @@ export async function POST(request: NextRequest) {
     registered_at: Date.now(),
   };
 
-  await registerClient(registration, { ip, userId: userId ?? undefined });
-  logger.info("oauth-client-registered", { clientId, ip, userId: userId ?? null });
+  try {
+    await registerClient(registration, { ip, userId: userId ?? undefined });
+    logger.info("oauth-client-registered", { clientId, ip, userId: userId ?? null });
+  } catch (error) {
+    logger.error("oauth-register db-write failed", { clientId, ip, error });
+    return NextResponse.json(
+      { error: "server_error", error_description: "failed to persist client registration" },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json(
     {

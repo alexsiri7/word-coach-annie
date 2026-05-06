@@ -18,8 +18,10 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/auth", () => ({ isAuthEnabled: vi.fn().mockReturnValue(false) }));
 vi.mock("@/lib/api-auth", () => ({ getCurrentUserId: vi.fn().mockReturnValue(null) }));
 
-import { countClientsByIpInWindow, countTotalClients } from "@/lib/oauth-store";
+import { registerClient, countClientsByIpInWindow, countTotalClients } from "@/lib/oauth-store";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { isAuthEnabled } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { POST } from "@/app/oauth/register/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,6 +52,10 @@ describe("POST /oauth/register", () => {
     const body = await res.json();
     expect(body.client_id).toBeTruthy();
     expect(body.redirect_uris).toEqual(["http://localhost:3000/cb"]);
+    expect(vi.mocked(registerClient)).toHaveBeenCalledWith(
+      expect.objectContaining({ redirect_uris: ["http://localhost:3000/cb"] }),
+      { ip: "1.2.3.4", userId: undefined }
+    );
   });
 
   it("returns 429 when in-memory rate limit exceeded", async () => {
@@ -89,5 +95,42 @@ describe("POST /oauth/register", () => {
   it("returns 400 when redirect_uri uses plain HTTP (non-localhost)", async () => {
     const res = await POST(makeRegisterRequest({ redirect_uris: ["http://evil.com/cb"] }));
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when more than 5 redirect_uris provided", async () => {
+    const uris = Array.from({ length: 6 }, (_, i) => `https://app${i}.example.com/cb`);
+    const res = await POST(makeRegisterRequest({ redirect_uris: uris }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_client_metadata");
+  });
+});
+
+describe("POST /oauth/register — auth-enabled", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(checkRateLimit).mockReturnValue({ allowed: true, remaining: 5, resetMs: 0 });
+    vi.mocked(countClientsByIpInWindow).mockResolvedValue(0);
+    vi.mocked(countTotalClients).mockResolvedValue(0);
+  });
+
+  it("returns 401 when auth is enabled and no session", async () => {
+    vi.mocked(isAuthEnabled).mockReturnValue(true);
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    const res = await POST(makeRegisterRequest(validBody));
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_client_metadata");
+  });
+
+  it("returns 201 when auth is enabled and session is present", async () => {
+    vi.mocked(isAuthEnabled).mockReturnValue(true);
+    vi.mocked(getCurrentUserId).mockReturnValue("user-123");
+    const res = await POST(makeRegisterRequest(validBody));
+    expect(res.status).toBe(201);
+    expect(vi.mocked(registerClient)).toHaveBeenCalledWith(
+      expect.objectContaining({ redirect_uris: ["http://localhost:3000/cb"] }),
+      { ip: "1.2.3.4", userId: "user-123" }
+    );
   });
 });

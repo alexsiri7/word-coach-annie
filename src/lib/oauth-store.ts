@@ -9,10 +9,14 @@ import { prisma } from "@/lib/db";
 
 const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const IP_REGISTRATION_LIMIT = 25;
-export const GLOBAL_CLIENT_LIMIT = parseInt(
-  process.env.OAUTH_GLOBAL_CLIENT_LIMIT ?? "10000",
-  10
-);
+// Restart required to pick up OAUTH_GLOBAL_CLIENT_LIMIT changes.
+const _rawLimit = parseInt(process.env.OAUTH_GLOBAL_CLIENT_LIMIT ?? "10000", 10);
+if (!Number.isFinite(_rawLimit) || _rawLimit <= 0) {
+  throw new Error(
+    `OAUTH_GLOBAL_CLIENT_LIMIT must be a positive integer, got: "${process.env.OAUTH_GLOBAL_CLIENT_LIMIT}"`
+  );
+}
+export const GLOBAL_CLIENT_LIMIT = _rawLimit;
 
 export interface ClientRegistration {
   client_id: string;

@@ -116,6 +116,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 | `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive MCP tools (delete, restore_snapshot). Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
+| `OAUTH_GLOBAL_CLIENT_LIMIT` | Maximum total OAuth clients allowed to register. Default: `10000`. Raise or lower to tune global registration capacity. Requires a process restart to take effect. |
 
 ---
 
