@@ -8,6 +8,7 @@
  * When neither API_TOKEN nor GOOGLE_CLIENT_ID is set, auth is disabled (local dev).
  */
 import { SignJWT, jwtVerify } from "jose";
+import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 
 const SESSION_COOKIE_NAME = "annie_session";
@@ -29,12 +30,14 @@ export interface SessionPayload {
  * Throws if auth is enabled but no secret is configured.
  */
 export function resolveJwtSecret(): string {
-    const secret = env.JWT_SECRET || env.API_TOKEN || env.ENCRYPTION_KEY;
+    // Use only JWT_SECRET — do not reuse API_TOKEN or ENCRYPTION_KEY as a JWT seed.
+    // Those serve distinct purposes and reuse allows key-confusion attacks.
+    const secret = env.JWT_SECRET;
     if (secret) return secret;
     if (isAuthEnabled()) {
         throw new Error(
-            "JWT secret is required when auth is enabled. " +
-            "Set JWT_SECRET, API_TOKEN, or ENCRYPTION_KEY."
+            "JWT_SECRET is required when auth is enabled. " +
+            "Set JWT_SECRET to a random string of at least 32 characters."
         );
     }
     return "annie-dev-secret";
@@ -102,6 +105,17 @@ export async function deriveSessionToken(apiToken: string): Promise<string> {
     return Array.from(new Uint8Array(hash))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks on secrets.
+ * Returns false when lengths differ (no timing info leaks there).
+ */
+export function safeEqual(a: string, b: string): boolean {
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    if (ab.length !== bb.length) return false;
+    return timingSafeEqual(ab, bb);
 }
 
 /** Check if auth is configured at all (any auth mode). */

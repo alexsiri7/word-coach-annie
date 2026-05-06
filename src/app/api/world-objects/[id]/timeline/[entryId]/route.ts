@@ -25,6 +25,15 @@ export async function PATCH(
         const access = await verifyWorldObjectAccess(id, userId);
         if (!access.authorized) return access.response;
 
+        // Verify the entry belongs to this world object (prevents IDOR)
+        const owned = await prisma.worldObjectTimelineEntry.findFirst({
+            where: { id: entryId, worldObjectId: id },
+            select: { id: true },
+        });
+        if (!owned) {
+            return NextResponse.json({ error: "Timeline entry not found" }, { status: 404 });
+        }
+
         const body = await request.json();
         const entry = await UniversesController.updateTimelineEntry(entryId, body);
         return NextResponse.json(entry);
@@ -43,6 +52,15 @@ export async function DELETE(
         const userId = getCurrentUserId(request);
         const access = await verifyWorldObjectAccess(id, userId);
         if (!access.authorized) return access.response;
+
+        // Verify the entry belongs to this world object (prevents IDOR)
+        const owned = await prisma.worldObjectTimelineEntry.findFirst({
+            where: { id: entryId, worldObjectId: id },
+            select: { id: true },
+        });
+        if (!owned) {
+            return NextResponse.json({ error: "Timeline entry not found" }, { status: 404 });
+        }
 
         await UniversesController.deleteTimelineEntry(entryId);
         return NextResponse.json({ success: true });

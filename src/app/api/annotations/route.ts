@@ -6,13 +6,18 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get("projectId") || undefined;
+        const projectId = searchParams.get("projectId");
 
-        if (projectId) {
-            const userId = getCurrentUserId(request);
-            const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
-            if (!access.authorized) return access.response;
+        if (!projectId) {
+            return NextResponse.json(
+                { error: "projectId is required" },
+                { status: 400 }
+            );
         }
+
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
+        if (!access.authorized) return access.response;
 
         // getOpenAnnotations returns unresolved by default
         const annotations = await StructureController.getOpenAnnotations(projectId);

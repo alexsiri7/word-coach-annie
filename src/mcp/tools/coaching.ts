@@ -495,6 +495,15 @@ After presenting mismatches, offer these resolution options for each:
 // ─── Voice Context ───────────────────────────────────────────────────────────
 
 export async function getVoiceContext(projectId: string, sceneId: string) {
+  // Verify the scene belongs to the project before fetching any content
+  const sceneNode = await prisma.structureNode.findFirst({
+    where: { id: sceneId, projectId },
+    select: { id: true },
+  });
+  if (!sceneNode) {
+    throw new Error("Scene not found in this project");
+  }
+
   const sceneRelationships = await prisma.relationship.findMany({
     where: { OR: [{ fromNodeId: sceneId }, { toNodeId: sceneId }] },
     select: { fromObjectId: true, toObjectId: true },

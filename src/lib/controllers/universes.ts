@@ -290,6 +290,14 @@ export class UniversesController {
     }
 
     static async reorderTimelineEntries(worldObjectId: string, orderedIds: string[]) {
+        // Verify every ID belongs to this worldObject before touching any of them.
+        const owned = await prisma.worldObjectTimelineEntry.findMany({
+            where: { id: { in: orderedIds }, worldObjectId },
+            select: { id: true },
+        });
+        if (owned.length !== orderedIds.length) {
+            throw new Error("Some timeline entries do not belong to this world object");
+        }
         await prisma.$transaction(
             orderedIds.map((id, index) =>
                 prisma.worldObjectTimelineEntry.update({

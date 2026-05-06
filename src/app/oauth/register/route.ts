@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { registerClient, type ClientRegistration } from "@/lib/oauth-store";
+import { getCurrentUserId } from "@/lib/api-auth";
+import { isAuthEnabled } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /oauth/register
@@ -8,6 +11,29 @@ import { registerClient, type ClientRegistration } from "@/lib/oauth-store";
  * MCP clients call this to register before starting the auth flow.
  */
 export async function POST(request: NextRequest) {
+  // Per-IP throttle to limit client registration abuse
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+  if (process.env.DISABLE_RATE_LIMIT !== "true") {
+    const rl = checkRateLimit(`oauth-register:${ip}`, { limit: 5, windowMs: 3_600_000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", error_description: "too many registration attempts" },
+        { status: 429 }
+      );
+    }
+  }
+
+  // Require an authenticated session when auth is enabled
+  if (isAuthEnabled()) {
+    const userId = getCurrentUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
+        { status: 401 }
+      );
+    }
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -69,9 +95,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (redirectUris.length > 5) {
+    return NextResponse.json(
+      { error: "invalid_client_metadata", error_description: "too many redirect_uris (max 5)" },
+      { status: 400 }
+    );
+  }
+
   const clientId = crypto.randomUUID();
-  const clientName =
-    typeof body.client_name === "string" ? body.client_name : "Unknown Client";
+  const clientName = (
+    typeof body.client_name === "string" ? body.client_name : "Unknown Client"
+  ).slice(0, 80);
   const grantTypes = Array.isArray(body.grant_types)
     ? (body.grant_types as string[])
     : ["authorization_code", "refresh_token"];
