@@ -11,6 +11,9 @@ import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
+/** Auth paths that get a tight per-IP rate limit even though they are public. */
+const AUTH_RATE_LIMITED_PATHS = ["/api/auth/login"];
+
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
     "/api/health",
@@ -154,9 +157,8 @@ export async function middleware(request: NextRequest) {
 
     // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
     // This prevents brute-force attacks on /api/auth/login even though that path is public.
-    const AUTH_RATE_LIMITED = ["/api/auth/login"];
     const rateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-    if (AUTH_RATE_LIMITED.includes(pathname) && !rateLimitDisabled) {
+    if (AUTH_RATE_LIMITED_PATHS.includes(pathname) && !rateLimitDisabled) {
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
         const result = checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {
