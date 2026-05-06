@@ -83,6 +83,36 @@ describe("UniversesController", () => {
         expect(woWithTimeline.timeline[1].label).toBe("E1");
     });
 
+    it("reorderTimelineEntries rejects entries not owned by the world object (IDOR guard)", async () => {
+        const u = await UniversesController.createUniverse({ title: "U1" });
+        const wo1 = await UniversesController.createWorldObject({ universeId: u.id, type: "CHARACTER", name: "A" });
+        const wo2 = await UniversesController.createWorldObject({ universeId: u.id, type: "CHARACTER", name: "B" });
+
+        const own = await UniversesController.addTimelineEntry({ worldObjectId: wo1.id, label: "Mine" });
+        const foreign = await UniversesController.addTimelineEntry({ worldObjectId: wo2.id, label: "Theirs" });
+
+        await expect(
+            UniversesController.reorderTimelineEntries(wo1.id, [foreign.id, own.id])
+        ).rejects.toThrow(/do not belong/);
+
+        // The foreign entry must be untouched
+        const stillTheirs = await testPrisma.worldObjectTimelineEntry.findUnique({ where: { id: foreign.id } });
+        expect(stillTheirs?.worldObjectId).toBe(wo2.id);
+    });
+
+    // findMany dedupes results, so duplicates make owned.length < orderedIds.length
+    // and trip the length check. Pinning this so a future "dedupe before checking"
+    // optimisation cannot let duplicates slip through silently.
+    it("reorderTimelineEntries rejects duplicate IDs in orderedIds", async () => {
+        const u = await UniversesController.createUniverse({ title: "U1" });
+        const wo = await UniversesController.createWorldObject({ universeId: u.id, type: "CHARACTER", name: "A" });
+        const e = await UniversesController.addTimelineEntry({ worldObjectId: wo.id, label: "X" });
+
+        await expect(
+            UniversesController.reorderTimelineEntries(wo.id, [e.id, e.id])
+        ).rejects.toThrow();
+    });
+
     it("should link and unlink projects", async () => {
         const u = await UniversesController.createUniverse({ title: "U1" });
         const p = await ProjectsController.createProject({ title: "P1" });

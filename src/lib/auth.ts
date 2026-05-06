@@ -108,7 +108,11 @@ export async function deriveSessionToken(apiToken: string): Promise<string> {
 
 /**
  * Constant-time string comparison to prevent timing attacks on secrets.
- * Returns false when lengths differ (no timing info leaks there).
+ * The XOR loop is constant-time over the input length; only the length
+ * comparison short-circuits, so this leaks whether lengths match. Safe
+ * for fixed-length secrets (API tokens, session tokens, JWT signatures).
+ * Do NOT use for variable-length secrets where the length itself is sensitive.
+ *
  * Pure JS implementation — works in Edge Runtime (no node:crypto).
  */
 export function safeEqual(a: string, b: string): boolean {

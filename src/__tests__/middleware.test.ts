@@ -385,5 +385,92 @@ describe("middleware", () => {
             });
             expect((await middleware(readReq)).status).toBe(200);
         });
+
+        it("rate-limits /api/auth/login at 5 per minute per IP", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-forwarded-for": "1.2.3.4" };
+            for (let i = 0; i < 5; i++) {
+                await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+            }
+            const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+            expect(res.status).toBe(429);
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
+        it("auth login bucket is per-IP — different IP gets a fresh bucket", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            for (let i = 0; i < 5; i++) {
+                await middleware(createRequest("/api/auth/login", {
+                    method: "POST",
+                    headers: { "x-forwarded-for": "1.1.1.1" },
+                }));
+            }
+            const res = await middleware(createRequest("/api/auth/login", {
+                method: "POST",
+                headers: { "x-forwarded-for": "2.2.2.2" },
+            }));
+            expect(res.status).toBe(200);
+        });
+
+        it("DISABLE_RATE_LIMIT=true is honoured when NODE_ENV is not production", async () => {
+            const env = process.env as Record<string, string | undefined>;
+            const origDisable = env.DISABLE_RATE_LIMIT;
+            const origNodeEnv = env.NODE_ENV;
+            env.DISABLE_RATE_LIMIT = "true";
+            env.NODE_ENV = "development";
+            try {
+                vi.mocked(isAuthEnabled).mockReturnValue(true);
+                vi.mocked(verifySessionToken).mockResolvedValue({
+                    userId: "disable-test",
+                    email: "t@x",
+                    name: "T",
+                });
+                // Far past chat limit (30) — would 429 if rate limit ran
+                for (let i = 0; i < 35; i++) {
+                    const res = await middleware(createRequest("/api/chat", {
+                        method: "POST",
+                        cookies: { annie_session: "valid-jwt" },
+                    }));
+                    expect(res.status).toBe(200);
+                }
+            } finally {
+                if (origDisable === undefined) delete env.DISABLE_RATE_LIMIT;
+                else env.DISABLE_RATE_LIMIT = origDisable;
+                if (origNodeEnv === undefined) delete env.NODE_ENV;
+                else env.NODE_ENV = origNodeEnv;
+            }
+        });
+
+        it("DISABLE_RATE_LIMIT=true is ignored when NODE_ENV=production", async () => {
+            const env = process.env as Record<string, string | undefined>;
+            const origDisable = env.DISABLE_RATE_LIMIT;
+            const origNodeEnv = env.NODE_ENV;
+            env.DISABLE_RATE_LIMIT = "true";
+            env.NODE_ENV = "production";
+            try {
+                vi.mocked(isAuthEnabled).mockReturnValue(true);
+                vi.mocked(verifySessionToken).mockResolvedValue({
+                    userId: "prod-disable-test",
+                    email: "t@x",
+                    name: "T",
+                });
+                for (let i = 0; i < 30; i++) {
+                    await middleware(createRequest("/api/chat", {
+                        method: "POST",
+                        cookies: { annie_session: "valid-jwt" },
+                    }));
+                }
+                const res = await middleware(createRequest("/api/chat", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                }));
+                expect(res.status).toBe(429);
+            } finally {
+                if (origDisable === undefined) delete env.DISABLE_RATE_LIMIT;
+                else env.DISABLE_RATE_LIMIT = origDisable;
+                if (origNodeEnv === undefined) delete env.NODE_ENV;
+                else env.NODE_ENV = origNodeEnv;
+            }
+        });
     });
 });

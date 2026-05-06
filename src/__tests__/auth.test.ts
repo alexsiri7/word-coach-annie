@@ -5,6 +5,7 @@ import {
     createSessionToken,
     verifySessionToken,
     isAuthEnabled,
+    safeEqual,
 } from "@/lib/auth";
 
 describe("auth utilities", () => {
@@ -207,5 +208,37 @@ describe("middleware auth logic", () => {
             expect(setCookie).toContain("annie_session=");
             expect(setCookie).toContain("Max-Age=0");
         });
+    });
+});
+
+describe("safeEqual", () => {
+    it("returns true for equal strings", () => {
+        expect(safeEqual("abc", "abc")).toBe(true);
+    });
+
+    it("returns false for equal-length but different content", () => {
+        expect(safeEqual("abc", "abd")).toBe(false);
+    });
+
+    // Regression guard: a future "optimisation" that early-returns on the first
+    // mismatched character would silently reintroduce a timing side-channel.
+    // This test pins the functional-correctness contract (not the timing one,
+    // which can't be tested deterministically).
+    it("returns false when only the last char differs (no early-return)", () => {
+        expect(safeEqual("aaaaaaab", "aaaaaaaa")).toBe(false);
+    });
+
+    it("returns false for strings of different lengths", () => {
+        expect(safeEqual("abc", "abcd")).toBe(false);
+        expect(safeEqual("", "x")).toBe(false);
+    });
+
+    it("returns true for two empty strings", () => {
+        expect(safeEqual("", "")).toBe(true);
+    });
+
+    it("handles unicode code points consistently", () => {
+        expect(safeEqual("café", "café")).toBe(true);
+        expect(safeEqual("café", "cafe")).toBe(false);
     });
 });

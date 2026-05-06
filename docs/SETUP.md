@@ -105,7 +105,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 | Variable | Description |
 |----------|-------------|
 | `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
-| `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
+| `JWT_SECRET` | JWT signing key for Google OAuth sessions. **Required when auth is enabled** — no fallback. Generate: `openssl rand -hex 32` (≥ 32 chars). |
 | `ALLOWED_EMAILS` | Comma-separated list of Google emails allowed to sign in. When unset, any Google account can sign in. |
 
 ### Optional
@@ -116,6 +116,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 | `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive MCP tools (delete, restore_snapshot). Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
+| `DISABLE_RATE_LIMIT` | Skip in-process rate limiting (development/testing only). Ignored in `NODE_ENV=production`. |
 
 ---
 

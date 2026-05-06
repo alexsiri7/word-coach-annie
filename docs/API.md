@@ -17,7 +17,7 @@ Authenticate with the API token and receive a session cookie.
 
 **Response**: Sets `annie-session` cookie. Returns `{ "ok": true }`.
 
-**Error**: `501` if `API_TOKEN` not configured; `401` if token wrong.
+**Error**: `501` if `API_TOKEN` not configured; `401` if token wrong; `429` if more than 5 attempts in 60s from the same IP.
 
 ---
 
@@ -298,9 +298,9 @@ Create a relationship between two entities.
 ## Annotations
 
 ### `GET /api/annotations`
-List open (unresolved) annotations.
+List open (unresolved) annotations for a project.
 
-**Query params**: `projectId` (optional filter)
+**Query params**: `projectId=<id>` (required)
 
 **Response**: Array of annotation objects:
 ```json
@@ -316,6 +316,8 @@ List open (unresolved) annotations.
   }
 ]
 ```
+
+**Errors**: `400` if `projectId` missing; `403` if not authorized for the project.
 
 ---
 

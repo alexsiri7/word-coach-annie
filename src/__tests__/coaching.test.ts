@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getSceneFocus } from "@/mcp/tools/coaching";
+import { getSceneFocus, getVoiceContext } from "@/mcp/tools/coaching";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { testPrisma } from "./setup";
 
@@ -64,5 +64,35 @@ describe("getSceneFocus", () => {
 
     it("throws for non-existent sceneId", async () => {
         await expect(getSceneFocus("nonexistent-id")).rejects.toThrow();
+    });
+});
+
+describe("getVoiceContext", () => {
+    it("throws when sceneId belongs to a different project (IDOR guard)", async () => {
+        const projectA = await ProjectsController.createProject({ title: "A" });
+        const projectB = await ProjectsController.createProject({ title: "B" });
+        const sceneInB = await createNodeDirect({
+            projectId: projectB.id,
+            type: "SCENE",
+            title: "B-Scene",
+        });
+
+        await expect(
+            getVoiceContext(projectA.id, sceneInB.id)
+        ).rejects.toThrow(/Scene not found in this project/);
+    });
+
+    it("returns voice context for an in-project scene", async () => {
+        const project = await ProjectsController.createProject({ title: "Test" });
+        const scene = await createNodeDirect({
+            projectId: project.id,
+            type: "SCENE",
+            title: "S",
+        });
+
+        const result = await getVoiceContext(project.id, scene.id);
+        expect(result).toBeDefined();
+        expect(Array.isArray(result.characters)).toBe(true);
+        expect(typeof result.sceneText).toBe("string");
     });
 });
