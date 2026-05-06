@@ -7,6 +7,13 @@
 
 import { prisma } from "@/lib/db";
 
+const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const IP_REGISTRATION_LIMIT = 25;
+export const GLOBAL_CLIENT_LIMIT = parseInt(
+  process.env.OAUTH_GLOBAL_CLIENT_LIMIT ?? "10000",
+  10
+);
+
 export interface ClientRegistration {
   client_id: string;
   client_name: string;
@@ -28,7 +35,8 @@ export interface AuthCode {
 
 /** Register an OAuth client (persisted to database). */
 export async function registerClient(
-  registration: ClientRegistration
+  registration: ClientRegistration,
+  options?: { ip?: string; userId?: string }
 ): Promise<void> {
   await prisma.oAuthClient.create({
     data: {
@@ -36,8 +44,25 @@ export async function registerClient(
       clientName: registration.client_name,
       redirectUris: JSON.stringify(registration.redirect_uris),
       grantTypes: JSON.stringify(registration.grant_types),
+      registrationIp: options?.ip ?? null,
+      registrationUserId: options?.userId ?? null,
     },
   });
+}
+
+/** Count clients registered from this IP within the rolling 24h window. */
+export async function countClientsByIpInWindow(ip: string): Promise<number> {
+  return prisma.oAuthClient.count({
+    where: {
+      registrationIp: ip,
+      createdAt: { gte: new Date(Date.now() - IP_WINDOW_MS) },
+    },
+  });
+}
+
+/** Count total OAuth clients (for global capacity cap). */
+export async function countTotalClients(): Promise<number> {
+  return prisma.oAuthClient.count();
 }
 
 /** Look up a registered OAuth client by ID. Returns null if not found. */

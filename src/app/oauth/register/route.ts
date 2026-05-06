@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { registerClient, type ClientRegistration } from "@/lib/oauth-store";
+import {
+  registerClient,
+  countClientsByIpInWindow,
+  countTotalClients,
+  IP_REGISTRATION_LIMIT,
+  GLOBAL_CLIENT_LIMIT,
+  type ClientRegistration,
+} from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { isAuthEnabled } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 /**
  * POST /oauth/register
@@ -23,15 +31,33 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // DB-persisted per-IP limit (24h rolling window, survives deploys)
+  const ipCount = await countClientsByIpInWindow(ip);
+  if (ipCount >= IP_REGISTRATION_LIMIT) {
+    logger.warn("oauth-registration-rejected", { reason: "ip_limit", ip, ipCount });
+    return NextResponse.json(
+      { error: "rate_limited", error_description: "too many registrations from this IP" },
+      { status: 429 }
+    );
+  }
+
+  // Global client cap
+  const totalCount = await countTotalClients();
+  if (totalCount >= GLOBAL_CLIENT_LIMIT) {
+    logger.warn("oauth-registration-rejected", { reason: "global_limit", totalCount });
+    return NextResponse.json(
+      { error: "server_error", error_description: "registration capacity reached" },
+      { status: 503 }
+    );
+  }
+
   // Require an authenticated session when auth is enabled
-  if (isAuthEnabled()) {
-    const userId = getCurrentUserId(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
-        { status: 401 }
-      );
-    }
+  const userId = isAuthEnabled() ? getCurrentUserId(request) : null;
+  if (isAuthEnabled() && !userId) {
+    return NextResponse.json(
+      { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
+      { status: 401 }
+    );
   }
 
   let body: Record<string, unknown>;
@@ -118,7 +144,8 @@ export async function POST(request: NextRequest) {
     registered_at: Date.now(),
   };
 
-  await registerClient(registration);
+  await registerClient(registration, { ip, userId: userId ?? undefined });
+  logger.info("oauth-client-registered", { clientId, ip, userId: userId ?? null });
 
   return NextResponse.json(
     {

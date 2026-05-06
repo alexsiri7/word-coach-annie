@@ -314,11 +314,15 @@ model WritingSession {
 }
 
 model OAuthClient {
-  id           String   @id
-  clientName   String   @default("")
-  redirectUris String // JSON array stored as string
-  grantTypes   String   @default("[\"authorization_code\",\"refresh_token\"]")
-  createdAt    DateTime @default(now())
+  id                 String   @id
+  clientName         String   @default("")
+  redirectUris       String // JSON array stored as string
+  grantTypes         String   @default("[\"authorization_code\",\"refresh_token\"]")
+  createdAt          DateTime @default(now())
+  registrationIp     String?
+  registrationUserId String?
+
+  @@index([registrationIp, createdAt])
 }
 
 model HashnodeCredential {
