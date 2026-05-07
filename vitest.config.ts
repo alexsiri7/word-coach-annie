@@ -6,6 +6,7 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**"],
     environment: "node",
     globals: true,
+    clearMocks: true,
     testTimeout: 15000,
     hookTimeout: 15000,
     globalSetup: ["./src/__tests__/globalSetup.ts"],
