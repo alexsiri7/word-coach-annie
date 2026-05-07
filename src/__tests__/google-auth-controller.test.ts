@@ -6,19 +6,19 @@ import { testPrisma } from "./setup";
 vi.mock("googleapis", () => ({
     google: {
         auth: {
-            OAuth2: vi.fn().mockImplementation(() => ({
-                generateAuthUrl: vi.fn().mockReturnValue("https://accounts.google.com/auth?test=1"),
-                getToken: vi.fn().mockResolvedValue({
+            OAuth2: class {
+                generateAuthUrl = vi.fn().mockReturnValue("https://accounts.google.com/auth?test=1");
+                getToken = vi.fn().mockResolvedValue({
                     tokens: {
                         access_token: "test-access-token",
                         refresh_token: "test-refresh-token",
                         expiry_date: Date.now() + 3600000,
                         scope: "https://www.googleapis.com/auth/documents"
                     }
-                }),
-                setCredentials: vi.fn(),
-                on: vi.fn(),
-            })),
+                });
+                setCredentials = vi.fn();
+                on = vi.fn();
+            },
         },
     },
 }));
