@@ -17,6 +17,10 @@ import { join } from 'path';
 // Use DATABASE_URL (pooler) — our script splits SQL into single statements
 // which work fine through PgBouncer transaction mode
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('Migration failed: DATABASE_URL environment variable is not set');
+  process.exit(1);
+}
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
