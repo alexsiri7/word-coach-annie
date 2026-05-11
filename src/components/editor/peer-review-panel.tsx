@@ -381,8 +381,9 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                     </div>
                     {row.synthesizedRecommendation && (
                       <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                        {row.synthesizedRecommendation.slice(0, 80)}
-                        {row.synthesizedRecommendation.length > 80 ? "…" : ""}
+                        {row.synthesizedRecommendation.length > 80
+                          ? row.synthesizedRecommendation.slice(0, 80) + "…"
+                          : row.synthesizedRecommendation}
                       </div>
                     )}
                   </button>

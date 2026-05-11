@@ -52,8 +52,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Require an authenticated session when auth is enabled
-  const userId = isAuthEnabled() ? getCurrentUserId(request) : null;
-  if (isAuthEnabled() && !userId) {
+  const authEnabled = isAuthEnabled();
+  const userId = authEnabled ? getCurrentUserId(request) : null;
+  if (authEnabled && !userId) {
     return NextResponse.json(
       { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
       { status: 401 }
