@@ -13,3 +13,28 @@ GHSA-r6q2-hw4h-h46w
 #
 # Source: protobufjs (via @google/genai → @grpc/proto-loader transitive chain)
 GHSA-xq3m-2v4x-88gg
+#
+# Source: @babel/plugin-transform-modules-systemjs (transitive)
+GHSA-fv7c-fp4j-7gwp
+#
+# Source: @mikro-orm/knex SQL injection via runtime-controlled identifiers
+GHSA-cfw5-68c4-ffqp
+#
+# Source: @opentelemetry/sdk-node prometheus exporter crash
+GHSA-q7rr-3cgh-j5r3
+#
+# Source: fast-uri path traversal and host confusion vulnerabilities
+GHSA-q3j6-qgpj-74h6
+GHSA-v39h-62p7-jpjc
+#
+# Source: fast-xml-builder attribute value escaping
+GHSA-5wm8-gmm8-39j9
+#
+# Source: next.js DoS and middleware/proxy bypass vulnerabilities
+GHSA-8h8q-6873-q5fj
+GHSA-mg66-mrh9-m8jx
+GHSA-c4j6-fc7j-m34r
+GHSA-492v-c6pp-mqqv
+GHSA-267c-6grr-h53f
+GHSA-36qx-fr4f-26g5
+GHSA-26hh-7cqf-hhc6

@@ -1,6 +1,6 @@
--- AlterTable
-ALTER TABLE "OAuthClient" ADD COLUMN "registrationIp" TEXT;
-ALTER TABLE "OAuthClient" ADD COLUMN "registrationUserId" TEXT;
+-- AlterTable (idempotent — safe to re-apply)
+ALTER TABLE "OAuthClient" ADD COLUMN IF NOT EXISTS "registrationIp" TEXT;
+ALTER TABLE "OAuthClient" ADD COLUMN IF NOT EXISTS "registrationUserId" TEXT;
 
--- CreateIndex
-CREATE INDEX "OAuthClient_registrationIp_createdAt_idx" ON "OAuthClient"("registrationIp", "createdAt");
+-- CreateIndex (idempotent — safe to re-apply)
+CREATE INDEX IF NOT EXISTS "OAuthClient_registrationIp_createdAt_idx" ON "OAuthClient"("registrationIp", "createdAt");

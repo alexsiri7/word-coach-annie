@@ -15,8 +15,14 @@ import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 
 // Use DATABASE_URL (pooler) — our script splits SQL into single statements
-// which work fine through PgBouncer transaction mode
+// which work fine through PgBouncer transaction mode.
+// Guard: PrismaPg accepts undefined without throwing, which would cause
+// migrations to silently no-op on Railway when the env var is missing.
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('Migration failed: DATABASE_URL environment variable is not set');
+  process.exit(1);
+}
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
@@ -96,8 +102,15 @@ async function migrate() {
       .map((s) => s.replace(/--[^\n]*/g, '').trim())
       .filter((s) => s.length > 0);
 
-    for (const stmt of statements) {
-      await prisma.$executeRawUnsafe(stmt);
+    for (let i = 0; i < statements.length; i++) {
+      const stmt = statements[i];
+      try {
+        await prisma.$executeRawUnsafe(stmt);
+      } catch (e) {
+        console.error(`  FAIL  ${dir} — statement ${i + 1}/${statements.length}:`);
+        console.error(`         ${stmt.slice(0, 200)}`);
+        throw e;
+      }
     }
 
     // Record in _prisma_migrations
@@ -122,7 +135,8 @@ async function migrate() {
   await prisma.$disconnect();
 }
 
-migrate().catch((e) => {
+migrate().catch(async (e) => {
   console.error('Migration failed:', e);
+  await prisma.$disconnect();
   process.exit(1);
 });
