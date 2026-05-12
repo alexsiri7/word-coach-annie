@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "dev:secure": "next dev --experimental-https -H 0.0.0.0",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",
@@ -18,7 +18,7 @@
     "e2e:update-snapshots": "playwright test --update-snapshots",
     "test:screenshots": "playwright test e2e/visual.spec.ts",
     "test:screenshots:update": "playwright test e2e/visual.spec.ts --update-snapshots",
-    "analyze": "ANALYZE=true next build",
+    "analyze": "ANALYZE=true next build --webpack",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -92,7 +92,6 @@
     "@types/react-dom": "^19.0.4",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
-    "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.5",
     "autoprefixer": "^10.5.0",
     "esbuild": "^0.28.0",

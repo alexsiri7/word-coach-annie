@@ -1,8 +1,13 @@
 import { google } from 'googleapis';
 import { prisma } from '@/lib/db';
-import { OAuth2Client } from 'google-auth-library';
 import { encrypt, decrypt } from '@/lib/crypto';
 import { env } from '@/lib/env';
+import { logger } from '@/lib/logger';
+
+// Derive OAuth2Client from googleapis to avoid type conflicts introduced by @google/adk v1.x,
+// which bundles @google/genai's own google-auth-library (separate private property declarations
+// cause structural incompatibility with the top-level import).
+type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
 
 const DEFAULT_USER_ID = 'local';
 
@@ -63,16 +68,20 @@ export class GoogleAuthController {
         // Setup token refresh handler
         client.on('tokens', async (tokens) => {
             if (tokens.access_token) {
-                // Update existing credential with encrypted tokens
-                await prisma.googleCredential.update({
-                    where: { id: cred.id },
-                    data: {
-                        accessToken: encrypt(tokens.access_token),
-                        expiresAt: new Date(tokens.expiry_date!),
-                        // Only update refresh token if a new one is provided
-                        ...(tokens.refresh_token ? { refreshToken: encrypt(tokens.refresh_token) } : {})
-                    }
-                });
+                try {
+                    // Update existing credential with encrypted tokens
+                    await prisma.googleCredential.update({
+                        where: { id: cred.id },
+                        data: {
+                            accessToken: encrypt(tokens.access_token),
+                            expiresAt: new Date(tokens.expiry_date!),
+                            // Only update refresh token if a new one is provided
+                            ...(tokens.refresh_token ? { refreshToken: encrypt(tokens.refresh_token) } : {})
+                        }
+                    });
+                } catch (err) {
+                    logger.error("Failed to persist refreshed Google tokens", err);
+                }
             }
         });
 

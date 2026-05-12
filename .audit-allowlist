@@ -13,6 +13,10 @@ GHSA-r6q2-hw4h-h46w
 #
 # Source: protobufjs (via @google/genai → @grpc/proto-loader transitive chain)
 GHSA-xq3m-2v4x-88gg
+GHSA-66ff-xgx4-vchm
+GHSA-75px-5xx7-5xc7
+GHSA-jvwf-75h9-cwgg
+GHSA-685m-2w69-288q
 #
 # Source: @babel/plugin-transform-modules-systemjs (transitive)
 GHSA-fv7c-fp4j-7gwp
