@@ -1,8 +1,11 @@
 import { google } from 'googleapis';
 import { prisma } from '@/lib/db';
-import { OAuth2Client } from 'google-auth-library';
 import { encrypt, decrypt } from '@/lib/crypto';
 import { env } from '@/lib/env';
+
+// Derive OAuth2Client from googleapis to avoid type conflicts with @google/genai's
+// bundled google-auth-library (which has separate private property declarations).
+type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
 
 const DEFAULT_USER_ID = 'local';
 
