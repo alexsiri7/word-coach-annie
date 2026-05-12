@@ -7,7 +7,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 
 ```
 ┌─────────────────────────────────────────────┐
-│              Next.js 15 (App Router)        │
+│              Next.js 16 (App Router)        │
 │  ┌──────────────────┐  ┌─────────────────┐ │
 │  │  React 19 SPA    │  │  API Routes     │ │
 │  │  Tiptap Editor   │  │  (/api/*)       │ │
@@ -28,12 +28,12 @@ hierarchical story structure, world-building tools, and AI chat integration.
 
 | Component | Technology | Details |
 |-----------|-----------|---------|
-| Framework | Next.js 15.2.1 | App Router, API routes |
+| Framework | Next.js 16.2.6 | App Router, API routes; webpack opt-in via `--webpack` flag (Next.js 16 defaults to Turbopack) |
 | Runtime | Node.js 20 | Docker base: `node:20-slim` |
 | Language | TypeScript 5.7.3 | Strict mode |
 | ORM | Prisma 7.6.0 | Type-safe DB access with `@prisma/adapter-pg` |
 | Database | PostgreSQL 16 | Via Supabase (connection pooler, port 6543) |
-| Validation | Zod 3.24.2 | Schema validation |
+| Validation | Zod 4.4.3 | Schema validation; MCP server uses `@ts-nocheck` due to Zod v4 / MCP SDK type incompatibility (tracked in #614) |
 | AI | Google AI + @google/adk 0.6 | Gemini 2.0 Flash via native ADK integration |
 | PDF Export | @react-pdf/renderer | Server-side PDF generation from React components |
 | EPUB Export | epub-gen-memory | Server-side EPUB 3 generation from HTML chapters |
@@ -68,7 +68,7 @@ Core models for hierarchical story structure:
 |-----------|-----------|---------|
 | Framework | React 19.0 | Latest React with App Router |
 | UI Library | Shadcn/ui | Built on Radix UI primitives |
-| Rich Text Editor | Tiptap 3.19 | Extensible editor (bubble menu, highlight, placeholder) |
+| Rich Text Editor | Tiptap 3.23 | Extensible editor (bubble menu, highlight, placeholder) |
 | Icons | Lucide React | Icon library |
 | Styling | Tailwind CSS 3.4 | With tailwind-animate, tailwind-merge, CVA |
 | XSS Protection | DOMPurify | HTML sanitization |

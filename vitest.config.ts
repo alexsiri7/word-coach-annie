@@ -2,7 +2,6 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
-  plugins: [],
   test: {
     exclude: ["e2e/**", "node_modules/**"],
     environment: "node",
