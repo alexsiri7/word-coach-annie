@@ -37,7 +37,7 @@ function makeRateLimitResponse(
     retryAfterMs: number,
     resetMs: number
 ): NextResponse {
-    const retryAfterSec = Math.ceil((retryAfterMs ?? 1000) / 1000);
+    const retryAfterSec = Math.ceil(retryAfterMs / 1000);
     return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         {
