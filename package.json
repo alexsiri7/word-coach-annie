@@ -81,7 +81,7 @@
     "serialize-javascript": ">=7.0.4"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.2.4",
+    "@next/bundle-analyzer": "^16.2.6",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/archiver": "^7.0.0",
