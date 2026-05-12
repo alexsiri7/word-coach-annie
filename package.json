@@ -51,7 +51,7 @@
     "@tiptap/extension-bubble-menu": "^3.19.0",
     "@tiptap/extension-highlight": "^3.22.5",
     "@tiptap/extension-placeholder": "^3.22.5",
-    "@tiptap/extension-underline": "^3.19.0",
+    "@tiptap/extension-underline": "^3.23.1",
     "@tiptap/pm": "^3.19.0",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.22.5",
