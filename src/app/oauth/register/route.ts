@@ -130,9 +130,7 @@ export async function POST(request: NextRequest) {
   }
 
   const clientId = crypto.randomUUID();
-  const clientName = (
-    typeof body.client_name === "string" ? body.client_name : "Unknown Client"
-  ).slice(0, 80);
+  const clientName = (typeof body.client_name === "string" ? body.client_name : "Unknown Client").slice(0, 80);
   const grantTypes = Array.isArray(body.grant_types)
     ? (body.grant_types as string[])
     : ["authorization_code", "refresh_token"];
