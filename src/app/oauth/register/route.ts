@@ -82,6 +82,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (redirectUris.length > 5) {
+    return NextResponse.json(
+      { error: "invalid_client_metadata", error_description: "too many redirect_uris (max 5)" },
+      { status: 400 }
+    );
+  }
+
   // Validate each redirect URI is a valid URL
   for (const uri of redirectUris) {
     if (typeof uri !== "string") {
@@ -120,13 +127,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-  }
-
-  if (redirectUris.length > 5) {
-    return NextResponse.json(
-      { error: "invalid_client_metadata", error_description: "too many redirect_uris (max 5)" },
-      { status: 400 }
-    );
   }
 
   const clientId = crypto.randomUUID();
