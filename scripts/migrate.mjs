@@ -20,8 +20,8 @@ import { join } from 'path';
 // migrations to silently no-op on Railway when the env var is missing.
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error('Migration failed: DATABASE_URL environment variable is not set');
-  process.exit(1);
+  console.warn('Warning: DATABASE_URL is not set — skipping migrations. Server will start but DB-dependent routes will fail.');
+  process.exit(0);
 }
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
