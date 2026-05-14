@@ -79,7 +79,8 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "serialize-javascript": ">=7.0.4"
+    "serialize-javascript": ">=7.0.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.6",
