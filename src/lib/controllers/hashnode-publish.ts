@@ -40,8 +40,8 @@ export class HashnodePublishController {
         if (titleOverride) {
             title = titleOverride;
         } else if (nodeId) {
-            const node = await prisma.structureNode.findUnique({
-                where: { id: nodeId },
+            const node = await prisma.structureNode.findFirst({
+                where: { id: nodeId, projectId },
                 select: { title: true },
             });
             if (!node) throw new Error(`Node not found: ${nodeId}`);
