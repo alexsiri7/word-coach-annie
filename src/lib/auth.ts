@@ -124,3 +124,28 @@ export function safeEqual(a: string, b: string): boolean {
 export function isAuthEnabled(): boolean {
     return !!(env.API_TOKEN || env.GOOGLE_CLIENT_ID);
 }
+
+/**
+ * Validate that a post-login redirect destination is an allowed app path.
+ * Accepts only same-origin paths that match known user-facing routes.
+ * Rejects cross-origin attempts, protocol injections, and unknown paths.
+ */
+export function isAllowedRedirect(path: string): boolean {
+    if (!path || typeof path !== "string") return false;
+    if (!path.startsWith("/") || path.startsWith("//")) return false;
+    if (path.includes("\\")) return false;
+
+    const [pathname] = path.split("?");
+    if (pathname.includes(":")) return false; // blocks javascript: and http:
+
+    const ALLOWED_PATTERNS = [
+        /^\/$/,
+        /^\/settings(\/.*)?$/,
+        /^\/setup(\/.*)?$/,
+        /^\/project\/[a-zA-Z0-9_-]+(\/.*)?$/,
+        /^\/read\/[a-zA-Z0-9_-]+(\/.*)?$/,
+        /^\/universe(\/[a-zA-Z0-9_-]+(\/.*)?)?$/,
+    ];
+
+    return ALLOWED_PATTERNS.some((re) => re.test(pathname));
+}

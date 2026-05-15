@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import crypto from "crypto";
 import { env } from "@/lib/env";
+import { isAllowedRedirect } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 /**
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
         // Persist the post-login redirect destination (e.g. /read/...) so the
         // callback can send the user back where they came from.
         const from = request.nextUrl.searchParams.get("from");
-        if (from && from.startsWith("/") && !from.startsWith("//")) {
+        if (from && isAllowedRedirect(from)) {
             response.cookies.set("oauth_redirect", from, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
