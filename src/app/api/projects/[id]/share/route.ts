@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
@@ -72,6 +73,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(share, { status: 201 });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "Already shared with this email" },
+        { status: 409 }
+      );
+    }
     logger.error("POST /api/projects/[id]/share error", error);
     return NextResponse.json(
       { error: "Internal server error" },
