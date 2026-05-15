@@ -28,7 +28,7 @@ vi.mock("@/lib/logger", () => ({
 
 import { prisma } from "@/lib/db";
 
-const mockProjectShare = prisma.projectShare as {
+const mockProjectShare = prisma.projectShare as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
 };
