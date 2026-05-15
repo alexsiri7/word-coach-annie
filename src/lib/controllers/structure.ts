@@ -341,7 +341,8 @@ export class StructureController {
     static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
         if (!content) throw new Error("Content is required");
 
-        // Manual ID and timestamp generation as a workaround for Prisma client issues
+        // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
+        // in this context; crypto.randomUUID() is cryptographically secure and globally unique.
         const annotation = await prisma.annotation.create({
             data: {
                 id: crypto.randomUUID(),
