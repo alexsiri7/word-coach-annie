@@ -4,7 +4,6 @@
  * Shared between the /oauth/token endpoint and middleware.
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
-import { timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { resolveJwtSecret } from "@/lib/auth";
 
@@ -85,8 +84,10 @@ export async function verifyPkce(
     new TextEncoder().encode(codeVerifier)
   );
   const computed = base64urlEncode(digest);
-  const a = Buffer.from(computed);
-  const b = Buffer.from(codeChallenge);
+  const a = new TextEncoder().encode(computed);
+  const b = new TextEncoder().encode(codeChallenge);
   if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
