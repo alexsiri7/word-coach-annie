@@ -144,5 +144,21 @@ describe("MCP OAuth Tokens", () => {
       const result = await verifyPkce("", challenge);
       expect(result).toBe(false);
     });
+
+    it("rejects a challenge that differs by one character but has same length", async () => {
+      const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(verifier)
+      );
+      const challenge = base64urlEncode(digest);
+      // Tamper last character while preserving length
+      const tampered =
+        challenge.slice(0, -1) + (challenge.endsWith("A") ? "B" : "A");
+      expect(tampered.length).toBe(challenge.length);
+
+      const result = await verifyPkce(verifier, tampered);
+      expect(result).toBe(false);
+    });
   });
 });

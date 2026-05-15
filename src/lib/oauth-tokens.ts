@@ -71,7 +71,10 @@ export function base64urlEncode(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Verify PKCE: SHA256(code_verifier) must match code_challenge. */
+/**
+ * Verify PKCE: SHA256(code_verifier) must match code_challenge.
+ * Uses timing-resistant comparison to prevent timing oracle attacks.
+ */
 export async function verifyPkce(
   codeVerifier: string,
   codeChallenge: string
@@ -81,5 +84,10 @@ export async function verifyPkce(
     new TextEncoder().encode(codeVerifier)
   );
   const computed = base64urlEncode(digest);
-  return computed === codeChallenge;
+  const a = new TextEncoder().encode(computed);
+  const b = new TextEncoder().encode(codeChallenge);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
