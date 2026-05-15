@@ -222,6 +222,20 @@ describe("HashnodePublishController", () => {
             const requestBody = JSON.parse(fetchCall[1].body);
             expect(requestBody.variables.input.title).toBe("My Article");
         });
+
+        it("throws when nodeId belongs to a different project", async () => {
+            const otherProject = await testPrisma.project.create({
+                data: { title: "Other Project", author: "Other Author" },
+            });
+            const node = await testPrisma.structureNode.create({
+                data: { projectId: otherProject.id, type: "SCENE", title: "Secret Title", orderIndex: 0 },
+            });
+            mockFetchDraft();
+
+            await expect(
+                HashnodePublishController.publish(projectId, null, { nodeId: node.id })
+            ).rejects.toThrow(`Node not found: ${node.id}`);
+        });
     });
 
     describe("tags and canonical URL", () => {
