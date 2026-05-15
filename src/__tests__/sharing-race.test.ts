@@ -13,10 +13,10 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
-const mockProjectShare = {
+const mockProjectShare = vi.hoisted(() => ({
   findUnique: vi.fn(),
   create: vi.fn(),
-};
+}));
 
 vi.mock("@/lib/db", () => ({
   prisma: { projectShare: mockProjectShare },
