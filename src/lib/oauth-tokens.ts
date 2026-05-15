@@ -94,10 +94,5 @@ export async function verifyPkce(
     new TextEncoder().encode(codeVerifier)
   );
   const computed = base64urlEncode(digest);
-  const a = new TextEncoder().encode(computed);
-  const b = new TextEncoder().encode(codeChallenge);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-  return diff === 0;
+  return timingSafeStringEqual(computed, codeChallenge);
 }
