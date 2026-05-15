@@ -125,6 +125,15 @@ export function isAuthEnabled(): boolean {
     return !!(env.API_TOKEN || env.GOOGLE_CLIENT_ID);
 }
 
+const ALLOWED_REDIRECT_PATTERNS = [
+    /^\/$/,
+    /^\/settings(\/.*)?$/,
+    /^\/setup(\/.*)?$/,
+    /^\/project\/[a-zA-Z0-9_-]+(\/.*)?$/,
+    /^\/read\/[a-zA-Z0-9_-]+(\/.*)?$/,
+    /^\/universe(\/[a-zA-Z0-9_-]+(\/.*)?)?$/,
+];
+
 /**
  * Validate that a post-login redirect destination is an allowed app path.
  * Accepts only same-origin paths that match known user-facing routes.
@@ -138,14 +147,5 @@ export function isAllowedRedirect(path: string): boolean {
     const [pathname] = path.split("?");
     if (pathname.includes(":")) return false; // blocks javascript: and http:
 
-    const ALLOWED_PATTERNS = [
-        /^\/$/,
-        /^\/settings(\/.*)?$/,
-        /^\/setup(\/.*)?$/,
-        /^\/project\/[a-zA-Z0-9_-]+(\/.*)?$/,
-        /^\/read\/[a-zA-Z0-9_-]+(\/.*)?$/,
-        /^\/universe(\/[a-zA-Z0-9_-]+(\/.*)?)?$/,
-    ];
-
-    return ALLOWED_PATTERNS.some((re) => re.test(pathname));
+    return ALLOWED_REDIRECT_PATTERNS.some((re) => re.test(pathname));
 }
