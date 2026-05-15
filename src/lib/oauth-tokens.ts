@@ -4,6 +4,7 @@
  * Shared between the /oauth/token endpoint and middleware.
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
+import { timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { resolveJwtSecret } from "@/lib/auth";
 
@@ -71,7 +72,10 @@ export function base64urlEncode(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Verify PKCE: SHA256(code_verifier) must match code_challenge. */
+/**
+ * Verify PKCE: SHA256(code_verifier) must match code_challenge.
+ * Uses timing-resistant comparison to prevent timing oracle attacks.
+ */
 export async function verifyPkce(
   codeVerifier: string,
   codeChallenge: string
@@ -81,11 +85,8 @@ export async function verifyPkce(
     new TextEncoder().encode(codeVerifier)
   );
   const computed = base64urlEncode(digest);
-  if (computed.length !== codeChallenge.length) return false;
-  // Constant-time comparison using XOR to prevent timing attacks
-  const a = new TextEncoder().encode(computed);
-  const b = new TextEncoder().encode(codeChallenge);
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-  return diff === 0;
+  const a = Buffer.from(computed);
+  const b = Buffer.from(codeChallenge);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
