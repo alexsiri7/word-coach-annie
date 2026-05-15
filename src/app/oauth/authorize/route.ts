@@ -17,14 +17,27 @@ export async function GET(request: NextRequest) {
 
   const { redirectUri, state } = params!;
 
-  return renderConsentPage(clientName!, {
+  const csrfToken = crypto.randomUUID();
+
+  const response = renderConsentPage(clientName!, {
     response_type: params!.responseType,
     client_id: params!.clientId,
     redirect_uri: redirectUri,
     state: state ?? "",
     code_challenge: params!.codeChallenge,
     code_challenge_method: params!.codeChallengeMethod,
+    csrf_token: csrfToken,
   });
+
+  response.cookies.set("csrf_oauth", csrfToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 600,
+    path: "/oauth/authorize",
+  });
+
+  return response;
 }
 
 /**
@@ -36,6 +49,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
+
+  const csrfForm = formData.get("csrf_token") as string | null;
+  const csrfCookie = request.cookies.get("csrf_oauth")?.value;
+  if (!csrfForm || !csrfCookie || csrfForm !== csrfCookie) {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "Invalid or missing CSRF token" },
+      { status: 403 },
+    );
+  }
+
   const action = formData.get("action") as string | null;
 
   const redirectUri = formData.get("redirect_uri") as string;
