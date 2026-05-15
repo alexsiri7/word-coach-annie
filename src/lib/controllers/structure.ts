@@ -344,7 +344,7 @@ export class StructureController {
         // Manual ID and timestamp generation as a workaround for Prisma client issues
         const annotation = await prisma.annotation.create({
             data: {
-                id: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                id: crypto.randomUUID(),
                 nodeId,
                 content,
                 range,
