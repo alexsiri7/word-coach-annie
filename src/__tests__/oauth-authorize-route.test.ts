@@ -114,12 +114,53 @@ describe("GET /oauth/authorize CSRF token generation", () => {
     expect(setCookie).toContain("csrf_oauth=");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie.toLowerCase()).toContain("samesite=strict");
+    expect(setCookie.toLowerCase()).toContain("path=/oauth/authorize");
+    expect(setCookie.toLowerCase()).toContain("max-age=600");
   });
 
   it("embeds csrf_token as hidden input in HTML", async () => {
     const req = makeGetRequest();
     const res = await GET(req);
     const html = await res.text();
-    expect(html).toMatch(/name="csrf_token" value="[0-9a-f-]{36}"/);
+    expect(html).toMatch(
+      /name="csrf_token" value="[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/,
+    );
+  });
+
+  it("csrf_oauth cookie value matches csrf_token hidden field value", async () => {
+    const req = makeGetRequest();
+    const res = await GET(req);
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    const cookieMatch = setCookie.match(/csrf_oauth=([^;]+)/);
+    expect(cookieMatch).not.toBeNull();
+    const cookieValue = cookieMatch![1];
+    const html = await res.text();
+    const hiddenMatch = html.match(/name="csrf_token" value="([^"]+)"/);
+    expect(hiddenMatch).not.toBeNull();
+    const hiddenValue = hiddenMatch![1];
+    expect(cookieValue).toBe(hiddenValue);
+  });
+});
+
+describe("POST /oauth/authorize approve happy-path", () => {
+  it("renders code page on approve when CSRF and session are valid (localhost redirect)", async () => {
+    const req = makePostRequest(
+      {
+        action: "approve",
+        csrf_token: "token-abc",
+        response_type: "code",
+        client_id: "c1",
+        redirect_uri: "http://localhost/callback",
+        code_challenge: "abc",
+        code_challenge_method: "S256",
+        state: "xyz",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+    );
+    const res = await POST(req);
+    // localhost redirects render the code page (200 HTML), not a 303
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("code-123"); // from mocked createAuthCode
   });
 });
