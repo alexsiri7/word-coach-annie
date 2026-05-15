@@ -159,6 +159,37 @@ describe("Share management API — /api/projects/[id]/share", () => {
         expect(body.error).toMatch(/already/i);
     });
 
+    it("POST — returns 409 when create throws P2002 (concurrent race)", async () => {
+        // Simulate the race: findUnique returns null (no existing share) but
+        // create throws a unique-constraint error because a concurrent request
+        // already inserted the row.
+        const { prisma: mockPrisma } = await import("@/lib/db");
+        const { PrismaClientKnownRequestError } = await import("@prisma/client").then(
+            (m) => ({ PrismaClientKnownRequestError: m.Prisma.PrismaClientKnownRequestError })
+        );
+
+        const spy = vi.spyOn(mockPrisma.projectShare, "create").mockRejectedValueOnce(
+            new PrismaClientKnownRequestError("Unique constraint failed", {
+                code: "P2002",
+                clientVersion: "0.0.0",
+            })
+        );
+
+        const { POST } = await import("@/app/api/projects/[id]/share/route");
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
+            method: "POST",
+            body: { email: "race@example.com" },
+            userId: ownerId,
+        });
+        const res = await POST(req as never, mockParams({ id: projectId }));
+
+        expect((res as any).status).toBe(409);
+        const body = await (res as any).json();
+        expect(body.error).toMatch(/already/i);
+
+        spy.mockRestore();
+    });
+
     it("POST — owner can add an editor by email", async () => {
         const { POST } = await import("@/app/api/projects/[id]/share/route");
         const req = makeRequest(`http://localhost/api/projects/${projectId}/share`, {
