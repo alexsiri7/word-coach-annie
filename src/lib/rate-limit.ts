@@ -91,6 +91,8 @@ export const RATE_LIMITS = {
     write: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
     /** Project creation (POST /api/projects): 100 per hour per user */
     projectCreate: { limit: 100, windowMs: 3_600_000 } satisfies RateLimitConfig,
+    /** Project import (POST /api/projects/import): 20 per hour per user */
+    projectImport: { limit: 20, windowMs: 3_600_000 } satisfies RateLimitConfig,
     /** Feedback submission (POST /api/feedback): 5 per hour per user */
     feedback: { limit: 5, windowMs: 3_600_000 } satisfies RateLimitConfig,
     /** Auth endpoints (login): 5 attempts per minute per IP — brute-force protection */

@@ -110,6 +110,23 @@ function applyRateLimit(
         return null;
     }
 
+    // Project import: POST /api/projects/import
+    const isProjectImport = method === "POST" && pathname === "/api/projects/import";
+    if (isProjectImport) {
+        const result = checkRateLimit(
+            `projectImport:${userKey}`,
+            RATE_LIMITS.projectImport
+        );
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.projectImport,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+        return null;
+    }
+
     // Feedback submission: POST /api/feedback
     const isFeedback = method === "POST" && pathname === "/api/feedback";
     if (isFeedback) {
