@@ -5,6 +5,7 @@ import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     createSessionToken,
+    isAllowedRedirect,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -115,9 +116,7 @@ export async function GET(request: NextRequest) {
         // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
         const baseUrl = new URL(redirectUri).origin;
         const redirectTo = request.cookies.get("oauth_redirect")?.value;
-        const destination = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
-            ? redirectTo
-            : "/";
+        const destination = redirectTo && isAllowedRedirect(redirectTo) ? redirectTo : "/";
         const response = NextResponse.redirect(new URL(destination, baseUrl));
         // Clear the OAuth state and redirect cookies
         response.cookies.set("oauth_redirect", "", {

@@ -5,6 +5,7 @@ import {
     createSessionToken,
     verifySessionToken,
     isAuthEnabled,
+    isAllowedRedirect,
 } from "@/lib/auth";
 
 describe("auth utilities", () => {
@@ -133,6 +134,45 @@ describe("isAuthEnabled", () => {
         delete process.env.API_TOKEN;
         process.env.GOOGLE_CLIENT_ID = "test-client-id";
         expect(isAuthEnabled()).toBe(true);
+    });
+});
+
+describe("isAllowedRedirect", () => {
+    it("allows known user-facing routes", () => {
+        expect(isAllowedRedirect("/")).toBe(true);
+        expect(isAllowedRedirect("/settings")).toBe(true);
+        expect(isAllowedRedirect("/settings/profile")).toBe(true);
+        expect(isAllowedRedirect("/setup")).toBe(true);
+        expect(isAllowedRedirect("/project/abc123")).toBe(true);
+        expect(isAllowedRedirect("/project/abc123/timeline")).toBe(true);
+        expect(isAllowedRedirect("/read/abc123")).toBe(true);
+        expect(isAllowedRedirect("/universe")).toBe(true);
+        expect(isAllowedRedirect("/universe/abc123")).toBe(true);
+    });
+
+    it("allows query strings on known routes", () => {
+        expect(isAllowedRedirect("/settings?tab=billing")).toBe(true);
+        expect(isAllowedRedirect("/project/abc123?view=graph")).toBe(true);
+    });
+
+    it("blocks cross-origin and protocol injection attempts", () => {
+        expect(isAllowedRedirect("//evil.com")).toBe(false);
+        expect(isAllowedRedirect("javascript:alert(1)")).toBe(false);
+        expect(isAllowedRedirect("/\\evil.com")).toBe(false);
+        expect(isAllowedRedirect("/path?redirect=http://evil.com")).toBe(false);
+    });
+
+    it("blocks unknown app paths", () => {
+        expect(isAllowedRedirect("/api/admin")).toBe(false);
+        expect(isAllowedRedirect("/login")).toBe(false);
+        expect(isAllowedRedirect("/dmca")).toBe(false);
+        expect(isAllowedRedirect("/privacy")).toBe(false);
+    });
+
+    it("blocks empty and non-string values", () => {
+        expect(isAllowedRedirect("")).toBe(false);
+        expect(isAllowedRedirect(null as unknown as string)).toBe(false);
+        expect(isAllowedRedirect(undefined as unknown as string)).toBe(false);
     });
 });
 
