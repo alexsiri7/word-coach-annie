@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
+import { NextRequest } from "next/server";
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -23,44 +24,6 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
-vi.mock("next/server", () => {
-  class MockResp {
-    status: number;
-    _data: unknown;
-    constructor(body: unknown, init?: { status?: number }) {
-      this._data = body;
-      this.status = init?.status || 200;
-    }
-    async json() { return this._data; }
-  }
-  return {
-    NextRequest: class {
-      private _body: unknown;
-      headers: Map<string, string>;
-      nextUrl: { searchParams: URLSearchParams };
-      constructor(url: string, init?: { body?: string; headers?: Record<string, string> }) {
-        this._body = init?.body ? JSON.parse(init.body) : null;
-        this.headers = new Map(Object.entries(init?.headers ?? {}));
-        this.nextUrl = { searchParams: new URL(url, "http://localhost").searchParams };
-      }
-      get(key: string) { return this.headers.get(key) ?? null; }
-      async json() { return this._body; }
-    },
-    NextResponse: Object.assign(
-      function (body: unknown, init?: { status?: number }) {
-        return new MockResp(body, init);
-      } as object,
-      {
-        json: (data: unknown, init?: { status?: number }) => {
-          const r = new MockResp(data, init);
-          r._data = data;
-          return r;
-        },
-      }
-    ),
-  };
-});
-
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 import { prisma } from "@/lib/db";
@@ -71,10 +34,10 @@ const mockProjectShare = prisma.projectShare as {
 };
 
 function makeRequest(body: Record<string, unknown>) {
-  const { NextRequest } = require("next/server");
   return new NextRequest("http://localhost/api/projects/proj-1/share", {
+    method: "POST",
     body: JSON.stringify(body),
-    headers: { "x-user-id": "user-1" },
+    headers: { "x-user-id": "user-1", "content-type": "application/json" },
   });
 }
 
