@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
+import { timingSafeStringEqual } from "@/lib/oauth-tokens";
 
 /**
  * GET /oauth/authorize
  *
  * OAuth 2.0 Authorization Endpoint (RFC 6749 Section 3.1).
  * Validates params, checks user session, and shows a consent screen.
+ * Also generates a CSRF token, sets it as a `csrf_oauth` cookie, and
+ * embeds it as a hidden field so POST can validate it.
  *
  * If the user is not logged in, redirects to /login with a return URL.
  * If logged in, renders an HTML consent page with Approve / Deny buttons.
@@ -17,25 +20,49 @@ export async function GET(request: NextRequest) {
 
   const { redirectUri, state } = params!;
 
-  return renderConsentPage(clientName!, {
+  const csrfToken = crypto.randomUUID();
+
+  const response = renderConsentPage(clientName!, {
     response_type: params!.responseType,
     client_id: params!.clientId,
     redirect_uri: redirectUri,
     state: state ?? "",
     code_challenge: params!.codeChallenge,
     code_challenge_method: params!.codeChallengeMethod,
+    csrf_token: csrfToken,
   });
+
+  response.cookies.set("csrf_oauth", csrfToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 600, // 10-minute TTL — matches typical consent page session
+    path: "/oauth/authorize", // scope cookie to this route only
+  });
+
+  return response;
 }
 
 /**
  * POST /oauth/authorize
  *
- * Handles the consent form submission. On approval, generates an
- * authorization code and redirects to the client. On denial, redirects
- * with error=access_denied.
+ * Handles the consent form submission. Validates the CSRF token from the
+ * form body against the `csrf_oauth` cookie before processing any action.
+ * On approval, generates an authorization code and redirects to the client.
+ * On denial, redirects with error=access_denied.
  */
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
+
+  const csrfForm = formData.get("csrf_token") as string | null;
+  const csrfCookie = request.cookies.get("csrf_oauth")?.value;
+  if (!csrfForm || !csrfCookie || !timingSafeStringEqual(csrfForm, csrfCookie)) {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "Invalid or missing CSRF token" },
+      { status: 403 },
+    );
+  }
+
   const action = formData.get("action") as string | null;
 
   const redirectUri = formData.get("redirect_uri") as string;
