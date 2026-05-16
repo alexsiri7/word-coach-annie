@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
     if (session) {
         return NextResponse.json({
             authenticated: true,
-            authMethod: "google",
             user: {
                 userId: session.userId,
                 email: session.email,
@@ -38,7 +37,6 @@ export async function GET(request: NextRequest) {
         if (cookie === expected) {
             return NextResponse.json({
                 authenticated: true,
-                authMethod: "api_token",
                 user: null,
             });
         }
