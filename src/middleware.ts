@@ -58,6 +58,8 @@ function makeRateLimitResponse(
  * - Read (GET): 120 req/min
  * - Write (POST/PATCH/DELETE): 60 req/min
  * - Project creation (POST /api/projects): 100/hour
+ * - Project import (POST /api/projects/import): 20/hour
+ * - Feedback submission (POST /api/feedback): 5/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
 function applyRateLimit(
@@ -69,11 +71,8 @@ function applyRateLimit(
 
     // Allow E2E / CI environments to bypass rate limiting (not honoured in production)
     if (process.env.DISABLE_RATE_LIMIT === "true") {
-        if (process.env.NODE_ENV === "production") {
-            console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
-        } else {
-            return null;
-        }
+        if (process.env.NODE_ENV !== "production") return null;
+        console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
     }
 
     const method = request.method;
@@ -103,6 +102,23 @@ function applyRateLimit(
         if (!result.allowed) {
             return makeRateLimitResponse(
                 RATE_LIMITS.projectCreate,
+                result.retryAfterMs!,
+                result.resetMs
+            );
+        }
+        return null;
+    }
+
+    // Project import: POST /api/projects/import
+    const isProjectImport = method === "POST" && pathname === "/api/projects/import";
+    if (isProjectImport) {
+        const result = checkRateLimit(
+            `projectImport:${userKey}`,
+            RATE_LIMITS.projectImport
+        );
+        if (!result.allowed) {
+            return makeRateLimitResponse(
+                RATE_LIMITS.projectImport,
                 result.retryAfterMs!,
                 result.resetMs
             );

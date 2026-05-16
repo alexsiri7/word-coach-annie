@@ -292,6 +292,59 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
 
+        it("returns 429 when project import limit exceeded (20/hour)", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "project-import-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+
+            // Fill up the project import limit (20 requests)
+            for (let i = 0; i < 20; i++) {
+                await middleware(createRequest("/api/projects/import", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                }));
+            }
+
+            // 21st should be rate limited
+            const req = createRequest("/api/projects/import", {
+                method: "POST",
+                cookies: { annie_session: "valid-jwt" },
+            });
+            const res = await middleware(req);
+            expect(res.status).toBe(429);
+            expect(res.headers.get("Retry-After")).toBeTruthy();
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("20");
+            expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+        });
+
+        it("project import limit does not affect other POST routes", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "project-import-separate",
+                email: "test@example.com",
+                name: "Test",
+            });
+
+            // Exhaust the import limit
+            for (let i = 0; i < 20; i++) {
+                await middleware(createRequest("/api/projects/import", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                }));
+            }
+
+            // A different POST route should still succeed (write bucket is separate)
+            const req = createRequest("/api/other-route", {
+                method: "POST",
+                cookies: { annie_session: "valid-jwt" },
+            });
+            const res = await middleware(req);
+            expect(res.status).toBe(200);
+        });
+
         it("project create limit does not affect other POST routes", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
