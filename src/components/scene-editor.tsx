@@ -429,6 +429,8 @@ export function SceneEditor({
           )}
 
           {/* Editor */}
+          {/* NOTE: class name "tiptap-editor" is referenced in sentry.client.config.ts
+              for session replay masking (PII). Update sentry config if this class is renamed. */}
           <div className="flex-1 overflow-y-auto tiptap-editor relative">
             {/* Manuscript Header */}
             <div className="px-12 pt-10 pb-2 max-w-3xl mx-auto">

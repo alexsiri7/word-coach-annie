@@ -153,15 +153,12 @@ export async function POST(request: NextRequest) {
   // Sanitize and escape user-provided fields before embedding in GitHub Markdown
   const safeMessage = sanitizeInput(body.message.trim());
   // Extract only the pathname — drop origin, query params, and hash
-  const safeUrl = body.context?.url
-    ? (() => {
-        try {
-          return escapeMarkdown(new URL(body.context.url).pathname);
-        } catch {
-          return undefined;
-        }
-      })()
-    : undefined;
+  let safeUrl: string | undefined;
+  try {
+    safeUrl = body.context?.url ? escapeMarkdown(new URL(body.context.url).pathname) : undefined;
+  } catch {
+    safeUrl = undefined;
+  }
   const safeUserAgent = body.context?.userAgent ? escapeMarkdown(body.context.userAgent) : undefined;
   const safeScreenSize = body.context?.screenSize ? escapeMarkdown(body.context.screenSize) : undefined;
 
