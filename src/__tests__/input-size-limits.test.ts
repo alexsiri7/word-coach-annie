@@ -183,6 +183,8 @@ describe("POST /api/feedback — input size limits", () => {
       email: "a".repeat(321),
     }));
     expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
   });
 
   it("passes when email is exactly 320 chars", async () => {
@@ -202,15 +204,26 @@ describe("POST /api/feedback — input size limits", () => {
     expect(res.status).not.toBe(413);
   });
 
-  it("returns 413 when screenshot exceeds 3MB base64", async () => {
+  it("returns 413 when screenshot exceeds 2MB binary (as base64)", async () => {
+    const maxBase64 = Math.ceil(2 * 1024 * 1024 * (4 / 3));
     const res = await feedbackPost(postJson("http://localhost/api/feedback", {
       type: "bug",
       message: "Bug report",
-      screenshot: "a".repeat(3 * 1024 * 1024 + 1),
+      screenshot: "a".repeat(maxBase64 + 1),
     }));
     expect(res.status).toBe(413);
     const body = await res.json();
     expect(body).toHaveProperty("error");
+  });
+
+  it("passes when screenshot is exactly at the 2MB binary base64 limit", async () => {
+    const maxBase64 = Math.ceil(2 * 1024 * 1024 * (4 / 3));
+    const res = await feedbackPost(postJson("http://localhost/api/feedback", {
+      type: "bug",
+      message: "Bug report",
+      screenshot: "a".repeat(maxBase64),
+    }));
+    expect(res.status).not.toBe(413);
   });
 });
 

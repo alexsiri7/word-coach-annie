@@ -264,13 +264,13 @@ export async function POST(request: NextRequest) {
     }
     if (message.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json(
-        { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+        { error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
         { status: 413 }
       );
     }
     if (conversationId.length > MAX_ID_LENGTH) {
       return NextResponse.json(
-        { error: `conversationId exceeds maximum length of ${MAX_ID_LENGTH} characters` },
+        { error: `ConversationId exceeds maximum length of ${MAX_ID_LENGTH} characters` },
         { status: 413 }
       );
     }

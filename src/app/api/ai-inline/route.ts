@@ -59,13 +59,13 @@ export async function POST(request: NextRequest) {
     }
     if (selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
       return NextResponse.json(
-        { error: `selectedText exceeds maximum length of ${MAX_SELECTED_TEXT_LENGTH} characters` },
+        { error: `SelectedText exceeds maximum length of ${MAX_SELECTED_TEXT_LENGTH} characters` },
         { status: 413 }
       );
     }
     if (askPrompt && askPrompt.length > MAX_ASK_PROMPT_LENGTH) {
       return NextResponse.json(
-        { error: `askPrompt exceeds maximum length of ${MAX_ASK_PROMPT_LENGTH} characters` },
+        { error: `AskPrompt exceeds maximum length of ${MAX_ASK_PROMPT_LENGTH} characters` },
         { status: 413 }
       );
     }

@@ -17,7 +17,7 @@ interface FeedbackBody {
 
 const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
 const MAX_EMAIL_LENGTH = 320; // RFC 5321 max
-const MAX_SCREENSHOT_LENGTH = 3 * 1024 * 1024; // ~2MB binary as base64
+const MAX_SCREENSHOT_LENGTH = Math.ceil(2 * 1024 * 1024 * (4 / 3)); // 2 MB binary limit expressed as base64 length (~2,796,203 chars)
 
 const LABEL_MAP: Record<string, string> = {
   bug: "bug",
@@ -110,13 +110,13 @@ export async function POST(request: NextRequest) {
   }
   if (body.message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
     return NextResponse.json(
-      { error: `message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH} characters` },
+      { error: `Message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH} characters` },
       { status: 413 }
     );
   }
   if (body.email && body.email.length > MAX_EMAIL_LENGTH) {
     return NextResponse.json(
-      { error: `email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters` },
+      { error: `Email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters` },
       { status: 413 }
     );
   }
