@@ -34,7 +34,7 @@ jobs:
           # Check if auth already works — skip reconfiguration if so
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -H "Authorization: Bearer $API_TOKEN" \
-            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1)
+            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1) || STATUS="000"
           if [ "$STATUS" = "200" ]; then
             echo "✓ API token auth already works on staging — no reconfiguration needed"
             exit 0
@@ -70,7 +70,7 @@ jobs:
           echo "Polling staging health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
           for i in $(seq 1 $MAX_ATTEMPTS); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-              https://word-coach-annie-staging.up.railway.app/api/health)
+              https://word-coach-annie-staging.up.railway.app/api/health) || STATUS="000"
             if [ "$STATUS" = "200" ]; then
               echo "✓ Staging health check passed after $((i * INTERVAL))s"
               break
@@ -87,7 +87,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1)
+            https://word-coach-annie-staging.up.railway.app/api/projects?limit=1) || STATUS="000"
           if [ "$STATUS" != "200" ]; then
             echo "::error::API token auth still failing after deploy (HTTP $STATUS)"
             echo "::error::Check that API_TOKEN in Railway staging matches the GitHub secret"
