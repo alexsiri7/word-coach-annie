@@ -98,4 +98,8 @@ describe("escapeMarkdown", () => {
     it("escapes pipe", () => {
         expect(escapeMarkdown("a | b")).toBe("a \\| b");
     });
+
+    it("escapes curly braces", () => {
+        expect(escapeMarkdown("{key}")).toBe("\\{key\\}");
+    });
 });
