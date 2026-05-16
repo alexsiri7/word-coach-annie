@@ -2,7 +2,8 @@
  * AES-256-GCM encryption for sensitive values stored in the database.
  *
  * Uses ENCRYPTION_KEY env var (or falls back to API_TOKEN).
- * When neither is set, values are stored as plaintext (local dev mode).
+ * When neither is set, throws by default. To allow plaintext storage in
+ * local dev, set ALLOW_PLAINTEXT_STORAGE=true.
  *
  * Encrypted format: "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
  */
@@ -18,16 +19,17 @@ let encryptionWarningLogged = false;
 function getEncryptionKey(): Buffer | null {
     const keySource = env.ENCRYPTION_KEY || env.API_TOKEN;
     if (!keySource) {
-        if (process.env.NODE_ENV === "production") {
+        if (process.env.ALLOW_PLAINTEXT_STORAGE !== "true") {
             throw new Error(
-                "[crypto] ENCRYPTION_KEY or API_TOKEN must be set in production. " +
-                "Refusing to store credentials as plaintext."
+                "[crypto] ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         }
         if (!encryptionWarningLogged) {
             console.warn(
                 "[crypto] No ENCRYPTION_KEY or API_TOKEN set — " +
-                "encryption is disabled, values stored as plaintext."
+                "encryption is disabled, values stored as plaintext. " +
+                "(ALLOW_PLAINTEXT_STORAGE=true)"
             );
             encryptionWarningLogged = true;
         }
@@ -44,7 +46,8 @@ export function isEncrypted(value: string): boolean {
 
 /**
  * Encrypt a plaintext value. Returns the encrypted string.
- * If no encryption key is available, returns the plaintext unchanged.
+ * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the plaintext unchanged.
  */
 export function encrypt(plaintext: string): string {
     if (!plaintext) return plaintext;
@@ -66,7 +69,8 @@ export function encrypt(plaintext: string): string {
 /**
  * Decrypt an encrypted value. Returns the plaintext.
  * If the value is not encrypted (no prefix), returns it unchanged.
- * If no encryption key is available, returns the raw value.
+ * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the raw value unchanged.
  */
 export function decrypt(value: string): string {
     if (!value || !isEncrypted(value)) return value;

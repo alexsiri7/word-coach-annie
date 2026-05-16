@@ -77,87 +77,24 @@ function applyRateLimit(
 
     const method = request.method;
 
-    // Chat endpoint has its own dedicated limit
-    const isChatRoute =
-        pathname === "/api/chat" || pathname.startsWith("/api/chat/");
-    if (isChatRoute) {
-        const result = checkRateLimit(`chat:${userKey}`, RATE_LIMITS.chat);
-        if (!result.allowed) {
-            return makeRateLimitResponse(
-                RATE_LIMITS.chat,
-                result.retryAfterMs!,
-                result.resetMs
-            );
-        }
+    function tryLimit(key: string, config: { limit: number; windowMs: number }): NextResponse | null {
+        const result = checkRateLimit(key, config);
+        if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
         return null;
     }
 
-    // Project creation: POST /api/projects (not /api/projects/:id subpaths)
-    const isProjectCreate = method === "POST" && pathname === "/api/projects";
-    if (isProjectCreate) {
-        const result = checkRateLimit(
-            `projectCreate:${userKey}`,
-            RATE_LIMITS.projectCreate
-        );
-        if (!result.allowed) {
-            return makeRateLimitResponse(
-                RATE_LIMITS.projectCreate,
-                result.retryAfterMs!,
-                result.resetMs
-            );
-        }
-        return null;
-    }
+    if (pathname === "/api/chat" || pathname.startsWith("/api/chat/"))
+        return tryLimit(`chat:${userKey}`, RATE_LIMITS.chat);
+    if (method === "POST" && pathname === "/api/projects")
+        return tryLimit(`projectCreate:${userKey}`, RATE_LIMITS.projectCreate);
+    if (method === "POST" && pathname === "/api/projects/import")
+        return tryLimit(`projectImport:${userKey}`, RATE_LIMITS.projectImport);
+    if (method === "POST" && pathname === "/api/feedback")
+        return tryLimit(`feedback:${userKey}`, RATE_LIMITS.feedback);
 
-    // Project import: POST /api/projects/import
-    const isProjectImport = method === "POST" && pathname === "/api/projects/import";
-    if (isProjectImport) {
-        const result = checkRateLimit(
-            `projectImport:${userKey}`,
-            RATE_LIMITS.projectImport
-        );
-        if (!result.allowed) {
-            return makeRateLimitResponse(
-                RATE_LIMITS.projectImport,
-                result.retryAfterMs!,
-                result.resetMs
-            );
-        }
-        return null;
-    }
-
-    // Feedback submission: POST /api/feedback
-    const isFeedback = method === "POST" && pathname === "/api/feedback";
-    if (isFeedback) {
-        const result = checkRateLimit(
-            `feedback:${userKey}`,
-            RATE_LIMITS.feedback
-        );
-        if (!result.allowed) {
-            return makeRateLimitResponse(
-                RATE_LIMITS.feedback,
-                result.retryAfterMs!,
-                result.resetMs
-            );
-        }
-        return null;
-    }
-
-    // Read vs write rate limit
     const isRead = method === "GET" || method === "HEAD";
     const config = isRead ? RATE_LIMITS.read : RATE_LIMITS.write;
-    const prefix = isRead ? "read" : "write";
-    const result = checkRateLimit(`${prefix}:${userKey}`, config);
-
-    if (!result.allowed) {
-        return makeRateLimitResponse(
-            config,
-            result.retryAfterMs!,
-            result.resetMs
-        );
-    }
-
-    return null;
+    return tryLimit(`${isRead ? "read" : "write"}:${userKey}`, config);
 }
 
 export async function middleware(request: NextRequest) {
