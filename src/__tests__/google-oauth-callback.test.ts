@@ -92,11 +92,16 @@ describe("Google OAuth callback - verified_email check", () => {
         const { GET } = await import(
             "@/app/api/auth/google/callback/route"
         );
+        const { logger } = await import("@/lib/logger");
         const response = await GET(makeRequest());
 
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
+        expect(logger.warn).toHaveBeenCalledWith(
+            "Google OAuth rejected: unverified email",
+            { email: "unverified@example.com" }
+        );
     });
 
     it("should redirect to /login?error=email_not_verified when verified_email is undefined", async () => {
@@ -111,11 +116,16 @@ describe("Google OAuth callback - verified_email check", () => {
         const { GET } = await import(
             "@/app/api/auth/google/callback/route"
         );
+        const { logger } = await import("@/lib/logger");
         const response = await GET(makeRequest());
 
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
+        expect(logger.warn).toHaveBeenCalledWith(
+            "Google OAuth rejected: unverified email",
+            { email: "noverified@example.com" }
+        );
     });
 
     it("should proceed to login when verified_email is true", async () => {
