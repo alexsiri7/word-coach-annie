@@ -329,12 +329,7 @@ export async function getConsistencyContext(projectId: string, focusSceneId?: st
     });
     const scene = scenes.find((s) => s.id === sceneId);
     if (scene && version?.content) {
-      const textContent = version.content
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 800);
+      const textContent = htmlToText(version.content, 800);
       if (textContent.length > 50) {
         scenesWithContent.push({ id: sceneId, title: scene.title, content: textContent });
       }
@@ -438,12 +433,7 @@ export async function getStoryBibleCrossReference(projectId: string, sceneId?: s
     });
     const scene = scenes.find((s) => s.id === sid);
     if (scene && version?.content) {
-      const textContent = version.content
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 2000);
+      const textContent = htmlToText(version.content, 2000);
       if (textContent.length > 50) {
         scenesWithContent.push({
           id: sid,
@@ -528,14 +518,7 @@ export async function getVoiceContext(projectId: string, sceneId: string) {
     orderBy: { createdAt: "desc" },
     select: { content: true },
   });
-  const sceneText = version?.content
-    ? version.content
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 1500)
-    : "";
+  const sceneText = version?.content ? htmlToText(version.content, 1500) : "";
 
   return {
     characters: characters.map((c) => ({
@@ -550,6 +533,16 @@ export async function getVoiceContext(projectId: string, sceneId: string) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Strip HTML comments and tags, collapse whitespace, and truncate. */
+function htmlToText(html: string, limit: number): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
 
 interface NodeInfo {
   id: string;
