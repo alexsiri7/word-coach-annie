@@ -15,8 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const rawLength = request.headers.get("content-length");
-    const contentLength = rawLength !== null ? parseInt(rawLength, 10) : NaN;
+    const contentLength = parseInt(request.headers.get("content-length") ?? "", 10);
     if (!isNaN(contentLength) && contentLength > MAX_IMPORT_BODY_BYTES) {
       return NextResponse.json(
         { error: "Request body exceeds maximum size of 5MB" },
