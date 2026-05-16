@@ -76,7 +76,27 @@ describe("crypto", () => {
             delete process.env.API_TOKEN;
         });
 
-        it("returns plaintext when no key is available", () => {
+        afterEach(() => {
+            // vitest isolates modules per file, so deleting is safe here
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+        });
+
+        it("throws when ALLOW_PLAINTEXT_STORAGE is not set", () => {
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+            expect(() => encrypt("sk-no-encryption")).toThrow(
+                "ENCRYPTION_KEY or API_TOKEN must be set"
+            );
+        });
+
+        it("throws on decrypt when ALLOW_PLAINTEXT_STORAGE is not set", () => {
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+            expect(() => decrypt("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff")).toThrow(
+                "ENCRYPTION_KEY or API_TOKEN must be set"
+            );
+        });
+
+        it("returns plaintext when ALLOW_PLAINTEXT_STORAGE=true", () => {
+            process.env.ALLOW_PLAINTEXT_STORAGE = "true";
             const plaintext = "sk-no-encryption";
             expect(encrypt(plaintext)).toBe(plaintext);
             expect(decrypt(plaintext)).toBe(plaintext);

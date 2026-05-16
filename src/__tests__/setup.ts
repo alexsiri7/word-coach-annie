@@ -46,3 +46,6 @@ beforeEach(async () => {
     CASCADE`
   );
 });
+
+// Allow plaintext storage in tests — no encryption keys in test environment.
+process.env.ALLOW_PLAINTEXT_STORAGE = "true";
