@@ -65,8 +65,10 @@ test.describe('Integration tests — real server, real data', () => {
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body.status).toMatch(/ok|degraded/)
-    expect(body.db).toBeDefined()
-    expect(body.db.projects + body.db.users).toBeGreaterThanOrEqual(0)
+    // db counts must not be exposed (information disclosure fix)
+    expect(body.db).toBeUndefined()
+    expect(body.projects).toBeUndefined()
+    expect(body.users).toBeUndefined()
   })
 
   // ── b) Project lifecycle ────────────────────────────────────────────

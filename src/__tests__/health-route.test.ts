@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
+import { GET } from "../app/api/health/route";
 
 vi.mock("@/lib/db", () => ({
     prisma: {
@@ -17,7 +18,6 @@ describe("GET /api/health", () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(5);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(10);
 
-        const { GET } = await import("../app/api/health/route");
         const res = await GET();
         const body = await res.json();
 
@@ -31,7 +31,6 @@ describe("GET /api/health", () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
 
-        const { GET } = await import("../app/api/health/route");
         const res = await GET();
         const body = await res.json();
 
@@ -45,10 +44,22 @@ describe("GET /api/health", () => {
             new Error("Connection refused")
         );
 
-        const { GET } = await import("../app/api/health/route");
         const res = await GET();
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.status).toBe("error");
+        expect(body.error).toBe("Connection refused");
+        expect(body.db).toBeUndefined();
+        expect(body.stack).toBeUndefined();
+    });
+
+    it("returns 503 with 'DB unreachable' when a non-Error value is thrown", async () => {
+        (prisma.project.count as ReturnType<typeof vi.fn>).mockRejectedValue("timeout");
+
+        const res = await GET();
+        expect(res.status).toBe(503);
+        const body = await res.json();
+        expect(body.status).toBe("error");
+        expect(body.error).toBe("DB unreachable");
     });
 });
