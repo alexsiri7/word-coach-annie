@@ -115,23 +115,6 @@ const pwaConfig = withPWA({
     skipWaiting: true,
     clientsClaim: true,
     runtimeCaching: [
-      // Network-first for API routes: fresh data when online, cached when offline
-      {
-        urlPattern: /^\/api\/.*$/i,
-        handler: "NetworkFirst",
-        method: "GET",
-        options: {
-          cacheName: "api-cache",
-          expiration: {
-            maxEntries: 64,
-            maxAgeSeconds: 24 * 60 * 60,
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-          networkTimeoutSeconds: 5,
-        },
-      },
       // Cache Google Fonts stylesheets
       {
         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -163,7 +146,11 @@ const pwaConfig = withPWA({
         },
       },
       // Include the default caches (static assets, images, etc.)
-      ...runtimeCaching,
+      // Filter out the built-in `apis` entry — authenticated API responses
+      // must not be cached on shared devices (MED-17).
+      // NOTE: "apis" is the cacheName used by @ducanh2912/next-pwa ≥10.x.
+      // Verify this string if upgrading the package.
+      ...runtimeCaching.filter((entry) => entry.options?.cacheName !== "apis"),
     ],
   },
 })(nextConfig);
