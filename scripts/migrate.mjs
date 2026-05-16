@@ -13,6 +13,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
+import { splitSqlStatements } from './sql-tokenizer.mjs';
 
 // Use DATABASE_URL (pooler) — our script splits SQL into single statements
 // which work fine through PgBouncer transaction mode.
@@ -25,62 +26,6 @@ if (!connectionString) {
 }
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
-
-function splitSqlStatements(sql) {
-  const statements = [];
-  let current = '';
-  let i = 0;
-
-  while (i < sql.length) {
-    // Dollar-quote: $tag$ ... $tag$
-    if (sql[i] === '$') {
-      const tagEnd = sql.indexOf('$', i + 1);
-      if (tagEnd !== -1) {
-        const tag = sql.slice(i, tagEnd + 1);
-        const closeIdx = sql.indexOf(tag, tagEnd + 1);
-        if (closeIdx !== -1) {
-          current += sql.slice(i, closeIdx + tag.length);
-          i = closeIdx + tag.length;
-          continue;
-        }
-      }
-    }
-    // Single-quoted string
-    if (sql[i] === "'") {
-      current += sql[i++];
-      while (i < sql.length) {
-        if (sql[i] === "'" && sql[i + 1] === "'") { current += "''"; i += 2; }
-        else if (sql[i] === "'") { current += sql[i++]; break; }
-        else current += sql[i++];
-      }
-      continue;
-    }
-    // Single-line comment (strip)
-    if (sql[i] === '-' && sql[i + 1] === '-') {
-      while (i < sql.length && sql[i] !== '\n') i++;
-      continue;
-    }
-    // Block comment (strip)
-    if (sql[i] === '/' && sql[i + 1] === '*') {
-      i += 2;
-      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    // Statement separator
-    if (sql[i] === ';') {
-      const stmt = current.trim();
-      if (stmt.length > 0) statements.push(stmt);
-      current = '';
-      i++;
-      continue;
-    }
-    current += sql[i++];
-  }
-  const stmt = current.trim();
-  if (stmt.length > 0) statements.push(stmt);
-  return statements;
-}
 
 async function ensureMigrationsTable() {
   await prisma.$executeRawUnsafe(`
@@ -128,6 +73,7 @@ async function migrate() {
 
     const sqlPath = join(migrationsDir, dir, 'migration.sql');
     if (!existsSync(sqlPath)) {
+      console.warn(`  warn  ${dir} — no migration.sql found, skipping`);
       continue;
     }
 
