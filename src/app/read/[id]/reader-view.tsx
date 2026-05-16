@@ -97,6 +97,8 @@ function SceneContent({ content }: { content: string }) {
   }, [cleaned]);
 
   return (
+    // NOTE: class name "reader-prose" is referenced in sentry.client.config.ts
+    // for session replay masking (PII). Update sentry config if this class is renamed.
     <div
       className="reader-prose"
       dangerouslySetInnerHTML={{ __html: sanitized }}
