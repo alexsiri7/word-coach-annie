@@ -5,27 +5,12 @@
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
 import { SignJWT, jwtVerify } from "jose";
-import { resolveJwtSecret, safeEqual } from "@/lib/auth";
+import { getJwtKey, safeEqual } from "@/lib/auth";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
 // Refresh token: 30 days
 export const REFRESH_TOKEN_TTL = 60 * 60 * 24 * 30;
-
-/**
- * Get the JWT signing key for MCP OAuth tokens.
- * Same derivation as src/lib/auth.ts getJwtKey().
- */
-async function getMcpJwtKey(): Promise<CryptoKey> {
-  const secret = resolveJwtSecret();
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"]
-  );
-}
 
 export interface McpTokenPayload {
   userId: string;
@@ -38,7 +23,7 @@ export async function createMcpToken(
   payload: McpTokenPayload,
   ttlSeconds: number
 ): Promise<string> {
-  const key = await getMcpJwtKey();
+  const key = await getJwtKey();
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -52,7 +37,7 @@ export async function verifyMcpToken(
   expectedType: "mcp_access" | "mcp_refresh"
 ): Promise<{ userId: string; email: string } | null> {
   try {
-    const key = await getMcpJwtKey();
+    const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key);
     if (payload.type !== expectedType || !payload.userId || !payload.email) {
       return null;
