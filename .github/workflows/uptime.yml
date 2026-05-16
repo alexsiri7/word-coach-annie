@@ -5,11 +5,15 @@ on:
     - cron: '*/5 * * * *' # Every 5 minutes
   workflow_dispatch: # Manual trigger
 
+permissions:
+  contents: read
+
 jobs:
   check-production:
     name: Production Health Check
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       issues: write
     steps:
       - name: Check health + data integrity
@@ -163,6 +167,7 @@ jobs:
     name: Backup Freshness Check
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       issues: write
     steps:
       - name: Check Supabase backup age

@@ -61,13 +61,13 @@ export async function POST(
   const categoryLabel = CATEGORY_LABELS[category] || escapeMarkdown(category);
   const safeTitle = escapeMarkdown(project.title ?? "");
   const safeAuthor = project.author ? escapeMarkdown(project.author) : "";
-  const safeUrl = (() => {
-    if (!url || typeof url !== "string") return "";
+  let safeUrl = "";
+  if (url && typeof url === "string") {
     try {
       const u = new URL(url);
-      return ["http:", "https:"].includes(u.protocol) ? escapeMarkdown(u.toString()) : "";
-    } catch { return ""; }
-  })();
+      if (["http:", "https:"].includes(u.protocol)) safeUrl = escapeMarkdown(u.toString());
+    } catch { /* ignore invalid URLs */ }
+  }
   const safeDetails = details?.trim() ? sanitizeInput(details.trim()).slice(0, 4000) : "";
   const safeReporterEmail = reporterEmail ? escapeMarkdown(reporterEmail) : null;
   const safeReporterId = reporterId ? escapeMarkdown(reporterId) : null;
