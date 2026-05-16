@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/auth", () => ({
   SESSION_COOKIE_NAME: "session",
   verifySessionToken: vi.fn(async () => ({ userId: "u1", email: "u@test.com" })),
+  safeEqual: (a: string, b: string) => a === b,
 }));
 
 vi.mock("@/lib/oauth-store", () => ({

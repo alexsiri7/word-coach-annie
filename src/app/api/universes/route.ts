@@ -3,6 +3,7 @@ import { UniversesController } from "@/lib/controllers/universes";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { UniverseCreateSchema } from "@/schemas/universes";
 
 export async function GET(request: NextRequest) {
@@ -43,6 +44,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const userId = getCurrentUserId(request);
+
+        if (isGoogleAuthMode() && !userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await request.json();
         const parsed = UniverseCreateSchema.safeParse(body);
         if (!parsed.success) {
@@ -51,7 +58,6 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
-        const userId = getCurrentUserId(request);
 
         if (userId) {
             // Create with userId

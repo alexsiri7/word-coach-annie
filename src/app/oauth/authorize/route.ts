@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
+import { SESSION_COOKIE_NAME, verifySessionToken, safeEqual } from "@/lib/auth";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
-import { timingSafeStringEqual } from "@/lib/oauth-tokens";
 
 /**
  * GET /oauth/authorize
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   const csrfForm = formData.get("csrf_token") as string | null;
   const csrfCookie = request.cookies.get("csrf_oauth")?.value;
-  if (!csrfForm || !csrfCookie || !timingSafeStringEqual(csrfForm, csrfCookie)) {
+  if (!csrfForm || !csrfCookie || !safeEqual(csrfForm, csrfCookie)) {
     return NextResponse.json(
       { error: "invalid_request", error_description: "Invalid or missing CSRF token" },
       { status: 403 },

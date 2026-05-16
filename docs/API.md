@@ -80,6 +80,8 @@ Create a new project.
 
 **Response**: Project object (201)
 
+**Errors**: `401` unauthenticated (Google OAuth mode only)
+
 ---
 
 ### `GET /api/projects/:id`
@@ -349,6 +351,8 @@ List all universes.
 Create a universe.
 
 **Body**: `{ name: string, description?: string }`
+
+**Errors**: `401` unauthenticated (Google OAuth mode only)
 
 ---
 
@@ -713,3 +717,14 @@ Move a structure node to a new parent at a specific position, reindexing sibling
 Create the sample project (Sherlock Holmes) for new users. No-op if the user already has projects.
 
 **Response**: `{ ok: true, projectId: string }` or `{ ok: false, reason: "already_has_projects" }`
+
+**Errors**: `401` unauthenticated (Google OAuth mode only)
+
+---
+
+### `POST /api/projects/import`
+Import a project from a JSON export file.
+
+**Body**: JSON export data (project object)
+
+**Errors**: `401` unauthenticated (Google OAuth mode only)
