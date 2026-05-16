@@ -574,6 +574,8 @@ Submit feedback (creates a GitHub issue if `GITHUB_FEEDBACK_TOKEN` is configured
 
 **Body**: `{ type: "bug|feature|other", message: string, email?: string, context?: { url?, userAgent?, screenSize? } }`
 
+> **Privacy**: `email` is accepted for interface compatibility but is never embedded in the public GitHub issue body. The `url` is reduced to pathname-only (query params and hash are stripped) before embedding.
+
 ---
 
 ## AI Inline

@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   const safeUrl = body.context?.url
     ? (() => {
         try {
-          return escapeMarkdown(new URL(body.context.url!).pathname);
+          return escapeMarkdown(new URL(body.context.url).pathname);
         } catch {
           return undefined;
         }

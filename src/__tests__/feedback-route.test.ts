@@ -114,17 +114,21 @@ describe("POST /api/feedback", () => {
       json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/42" }),
     });
 
-    await POST(makeRequest({
+    const res = await POST(makeRequest({
       type: "bug",
       message: "Something broke",
       email: "private@example.com",
-      context: { url: "http://localhost:3000/project/abc?token=secret", userAgent: "TestBrowser/1.0" },
+      context: { url: "http://localhost:3000/project/abc?token=secret#myFragment", userAgent: "TestBrowser/1.0" },
     }));
+    expect(res.status).toBe(201);
 
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
     expect(body.body).not.toContain("private@example.com");
+    // Email must NOT appear in the public issue body
     expect(body.body).not.toContain("secret");
+    // URL should be pathname-only — query params and hash stripped
+    expect(body.body).not.toContain("myFragment");
     expect(body.body).toContain("/project/abc");
   });
 
@@ -290,5 +294,28 @@ describe("POST /api/feedback", () => {
     const [, issueOpts] = mockFetch.mock.calls[0];
     const issueBody = JSON.parse(issueOpts.body);
     expect(issueBody.body).not.toContain("### Screenshot");
+  });
+
+  it("omits Page line when context URL is a relative path (unparseable by URL constructor)", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/55" }),
+    });
+
+    const res = await POST(makeRequest({
+      type: "bug",
+      message: "Relative URL test",
+      context: { url: "/project/abc" }, // relative — new URL() will throw, catch returns undefined
+    }));
+
+    expect(res.status).toBe(201);
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    // Page line should be omitted gracefully — no crash on invalid URL
+    expect(body.body).not.toContain("**Page:**");
+    expect(body.body).toContain("Relative URL test");
   });
 });
