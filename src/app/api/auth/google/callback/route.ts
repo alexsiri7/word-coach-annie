@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
         response.cookies.set(SESSION_COOKIE_NAME, jwt, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax", // lax required for OAuth redirect
+            sameSite: "strict",
             maxAge: SESSION_MAX_AGE,
             path: "/",
         });
