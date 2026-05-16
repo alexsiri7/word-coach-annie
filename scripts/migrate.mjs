@@ -13,6 +13,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
+import { splitSqlStatements } from './sql-tokenizer.mjs';
 
 // Use DATABASE_URL (pooler) — our script splits SQL into single statements
 // which work fine through PgBouncer transaction mode.
@@ -72,6 +73,7 @@ async function migrate() {
 
     const sqlPath = join(migrationsDir, dir, 'migration.sql');
     if (!existsSync(sqlPath)) {
+      console.warn(`  warn  ${dir} — no migration.sql found, skipping`);
       continue;
     }
 
@@ -96,14 +98,12 @@ async function migrate() {
     console.log(`  apply ${dir}`);
 
     // Split into individual statements for Prisma's $executeRawUnsafe
-    // which only supports single statements at a time
-    const statements = sql
-      .split(';')
-      .map((s) => s.replace(/--[^\n]*/g, '').trim())
-      .filter((s) => s.length > 0);
+    // which only supports single statements at a time.
+    // Uses a context-aware tokenizer to handle dollar-quoted strings ($$...$$)
+    // and single-quoted strings that may contain semicolons.
+    const statements = splitSqlStatements(sql);
 
-    for (let i = 0; i < statements.length; i++) {
-      const stmt = statements[i];
+    for (const [i, stmt] of statements.entries()) {
       try {
         await prisma.$executeRawUnsafe(stmt);
       } catch (e) {
