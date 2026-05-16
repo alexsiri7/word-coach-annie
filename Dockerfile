@@ -45,6 +45,7 @@ COPY --from=builder /app/.skills ./.skills
 
 # Migration runner + migration SQL files
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /app/scripts/sql-tokenizer.mjs ./scripts/sql-tokenizer.mjs
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
 
 USER nextjs
