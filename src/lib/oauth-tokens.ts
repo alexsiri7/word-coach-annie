@@ -5,7 +5,7 @@
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
 import { SignJWT, jwtVerify } from "jose";
-import { resolveJwtSecret } from "@/lib/auth";
+import { resolveJwtSecret, safeEqual } from "@/lib/auth";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -71,16 +71,6 @@ export function base64urlEncode(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Constant-time string equality to prevent timing oracle attacks. */
-export function timingSafeStringEqual(a: string, b: string): boolean {
-  const ab = new TextEncoder().encode(a);
-  const bb = new TextEncoder().encode(b);
-  if (ab.length !== bb.length) return false;
-  let diff = 0;
-  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
-  return diff === 0;
-}
-
 /**
  * Verify PKCE: SHA256(code_verifier) must match code_challenge.
  * Uses timing-resistant comparison to prevent timing oracle attacks.
@@ -94,5 +84,5 @@ export async function verifyPkce(
     new TextEncoder().encode(codeVerifier)
   );
   const computed = base64urlEncode(digest);
-  return timingSafeStringEqual(computed, codeChallenge);
+  return safeEqual(computed, codeChallenge);
 }
