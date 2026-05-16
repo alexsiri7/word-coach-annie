@@ -315,7 +315,9 @@ describe("middleware", () => {
             });
             const res = await middleware(req);
             expect(res.status).toBe(429);
+            expect(res.headers.get("Retry-After")).toBeTruthy();
             expect(res.headers.get("X-RateLimit-Limit")).toBe("20");
+            expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
         });
 
         it("project import limit does not affect other POST routes", async () => {
@@ -335,7 +337,7 @@ describe("middleware", () => {
             }
 
             // A different POST route should still succeed (write bucket is separate)
-            const req = createRequest("/api/projects/export-all", {
+            const req = createRequest("/api/other-route", {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });

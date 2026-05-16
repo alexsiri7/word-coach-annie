@@ -20,12 +20,19 @@ const store = new Map<string, RateLimitEntry>();
 const CLEANUP_INTERVAL_MS = 60_000;
 let lastCleanup = Date.now();
 
-function cleanup(windowMs: number) {
+/**
+ * Maximum window across all rate limit configs.
+ * Used as the cleanup cutoff to avoid prematurely evicting long-window
+ * entries (e.g. hourly limits) when a short-window request triggers cleanup.
+ */
+const MAX_WINDOW_MS = 3_600_000; // 1 hour — matches the longest windowMs in RATE_LIMITS
+
+function cleanup() {
     const now = Date.now();
     if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
     lastCleanup = now;
 
-    const cutoff = now - windowMs;
+    const cutoff = now - MAX_WINDOW_MS;
     for (const [key, entry] of store) {
         entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
         if (entry.timestamps.length === 0) {
@@ -50,7 +57,7 @@ export function checkRateLimit(
     const now = Date.now();
     const windowStart = now - config.windowMs;
 
-    cleanup(config.windowMs);
+    cleanup();
 
     let entry = store.get(key);
     if (!entry) {
