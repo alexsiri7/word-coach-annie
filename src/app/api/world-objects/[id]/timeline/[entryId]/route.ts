@@ -15,6 +15,14 @@ async function verifyWorldObjectAccess(worldObjectId: string, userId: string | n
     return verifyUniverseAccess(wo.universeId, userId);
 }
 
+async function verifyEntryOwnership(entryId: string, worldObjectId: string): Promise<NextResponse | null> {
+    const owned = await prisma.worldObjectTimelineEntry.findFirst({
+        where: { id: entryId, worldObjectId },
+        select: { id: true },
+    });
+    return owned ? null : NextResponse.json({ error: "Timeline entry not found" }, { status: 404 });
+}
+
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -25,14 +33,8 @@ export async function PATCH(
         const access = await verifyWorldObjectAccess(id, userId);
         if (!access.authorized) return access.response;
 
-        // Verify the entry belongs to this world object (prevents IDOR)
-        const owned = await prisma.worldObjectTimelineEntry.findFirst({
-            where: { id: entryId, worldObjectId: id },
-            select: { id: true },
-        });
-        if (!owned) {
-            return NextResponse.json({ error: "Timeline entry not found" }, { status: 404 });
-        }
+        const notOwned = await verifyEntryOwnership(entryId, id);
+        if (notOwned) return notOwned;
 
         const body = await request.json();
         const entry = await UniversesController.updateTimelineEntry(entryId, body);
@@ -53,14 +55,8 @@ export async function DELETE(
         const access = await verifyWorldObjectAccess(id, userId);
         if (!access.authorized) return access.response;
 
-        // Verify the entry belongs to this world object (prevents IDOR)
-        const owned = await prisma.worldObjectTimelineEntry.findFirst({
-            where: { id: entryId, worldObjectId: id },
-            select: { id: true },
-        });
-        if (!owned) {
-            return NextResponse.json({ error: "Timeline entry not found" }, { status: 404 });
-        }
+        const notOwned = await verifyEntryOwnership(entryId, id);
+        if (notOwned) return notOwned;
 
         await UniversesController.deleteTimelineEntry(entryId);
         return NextResponse.json({ success: true });
