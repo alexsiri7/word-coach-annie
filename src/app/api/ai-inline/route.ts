@@ -37,6 +37,9 @@ const ACTION_PROMPTS: Record<InlineAiAction, (text: string, context: string, ask
     `${ask || "What do you think about this passage?"}\n\nContext (surrounding text):\n${context}\n\nSelected text:\n${text}`,
 };
 
+const MAX_SELECTED_TEXT_LENGTH = 50_000;
+const MAX_ASK_PROMPT_LENGTH = 1_000;
+
 // POST /api/ai-inline — apply an AI action to selected text
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +55,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "selectedText and action are required" },
         { status: 400 }
+      );
+    }
+    if (selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
+      return NextResponse.json(
+        { error: `SelectedText exceeds maximum length of ${MAX_SELECTED_TEXT_LENGTH} characters` },
+        { status: 413 }
+      );
+    }
+    if (askPrompt && askPrompt.length > MAX_ASK_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `AskPrompt exceeds maximum length of ${MAX_ASK_PROMPT_LENGTH} characters` },
+        { status: 413 }
       );
     }
 

@@ -5,12 +5,23 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { isGoogleAuthMode } from "@/lib/auth";
 
+const MAX_IMPORT_BODY_BYTES = 5 * 1024 * 1024; // 5MB
+
 export async function POST(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
 
     if (isGoogleAuthMode() && !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rawLength = request.headers.get("content-length");
+    const contentLength = rawLength !== null ? parseInt(rawLength, 10) : NaN;
+    if (!isNaN(contentLength) && contentLength > MAX_IMPORT_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "Request body exceeds maximum size of 5MB" },
+        { status: 413 }
+      );
     }
 
     let body: Record<string, unknown>;
