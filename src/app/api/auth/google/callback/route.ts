@@ -81,7 +81,6 @@ export async function GET(request: NextRequest) {
             tokens = result.tokens;
         } catch (tokenError) {
             logger.warn("OAuth code exchange failed", tokenError);
-            const baseUrl = new URL(redirectUri).origin;
             return NextResponse.redirect(
                 new URL("/login?error=invalid_code", baseUrl)
             );
@@ -103,7 +102,6 @@ export async function GET(request: NextRequest) {
             logger.warn("Google OAuth rejected: unverified email", {
                 email: userInfo.email,
             });
-            const baseUrl = new URL(redirectUri).origin;
             return NextResponse.redirect(
                 new URL("/login?error=email_not_verified", baseUrl)
             );
@@ -115,7 +113,6 @@ export async function GET(request: NextRequest) {
                 e.trim().toLowerCase()
             );
             if (!allowed.includes(userInfo.email.toLowerCase())) {
-                const baseUrl = new URL(redirectUri).origin;
                 return NextResponse.redirect(
                     new URL("/login?error=invite_only", baseUrl)
                 );
@@ -148,7 +145,6 @@ export async function GET(request: NextRequest) {
 
         // Redirect to the original page (if set) or home
         // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
-        const baseUrl = new URL(redirectUri).origin;
         const redirectTo = request.cookies.get("oauth_redirect")?.value;
         const destination = redirectTo && isAllowedRedirect(redirectTo) ? redirectTo : "/";
         const response = NextResponse.redirect(new URL(destination, baseUrl));
@@ -179,9 +175,6 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         logger.error("GET /api/auth/google/callback error", error);
         // Redirect to login with generic error rather than exposing details
-        const baseUrl = redirectUri
-            ? new URL(redirectUri).origin
-            : request.nextUrl.origin;
         return NextResponse.redirect(
             new URL("/login?error=callback_failed", baseUrl)
         );
