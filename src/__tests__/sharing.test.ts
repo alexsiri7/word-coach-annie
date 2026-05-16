@@ -26,28 +26,8 @@ class MockNextRequest {
     }
 }
 
-vi.mock("next/server", () => ({
-    NextRequest: MockNextRequest,
-    NextResponse: {
-        json: (data: unknown, init?: { status?: number }) => ({
-            data,
-            status: init?.status || 200,
-            async json() { return data; },
-        }),
-    },
-    NextResponse_constructor: class {
-        status: number;
-        constructor(_body: unknown, init?: { status?: number }) {
-            this.status = init?.status || 200;
-        }
-    },
-}));
-
-// The share route DELETE returns `new NextResponse(null, { status: 204 })`.
-// Our mock above only covers NextResponse.json(). We need the constructor too.
-// Re-mock to handle both patterns.
 vi.mock("next/server", () => {
-    class MockResp {
+    class MockNextResponse {
         status: number;
         _data: unknown;
         constructor(body: unknown, init?: { status?: number }) {
@@ -55,21 +35,15 @@ vi.mock("next/server", () => {
             this.status = init?.status || 200;
         }
         async json() { return this._data; }
+        static json(data: unknown, init?: { status?: number }) {
+            const r = new MockNextResponse(data, init);
+            r._data = data;
+            return r;
+        }
     }
     return {
         NextRequest: MockNextRequest,
-        NextResponse: Object.assign(
-            function (body: unknown, init?: { status?: number }) {
-                return new MockResp(body, init);
-            } as object,
-            {
-                json: (data: unknown, init?: { status?: number }) => {
-                    const r = new MockResp(data, init);
-                    r._data = data;
-                    return r;
-                },
-            }
-        ),
+        NextResponse: MockNextResponse,
     };
 });
 
