@@ -81,6 +81,15 @@ describe("userId=NULL guard — POST /api/projects", () => {
     const res = await POST(makeRequest("/api/projects", { title: "Test" }));
     expect(res.status).not.toBe(401);
   });
+
+  it("allows creation in Google Auth mode when userId is present", async () => {
+    mockEnv.GOOGLE_CLIENT_ID = "google-id";
+    mockGetCurrentUserId.mockReturnValue("user-abc");
+
+    const { POST } = await import("@/app/api/projects/route");
+    const res = await POST(makeRequest("/api/projects", { title: "Test" }));
+    expect(res.status).not.toBe(401);
+  });
 });
 
 describe("userId=NULL guard — POST /api/universes", () => {
@@ -102,6 +111,23 @@ describe("userId=NULL guard — POST /api/universes", () => {
   it("allows creation in API_TOKEN mode without userId", async () => {
     mockEnv.API_TOKEN = "token-123";
     mockGetCurrentUserId.mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/universes/route");
+    const res = await POST(makeRequest("/api/universes", { title: "Test Universe" }));
+    expect(res.status).not.toBe(401);
+  });
+
+  it("allows creation in dev mode (no auth) without userId", async () => {
+    mockGetCurrentUserId.mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/universes/route");
+    const res = await POST(makeRequest("/api/universes", { title: "Test Universe" }));
+    expect(res.status).not.toBe(401);
+  });
+
+  it("allows creation in Google Auth mode when userId is present", async () => {
+    mockEnv.GOOGLE_CLIENT_ID = "google-id";
+    mockGetCurrentUserId.mockReturnValue("user-abc");
 
     const { POST } = await import("@/app/api/universes/route");
     const res = await POST(makeRequest("/api/universes", { title: "Test Universe" }));
@@ -133,6 +159,23 @@ describe("userId=NULL guard — POST /api/onboarding/sample", () => {
     const res = await POST(makeRequest("/api/onboarding/sample"));
     expect(res.status).not.toBe(401);
   });
+
+  it("allows creation in dev mode (no auth) without userId", async () => {
+    mockGetCurrentUserId.mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/onboarding/sample/route");
+    const res = await POST(makeRequest("/api/onboarding/sample"));
+    expect(res.status).not.toBe(401);
+  });
+
+  it("allows creation in Google Auth mode when userId is present", async () => {
+    mockEnv.GOOGLE_CLIENT_ID = "google-id";
+    mockGetCurrentUserId.mockReturnValue("user-abc");
+
+    const { POST } = await import("@/app/api/onboarding/sample/route");
+    const res = await POST(makeRequest("/api/onboarding/sample"));
+    expect(res.status).not.toBe(401);
+  });
 });
 
 describe("userId=NULL guard — POST /api/projects/import", () => {
@@ -154,6 +197,23 @@ describe("userId=NULL guard — POST /api/projects/import", () => {
   it("allows creation in API_TOKEN mode without userId", async () => {
     mockEnv.API_TOKEN = "token-123";
     mockGetCurrentUserId.mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/projects/import/route");
+    const res = await POST(makeRequest("/api/projects/import", { title: "Imported" }));
+    expect(res.status).not.toBe(401);
+  });
+
+  it("allows creation in dev mode (no auth) without userId", async () => {
+    mockGetCurrentUserId.mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/projects/import/route");
+    const res = await POST(makeRequest("/api/projects/import", { title: "Imported" }));
+    expect(res.status).not.toBe(401);
+  });
+
+  it("allows creation in Google Auth mode when userId is present", async () => {
+    mockEnv.GOOGLE_CLIENT_ID = "google-id";
+    mockGetCurrentUserId.mockReturnValue("user-abc");
 
     const { POST } = await import("@/app/api/projects/import/route");
     const res = await POST(makeRequest("/api/projects/import", { title: "Imported" }));

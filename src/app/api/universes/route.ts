@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const userId = getCurrentUserId(request);
+
+        if (isGoogleAuthMode() && !userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await request.json();
         const parsed = UniverseCreateSchema.safeParse(body);
         if (!parsed.success) {
@@ -51,11 +57,6 @@ export async function POST(request: NextRequest) {
                 { error: parsed.error.issues[0].message },
                 { status: 400 }
             );
-        }
-        const userId = getCurrentUserId(request);
-
-        if (isGoogleAuthMode() && !userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         if (userId) {

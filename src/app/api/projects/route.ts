@@ -93,13 +93,13 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - Create a new project (owned by current user)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
     const userId = getCurrentUserId(request);
 
     if (isGoogleAuthMode() && !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await request.json();
     const parsed = ProjectCreateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
