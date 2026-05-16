@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
+const MAX_SEARCH_QUERY_LENGTH = 200;
+
 function stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, "").replace(/&[a-zA-Z]+;/g, " ");
 }
@@ -41,6 +43,12 @@ export async function GET(
             return NextResponse.json(
                 { error: "Search query 'q' is required" },
                 { status: 400 }
+            );
+        }
+        if (q.length > MAX_SEARCH_QUERY_LENGTH) {
+            return NextResponse.json(
+                { error: `Search query exceeds maximum length of ${MAX_SEARCH_QUERY_LENGTH} characters` },
+                { status: 413 }
             );
         }
 

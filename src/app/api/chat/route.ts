@@ -8,6 +8,9 @@ import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { compressConversation } from "@/lib/ai/chat-compression";
 import type { AiProviderConfig } from "@/lib/ai/settings";
 
+const MAX_MESSAGE_LENGTH = 10_000;
+const MAX_ID_LENGTH = 100;
+
 async function buildSystemPrompt(projectId: string): Promise<string> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -257,6 +260,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "conversationId and message are required" },
         { status: 400 }
+      );
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json(
+        { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
+        { status: 413 }
+      );
+    }
+    if (conversationId.length > MAX_ID_LENGTH) {
+      return NextResponse.json(
+        { error: `conversationId exceeds maximum length of ${MAX_ID_LENGTH} characters` },
+        { status: 413 }
       );
     }
 
