@@ -143,6 +143,17 @@ describe("GET /oauth/authorize CSRF token generation", () => {
   });
 });
 
+describe("GET /oauth/authorize CSP headers", () => {
+  it("sets form-action 'self' (not wildcard) on consent page", async () => {
+    const req = makeGetRequest();
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    expect(csp).toContain("form-action 'self'");
+    expect(csp).not.toContain("form-action *");
+  });
+});
+
 describe("POST /oauth/authorize approve happy-path", () => {
   it("renders code page on approve when CSRF and session are valid (localhost redirect)", async () => {
     const req = makePostRequest(
