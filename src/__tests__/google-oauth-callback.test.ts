@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import crypto from "crypto";
 
 const mockUserinfoGet = vi.fn();
 const mockGetToken = vi.fn();
@@ -46,6 +47,8 @@ vi.mock("@/lib/auth", () => ({
     SESSION_MAX_AGE: 86400,
     createSessionToken: vi.fn().mockResolvedValue("mock-jwt-token"),
     isAllowedRedirect: vi.fn().mockReturnValue(false),
+    resolveJwtSecret: vi.fn().mockReturnValue("annie-dev-secret"),
+    safeEqual: (a: string, b: string) => a === b,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -55,16 +58,24 @@ vi.mock("@/lib/logger", () => ({
     },
 }));
 
+// Helper to generate a valid signed state using the test secret
+function makeSignedState(nonce: string = "test-nonce"): string {
+    const secret = "annie-dev-secret"; // matches resolveJwtSecret() mock
+    const sig = crypto.createHmac("sha256", secret).update(nonce).digest("hex").slice(0, 16);
+    return `${nonce}.${sig}`;
+}
+
 function makeRequest(params?: Record<string, string>, cookies?: Record<string, string>) {
     const url = new URL("http://localhost:3000/api/auth/google/callback");
+    const signedState = makeSignedState("test-nonce");
     url.searchParams.set("code", "test-code");
-    url.searchParams.set("state", "test-state");
+    url.searchParams.set("state", signedState);
     for (const [k, v] of Object.entries(params ?? {})) {
         url.searchParams.set(k, v);
     }
     const req = new NextRequest(url, {
         headers: new Headers({
-            cookie: Object.entries({ oauth_state: "test-state", ...cookies })
+            cookie: Object.entries({ oauth_state: signedState, ...cookies })
                 .map(([k, v]) => `${k}=${v}`)
                 .join("; "),
         }),
@@ -152,5 +163,23 @@ describe("Google OAuth callback - verified_email check", () => {
         const sessionCookie = setCookie.find((c: string) => c.startsWith("session="));
         expect(sessionCookie).toBeDefined();
         expect(sessionCookie).toContain("mock-jwt-token");
+    });
+
+    it("should redirect to /login?error=invalid_state when state HMAC is tampered", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        // state cookie matches URL but HMAC sig is wrong
+        const tamperedState = "test-nonce.0000000000000000";
+        const req = new NextRequest(
+            new URL(`http://localhost:3000/api/auth/google/callback?code=test-code&state=${tamperedState}`),
+            {
+                headers: new Headers({
+                    cookie: `oauth_state=${tamperedState}`,
+                }),
+            }
+        );
+        const response = await GET(req);
+        expect(response.status).toBe(307);
+        const location = response.headers.get("location") ?? "";
+        expect(location).toContain("/login?error=invalid_state");
     });
 });

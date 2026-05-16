@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import crypto from "crypto";
 import { env } from "@/lib/env";
-import { isAllowedRedirect } from "@/lib/auth";
+import { isAllowedRedirect, resolveJwtSecret } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 /**
@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
     try {
         const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
-        const state = crypto.randomUUID();
+        const nonce = crypto.randomUUID();
+        const jwtSecret = resolveJwtSecret();
+        const sig = crypto.createHmac("sha256", jwtSecret).update(nonce).digest("hex").slice(0, 16);
+        const state = `${nonce}.${sig}`;
 
         const authUrl = client.generateAuthUrl({
             access_type: "offline",
