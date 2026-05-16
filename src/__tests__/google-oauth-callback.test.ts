@@ -48,7 +48,8 @@ vi.mock("@/lib/auth", () => ({
     createSessionToken: vi.fn().mockResolvedValue("mock-jwt-token"),
     isAllowedRedirect: vi.fn().mockReturnValue(false),
     resolveJwtSecret: vi.fn().mockReturnValue("annie-dev-secret"),
-    safeEqual: (a: string, b: string) => a === b,
+    // timing-safe comparison is irrelevant in unit tests; using vi.fn() enables spy assertions
+    safeEqual: vi.fn().mockImplementation((a: string, b: string) => a === b),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -167,6 +168,7 @@ describe("Google OAuth callback - verified_email check", () => {
 
     it("should redirect to /login?error=invalid_state when state HMAC is tampered", async () => {
         const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { safeEqual } = await import("@/lib/auth");
         // state cookie matches URL but HMAC sig is wrong
         const tamperedState = "test-nonce.0000000000000000";
         const req = new NextRequest(
@@ -181,5 +183,7 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=invalid_state");
+        // Confirm that safeEqual was invoked (HMAC branch was exercised, not short-circuited)
+        expect(safeEqual).toHaveBeenCalledOnce();
     });
 });
