@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -61,8 +61,8 @@ describe("POST /api/projects/[id]/share — P2002 race condition", () => {
 
     const res = await POST(makeRequest({ email: "race@example.com" }) as never, routeCtx);
 
-    expect((res as any).status).toBe(409);
-    const body = await (res as any).json();
+    expect((res as NextResponse).status).toBe(409);
+    const body = await (res as NextResponse).json();
     expect(body.error).toMatch(/already/i);
   });
 
@@ -72,8 +72,8 @@ describe("POST /api/projects/[id]/share — P2002 race condition", () => {
 
     const res = await POST(makeRequest({ email: "other@example.com" }) as never, routeCtx);
 
-    expect((res as any).status).toBe(500);
-    const body = await (res as any).json();
+    expect((res as NextResponse).status).toBe(500);
+    const body = await (res as NextResponse).json();
     expect(body.error).toMatch(/internal server error/i);
   });
 });
