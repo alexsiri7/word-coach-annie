@@ -14,7 +14,6 @@ export async function GET() {
 
         return NextResponse.json({
             status: dataOk ? "ok" : "degraded",
-            db: { projects, users },
             ...(!dataOk && { warning: "Database appears empty — possible data loss" }),
         });
     } catch (e) {
