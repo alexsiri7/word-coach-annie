@@ -10,12 +10,15 @@ Sentry.init({
   // Performance: sample 10% of transactions in production
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
-  // Session replay: capture 1% of sessions, 100% on error
+  // Session replay: capture 1% of sessions, 10% on error
   replaysSessionSampleRate: 0.01,
-  replaysOnErrorSampleRate: 1.0,
+  replaysOnErrorSampleRate: 0.1,
 
   integrations: [
-    Sentry.replayIntegration(),
+    Sentry.replayIntegration({
+      // Mask manuscript/editor content — creative writing is user PII
+      mask: [".tiptap-editor", ".reader-prose"],
+    }),
     Sentry.browserTracingIntegration(),
   ],
 
