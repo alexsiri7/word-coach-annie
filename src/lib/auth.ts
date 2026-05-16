@@ -43,7 +43,7 @@ export function resolveJwtSecret(): string {
 }
 
 /**
- * Get the JWT signing key. Uses API_TOKEN, ENCRYPTION_KEY, or a fallback.
+ * Get the JWT signing key derived from JWT_SECRET (via resolveJwtSecret).
  * Returns a CryptoKey suitable for jose sign/verify.
  */
 export async function getJwtKey(): Promise<CryptoKey> {
