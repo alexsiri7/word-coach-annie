@@ -1,4 +1,6 @@
 # --- Stage 1: Install dependencies ---
+# Pinned to multi-arch manifest list digest for node:20-slim (2025-05-16).
+# To update: docker manifest inspect node:20-slim --verbose | jq '.[0].Descriptor.digest'
 FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS deps
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
