@@ -94,10 +94,38 @@ describe("POST /api/feedback", () => {
     const body = JSON.parse(options.body);
     expect(body.title).toContain("Bug:");
     expect(body.title).toContain("editor crashes");
-    expect(body.body).toContain("tester@example.com");
+    // Email must NOT appear in the public issue body
+    expect(body.body).not.toContain("tester@example.com");
+    // User-agent and screen size are kept for debugging utility
     expect(body.body).toContain("TestBrowser/1.0");
     expect(body.body).toContain("1920x1080");
+    // URL should be pathname-only
+    expect(body.body).toContain("/project/abc");
+    expect(body.body).not.toContain("http://localhost:3000");
     expect(body.labels).toContain("bug");
+  });
+
+  it("does not include reporter email in GitHub issue body", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/42" }),
+    });
+
+    await POST(makeRequest({
+      type: "bug",
+      message: "Something broke",
+      email: "private@example.com",
+      context: { url: "http://localhost:3000/project/abc?token=secret", userAgent: "TestBrowser/1.0" },
+    }));
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.body).not.toContain("private@example.com");
+    expect(body.body).not.toContain("secret");
+    expect(body.body).toContain("/project/abc");
   });
 
   it("returns 502 when GitHub API fails", async () => {
