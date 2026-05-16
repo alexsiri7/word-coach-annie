@@ -43,8 +43,7 @@ export function splitSqlStatements(sql) {
         }
       }
     }
-    // Single-quoted string ('...' with standard SQL '' escaping only).
-    // Note: PostgreSQL E'...\'' escape strings are NOT handled — Prisma does not emit them.
+    // Single-quoted string ('...' with standard SQL '' escaping only)
     if (sql[i] === "'") {
       const strStart = i;
       current += sql[i++];

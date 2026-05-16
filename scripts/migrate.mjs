@@ -103,8 +103,7 @@ async function migrate() {
     // and single-quoted strings that may contain semicolons.
     const statements = splitSqlStatements(sql);
 
-    for (let i = 0; i < statements.length; i++) {
-      const stmt = statements[i];
+    for (const [i, stmt] of statements.entries()) {
       try {
         await prisma.$executeRawUnsafe(stmt);
       } catch (e) {
