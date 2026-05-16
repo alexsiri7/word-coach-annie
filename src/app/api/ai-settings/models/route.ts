@@ -27,8 +27,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${aiConfig.apiKey}&pageSize=200`;
-    const res = await fetch(url);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200`;
+    const res = await fetch(url, {
+      headers: { "x-goog-api-key": aiConfig.apiKey },
+    });
 
     if (!res.ok) {
       const body = await res.text();
