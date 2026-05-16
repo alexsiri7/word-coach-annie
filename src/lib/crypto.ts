@@ -46,7 +46,8 @@ export function isEncrypted(value: string): boolean {
 
 /**
  * Encrypt a plaintext value. Returns the encrypted string.
- * If no encryption key is available, returns the plaintext unchanged.
+ * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the plaintext unchanged.
  */
 export function encrypt(plaintext: string): string {
     if (!plaintext) return plaintext;
@@ -68,7 +69,8 @@ export function encrypt(plaintext: string): string {
 /**
  * Decrypt an encrypted value. Returns the plaintext.
  * If the value is not encrypted (no prefix), returns it unchanged.
- * If no encryption key is available, returns the raw value.
+ * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the raw value unchanged.
  */
 export function decrypt(value: string): string {
     if (!value || !isEncrypted(value)) return value;

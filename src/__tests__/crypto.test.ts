@@ -77,21 +77,24 @@ describe("crypto", () => {
         });
 
         afterEach(() => {
-            // vitest isolates modules per file, so deleting is safe here
+            // setup.ts sets ALLOW_PLAINTEXT_STORAGE=true globally; unset here so
+            // throw-by-default tests below are not masked by the global default.
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
         });
 
         it("throws when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
             expect(() => encrypt("sk-no-encryption")).toThrow(
-                "ENCRYPTION_KEY or API_TOKEN must be set"
+                "ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         });
 
         it("throws on decrypt when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
             expect(() => decrypt("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff")).toThrow(
-                "ENCRYPTION_KEY or API_TOKEN must be set"
+                "ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         });
 
@@ -100,6 +103,16 @@ describe("crypto", () => {
             const plaintext = "sk-no-encryption";
             expect(encrypt(plaintext)).toBe(plaintext);
             expect(decrypt(plaintext)).toBe(plaintext);
+        });
+
+        it("throws when ALLOW_PLAINTEXT_STORAGE is '1' (strict string check)", () => {
+            process.env.ALLOW_PLAINTEXT_STORAGE = "1";
+            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY or API_TOKEN must be set");
+        });
+
+        it("throws when ALLOW_PLAINTEXT_STORAGE is 'TRUE' (case-sensitive check)", () => {
+            process.env.ALLOW_PLAINTEXT_STORAGE = "TRUE";
+            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY or API_TOKEN must be set");
         });
     });
 
