@@ -148,6 +148,8 @@ const pwaConfig = withPWA({
       // Include the default caches (static assets, images, etc.)
       // Filter out the built-in `apis` entry — authenticated API responses
       // must not be cached on shared devices (MED-17).
+      // NOTE: "apis" is the cacheName used by @ducanh2912/next-pwa ≥10.x.
+      // Verify this string if upgrading the package.
       ...runtimeCaching.filter((entry) => entry.options?.cacheName !== "apis"),
     ],
   },
