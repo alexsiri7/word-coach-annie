@@ -154,6 +154,29 @@ describe("GET /oauth/authorize CSP headers", () => {
   });
 });
 
+describe("POST /oauth/authorize CSP headers", () => {
+  it("sets form-action 'self' (not wildcard) on code page", async () => {
+    const req = makePostRequest(
+      {
+        action: "approve",
+        csrf_token: "token-abc",
+        response_type: "code",
+        client_id: "c1",
+        redirect_uri: "http://localhost/callback",
+        code_challenge: "abc",
+        code_challenge_method: "S256",
+        state: "xyz",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    expect(csp).toContain("form-action 'self'");
+    expect(csp).not.toContain("form-action *");
+  });
+});
+
 describe("POST /oauth/authorize approve happy-path", () => {
   it("renders code page on approve when CSRF and session are valid (localhost redirect)", async () => {
     const req = makePostRequest(
