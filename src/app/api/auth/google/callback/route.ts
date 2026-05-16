@@ -75,6 +75,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        if (!userInfo.verified_email) {
+            logger.warn("Google OAuth rejected: unverified email", {
+                email: userInfo.email,
+            });
+            const baseUrl = new URL(redirectUri).origin;
+            return NextResponse.redirect(
+                new URL("/login?error=email_not_verified", baseUrl)
+            );
+        }
+
         // Enforce invite-only allowlist (when configured)
         if (env.ALLOWED_EMAILS) {
             const allowed = env.ALLOWED_EMAILS.split(",").map((e) =>
