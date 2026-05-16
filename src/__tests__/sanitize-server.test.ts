@@ -74,4 +74,32 @@ describe("escapeMarkdown", () => {
     it("passes through safe plain text", () => {
         expect(escapeMarkdown("hello world")).toBe("hello world");
     });
+
+    it("escapes backslash", () => {
+        expect(escapeMarkdown("a\\b")).toBe("a\\\\b");
+    });
+
+    it("escapes asterisk", () => {
+        expect(escapeMarkdown("*bold*")).toBe("\\*bold\\*");
+    });
+
+    it("escapes underscore", () => {
+        expect(escapeMarkdown("_italic_")).toBe("\\_italic\\_");
+    });
+
+    it("escapes tilde", () => {
+        expect(escapeMarkdown("~strike~")).toBe("\\~strike\\~");
+    });
+
+    it("escapes hash", () => {
+        expect(escapeMarkdown("# heading")).toBe("\\# heading");
+    });
+
+    it("escapes pipe", () => {
+        expect(escapeMarkdown("a | b")).toBe("a \\| b");
+    });
+
+    it("escapes curly braces", () => {
+        expect(escapeMarkdown("{key}")).toBe("\\{key\\}");
+    });
 });
