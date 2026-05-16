@@ -90,4 +90,19 @@ describe("POST /oauth/register", () => {
     const res = await POST(makeRegisterRequest({ redirect_uris: ["http://evil.com/cb"] }));
     expect(res.status).toBe(400);
   });
+
+  it("truncates client_name to 80 characters", async () => {
+    const longName = "a".repeat(100);
+    const res = await POST(makeRegisterRequest({ ...validBody, client_name: longName }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.client_name).toBe("a".repeat(80));
+  });
+
+  it("defaults client_name to 'Unknown Client' when not provided", async () => {
+    const res = await POST(makeRegisterRequest(validBody));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.client_name).toBe("Unknown Client");
+  });
 });
