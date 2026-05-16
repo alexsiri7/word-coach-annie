@@ -125,6 +125,11 @@ export function isAuthEnabled(): boolean {
     return !!(env.API_TOKEN || env.GOOGLE_CLIENT_ID);
 }
 
+/** Returns true when Google OAuth is the active auth mode (multi-user; all requests must have a user identity). */
+export function isGoogleAuthMode(): boolean {
+    return !!env.GOOGLE_CLIENT_ID;
+}
+
 const ALLOWED_REDIRECT_PATTERNS = [
     /^\/$/,
     /^\/settings(\/.*)?$/,

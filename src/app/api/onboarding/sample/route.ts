@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { importProjectJson } from "@/lib/import-json";
 import { logger } from "@/lib/logger";
+import { isGoogleAuthMode } from "@/lib/auth";
 import sampleData from "@/data/sherlock-sample.json";
 
 // POST /api/onboarding/sample - Create sample project for new users.
@@ -10,6 +11,10 @@ import sampleData from "@/data/sherlock-sample.json";
 export async function POST(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
+
+    if (isGoogleAuthMode() && !userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { projectId } = await importProjectJson(sampleData, {
       userId: userId ?? undefined,

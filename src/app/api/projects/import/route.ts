@@ -3,10 +3,15 @@ import { getCurrentUserId } from "@/lib/api-auth";
 import { importProjectJson } from "@/lib/import-json";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { isGoogleAuthMode } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
+
+    if (isGoogleAuthMode() && !userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     let body: Record<string, unknown>;
     try {
