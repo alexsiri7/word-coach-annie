@@ -71,11 +71,8 @@ function applyRateLimit(
 
     // Allow E2E / CI environments to bypass rate limiting (not honoured in production)
     if (process.env.DISABLE_RATE_LIMIT === "true") {
-        if (process.env.NODE_ENV === "production") {
-            console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
-        } else {
-            return null;
-        }
+        if (process.env.NODE_ENV !== "production") return null;
+        console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
     }
 
     const method = request.method;
