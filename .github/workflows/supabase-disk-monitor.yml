@@ -5,6 +5,9 @@ on:
     - cron: '0 */6 * * *' # Every 6 hours
   workflow_dispatch: # Manual trigger
 
+permissions:
+  contents: read
+
 env:
   QUOTA_BYTES: 524288000  # 500 MB in bytes
   THRESHOLD_PCT: 70
@@ -13,6 +16,9 @@ jobs:
   check-disk:
     name: ${{ matrix.instance }} Disk Usage Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     strategy:
       matrix:
         include:
