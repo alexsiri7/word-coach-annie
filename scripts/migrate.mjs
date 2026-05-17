@@ -24,8 +24,14 @@ if (!connectionString) {
   process.exit(0);
 }
 
-const { PrismaClient } = await import('@prisma/client');
-const { PrismaPg } = await import('@prisma/adapter-pg');
+let PrismaClient, PrismaPg;
+try {
+  ({ PrismaClient } = await import('@prisma/client'));
+  ({ PrismaPg } = await import('@prisma/adapter-pg'));
+} catch (e) {
+  console.error('Migration failed: could not load Prisma packages:', e);
+  process.exit(1);
+}
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
