@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeInput, sanitizeHtml, escapeMarkdown } from "@/lib/sanitize-server";
+import { sanitizeInput, sanitizeHtml, escapeMarkdown, escapeHtml } from "@/lib/sanitize-server";
 
 describe("sanitizeInput", () => {
     it("strips HTML tags from input", () => {
@@ -101,5 +101,32 @@ describe("escapeMarkdown", () => {
 
     it("escapes curly braces", () => {
         expect(escapeMarkdown("{key}")).toBe("\\{key\\}");
+    });
+});
+
+describe("escapeHtml", () => {
+    it("escapes angle brackets", () => {
+        expect(escapeHtml("<script>")).toBe("&lt;script&gt;");
+    });
+
+    it("escapes ampersand", () => {
+        expect(escapeHtml("a & b")).toBe("a &amp; b");
+    });
+
+    it("escapes double quotes", () => {
+        expect(escapeHtml('"hello"')).toBe("&quot;hello&quot;");
+    });
+
+    it("escapes single quotes", () => {
+        expect(escapeHtml("it's")).toBe("it&#39;s");
+    });
+
+    it("passes through plain text", () => {
+        expect(escapeHtml("Chapter One")).toBe("Chapter One");
+    });
+
+    it("prevents XSS payload in EPUB title context", () => {
+        const title = '<script>alert(1)</script>';
+        expect(escapeHtml(title)).toBe("&lt;script&gt;alert(1)&lt;/script&gt;");
     });
 });
