@@ -5,7 +5,9 @@
  * survive Railway deploys and work across multiple replicas.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const IP_REGISTRATION_LIMIT = 25;
@@ -90,27 +92,55 @@ export async function createAuthCode(
 ): Promise<AuthCode> {
   const code = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS);
-  await prisma.oAuthAuthCode.create({
-    data: {
-      code,
+  try {
+    await prisma.oAuthAuthCode.create({
+      data: {
+        code,
+        userId: params.userId,
+        email: params.email,
+        codeChallenge: params.codeChallenge,
+        codeChallengeMethod: params.codeChallengeMethod,
+        redirectUri: params.redirectUri,
+        clientId: params.clientId,
+        expiresAt,
+      },
+    });
+  } catch (err) {
+    logger.error("createAuthCode: failed to persist auth code", {
       userId: params.userId,
-      email: params.email,
-      codeChallenge: params.codeChallenge,
-      codeChallengeMethod: params.codeChallengeMethod,
-      redirectUri: params.redirectUri,
       clientId: params.clientId,
-      expiresAt,
-    },
-  });
+      err,
+    });
+    throw err;
+  }
   return { ...params, code, expiresAt: expiresAt.getTime() };
 }
 
-/** Consume an auth code (single use, atomic). Returns null if not found or expired. */
+/**
+ * Consume an auth code (single use). Returns null if not found or expired.
+ *
+ * Note: `findUnique` + `delete` are two separate DB calls. In practice this
+ * is safe for low-concurrency OAuth flows, but is not strictly atomic — a
+ * narrow TOCTOU window exists under high concurrency. Use a `$transaction`
+ * if strict exactly-once guarantees are needed.
+ */
 export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
   const row = await prisma.oAuthAuthCode.findUnique({ where: { code } });
   if (!row) return null;
   // Delete regardless of expiry (clean up always)
-  await prisma.oAuthAuthCode.delete({ where: { code } });
+  try {
+    await prisma.oAuthAuthCode.delete({ where: { code } });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      // Another replica already consumed this code — treat as already used.
+      return null;
+    }
+    logger.error("consumeAuthCode: unexpected error deleting auth code", err);
+    throw err;
+  }
   if (row.expiresAt < new Date()) return null;
   return {
     code: row.code,

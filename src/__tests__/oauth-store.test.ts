@@ -130,6 +130,30 @@ describe("OAuth Store", () => {
       expect(result).toBeNull();
     });
 
+    it("deletes expired auth code from database even though it returns null", async () => {
+      const code = await createAuthCode({
+        userId: "user-1",
+        email: "test@example.com",
+        codeChallenge: "challenge",
+        codeChallengeMethod: "S256",
+        redirectUri: "http://localhost/cb",
+        clientId: "client-1",
+      });
+
+      // Manually expire the code in the DB
+      await prisma.oAuthAuthCode.update({
+        where: { code: code.code },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+
+      const result = await consumeAuthCode(code.code);
+      expect(result).toBeNull();
+
+      // Confirm the row was cleaned up even though it was expired
+      const row = await prisma.oAuthAuthCode.findUnique({ where: { code: code.code } });
+      expect(row).toBeNull();
+    });
+
     it("each auth code gets a unique code string", async () => {
       const params = {
         userId: "user-1",

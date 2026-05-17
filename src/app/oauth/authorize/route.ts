@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken, safeEqual } from "@/lib/auth";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
 import { escapeHtml } from "@/lib/sanitize-server";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /oauth/authorize
@@ -111,14 +112,26 @@ export async function POST(request: NextRequest) {
   }
 
   // Issue authorization code
-  const authCode = await createAuthCode({
-    userId: session.userId,
-    email: session.email,
-    codeChallenge,
-    codeChallengeMethod,
-    redirectUri,
-    clientId,
-  });
+  let authCode;
+  try {
+    authCode = await createAuthCode({
+      userId: session.userId,
+      email: session.email,
+      codeChallenge,
+      codeChallengeMethod,
+      redirectUri,
+      clientId,
+    });
+  } catch {
+    logger.error("POST /oauth/authorize: failed to create auth code", {
+      userId: session.userId,
+      clientId,
+    });
+    return NextResponse.json(
+      { error: "server_error", error_description: "Failed to issue authorization code" },
+      { status: 500 },
+    );
+  }
 
   const redirectUrl = new URL(redirectUri);
   redirectUrl.searchParams.set("code", authCode.code);
