@@ -129,4 +129,15 @@ describe("escapeHtml", () => {
         const title = '<script>alert(1)</script>';
         expect(escapeHtml(title)).toBe("&lt;script&gt;alert(1)&lt;/script&gt;");
     });
+
+    it("returns empty string for empty input", () => {
+        expect(escapeHtml("")).toBe("");
+    });
+
+    it("escapes all special characters in combination", () => {
+        const title = `Part I: <Prologue> & "Setup" it's`;
+        expect(escapeHtml(title)).toBe(
+            "Part I: &lt;Prologue&gt; &amp; &quot;Setup&quot; it&#39;s"
+        );
+    });
 });
