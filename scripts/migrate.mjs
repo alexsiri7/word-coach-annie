@@ -8,8 +8,6 @@
  * and applies any that haven't been recorded in _prisma_migrations.
  */
 
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
@@ -19,11 +17,15 @@ import { splitSqlStatements } from './sql-tokenizer.mjs';
 // which work fine through PgBouncer transaction mode.
 // Guard: PrismaPg accepts undefined without throwing, which would cause
 // migrations to silently no-op on Railway when the env var is missing.
+// Check before importing DB packages so the guard works even without node_modules.
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.warn('Warning: DATABASE_URL is not set — skipping migrations. Server will start but DB-dependent routes will fail.');
   process.exit(0);
 }
+
+const { PrismaClient } = await import('@prisma/client');
+const { PrismaPg } = await import('@prisma/adapter-pg');
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
