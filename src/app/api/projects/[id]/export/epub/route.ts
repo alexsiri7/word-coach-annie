@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import epub from "epub-gen-memory";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
+import { escapeHtml } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
 interface OutlineNode {
@@ -98,7 +99,7 @@ function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
       const partSceneHtml = collectSceneHtml(node);
       chapters.push({
         title: node.title,
-        content: `<h1>${node.title}</h1>${partSceneHtml}`,
+        content: `<h1>${escapeHtml(node.title)}</h1>${partSceneHtml}`,
       });
       for (const child of node.children) {
         if (child.type !== "SCENE") walk(child);
@@ -107,7 +108,7 @@ function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
       const sceneHtml = collectSceneHtml(node);
       chapters.push({
         title: node.title,
-        content: `<h2>${node.title}</h2>${sceneHtml}`,
+        content: `<h2>${escapeHtml(node.title)}</h2>${sceneHtml}`,
       });
     } else if (node.type === "SCENE" && !isEmptyContent(node.content)) {
       // Top-level scene (no parent chapter)

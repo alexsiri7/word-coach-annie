@@ -53,3 +53,16 @@ export function escapeMarkdown(input: string): string {
     .replace(/>/g, "&gt;")
     .replace(/[*_~#|{}\[\]()!`]/g, "\\$&");
 }
+
+/**
+ * Escape a string for safe embedding in an HTML attribute or text node.
+ * Use when interpolating user-supplied values into HTML template literals.
+ */
+export function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
