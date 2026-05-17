@@ -176,7 +176,8 @@ describe("POST /api/feedback", () => {
     process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
     process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
 
-    const fakeBase64 = "iVBORw0KGgoAAAANSUhEUg==";
+    // FF D8 FF E0 ... — minimal valid JPEG header in base64
+    const fakeBase64 = "/9j/4AAQ";
     const fakeDataUrl = `data:image/jpeg;base64,${fakeBase64}`;
     const fakeAssetUrl =
       "https://github.com/user-attachments/assets/abc-123/feedback.jpg";
@@ -231,20 +232,7 @@ describe("POST /api/feedback", () => {
     process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
     process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
 
-    // getRepoId succeeds
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: 12345 }),
-    });
-
-    // Screenshot upload fails
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      text: async () => "Internal Server Error",
-    });
-
-    // Issue creation succeeds
+    // Only issue creation — screenshot rejected by magic-byte check before any fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -262,12 +250,63 @@ describe("POST /api/feedback", () => {
 
     expect(res.status).toBe(201);
 
-    // Issue should still be created, just without screenshot
-    // Last fetch call is the issue creation
     const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
     const issueBody = JSON.parse(lastCall[1].body);
     expect(issueBody.body).not.toContain("### Screenshot");
     expect(issueBody.body).toContain("Bug with failed screenshot");
+  });
+
+  it("rejects screenshot with non-JPEG magic bytes (PNG data)", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    // Issue creation succeeds — screenshot silently dropped
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/999" }),
+    });
+
+    // PNG base64 — starts with 89 50 4E 47 (iVBOR…)
+    const pngBase64 = "iVBORw0KGgoAAAANSUhEUg==";
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "PNG screenshot rejected",
+        screenshot: `data:image/jpeg;base64,${pngBase64}`,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    // Only 1 fetch call — no getRepoId or upload, just issue creation
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, opts] = mockFetch.mock.calls[0];
+    const body = JSON.parse(opts.body);
+    expect(body.body).not.toContain("### Screenshot");
+  });
+
+  it("rejects screenshot with unsupported data URL prefix", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/998" }),
+    });
+
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "Bad prefix rejected",
+        // Valid JPEG bytes but wrong prefix
+        screenshot: "data:application/octet-stream;base64,/9j/4AAQ",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, opts] = mockFetch.mock.calls[0];
+    const body = JSON.parse(opts.body);
+    expect(body.body).not.toContain("### Screenshot");
   });
 
   it("creates issue without screenshot section when no screenshot provided", async () => {
