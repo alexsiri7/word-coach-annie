@@ -70,19 +70,11 @@ export async function verifyMcpToken(
       clientId: payload.clientId as string,
     };
   } catch (err) {
-    // Expected: token is expired, tampered, has a wrong algorithm,
-    // mismatched issuer/audience, or other JOSE validation failure — treat as invalid.
-    if (
-      err instanceof JoseErrors.JWTExpired ||
-      err instanceof JoseErrors.JWTInvalid ||
-      err instanceof JoseErrors.JWSSignatureVerificationFailed ||
-      err instanceof JoseErrors.JOSEError
-    ) {
+    // Expected: expired, tampered, wrong algorithm, mismatched issuer/audience — treat as invalid.
+    if (err instanceof JoseErrors.JOSEError) {
       return null;
     }
     // Unexpected: infrastructure failure (missing key, crypto error).
-    // Log with full context so Sentry captures it, then return null so
-    // callers still return 400 rather than an unhandled 500.
     logger.error("verifyMcpToken: unexpected error during JWT verification", err);
     return null;
   }
