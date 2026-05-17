@@ -111,7 +111,7 @@ describe("POST /oauth/token", () => {
 
   it("refresh_token grant with valid token returns new tokens", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com" });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1" });
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
@@ -122,6 +122,20 @@ describe("POST /oauth/token", () => {
     expect(res.status).toBe(200);
     expect(body.access_token).toBe("mock-token");
     expect(body.refresh_token).toBe("mock-token");
+  });
+
+  it("refresh_token grant with mismatched client_id returns 400 invalid_grant", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-2", client_name: "Other App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1" });
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "valid-refresh",
+      client_id: "client-2",
+    }));
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("invalid_grant");
   });
 
   it("refresh_token grant with expired token returns 400 invalid_grant", async () => {

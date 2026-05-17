@@ -16,6 +16,7 @@ export interface McpTokenPayload {
   userId: string;
   email: string;
   type: "mcp_access" | "mcp_refresh";
+  clientId: string;
 }
 
 /** Create a signed MCP access or refresh token. */
@@ -35,14 +36,23 @@ export async function createMcpToken(
 export async function verifyMcpToken(
   token: string,
   expectedType: "mcp_access" | "mcp_refresh"
-): Promise<{ userId: string; email: string } | null> {
+): Promise<{ userId: string; email: string; clientId: string } | null> {
   try {
     const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key);
-    if (payload.type !== expectedType || !payload.userId || !payload.email) {
+    if (
+      payload.type !== expectedType ||
+      !payload.userId ||
+      !payload.email ||
+      !payload.clientId
+    ) {
       return null;
     }
-    return { userId: payload.userId as string, email: payload.email as string };
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      clientId: payload.clientId as string,
+    };
   } catch {
     return null;
   }

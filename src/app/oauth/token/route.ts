@@ -108,11 +108,11 @@ async function handleAuthorizationCode(body: Record<string, string>) {
 
   // Issue tokens
   const accessToken = await createMcpToken(
-    { userId: authCode.userId, email: authCode.email, type: "mcp_access" },
+    { userId: authCode.userId, email: authCode.email, type: "mcp_access", clientId: client_id },
     ACCESS_TOKEN_TTL
   );
   const refreshToken = await createMcpToken(
-    { userId: authCode.userId, email: authCode.email, type: "mcp_refresh" },
+    { userId: authCode.userId, email: authCode.email, type: "mcp_refresh", clientId: client_id },
     REFRESH_TOKEN_TTL
   );
 
@@ -146,13 +146,18 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "Invalid or expired refresh token");
   }
 
+  // Validate client_id matches the token's bound client
+  if (tokenData.clientId !== client_id) {
+    return errorResponse("invalid_grant", "client_id mismatch");
+  }
+
   // Issue new tokens
   const accessToken = await createMcpToken(
-    { userId: tokenData.userId, email: tokenData.email, type: "mcp_access" },
+    { userId: tokenData.userId, email: tokenData.email, type: "mcp_access", clientId: tokenData.clientId },
     ACCESS_TOKEN_TTL
   );
   const newRefreshToken = await createMcpToken(
-    { userId: tokenData.userId, email: tokenData.email, type: "mcp_refresh" },
+    { userId: tokenData.userId, email: tokenData.email, type: "mcp_refresh", clientId: tokenData.clientId },
     REFRESH_TOKEN_TTL
   );
 

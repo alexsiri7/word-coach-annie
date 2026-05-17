@@ -36,7 +36,7 @@ describe("MCP OAuth Tokens", () => {
   describe("createMcpToken + verifyMcpToken round-trip", () => {
     it("creates and verifies an access token", async () => {
       const token = await createMcpToken(
-        { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+        { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
         ACCESS_TOKEN_TTL
       );
 
@@ -47,11 +47,12 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).not.toBeNull();
       expect(payload!.userId).toBe("user-123");
       expect(payload!.email).toBe("test@example.com");
+      expect(payload!.clientId).toBe("client-1");
     });
 
-    it("creates and verifies a refresh token", async () => {
+    it("creates and verifies a refresh token with clientId binding", async () => {
       const token = await createMcpToken(
-        { userId: "user-456", email: "refresh@example.com", type: "mcp_refresh" },
+        { userId: "user-456", email: "refresh@example.com", type: "mcp_refresh", clientId: "client-1" },
         REFRESH_TOKEN_TTL
       );
 
@@ -59,11 +60,12 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).not.toBeNull();
       expect(payload!.userId).toBe("user-456");
       expect(payload!.email).toBe("refresh@example.com");
+      expect(payload!.clientId).toBe("client-1");
     });
 
     it("rejects token with wrong expected type", async () => {
       const token = await createMcpToken(
-        { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+        { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
         ACCESS_TOKEN_TTL
       );
 
@@ -82,7 +84,7 @@ describe("MCP OAuth Tokens", () => {
       try {
         // Create a token with a 1-second TTL
         const token = await createMcpToken(
-          { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+          { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
           1 // 1 second TTL
         );
 
