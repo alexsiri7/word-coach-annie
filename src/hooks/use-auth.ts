@@ -11,7 +11,6 @@ export interface AuthUser {
 
 export interface AuthState {
     authenticated: boolean;
-    authMethod: "google" | "api_token" | null;
     user: AuthUser | null;
     loading: boolean;
     logout: () => Promise<void>;
@@ -20,7 +19,6 @@ export interface AuthState {
 
 export function useAuth(): AuthState {
     const [authenticated, setAuthenticated] = useState(false);
-    const [authMethod, setAuthMethod] = useState<"google" | "api_token" | null>(null);
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -30,16 +28,13 @@ export function useAuth(): AuthState {
             if (res.ok) {
                 const data = await res.json();
                 setAuthenticated(data.authenticated);
-                setAuthMethod(data.authMethod || null);
                 setUser(data.user || null);
             } else {
                 setAuthenticated(false);
-                setAuthMethod(null);
                 setUser(null);
             }
         } catch {
             setAuthenticated(false);
-            setAuthMethod(null);
             setUser(null);
         } finally {
             setLoading(false);
@@ -49,7 +44,6 @@ export function useAuth(): AuthState {
     const logout = useCallback(async () => {
         await fetch("/api/auth/logout", { method: "POST" });
         setAuthenticated(false);
-        setAuthMethod(null);
         setUser(null);
         window.location.href = "/login";
     }, []);
@@ -58,5 +52,5 @@ export function useAuth(): AuthState {
         refresh();
     }, [refresh]);
 
-    return { authenticated, authMethod, user, loading, logout, refresh };
+    return { authenticated, user, loading, logout, refresh };
 }

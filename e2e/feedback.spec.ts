@@ -4,7 +4,6 @@ import { test, expect, Page } from '@playwright/test'
 
 const MOCK_AUTH_USER = {
   authenticated: true,
-  authMethod: 'google',
   user: {
     userId: 'test-user-1',
     email: 'tester@example.com',
