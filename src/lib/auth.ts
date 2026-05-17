@@ -7,8 +7,9 @@
  *
  * When neither API_TOKEN nor GOOGLE_CLIENT_ID is set, auth is disabled (local dev).
  */
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "annie_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -63,6 +64,7 @@ export async function getJwtKey(): Promise<CryptoKey> {
 
 /**
  * Create a signed JWT for a user session.
+ * Sets iss=JWT_ISSUER and aud=JWT_AUDIENCE_SESSION; verifySessionToken enforces both.
  */
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
     const key = await getJwtKey();
@@ -96,7 +98,13 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
             };
         }
         return null;
-    } catch {
+    } catch (err) {
+        // Expected: expired, tampered, wrong issuer/audience/algorithm — treat as invalid.
+        if (err instanceof JoseErrors.JOSEError) {
+            return null;
+        }
+        // Unexpected: infrastructure failure (missing key, crypto error).
+        logger.error("verifySessionToken: unexpected error during JWT verification", err);
         return null;
     }
 }

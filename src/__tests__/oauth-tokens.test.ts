@@ -104,6 +104,15 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).toBeNull();
     });
 
+    it("rejects a session token presented to MCP verifier", async () => {
+      const { createSessionToken } = await import("@/lib/auth");
+      const sessionToken = await createSessionToken({
+        userId: "user-1", email: "a@b.com", name: "A",
+      });
+      const payload = await verifyMcpToken(sessionToken, "mcp_access");
+      expect(payload).toBeNull();
+    });
+
     it("rejects a token missing clientId claim (legacy token)", async () => {
       // Simulate a pre-fix token by signing directly without clientId.
       // Tokens issued before this PR will be rejected, enforcing the security fix.

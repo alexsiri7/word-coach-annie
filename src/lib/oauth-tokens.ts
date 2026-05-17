@@ -6,10 +6,10 @@
  */
 import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { getJwtKey, safeEqual, JWT_ISSUER } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 const JWT_AUDIENCE_MCP_ACCESS = "word-coach-annie:mcp_access";
 const JWT_AUDIENCE_MCP_REFRESH = "word-coach-annie:mcp_refresh";
-import { logger } from "@/lib/logger";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -70,7 +70,8 @@ export async function verifyMcpToken(
       clientId: payload.clientId as string,
     };
   } catch (err) {
-    // Expected: token is expired, tampered, or has wrong type — treat as invalid.
+    // Expected: token is expired, tampered, has a wrong algorithm,
+    // mismatched issuer/audience, or other JOSE validation failure — treat as invalid.
     if (
       err instanceof JoseErrors.JWTExpired ||
       err instanceof JoseErrors.JWTInvalid ||

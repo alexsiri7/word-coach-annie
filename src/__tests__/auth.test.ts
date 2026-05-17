@@ -6,6 +6,7 @@ import {
     verifySessionToken,
     isAuthEnabled,
     isAllowedRedirect,
+    getJwtKey,
 } from "@/lib/auth";
 
 describe("auth utilities", () => {
@@ -93,16 +94,22 @@ describe("JWT session tokens", () => {
 
     it("rejects a valid HS256 token without issuer/audience claims", async () => {
         const { SignJWT } = await import("jose");
-        const encoder = new TextEncoder();
-        const key = await crypto.subtle.importKey(
-            "raw", encoder.encode("test-jwt-secret"),
-            { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-        );
+        const key = await getJwtKey();
         const token = await new SignJWT({ userId: "user-1", email: "a@b.com", name: "A" })
             .setProtectedHeader({ alg: "HS256" })
             .setExpirationTime("1h")
             .sign(key);
         const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("rejects an MCP access token presented to session verifier", async () => {
+        const { createMcpToken, ACCESS_TOKEN_TTL } = await import("@/lib/oauth-tokens");
+        const mcpToken = await createMcpToken(
+            { userId: "user-1", email: "a@b.com", type: "mcp_access", clientId: "c1" },
+            ACCESS_TOKEN_TTL
+        );
+        const result = await verifySessionToken(mcpToken);
         expect(result).toBeNull();
     });
 
