@@ -83,7 +83,7 @@ async function handleAuthorizationCode(body: Record<string, string>) {
   }
 
   // Consume the authorization code (single use)
-  const authCode = consumeAuthCode(code);
+  const authCode = await consumeAuthCode(code);
   if (!authCode) {
     return errorResponse(
       "invalid_grant",

@@ -1,8 +1,8 @@
 /**
  * OAuth 2.0 storage for MCP remote access.
  *
- * Client registrations are persisted to the database so they survive
- * Railway deploys. Auth codes remain in-memory (short-lived, 5 min).
+ * Client registrations and auth codes are persisted to the database so they
+ * survive Railway deploys and work across multiple replicas.
  */
 
 import { prisma } from "@/lib/db";
@@ -82,43 +82,44 @@ export async function getClient(
   };
 }
 
-/** Pending authorization codes (code -> auth code details). Expire after 5 min. */
-export const authCodes = new Map<string, AuthCode>();
-
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-/** Periodically clean up expired authorization codes. */
-function cleanupExpiredCodes() {
-  const now = Date.now();
-  for (const [code, data] of authCodes) {
-    if (data.expiresAt < now) {
-      authCodes.delete(code);
-    }
-  }
-}
-
-// Run cleanup every 60 seconds
-setInterval(cleanupExpiredCodes, 60_000).unref();
-
-/** Create an auth code entry that expires in 5 minutes. */
-export function createAuthCode(
+/** Create an auth code entry persisted to the database, expires in 5 minutes. */
+export async function createAuthCode(
   params: Omit<AuthCode, "code" | "expiresAt">
-): AuthCode {
+): Promise<AuthCode> {
   const code = crypto.randomUUID();
-  const entry: AuthCode = {
-    ...params,
-    code,
-    expiresAt: Date.now() + AUTH_CODE_TTL_MS,
-  };
-  authCodes.set(code, entry);
-  return entry;
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS);
+  await prisma.oAuthAuthCode.create({
+    data: {
+      code,
+      userId: params.userId,
+      email: params.email,
+      codeChallenge: params.codeChallenge,
+      codeChallengeMethod: params.codeChallengeMethod,
+      redirectUri: params.redirectUri,
+      clientId: params.clientId,
+      expiresAt,
+    },
+  });
+  return { ...params, code, expiresAt: expiresAt.getTime() };
 }
 
-/** Consume an auth code (single use). Returns null if not found or expired. */
-export function consumeAuthCode(code: string): AuthCode | null {
-  const entry = authCodes.get(code);
-  if (!entry) return null;
-  authCodes.delete(code);
-  if (entry.expiresAt < Date.now()) return null;
-  return entry;
+/** Consume an auth code (single use, atomic). Returns null if not found or expired. */
+export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
+  const row = await prisma.oAuthAuthCode.findUnique({ where: { code } });
+  if (!row) return null;
+  // Delete regardless of expiry (clean up always)
+  await prisma.oAuthAuthCode.delete({ where: { code } });
+  if (row.expiresAt < new Date()) return null;
+  return {
+    code: row.code,
+    userId: row.userId,
+    email: row.email,
+    codeChallenge: row.codeChallenge,
+    codeChallengeMethod: row.codeChallengeMethod,
+    redirectUri: row.redirectUri,
+    clientId: row.clientId,
+    expiresAt: row.expiresAt.getTime(),
+  };
 }

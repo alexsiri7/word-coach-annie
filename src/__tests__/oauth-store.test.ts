@@ -7,9 +7,9 @@ import {
   getClient,
   createAuthCode,
   consumeAuthCode,
-  authCodes,
   type ClientRegistration,
 } from "@/lib/oauth-store";
+import { prisma } from "@/lib/db";
 
 describe("OAuth Store", () => {
   describe("client registration (database-persisted)", () => {
@@ -59,17 +59,17 @@ describe("OAuth Store", () => {
     });
   });
 
-  describe("auth codes (in-memory)", () => {
-    beforeEach(() => {
-      authCodes.clear();
+  describe("auth codes (database-persisted)", () => {
+    beforeEach(async () => {
+      await prisma.oAuthAuthCode.deleteMany();
     });
 
-    afterEach(() => {
-      authCodes.clear();
+    afterEach(async () => {
+      await prisma.oAuthAuthCode.deleteMany();
     });
 
-    it("creates and consumes an auth code", () => {
-      const code = createAuthCode({
+    it("creates and consumes an auth code", async () => {
+      const code = await createAuthCode({
         userId: "user-1",
         email: "test@example.com",
         codeChallenge: "challenge123",
@@ -82,14 +82,14 @@ describe("OAuth Store", () => {
       expect(code.userId).toBe("user-1");
       expect(code.expiresAt).toBeGreaterThan(Date.now());
 
-      const consumed = consumeAuthCode(code.code);
+      const consumed = await consumeAuthCode(code.code);
       expect(consumed).not.toBeNull();
       expect(consumed!.userId).toBe("user-1");
       expect(consumed!.email).toBe("test@example.com");
     });
 
-    it("auth code is single-use (second consumption returns null)", () => {
-      const code = createAuthCode({
+    it("auth code is single-use (second consumption returns null)", async () => {
+      const code = await createAuthCode({
         userId: "user-1",
         email: "test@example.com",
         codeChallenge: "challenge",
@@ -98,20 +98,20 @@ describe("OAuth Store", () => {
         clientId: "client-1",
       });
 
-      const first = consumeAuthCode(code.code);
+      const first = await consumeAuthCode(code.code);
       expect(first).not.toBeNull();
 
-      const second = consumeAuthCode(code.code);
+      const second = await consumeAuthCode(code.code);
       expect(second).toBeNull();
     });
 
-    it("returns null for nonexistent auth code", () => {
-      const result = consumeAuthCode("nonexistent-code");
+    it("returns null for nonexistent auth code", async () => {
+      const result = await consumeAuthCode("nonexistent-code");
       expect(result).toBeNull();
     });
 
-    it("returns null for expired auth code", () => {
-      const code = createAuthCode({
+    it("returns null for expired auth code", async () => {
+      const code = await createAuthCode({
         userId: "user-1",
         email: "test@example.com",
         codeChallenge: "challenge",
@@ -120,15 +120,17 @@ describe("OAuth Store", () => {
         clientId: "client-1",
       });
 
-      // Manually expire the code
-      const entry = authCodes.get(code.code)!;
-      entry.expiresAt = Date.now() - 1000;
+      // Manually expire the code in the DB
+      await prisma.oAuthAuthCode.update({
+        where: { code: code.code },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
 
-      const result = consumeAuthCode(code.code);
+      const result = await consumeAuthCode(code.code);
       expect(result).toBeNull();
     });
 
-    it("each auth code gets a unique code string", () => {
+    it("each auth code gets a unique code string", async () => {
       const params = {
         userId: "user-1",
         email: "test@example.com",
@@ -138,8 +140,8 @@ describe("OAuth Store", () => {
         clientId: "client-1",
       };
 
-      const code1 = createAuthCode(params);
-      const code2 = createAuthCode(params);
+      const code1 = await createAuthCode(params);
+      const code2 = await createAuthCode(params);
       expect(code1.code).not.toBe(code2.code);
     });
   });

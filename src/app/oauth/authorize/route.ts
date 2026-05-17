@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Issue authorization code
-  const authCode = createAuthCode({
+  const authCode = await createAuthCode({
     userId: session.userId,
     email: session.email,
     codeChallenge,
