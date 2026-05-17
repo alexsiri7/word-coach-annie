@@ -145,7 +145,7 @@ const ALLOWED_REDIRECT_PATTERNS = [
  * Rejects cross-origin attempts, protocol injections, and unknown paths.
  */
 export function isAllowedRedirect(path: string): boolean {
-    if (!path || typeof path !== "string") return false;
+    if (!path) return false;
     if (!path.startsWith("/") || path.startsWith("//")) return false;
     if (path.includes("\\")) return false;
 
