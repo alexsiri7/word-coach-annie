@@ -456,4 +456,3 @@ function renderConsentPage(
     },
   });
 }
-
