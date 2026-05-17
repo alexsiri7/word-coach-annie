@@ -11,6 +11,10 @@ import { logger } from "@/lib/logger";
 const JWT_AUDIENCE_MCP_ACCESS = "word-coach-annie:mcp_access";
 const JWT_AUDIENCE_MCP_REFRESH = "word-coach-annie:mcp_refresh";
 
+function audienceFor(type: "mcp_access" | "mcp_refresh"): string {
+  return type === "mcp_access" ? JWT_AUDIENCE_MCP_ACCESS : JWT_AUDIENCE_MCP_REFRESH;
+}
+
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
 // Refresh token: 30 days
@@ -29,13 +33,10 @@ export async function createMcpToken(
   ttlSeconds: number
 ): Promise<string> {
   const key = await getJwtKey();
-  const audience = payload.type === "mcp_access"
-    ? JWT_AUDIENCE_MCP_ACCESS
-    : JWT_AUDIENCE_MCP_REFRESH;
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(JWT_ISSUER)
-    .setAudience(audience)
+    .setAudience(audienceFor(payload.type))
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(key);
@@ -48,13 +49,10 @@ export async function verifyMcpToken(
 ): Promise<{ userId: string; email: string; clientId: string } | null> {
   try {
     const key = await getJwtKey();
-    const audience = expectedType === "mcp_access"
-      ? JWT_AUDIENCE_MCP_ACCESS
-      : JWT_AUDIENCE_MCP_REFRESH;
     const { payload } = await jwtVerify(token, key, {
       algorithms: ["HS256"],
       issuer: JWT_ISSUER,
-      audience,
+      audience: audienceFor(expectedType),
     });
     if (
       payload.type !== expectedType ||

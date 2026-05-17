@@ -1,11 +1,13 @@
 /**
  * OAuth 2.0 storage for MCP remote access.
  *
- * Client registrations are persisted to the database so they survive
- * Railway deploys. Auth codes remain in-memory (short-lived, 5 min).
+ * Client registrations and auth codes are persisted to the database so they
+ * survive Railway deploys and work across multiple replicas.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const IP_REGISTRATION_LIMIT = 25;
@@ -82,43 +84,72 @@ export async function getClient(
   };
 }
 
-/** Pending authorization codes (code -> auth code details). Expire after 5 min. */
-export const authCodes = new Map<string, AuthCode>();
-
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-/** Periodically clean up expired authorization codes. */
-function cleanupExpiredCodes() {
-  const now = Date.now();
-  for (const [code, data] of authCodes) {
-    if (data.expiresAt < now) {
-      authCodes.delete(code);
-    }
-  }
-}
-
-// Run cleanup every 60 seconds
-setInterval(cleanupExpiredCodes, 60_000).unref();
-
-/** Create an auth code entry that expires in 5 minutes. */
-export function createAuthCode(
+/** Create an auth code entry persisted to the database, expires in 5 minutes. */
+export async function createAuthCode(
   params: Omit<AuthCode, "code" | "expiresAt">
-): AuthCode {
+): Promise<AuthCode> {
   const code = crypto.randomUUID();
-  const entry: AuthCode = {
-    ...params,
-    code,
-    expiresAt: Date.now() + AUTH_CODE_TTL_MS,
-  };
-  authCodes.set(code, entry);
-  return entry;
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS);
+  try {
+    await prisma.oAuthAuthCode.create({
+      data: {
+        code,
+        userId: params.userId,
+        email: params.email,
+        codeChallenge: params.codeChallenge,
+        codeChallengeMethod: params.codeChallengeMethod,
+        redirectUri: params.redirectUri,
+        clientId: params.clientId,
+        expiresAt,
+      },
+    });
+  } catch (err) {
+    logger.error("createAuthCode: failed to persist auth code", {
+      userId: params.userId,
+      clientId: params.clientId,
+      err,
+    });
+    throw err;
+  }
+  return { ...params, code, expiresAt: expiresAt.getTime() };
 }
 
-/** Consume an auth code (single use). Returns null if not found or expired. */
-export function consumeAuthCode(code: string): AuthCode | null {
-  const entry = authCodes.get(code);
-  if (!entry) return null;
-  authCodes.delete(code);
-  if (entry.expiresAt < Date.now()) return null;
-  return entry;
+/**
+ * Consume an auth code (single use). Returns null if not found or expired.
+ *
+ * Note: `findUnique` + `delete` are two separate DB calls. In practice this
+ * is safe for low-concurrency OAuth flows, but is not strictly atomic — a
+ * narrow TOCTOU window exists under high concurrency. Use a `$transaction`
+ * if strict exactly-once guarantees are needed.
+ */
+export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
+  const row = await prisma.oAuthAuthCode.findUnique({ where: { code } });
+  if (!row) return null;
+  // Delete regardless of expiry (clean up always)
+  try {
+    await prisma.oAuthAuthCode.delete({ where: { code } });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      // Another replica already consumed this code — treat as already used.
+      return null;
+    }
+    logger.error("consumeAuthCode: unexpected error deleting auth code", err);
+    throw err;
+  }
+  if (row.expiresAt < new Date()) return null;
+  return {
+    code: row.code,
+    userId: row.userId,
+    email: row.email,
+    codeChallenge: row.codeChallenge,
+    codeChallengeMethod: row.codeChallengeMethod,
+    redirectUri: row.redirectUri,
+    clientId: row.clientId,
+    expiresAt: row.expiresAt.getTime(),
+  };
 }

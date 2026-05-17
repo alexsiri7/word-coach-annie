@@ -58,7 +58,7 @@ describe("POST /oauth/token", () => {
 
   it("authorization_code grant with valid params returns tokens", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(consumeAuthCode).mockReturnValue(mockAuthCode);
+    vi.mocked(consumeAuthCode).mockResolvedValue(mockAuthCode);
     vi.mocked(verifyPkce).mockResolvedValue(true);
 
     const res = await POST(makeTokenRequest(validAuthCodeBody));
@@ -73,7 +73,7 @@ describe("POST /oauth/token", () => {
 
   it("authorization_code grant embeds client_id in issued tokens", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(consumeAuthCode).mockReturnValue(mockAuthCode);
+    vi.mocked(consumeAuthCode).mockResolvedValue(mockAuthCode);
     vi.mocked(verifyPkce).mockResolvedValue(true);
 
     await POST(makeTokenRequest(validAuthCodeBody));
@@ -107,7 +107,7 @@ describe("POST /oauth/token", () => {
 
   it("invalid/expired auth code returns 400 invalid_grant", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(consumeAuthCode).mockReturnValue(null);
+    vi.mocked(consumeAuthCode).mockResolvedValue(null);
 
     const res = await POST(makeTokenRequest(validAuthCodeBody));
     const body = await res.json();
@@ -117,7 +117,7 @@ describe("POST /oauth/token", () => {
 
   it("PKCE mismatch returns 400 invalid_grant", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(consumeAuthCode).mockReturnValue(mockAuthCode);
+    vi.mocked(consumeAuthCode).mockResolvedValue(mockAuthCode);
     vi.mocked(verifyPkce).mockResolvedValue(false);
 
     const res = await POST(makeTokenRequest(validAuthCodeBody));

@@ -83,7 +83,13 @@ async function handleAuthorizationCode(body: Record<string, string>) {
   }
 
   // Consume the authorization code (single use)
-  const authCode = consumeAuthCode(code);
+  let authCode;
+  try {
+    authCode = await consumeAuthCode(code);
+  } catch (err) {
+    logger.error("handleAuthorizationCode: failed to consume auth code", err);
+    return errorResponse("server_error", "Internal server error", 500);
+  }
   if (!authCode) {
     return errorResponse(
       "invalid_grant",

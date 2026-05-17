@@ -325,6 +325,19 @@ model OAuthClient {
   @@index([registrationIp, createdAt])
 }
 
+model OAuthAuthCode {
+  code                String   @id
+  userId              String
+  email               String
+  codeChallenge       String
+  codeChallengeMethod String
+  redirectUri         String
+  clientId            String
+  expiresAt           DateTime
+
+  @@index([expiresAt])
+}
+
 model HashnodeCredential {
   id            String           @id @default(cuid())
   userId        String           @unique // "local" in single-user mode, actual user ID in multi-user

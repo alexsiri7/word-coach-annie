@@ -12,7 +12,7 @@ vi.mock("@/lib/oauth-store", () => ({
     client_name: "TestApp",
     redirect_uris: ["http://localhost/callback"],
   })),
-  createAuthCode: vi.fn(() => ({ code: "code-123" })),
+  createAuthCode: vi.fn(async () => ({ code: "code-123" })),
 }));
 
 import { GET, POST } from "@/app/oauth/authorize/route";
