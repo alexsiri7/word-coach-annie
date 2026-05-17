@@ -10,7 +10,10 @@ import { logger } from "@/lib/logger";
  */
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const origin = new URL(env.GOOGLE_REDIRECT_URI || request.url).origin;
+    if (!env.GOOGLE_REDIRECT_URI) {
+        return NextResponse.json({ error: "Google OAuth not configured" }, { status: 501 });
+    }
+    const origin = new URL(env.GOOGLE_REDIRECT_URI).origin;
 
     const code = searchParams.get("code");
     const state = searchParams.get("state");

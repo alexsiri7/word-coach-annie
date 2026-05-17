@@ -31,7 +31,17 @@ export async function GET(request: NextRequest) {
     const stateParam = request.nextUrl.searchParams.get("state");
     const stateCookie = request.cookies.get("oauth_state")?.value;
     const redirectUri = env.GOOGLE_REDIRECT_URI;
-    const baseUrl = redirectUri ? new URL(redirectUri).origin : request.nextUrl.origin;
+    const clientId = env.GOOGLE_CLIENT_ID;
+    const clientSecret = env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+        return NextResponse.json(
+            { error: "Google OAuth not configured" },
+            { status: 501 }
+        );
+    }
+
+    const baseUrl = new URL(redirectUri).origin;
     if (!stateParam || !stateCookie || stateParam !== stateCookie) {
         return NextResponse.redirect(
             new URL("/login?error=invalid_state", baseUrl)
@@ -56,16 +66,6 @@ export async function GET(request: NextRequest) {
         logger.warn("OAuth HMAC state verification failed — possible CSRF or replay attempt");
         return NextResponse.redirect(
             new URL("/login?error=invalid_state", baseUrl)
-        );
-    }
-
-    const clientId = env.GOOGLE_CLIENT_ID;
-    const clientSecret = env.GOOGLE_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret || !redirectUri) {
-        return NextResponse.json(
-            { error: "Google OAuth not configured" },
-            { status: 501 }
         );
     }
 
