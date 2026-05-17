@@ -4,8 +4,9 @@
  * Shared between the /oauth/token endpoint and middleware.
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { getJwtKey, safeEqual } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -16,6 +17,7 @@ export interface McpTokenPayload {
   userId: string;
   email: string;
   type: "mcp_access" | "mcp_refresh";
+  clientId: string;
 }
 
 /** Create a signed MCP access or refresh token. */
@@ -35,15 +37,37 @@ export async function createMcpToken(
 export async function verifyMcpToken(
   token: string,
   expectedType: "mcp_access" | "mcp_refresh"
-): Promise<{ userId: string; email: string } | null> {
+): Promise<{ userId: string; email: string; clientId: string } | null> {
   try {
     const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key);
-    if (payload.type !== expectedType || !payload.userId || !payload.email) {
+    if (
+      payload.type !== expectedType ||
+      !payload.userId ||
+      !payload.email ||
+      !payload.clientId
+    ) {
       return null;
     }
-    return { userId: payload.userId as string, email: payload.email as string };
-  } catch {
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      clientId: payload.clientId as string,
+    };
+  } catch (err) {
+    // Expected: token is expired, tampered, or has wrong type — treat as invalid.
+    if (
+      err instanceof JoseErrors.JWTExpired ||
+      err instanceof JoseErrors.JWTInvalid ||
+      err instanceof JoseErrors.JWSSignatureVerificationFailed ||
+      err instanceof JoseErrors.JOSEError
+    ) {
+      return null;
+    }
+    // Unexpected: infrastructure failure (missing key, crypto error).
+    // Log with full context so Sentry captures it, then return null so
+    // callers still return 400 rather than an unhandled 500.
+    logger.error("verifyMcpToken: unexpected error during JWT verification", err);
     return null;
   }
 }

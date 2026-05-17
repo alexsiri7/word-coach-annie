@@ -6,6 +6,7 @@ import { resetRateLimitStore } from "@/lib/rate-limit";
 // Mock Sentry
 vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
+    captureException: vi.fn(),
 }));
 
 // Mock auth module

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { SignJWT } from "jose";
 
 // JWT_SECRET must be set before importing the module
 const origJwt = process.env.JWT_SECRET;
@@ -12,6 +13,7 @@ import {
   ACCESS_TOKEN_TTL,
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
+import { getJwtKey } from "@/lib/auth";
 
 describe("MCP OAuth Tokens", () => {
   beforeEach(() => {
@@ -36,7 +38,7 @@ describe("MCP OAuth Tokens", () => {
   describe("createMcpToken + verifyMcpToken round-trip", () => {
     it("creates and verifies an access token", async () => {
       const token = await createMcpToken(
-        { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+        { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
         ACCESS_TOKEN_TTL
       );
 
@@ -47,11 +49,12 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).not.toBeNull();
       expect(payload!.userId).toBe("user-123");
       expect(payload!.email).toBe("test@example.com");
+      expect(payload!.clientId).toBe("client-1");
     });
 
-    it("creates and verifies a refresh token", async () => {
+    it("creates and verifies a refresh token with clientId binding", async () => {
       const token = await createMcpToken(
-        { userId: "user-456", email: "refresh@example.com", type: "mcp_refresh" },
+        { userId: "user-456", email: "refresh@example.com", type: "mcp_refresh", clientId: "client-1" },
         REFRESH_TOKEN_TTL
       );
 
@@ -59,11 +62,12 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).not.toBeNull();
       expect(payload!.userId).toBe("user-456");
       expect(payload!.email).toBe("refresh@example.com");
+      expect(payload!.clientId).toBe("client-1");
     });
 
     it("rejects token with wrong expected type", async () => {
       const token = await createMcpToken(
-        { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+        { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
         ACCESS_TOKEN_TTL
       );
 
@@ -77,12 +81,31 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).toBeNull();
     });
 
+    it("rejects a token missing clientId claim (legacy token)", async () => {
+      // Simulate a pre-fix token by signing directly without clientId.
+      // Tokens issued before this PR will be rejected, enforcing the security fix.
+      const key = await getJwtKey();
+      const legacyToken = await new SignJWT({
+        userId: "user-legacy",
+        email: "legacy@example.com",
+        type: "mcp_access",
+        // no clientId field — simulates a token issued before MED-03 fix
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(key);
+
+      const payload = await verifyMcpToken(legacyToken, "mcp_access");
+      expect(payload).toBeNull(); // legacy tokens must not be accepted
+    });
+
     it("rejects expired token", async () => {
       vi.useFakeTimers();
       try {
         // Create a token with a 1-second TTL
         const token = await createMcpToken(
-          { userId: "user-123", email: "test@example.com", type: "mcp_access" },
+          { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
           1 // 1 second TTL
         );
 
