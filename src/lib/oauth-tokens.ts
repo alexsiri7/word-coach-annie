@@ -5,8 +5,11 @@
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
 import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
-import { getJwtKey, safeEqual } from "@/lib/auth";
+import { getJwtKey, safeEqual, JWT_ISSUER } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+
+const JWT_AUDIENCE_MCP_ACCESS = "word-coach-annie:mcp_access";
+const JWT_AUDIENCE_MCP_REFRESH = "word-coach-annie:mcp_refresh";
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -26,8 +29,13 @@ export async function createMcpToken(
   ttlSeconds: number
 ): Promise<string> {
   const key = await getJwtKey();
+  const audience = payload.type === "mcp_access"
+    ? JWT_AUDIENCE_MCP_ACCESS
+    : JWT_AUDIENCE_MCP_REFRESH;
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(key);
@@ -40,7 +48,14 @@ export async function verifyMcpToken(
 ): Promise<{ userId: string; email: string; clientId: string } | null> {
   try {
     const key = await getJwtKey();
-    const { payload } = await jwtVerify(token, key);
+    const audience = expectedType === "mcp_access"
+      ? JWT_AUDIENCE_MCP_ACCESS
+      : JWT_AUDIENCE_MCP_REFRESH;
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: ["HS256"],
+      issuer: JWT_ISSUER,
+      audience,
+    });
     if (
       payload.type !== expectedType ||
       !payload.userId ||
@@ -55,18 +70,11 @@ export async function verifyMcpToken(
       clientId: payload.clientId as string,
     };
   } catch (err) {
-    // Expected: token is expired, tampered, or has wrong type — treat as invalid.
-    if (
-      err instanceof JoseErrors.JWTExpired ||
-      err instanceof JoseErrors.JWTInvalid ||
-      err instanceof JoseErrors.JWSSignatureVerificationFailed ||
-      err instanceof JoseErrors.JOSEError
-    ) {
+    // Expected: expired, tampered, wrong algorithm, mismatched issuer/audience — treat as invalid.
+    if (err instanceof JoseErrors.JOSEError) {
       return null;
     }
     // Unexpected: infrastructure failure (missing key, crypto error).
-    // Log with full context so Sentry captures it, then return null so
-    // callers still return 400 rather than an unhandled 500.
     logger.error("verifyMcpToken: unexpected error during JWT verification", err);
     return null;
   }

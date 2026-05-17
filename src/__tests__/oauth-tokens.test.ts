@@ -81,6 +81,38 @@ describe("MCP OAuth Tokens", () => {
       expect(payload).toBeNull();
     });
 
+    it("rejects a valid HS256 token without issuer/audience claims", async () => {
+      const key = await getJwtKey();
+      const token = await new SignJWT({
+        userId: "user-1", email: "a@b.com",
+        type: "mcp_access", clientId: "client-1",
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(key);
+      const payload = await verifyMcpToken(token, "mcp_access");
+      expect(payload).toBeNull();
+    });
+
+    it("rejects an access token presented as a refresh token audience", async () => {
+      const token = await createMcpToken(
+        { userId: "user-1", email: "a@b.com", type: "mcp_access", clientId: "c1" },
+        ACCESS_TOKEN_TTL
+      );
+      const payload = await verifyMcpToken(token, "mcp_refresh");
+      expect(payload).toBeNull();
+    });
+
+    it("rejects a session token presented to MCP verifier", async () => {
+      const { createSessionToken } = await import("@/lib/auth");
+      const sessionToken = await createSessionToken({
+        userId: "user-1", email: "a@b.com", name: "A",
+      });
+      const payload = await verifyMcpToken(sessionToken, "mcp_access");
+      expect(payload).toBeNull();
+    });
+
     it("rejects a token missing clientId claim (legacy token)", async () => {
       // Simulate a pre-fix token by signing directly without clientId.
       // Tokens issued before this PR will be rejected, enforcing the security fix.

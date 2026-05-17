@@ -6,6 +6,7 @@ import {
     verifySessionToken,
     isAuthEnabled,
     isAllowedRedirect,
+    getJwtKey,
 } from "@/lib/auth";
 
 describe("auth utilities", () => {
@@ -79,6 +80,36 @@ describe("JWT session tokens", () => {
         parts[1] = "eyJ0ZXN0IjoidGFtcGVyZWQifQ";
         const tampered = parts.join(".");
         const result = await verifySessionToken(tampered);
+        expect(result).toBeNull();
+    });
+
+    it("rejects a token signed with wrong algorithm (none attack)", async () => {
+        const header = btoa(JSON.stringify({ alg: "none", typ: "JWT" }))
+            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const body = btoa(JSON.stringify({ userId: "x", email: "x@x.com", name: "x" }))
+            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const result = await verifySessionToken(`${header}.${body}.`);
+        expect(result).toBeNull();
+    });
+
+    it("rejects a valid HS256 token without issuer/audience claims", async () => {
+        const { SignJWT } = await import("jose");
+        const key = await getJwtKey();
+        const token = await new SignJWT({ userId: "user-1", email: "a@b.com", name: "A" })
+            .setProtectedHeader({ alg: "HS256" })
+            .setExpirationTime("1h")
+            .sign(key);
+        const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("rejects an MCP access token presented to session verifier", async () => {
+        const { createMcpToken, ACCESS_TOKEN_TTL } = await import("@/lib/oauth-tokens");
+        const mcpToken = await createMcpToken(
+            { userId: "user-1", email: "a@b.com", type: "mcp_access", clientId: "c1" },
+            ACCESS_TOKEN_TTL
+        );
+        const result = await verifySessionToken(mcpToken);
         expect(result).toBeNull();
     });
 
