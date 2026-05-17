@@ -55,10 +55,10 @@ export async function POST(
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {
         logger.error("Failed to create annotation", error);
-        const message = error instanceof Error ? error.message : "Internal server error";
+        const isContentRequired = error instanceof Error && error.message === "Content is required";
         return NextResponse.json(
-            { error: message },
-            { status: message === "Content is required" ? 400 : 500 }
+            { error: isContentRequired ? "Content is required" : "Internal server error" },
+            { status: isContentRequired ? 400 : 500 }
         );
     }
 }

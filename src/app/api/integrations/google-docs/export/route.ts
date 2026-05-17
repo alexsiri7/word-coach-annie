@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result);
     } catch (error) {
         logger.error('POST /api/integrations/google-docs/export error', error);
-        const message = error instanceof Error ? error.message : 'Export failed';
-        return NextResponse.json({ error: message }, { status: 500 });
+        return NextResponse.json({ error: 'Export failed' }, { status: 500 });
     }
 }

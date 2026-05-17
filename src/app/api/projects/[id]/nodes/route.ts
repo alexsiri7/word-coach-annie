@@ -75,8 +75,11 @@ export async function POST(
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (message.includes("type must be") || message.includes("status must be") || message.includes("Parent node not found")) {
-      return NextResponse.json({ error: message }, { status: 400 });
+    if (message.includes("type must be") || message.includes("status must be")) {
+      return NextResponse.json({ error: "Invalid node type or status" }, { status: 400 });
+    }
+    if (message.includes("Parent node not found")) {
+      return NextResponse.json({ error: "Parent node not found" }, { status: 400 });
     }
     return NextResponse.json(
       { error: "Internal server error" },
