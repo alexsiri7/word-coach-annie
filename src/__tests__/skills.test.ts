@@ -116,4 +116,47 @@ describe("MCP Skills", () => {
             expect(skill!.metadata.triggers.length).toBeGreaterThan(0);
         });
     });
+
+    describe("Hard Rule: No CONTENT blocks", () => {
+        const ALL_SKILLS = [
+            "developmental-edit",
+            "line-edit",
+            "consistency-check",
+            "outline-review",
+            "plot-structure-analysis",
+            "character-arc-review",
+            "scene-drafting-assistant",
+            "story-development-chat",
+        ];
+
+        it("should not instruct Annie to produce CONTENT blocks in any skill", () => {
+            for (const name of ALL_SKILLS) {
+                const skill = loadSkill(name);
+                expect(skill, `skill "${name}" should exist`).not.toBeNull();
+                // Fail if instructions tell Annie to write/produce/output CONTENT blocks.
+                // We check each line individually and skip lines that are clearly
+                // prohibitions (containing "never" or "not") to avoid false positives
+                // on phrases like "never CONTENT blocks".
+                const lines = skill!.instructions.split("\n");
+                for (const line of lines) {
+                    if (/never|do not|don't|should not|must not/i.test(line)) continue;
+                    const hasContentInstruction =
+                        /\buse\b.*CONTENT block|\bwrite\b.*CONTENT block|\bproduce\b.*CONTENT block|\boutput\b.*CONTENT block/i.test(line);
+                    expect(hasContentInstruction, `skill "${name}" should not instruct Annie to produce CONTENT blocks — found in: ${line.trim()}`).toBe(false);
+                }
+            }
+        });
+
+        it("scene-drafting-assistant should explicitly produce BEAT blocks only", () => {
+            const skill = loadSkill("scene-drafting-assistant");
+            expect(skill).not.toBeNull();
+            expect(skill!.instructions).toContain("BEAT blocks only");
+        });
+
+        it("scene-drafting-assistant should explicitly forbid CONTENT blocks", () => {
+            const skill = loadSkill("scene-drafting-assistant");
+            expect(skill).not.toBeNull();
+            expect(skill!.instructions).toContain("never CONTENT blocks");
+        });
+    });
 });
