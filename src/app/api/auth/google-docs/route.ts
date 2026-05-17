@@ -8,8 +8,8 @@ import crypto from "crypto";
  * GET /api/auth/google-docs — Redirect to Google OAuth for Docs/Drive scopes.
  * Separate from /api/auth/google (login) — this grants document access only.
  */
-export async function GET(request: NextRequest) {
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+export async function GET(_request: NextRequest) {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
         return NextResponse.json(
             { error: "Google OAuth not configured" },
             { status: 501 }
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const baseUrl = new URL(env.GOOGLE_REDIRECT_URI || request.url).origin;
+        const baseUrl = new URL(env.GOOGLE_REDIRECT_URI).origin;
         const redirectUri = `${baseUrl}/api/auth/google-docs/callback`;
 
         const state = crypto.randomUUID();

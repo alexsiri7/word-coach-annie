@@ -9,8 +9,11 @@ import { logger } from "@/lib/logger";
  * Exchanges auth code for tokens, stores GoogleCredential, redirects to /settings.
  */
 export async function GET(request: NextRequest) {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
+        return NextResponse.json({ error: "Google OAuth not configured" }, { status: 501 });
+    }
     const { searchParams } = new URL(request.url);
-    const origin = new URL(env.GOOGLE_REDIRECT_URI || request.url).origin;
+    const origin = new URL(env.GOOGLE_REDIRECT_URI).origin;
 
     const code = searchParams.get("code");
     const state = searchParams.get("state");
