@@ -30,9 +30,8 @@ export async function GET(request: NextRequest) {
     // Verify CSRF state parameter (cookie equality + HMAC signature)
     const stateParam = request.nextUrl.searchParams.get("state");
     const stateCookie = request.cookies.get("oauth_state")?.value;
-    const baseUrl = env.GOOGLE_REDIRECT_URI
-        ? new URL(env.GOOGLE_REDIRECT_URI).origin
-        : request.nextUrl.origin;
+    const redirectUri = env.GOOGLE_REDIRECT_URI;
+    const baseUrl = redirectUri ? new URL(redirectUri).origin : request.nextUrl.origin;
     if (!stateParam || !stateCookie || stateParam !== stateCookie) {
         return NextResponse.redirect(
             new URL("/login?error=invalid_state", baseUrl)
@@ -62,7 +61,6 @@ export async function GET(request: NextRequest) {
 
     const clientId = env.GOOGLE_CLIENT_ID;
     const clientSecret = env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = env.GOOGLE_REDIRECT_URI;
 
     if (!clientId || !clientSecret || !redirectUri) {
         return NextResponse.json(
