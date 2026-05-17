@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { StructureController } from "@/lib/controllers/structure";
+import { ANNOTATION_ERRORS, StructureController } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -55,9 +55,9 @@ export async function POST(
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {
         logger.error("Failed to create annotation", error);
-        const isContentRequired = error instanceof Error && error.message === "Content is required";
+        const isContentRequired = error instanceof Error && error.message === ANNOTATION_ERRORS.CONTENT_REQUIRED;
         return NextResponse.json(
-            { error: isContentRequired ? "Content is required" : "Internal server error" },
+            { error: isContentRequired ? ANNOTATION_ERRORS.CONTENT_REQUIRED : "Internal server error" },
             { status: isContentRequired ? 400 : 500 }
         );
     }
