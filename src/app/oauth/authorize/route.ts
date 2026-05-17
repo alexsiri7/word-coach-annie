@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken, safeEqual } from "@/lib/auth";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
+import { escapeHtml } from "@/lib/sanitize-server";
 
 /**
  * GET /oauth/authorize
@@ -443,12 +444,3 @@ function renderConsentPage(
   });
 }
 
-/** Basic HTML entity escaping. */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
