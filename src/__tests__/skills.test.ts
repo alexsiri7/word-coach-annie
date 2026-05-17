@@ -118,31 +118,25 @@ describe("MCP Skills", () => {
     });
 
     describe("Hard Rule: No CONTENT blocks", () => {
-        const ALL_SKILLS = [
-            "developmental-edit",
-            "line-edit",
-            "consistency-check",
-            "outline-review",
-            "plot-structure-analysis",
-            "character-arc-review",
-            "scene-drafting-assistant",
-            "story-development-chat",
-        ];
+        const ALL_SKILLS = listSkills().map(s => s.name);
 
         it("should not instruct Annie to produce CONTENT blocks in any skill", () => {
             for (const name of ALL_SKILLS) {
                 const skill = loadSkill(name);
                 expect(skill, `skill "${name}" should exist`).not.toBeNull();
-                // Fail if instructions tell Annie to write/produce/output CONTENT blocks.
-                // We check each line individually and skip lines that are clearly
-                // prohibitions (containing "never" or "not") to avoid false positives
-                // on phrases like "never CONTENT blocks".
+                // Fail if any line mentions "CONTENT block" outside of a prohibition context.
+                // Prohibition lines (containing "never", "do not", "don't", "should not",
+                // "must not") are skipped to avoid false positives on phrases like
+                // "never CONTENT blocks". Word boundaries prevent "should note" matching
+                // "should not".
                 const lines = skill!.instructions.split("\n");
                 for (const line of lines) {
-                    if (/never|do not|don't|should not|must not/i.test(line)) continue;
-                    const hasContentInstruction =
-                        /\buse\b.*CONTENT block|\bwrite\b.*CONTENT block|\bproduce\b.*CONTENT block|\boutput\b.*CONTENT block/i.test(line);
-                    expect(hasContentInstruction, `skill "${name}" should not instruct Annie to produce CONTENT blocks — found in: ${line.trim()}`).toBe(false);
+                    if (/never|\bdo not\b|\bdon't\b|\bshould not\b|\bmust not\b/i.test(line)) continue;
+                    const mentionsContentBlock = /CONTENT block/i.test(line);
+                    expect(
+                        mentionsContentBlock,
+                        `skill "${name}" has a non-prohibition line mentioning CONTENT block — found: ${line.trim()}`
+                    ).toBe(false);
                 }
             }
         });
