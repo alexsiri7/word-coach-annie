@@ -228,7 +228,7 @@ describe("POST /api/feedback", () => {
     expect(issueBody.body).toContain(`![Screenshot](${fakeAssetUrl})`);
   });
 
-  it("creates issue without screenshot section when upload fails", async () => {
+  it("creates issue without screenshot section when magic bytes are invalid", async () => {
     process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
     process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
 
@@ -254,6 +254,50 @@ describe("POST /api/feedback", () => {
     const issueBody = JSON.parse(lastCall[1].body);
     expect(issueBody.body).not.toContain("### Screenshot");
     expect(issueBody.body).toContain("Bug with failed screenshot");
+  });
+
+  it("creates issue without screenshot section when GitHub upload API fails", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+
+    // FF D8 FF E0 — valid JPEG magic bytes, passes both checks
+    const validJpegBase64 = "/9j/4AAQ";
+
+    // getRepoId succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 12345 }),
+    });
+
+    // Screenshot upload fails (GitHub 500)
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => "Internal Server Error",
+    });
+
+    // Issue creation succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        html_url: "https://github.com/testowner/testrepo/issues/100",
+      }),
+    });
+
+    const res = await POST(
+      makeRequest({
+        type: "bug",
+        message: "Bug with failed upload",
+        screenshot: `data:image/jpeg;base64,${validJpegBase64}`,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+    const issueBody = JSON.parse(lastCall[1].body);
+    expect(issueBody.body).not.toContain("### Screenshot");
+    expect(issueBody.body).toContain("Bug with failed upload");
   });
 
   it("rejects screenshot with non-JPEG magic bytes (PNG data)", async () => {
