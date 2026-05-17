@@ -8,7 +8,6 @@ import {
   type ClientRegistration,
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
-import { isAuthEnabled } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -51,15 +50,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Require an authenticated session when auth is enabled
-  const authEnabled = isAuthEnabled();
-  const userId = authEnabled ? getCurrentUserId(request) : null;
-  if (authEnabled && !userId) {
-    return NextResponse.json(
-      { error: "invalid_client_metadata", error_description: "registration requires an authenticated session" },
-      { status: 401 }
-    );
-  }
+  const userId = getCurrentUserId(request);  // null when not logged in — tracked for audit only
 
   let body: Record<string, unknown>;
   try {

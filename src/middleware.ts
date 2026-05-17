@@ -22,6 +22,7 @@ const PUBLIC_PATHS = [
     "/privacy",
     "/terms",
     "/.well-known/oauth-authorization-server",
+    "/oauth/register",
     "/oauth/token",
     "/version.json",
 ];
