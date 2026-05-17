@@ -115,6 +115,13 @@ const pwaConfig = withPWA({
     skipWaiting: true,
     clientsClaim: true,
     runtimeCaching: [
+      // Never cache OAuth or auth routes — the SW must not intercept redirects
+      // in the OAuth flow or serve stale responses for login/consent pages.
+      {
+        urlPattern: ({ url }: { url: URL }) =>
+          url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/api/auth/"),
+        handler: "NetworkOnly" as const,
+      },
       // Cache Google Fonts stylesheets
       {
         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
