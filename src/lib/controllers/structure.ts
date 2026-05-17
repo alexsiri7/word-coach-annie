@@ -3,6 +3,10 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 
+export const ANNOTATION_ERRORS = {
+    CONTENT_REQUIRED: "Content is required",
+} as const;
+
 export interface OutlineNode {
     id: string;
     type: string;
@@ -339,7 +343,7 @@ export class StructureController {
     }
 
     static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
-        if (!content) throw new Error("Content is required");
+        if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
 
         // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
         // in this context; crypto.randomUUID() is cryptographically secure and globally unique.
