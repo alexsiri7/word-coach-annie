@@ -15,6 +15,9 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE };
 
+export const JWT_ISSUER = "word-coach-annie";
+export const JWT_AUDIENCE_SESSION = "word-coach-annie:session";
+
 /** JWT payload shape for Google OAuth sessions. */
 export interface SessionPayload {
     userId: string;
@@ -65,6 +68,8 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
     const key = await getJwtKey();
     return new SignJWT({ ...payload })
         .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(JWT_ISSUER)
+        .setAudience(JWT_AUDIENCE_SESSION)
         .setIssuedAt()
         .setExpirationTime(`${SESSION_MAX_AGE}s`)
         .sign(key);
@@ -77,7 +82,11 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
     try {
         const key = await getJwtKey();
-        const { payload } = await jwtVerify(token, key);
+        const { payload } = await jwtVerify(token, key, {
+            algorithms: ["HS256"],
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE_SESSION,
+        });
         if (payload.userId && payload.email) {
             return {
                 userId: payload.userId as string,

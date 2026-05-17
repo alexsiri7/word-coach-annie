@@ -82,6 +82,30 @@ describe("JWT session tokens", () => {
         expect(result).toBeNull();
     });
 
+    it("rejects a token signed with wrong algorithm (none attack)", async () => {
+        const header = btoa(JSON.stringify({ alg: "none", typ: "JWT" }))
+            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const body = btoa(JSON.stringify({ userId: "x", email: "x@x.com", name: "x" }))
+            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const result = await verifySessionToken(`${header}.${body}.`);
+        expect(result).toBeNull();
+    });
+
+    it("rejects a valid HS256 token without issuer/audience claims", async () => {
+        const { SignJWT } = await import("jose");
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+            "raw", encoder.encode("test-jwt-secret"),
+            { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+        );
+        const token = await new SignJWT({ userId: "user-1", email: "a@b.com", name: "A" })
+            .setProtectedHeader({ alg: "HS256" })
+            .setExpirationTime("1h")
+            .sign(key);
+        const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+
     it("returns null for JWT missing required fields", async () => {
         // Create a JWT with jose directly without userId
         const { SignJWT } = await import("jose");

@@ -5,7 +5,10 @@
  * Uses the same JWT signing key as session tokens (src/lib/auth.ts).
  */
 import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
-import { getJwtKey, safeEqual } from "@/lib/auth";
+import { getJwtKey, safeEqual, JWT_ISSUER } from "@/lib/auth";
+
+const JWT_AUDIENCE_MCP_ACCESS = "word-coach-annie:mcp_access";
+const JWT_AUDIENCE_MCP_REFRESH = "word-coach-annie:mcp_refresh";
 import { logger } from "@/lib/logger";
 
 // Access token: 1 hour
@@ -26,8 +29,13 @@ export async function createMcpToken(
   ttlSeconds: number
 ): Promise<string> {
   const key = await getJwtKey();
+  const audience = payload.type === "mcp_access"
+    ? JWT_AUDIENCE_MCP_ACCESS
+    : JWT_AUDIENCE_MCP_REFRESH;
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(key);
@@ -40,7 +48,14 @@ export async function verifyMcpToken(
 ): Promise<{ userId: string; email: string; clientId: string } | null> {
   try {
     const key = await getJwtKey();
-    const { payload } = await jwtVerify(token, key);
+    const audience = expectedType === "mcp_access"
+      ? JWT_AUDIENCE_MCP_ACCESS
+      : JWT_AUDIENCE_MCP_REFRESH;
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: ["HS256"],
+      issuer: JWT_ISSUER,
+      audience,
+    });
     if (
       payload.type !== expectedType ||
       !payload.userId ||
