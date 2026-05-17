@@ -36,6 +36,12 @@ async function uploadScreenshot(
   dataUrl: string
 ): Promise<string | null> {
   try {
+    // Validate data URL prefix — only accept JPEG
+    if (!dataUrl.startsWith("data:image/jpeg;base64,")) {
+      logger.warn("Screenshot rejected: unsupported image type");
+      return null;
+    }
+
     const base64 = dataUrl.split(",")[1];
     if (!base64) return null;
 
@@ -52,6 +58,13 @@ async function uploadScreenshot(
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
+
+    // Validate JPEG magic bytes: FF D8 FF
+    if (bytes.length < 3 || bytes[0] !== 0xFF || bytes[1] !== 0xD8 || bytes[2] !== 0xFF) {
+      logger.warn("Screenshot rejected: invalid JPEG magic bytes");
+      return null;
+    }
+
     const blob = new Blob([bytes], { type: "image/jpeg" });
 
     const filename = `feedback-${Date.now()}.jpg`;

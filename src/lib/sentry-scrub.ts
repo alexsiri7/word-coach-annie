@@ -5,7 +5,8 @@ const SENSITIVE_KEY = /token|secret|password|api[-_]?key|cookie|authorization|em
 function redact<T>(node: T, depth = 0): T {
     if (depth > 6 || node == null) return node;
     if (typeof node === "string") {
-        return (node.length > 2000 ? node.slice(0, 2000) + "…[truncated]" : node) as unknown as T;
+        const truncated = node.length > 2000 ? node.slice(0, 2000) + "…[truncated]" : node;
+        return truncated as unknown as T;
     }
     if (typeof node !== "object") return node;
     if (Array.isArray(node)) return node.map((n) => redact(n, depth + 1)) as unknown as T;
