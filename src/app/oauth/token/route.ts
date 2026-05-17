@@ -7,6 +7,7 @@ import {
   ACCESS_TOKEN_TTL,
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
+import { logger } from "@/lib/logger";
 
 /**
  * Parse the request body. Supports both application/x-www-form-urlencoded
@@ -148,6 +149,11 @@ async function handleRefreshToken(body: Record<string, string>) {
 
   // Validate client_id matches the token's bound client
   if (tokenData.clientId !== client_id) {
+    logger.warn("OAuth refresh token client_id mismatch — possible token replay attempt", {
+      tokenClientId: tokenData.clientId,
+      requestClientId: client_id,
+      userId: tokenData.userId,
+    });
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 

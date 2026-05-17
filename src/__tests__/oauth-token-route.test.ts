@@ -17,7 +17,7 @@ vi.mock("@/lib/oauth-tokens", () => ({
 }));
 
 import { consumeAuthCode, getClient } from "@/lib/oauth-store";
-import { verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
+import { createMcpToken, verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
 import { POST } from "@/app/oauth/token/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,6 +69,23 @@ describe("POST /oauth/token", () => {
     expect(body.refresh_token).toBe("mock-token");
     expect(body.expires_in).toBe(3600);
     expect(body.token_type).toBe("Bearer");
+  });
+
+  it("authorization_code grant embeds client_id in issued tokens", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(consumeAuthCode).mockReturnValue(mockAuthCode);
+    vi.mocked(verifyPkce).mockResolvedValue(true);
+
+    await POST(makeTokenRequest(validAuthCodeBody));
+
+    expect(vi.mocked(createMcpToken)).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: "client-1", type: "mcp_access" }),
+      expect.any(Number)
+    );
+    expect(vi.mocked(createMcpToken)).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: "client-1", type: "mcp_refresh" }),
+      expect.any(Number)
+    );
   });
 
   it("missing code_verifier returns 400 invalid_request", async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { SignJWT } from "jose";
 
 // JWT_SECRET must be set before importing the module
 const origJwt = process.env.JWT_SECRET;
@@ -12,6 +13,7 @@ import {
   ACCESS_TOKEN_TTL,
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
+import { getJwtKey } from "@/lib/auth";
 
 describe("MCP OAuth Tokens", () => {
   beforeEach(() => {
@@ -77,6 +79,25 @@ describe("MCP OAuth Tokens", () => {
     it("rejects invalid/garbage token", async () => {
       const payload = await verifyMcpToken("not.a.valid.token", "mcp_access");
       expect(payload).toBeNull();
+    });
+
+    it("rejects a token missing clientId claim (legacy token)", async () => {
+      // Simulate a pre-fix token by signing directly without clientId.
+      // Tokens issued before this PR will be rejected, enforcing the security fix.
+      const key = await getJwtKey();
+      const legacyToken = await new SignJWT({
+        userId: "user-legacy",
+        email: "legacy@example.com",
+        type: "mcp_access",
+        // no clientId field — simulates a token issued before MED-03 fix
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(key);
+
+      const payload = await verifyMcpToken(legacyToken, "mcp_access");
+      expect(payload).toBeNull(); // legacy tokens must not be accepted
     });
 
     it("rejects expired token", async () => {
