@@ -76,7 +76,10 @@ export async function POST(request: NextRequest) {
     if (state) {
       redirectUrl.searchParams.set("state", state);
     }
-    return NextResponse.redirect(redirectUrl.toString(), 303);
+    // Use JS redirect: form-action 'self' CSP covers where the form POSTs (same-origin),
+    // but Chrome also enforces it on server 3xx destinations. A JS navigation via
+    // window.location.replace() is not subject to form-action CSP.
+    return renderJsRedirectPage(redirectUrl.toString());
   }
 
   // Re-validate everything on the POST (params come from hidden fields)
@@ -145,7 +148,9 @@ export async function POST(request: NextRequest) {
     return renderCodePage(authCode.code, redirectUrl.toString());
   }
 
-  return NextResponse.redirect(redirectUrl.toString(), 303);
+  // Use JS redirect (not 303) so the cross-origin callback URL isn't subject to
+  // form-action CSP enforcement. Chrome enforces form-action on 3xx destinations too.
+  return renderJsRedirectPage(redirectUrl.toString());
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +250,23 @@ async function validateRequest(request: NextRequest): Promise<{
     clientName: client.client_name,
     params: { responseType, clientId, redirectUri, state, codeChallenge, codeChallengeMethod },
   };
+}
+
+/**
+ * Return a minimal HTML page that immediately navigates to `url` via JS.
+ * Used instead of a 303 redirect so the destination is not subject to
+ * the page's form-action CSP (Chrome enforces form-action on 3xx targets).
+ */
+function renderJsRedirectPage(url: string): NextResponse {
+  const safeUrl = JSON.stringify(url);
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Redirecting…</title></head><body><script>window.location.replace(${safeUrl});<\/script></body></html>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 /** Redirect to login page, preserving the full authorize URL as return path. */
