@@ -164,7 +164,12 @@ export async function GET(request: NextRequest) {
         response.cookies.set(SESSION_COOKIE_NAME, jwt, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
+            // SameSite=Lax (not Strict) is required for OAuth flows: the redirect chain
+            // from Google back to /oauth/authorize inherits a cross-site context, so
+            // Strict cookies are silently dropped by the browser before reaching the
+            // middleware. Lax still blocks cross-site POST (CSRF vector); the session
+            // cookie is httpOnly so JS cannot read it regardless.
+            sameSite: "lax",
             maxAge: SESSION_MAX_AGE,
             path: "/",
         });
