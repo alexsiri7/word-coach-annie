@@ -347,7 +347,6 @@ function renderCodePage(code: string, redirectUrl: string): NextResponse {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'",
       "Cache-Control": "no-store",
     },
   });
@@ -451,7 +450,6 @@ function renderConsentPage(
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'",
       "Cache-Control": "no-store",
     },
   });
