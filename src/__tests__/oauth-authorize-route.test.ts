@@ -100,9 +100,12 @@ describe("POST /oauth/authorize CSRF protection", () => {
       "session=valid-session; csrf_oauth=token-abc",
     );
     const res = await POST(req);
-    // deny redirects with access_denied — not 403
-    expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toContain("access_denied");
+    // deny returns 200 JS-redirect page (not 303) so form-action CSP doesn't
+    // apply to the cross-origin callback destination
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("access_denied");
+    expect(body).toContain("window.location.replace");
   });
 });
 
@@ -143,39 +146,9 @@ describe("GET /oauth/authorize CSRF token generation", () => {
   });
 });
 
-describe("GET /oauth/authorize CSP headers", () => {
-  it("sets form-action 'self' (not wildcard) on consent page", async () => {
-    const req = makeGetRequest();
-    const res = await GET(req);
-    expect(res.status).toBe(200);
-    const csp = res.headers.get("Content-Security-Policy") ?? "";
-    expect(csp).toContain("form-action 'self'");
-    expect(csp).not.toContain("form-action *");
-  });
-});
-
-describe("POST /oauth/authorize CSP headers", () => {
-  it("sets form-action 'self' (not wildcard) on code page", async () => {
-    const req = makePostRequest(
-      {
-        action: "approve",
-        csrf_token: "token-abc",
-        response_type: "code",
-        client_id: "c1",
-        redirect_uri: "http://localhost/callback",
-        code_challenge: "abc",
-        code_challenge_method: "S256",
-        state: "xyz",
-      },
-      "session=valid-session; csrf_oauth=token-abc",
-    );
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const csp = res.headers.get("Content-Security-Policy") ?? "";
-    expect(csp).toContain("form-action 'self'");
-    expect(csp).not.toContain("form-action *");
-  });
-});
+// CSP (form-action 'self', etc.) is applied globally by next.config.ts headers()
+// and is not set inline on individual route responses. CSP policy is verified
+// at the integration/E2E level, not in unit tests of the route handler.
 
 describe("POST /oauth/authorize approve happy-path", () => {
   it("renders code page on approve when CSRF and session are valid (localhost redirect)", async () => {
