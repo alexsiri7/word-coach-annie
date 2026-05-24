@@ -27,6 +27,7 @@ import {
   PanelRight,
   ClipboardCheck,
   LayoutList,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +68,7 @@ interface EditorToolbarProps {
   showSceneContext?: boolean;
   onReviewScene?: () => void;
   onPlanBeats?: () => void;
+  onCanonCheck?: () => void;
 }
 
 export function EditorToolbar({
@@ -97,6 +99,7 @@ export function EditorToolbar({
   showSceneContext,
   onReviewScene,
   onPlanBeats,
+  onCanonCheck,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
@@ -284,6 +287,18 @@ export function EditorToolbar({
             aria-label="Review this scene"
           >
             <ClipboardCheck className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onCanonCheck && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onCanonCheck}
+            aria-label="Canon check — cross-reference story bible"
+          >
+            <ShieldCheck className="h-4 w-4" />
           </Button>
         )}
 

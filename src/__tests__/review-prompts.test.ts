@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReviewPrompt, buildPlanBeatsPrompt, REVIEW_PROMPTS } from "@/lib/review-prompts";
+import { buildReviewPrompt, buildPlanBeatsPrompt, buildCanonCheckPrompt, REVIEW_PROMPTS } from "@/lib/review-prompts";
 import type { SceneStatus } from "@/lib/types";
 
 describe("REVIEW_PROMPTS", () => {
@@ -79,5 +79,33 @@ describe("buildPlanBeatsPrompt", () => {
   it("prompt references beats or blueprint", () => {
     const result = buildPlanBeatsPrompt(undefined);
     expect(result.toLowerCase()).toMatch(/beat|blueprint|scaffold/);
+  });
+});
+
+describe("buildCanonCheckPrompt", () => {
+  it("returns a non-empty string", () => {
+    const result = buildCanonCheckPrompt(undefined);
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("prepends scene title when provided", () => {
+    const result = buildCanonCheckPrompt("The Duel");
+    expect(result).toMatch(/^\[Scene: The Duel\]/);
+  });
+
+  it("omits title prefix when title is undefined", () => {
+    const result = buildCanonCheckPrompt(undefined);
+    expect(result).not.toMatch(/^\[Scene:/);
+  });
+
+  it("prompt contains the canon check trigger phrase", () => {
+    const result = buildCanonCheckPrompt(undefined);
+    expect(result.toLowerCase()).toMatch(/canon check/);
+  });
+
+  it("title is included verbatim in the prompt prefix", () => {
+    const result = buildCanonCheckPrompt("Act Three: Resolution");
+    expect(result).toContain("[Scene: Act Three: Resolution]");
   });
 });

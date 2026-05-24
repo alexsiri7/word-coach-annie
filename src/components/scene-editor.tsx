@@ -45,6 +45,7 @@ interface SceneEditorProps {
   linkedCharacters?: StoryObject[];
   onReviewScene?: () => void;
   onPlanBeats?: () => void;
+  onCanonCheck?: () => void;
 }
 
 export function SceneEditor({
@@ -56,6 +57,7 @@ export function SceneEditor({
   linkedCharacters = [],
   onReviewScene,
   onPlanBeats,
+  onCanonCheck,
 }: SceneEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -411,6 +413,7 @@ export function SceneEditor({
         showSceneContext={showSceneContext}
         onReviewScene={onReviewScene}
         onPlanBeats={onPlanBeats}
+        onCanonCheck={onCanonCheck}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">

@@ -29,3 +29,10 @@ const PLAN_BEATS_PROMPT =
 export function buildPlanBeatsPrompt(title: string | undefined): string {
   return title ? `[Scene: ${title}] ${PLAN_BEATS_PROMPT}` : PLAN_BEATS_PROMPT;
 }
+
+const CANON_CHECK_PROMPT =
+  "Please run a canon check on this scene — cross-reference the prose against the story bible and flag any contradictions (attribute mismatches, behavioural inconsistencies, timeline issues). For each finding, ask me whether to update the story object or revise the prose.";
+
+export function buildCanonCheckPrompt(title: string | undefined): string {
+  return title ? `[Scene: ${title}] ${CANON_CHECK_PROMPT}` : CANON_CHECK_PROMPT;
+}
