@@ -123,6 +123,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [showManuscriptAI, setShowManuscriptAI] = useState(false);
   const [reviewConversationId, setReviewConversationId] = useState<string | null>(null);
   const [reviewManuscript, setReviewManuscript] = useState<string | null>(null);
+  const [reviewSceneId, setReviewSceneId] = useState<string | null>(null);
 
   // Data fetching
   const fetchProject = useCallback(async () => {
@@ -569,9 +570,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   sceneContext={selectedNode?.type === "SCENE" ? selectedNode.title : undefined}
                   initialConversationId={reviewConversationId ?? undefined}
                   initialMessage={reviewManuscript ?? undefined}
+                  reviewSceneId={reviewSceneId ?? undefined}
                   onPromptConsumed={() => {
                     setReviewConversationId(null);
                     setReviewManuscript(null);
+                    setReviewSceneId(null);
                   }}
                 />
               </ErrorBoundary>
@@ -705,6 +708,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   onReviewScene={() => {
                     const fullPrompt = buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title);
                     setReviewManuscript(fullPrompt);
+                    setReviewSceneId(selectedNode.id);
                     setReviewConversationId(null);
                     setActiveTab("ai-chat");
                     setSelectedNodeId(null);

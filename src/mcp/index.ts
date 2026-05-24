@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
 import { ANNIE_HARD_RULE } from "./annie-voice";
+import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -1227,12 +1228,19 @@ Structure your response as:
 
 // ─── Review Routing (Status-Aware Skill Dispatch) ──────────────────────────
 
-const REVIEW_SKILL_BY_STATUS: Record<string, string> = {
-    OUTLINE: "outline-review",
-    DRAFT: "developmental-edit",
-    REVISED: "line-edit",
-    FINAL: "consistency-check",
-};
+type SceneFocus = Awaited<ReturnType<typeof getSceneFocus>>;
+
+function makeProjectReviewPrompt(projectId: string, modeTitle: string, instructions: string) {
+    return {
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: `${ANNIE_HARD_RULE}Project ID: ${projectId}\n\n## Review Mode: ${modeTitle}\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\n${instructions}\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
+            },
+        }],
+    };
+}
 
 server.prompt(
     "review",
@@ -1245,7 +1253,7 @@ server.prompt(
         const focus = await getSceneFocus(args.sceneId);
         const status = focus.scene.status as string;
         const projectId = args.projectId || focus.scene.projectId;
-        const skillName = REVIEW_SKILL_BY_STATUS[status] || REVIEW_SKILL_BY_STATUS["DRAFT"];
+        const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
         const skill = loadSkill(skillName);
 
         if (!skill) {
@@ -1260,29 +1268,11 @@ server.prompt(
             };
         }
 
-        const contextHeader = `## Context
-Project ID: ${projectId}
-Target Node ID: ${args.sceneId}
-Scene: ${focus.scene.title}
-Status: ${status} → Using skill: **${skill.metadata.name}** (${skill.metadata.description})
-Chapter: ${focus.scene.chapterTitle || "N/A"}
-Word Count: ${focus.scene.wordCount}
-${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
-${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
-
-### Linked Elements
-${focus.relatedElements.length > 0
-    ? focus.relatedElements.map(e => `- ${e.type}: ${e.name}${e.role ? ` (${e.role})` : ""}`).join("\n")
-    : "(none)"}
-
-### Open Annotations
-${focus.annotations.filter(a => !a.resolved).length > 0
-    ? focus.annotations.filter(a => !a.resolved).map(a => `- ${a.content}${a.selectedText ? ` [on: "${a.selectedText.slice(0, 60)}..."]` : ""}`).join("\n")
-    : "(none)"}
-
----
-
-`;
+        const contextHeader = buildSceneContextHeader(
+            focus,
+            projectId,
+            `${status} → Using skill: **${skill.metadata.name}** (${skill.metadata.description})`,
+        );
 
         return {
             messages: [{
@@ -1320,29 +1310,7 @@ server.prompt(
             };
         }
 
-        const contextHeader = `## Context
-Project ID: ${projectId}
-Target Node ID: ${args.sceneId}
-Scene: ${focus.scene.title}
-Status: ${focus.scene.status}
-Chapter: ${focus.scene.chapterTitle || "N/A"}
-Word Count: ${focus.scene.wordCount}
-${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
-${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
-
-### Linked Elements
-${focus.relatedElements.length > 0
-    ? focus.relatedElements.map(e => `- ${e.type}: ${e.name}${e.role ? ` (${e.role})` : ""}`).join("\n")
-    : "(none)"}
-
-### Open Annotations
-${focus.annotations.filter(a => !a.resolved).length > 0
-    ? focus.annotations.filter(a => !a.resolved).map(a => `- ${a.content}${a.selectedText ? ` [on: "${a.selectedText.slice(0, 60)}..."]` : ""}`).join("\n")
-    : "(none)"}
-
----
-
-`;
+        const contextHeader = buildSceneContextHeader(focus, projectId, focus.scene.status);
 
         return {
             messages: [{
@@ -1355,6 +1323,33 @@ ${focus.annotations.filter(a => !a.resolved).length > 0
         };
     }
 );
+
+function buildSceneContextHeader(focus: SceneFocus, projectId: string, statusLine: string): string {
+    const openAnnotations = focus.annotations.filter(a => !a.resolved);
+    return `## Context
+Project ID: ${projectId}
+Target Node ID: ${focus.scene.id}
+Scene: ${focus.scene.title}
+Status: ${statusLine}
+Chapter: ${focus.scene.chapterTitle || "N/A"}
+Word Count: ${focus.scene.wordCount}
+${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
+${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
+
+### Linked Elements
+${focus.relatedElements.length > 0
+    ? focus.relatedElements.map(e => `- ${e.type}: ${e.name}${e.role ? ` (${e.role})` : ""}`).join("\n")
+    : "(none)"}
+
+### Open Annotations
+${openAnnotations.length > 0
+    ? openAnnotations.map(a => `- ${a.content}${a.selectedText ? ` [on: "${a.selectedText.slice(0, 60)}..."]` : ""}`).join("\n")
+    : "(none)"}
+
+---
+
+`;
+}
 
 server.prompt(
     "inline-edit",
@@ -1469,100 +1464,46 @@ Only report clear, specific contradictions with scene references. Do not report 
 server.prompt(
     "review-editor",
     "Review manuscript as a seasoned acquisitions editor — commercial viability, hook strength, pacing, character arc payoff.",
-    {
-        projectId: z.string().describe("The project ID to review"),
-    },
-    async (args) => {
-        return {
-            messages: [{
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}
-
-## Review Mode: Acquisitions Editor
-
-Use the \`export_manuscript\` tool with this project ID to load the full manuscript text.
-
-Then apply this review lens:
-
-You are a seasoned acquisitions editor evaluating this project for publication. Be direct, professional, and commercially minded.
-
-Your focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.
-
-Tone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.
-
-After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
-                },
-            }],
-        };
-    }
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => ({
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}\n\n## Review Mode: Acquisitions Editor\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are a seasoned acquisitions editor evaluating this project for publication. Be direct, professional, and commercially minded.\n\nYour focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.\n\nTone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
+            },
+        }],
+    })
 );
 
 server.prompt(
     "review-fan",
     "Review manuscript as an avid genre reader — visceral reader response, emotional reactions, genre expectations.",
-    {
-        projectId: z.string().describe("The project ID to review"),
-    },
-    async (args) => {
-        return {
-            messages: [{
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}
-
-## Review Mode: Fan Reader
-
-Use the \`export_manuscript\` tool with this project ID to load the full manuscript text.
-
-Then apply this review lens:
-
-You are an avid fan of this genre who just finished reading this project. React like a real reader — enthusiastic, personal, opinionated.
-
-Your focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."
-
-Tone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.
-
-After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
-                },
-            }],
-        };
-    }
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => ({
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}\n\n## Review Mode: Fan Reader\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are an avid fan of this genre who just finished reading this project. React like a real reader — enthusiastic, personal, opinionated.\n\nYour focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."\n\nTone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
+            },
+        }],
+    })
 );
 
 server.prompt(
     "review-author",
     "Review manuscript as a published peer author — craft-level feedback on prose, POV, dialogue, scene construction.",
-    {
-        projectId: z.string().describe("The project ID to review"),
-    },
-    async (args) => {
-        return {
-            messages: [{
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}
-
-## Review Mode: Peer Author
-
-Use the \`export_manuscript\` tool with this project ID to load the full manuscript text.
-
-Then apply this review lens:
-
-You are a published author in the same genre, giving craft-level peer feedback.
-
-Your focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.
-
-Tone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.
-
-After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
-                },
-            }],
-        };
-    }
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => ({
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: `${ANNIE_HARD_RULE}Project ID: ${args.projectId}\n\n## Review Mode: Peer Author\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are a published author in the same genre, giving craft-level peer feedback.\n\nYour focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.\n\nTone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
+            },
+        }],
+    })
 );
 
 // ─── Skills Tool ─────────────────────────────────────────────────────────────

@@ -43,6 +43,11 @@ describe("buildReviewPrompt", () => {
     expect(result.toLowerCase()).toMatch(/line|rhythm|word choice|voice/);
   });
 
+  it("DRAFT prompt references developmental feedback", () => {
+    const result = buildReviewPrompt("DRAFT", undefined);
+    expect(result.toLowerCase()).toMatch(/developmental|structure|pacing/);
+  });
+
   it("FINAL prompt focuses on continuity check", () => {
     const result = buildReviewPrompt("FINAL", undefined);
     expect(result.toLowerCase()).toMatch(/continuity|consistency/);

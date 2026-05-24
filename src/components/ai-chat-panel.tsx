@@ -46,6 +46,7 @@ interface AIChatPanelProps {
   initialMessage?: string;
   onPromptConsumed?: () => void;
   initialConversationId?: string;
+  reviewSceneId?: string;
 }
 
 function formatTime(dateStr: string): string {
@@ -95,7 +96,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   );
 }
 
-export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptConsumed, initialConversationId }: AIChatPanelProps) {
+export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptConsumed, initialConversationId, reviewSceneId }: AIChatPanelProps) {
   const { isOnline } = useNetworkStatus();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -167,7 +168,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
       const res = await offlineFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, message: text, sceneContext }),
+        body: JSON.stringify({ conversationId, message: text, sceneContext, reviewSceneId }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -239,7 +240,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, isOnline, conversationId, sceneContext]);
+  }, [isStreaming, isOnline, conversationId, sceneContext, reviewSceneId]);
 
   // Auto-send initialMessage once history is loaded
   useEffect(() => {
