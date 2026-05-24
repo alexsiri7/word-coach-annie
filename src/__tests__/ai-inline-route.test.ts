@@ -139,6 +139,17 @@ describe("POST /api/ai-inline", () => {
     );
   });
 
+  it("uses default prompt for ask action when no askPrompt provided", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const req = makeRequest({ selectedText: "Some text", action: "ask" });
+    await POST(req);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMessage: expect.stringContaining("What do you think about this passage?"),
+      })
+    );
+  });
+
   it("returns 503 when AI is not configured", async () => {
     const { getAiConfig } = await import("@/lib/ai/settings");
     vi.mocked(getAiConfig).mockResolvedValueOnce({ apiKey: "", model: "" });

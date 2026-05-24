@@ -336,6 +336,74 @@ describe("GET /api/chat", () => {
   });
 });
 
+describe("ANNIE_HARD_RULE integration in system prompts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true } as never);
+  });
+
+  it("includes ANNIE_HARD_RULE in buildSystemPrompt (chat session)", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "ANNIE Rule Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Chat" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: conversation.id, message: "Hello" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("You NEVER write narrative prose");
+  });
+
+  it("includes ANNIE_HARD_RULE in buildReviewSystemPrompt (review-editor session)", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Review Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Review", type: "review-editor" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: conversation.id, message: "Review my manuscript" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("You NEVER write narrative prose");
+  });
+
+  it("includes ANNIE_HARD_RULE in buildReviewSystemPrompt (review-fan session)", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Fan Review Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Review", type: "review-fan" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: conversation.id, message: "What did you think?" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("You NEVER write narrative prose");
+  });
+
+  it("includes ANNIE_HARD_RULE in buildReviewSystemPrompt (review-author session)", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Author Review Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Review", type: "review-author" },
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId: conversation.id, message: "Craft feedback please" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("You NEVER write narrative prose");
+  });
+});
+
 describe("DELETE /api/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();

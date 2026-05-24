@@ -99,8 +99,6 @@ interface McpServerOptions {
     userId?: string | null;
 }
 
-// Annie's personality is imported from @/lib/ai/annie-persona (ANNIE_HARD_RULE)
-
 function createServer(options?: McpServerOptions): McpServer {
 
 const allowDestructive = options?.allowDestructive ?? env.MCP_ALLOW_DESTRUCTIVE;

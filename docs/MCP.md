@@ -806,6 +806,33 @@ Deep manuscript-level analysis.
 
 ---
 
+#### `review-editor`
+Review a project as a seasoned acquisitions editor — structure, pacing, opening hook, character arc payoff, thematic clarity, and commercial readiness.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-fan`
+Review a project as an avid genre fan — reader reactions, pacing feel, whether the genre's promises are delivered.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-author`
+Review a project as a published author in the same genre — craft-level peer feedback on prose rhythm, POV discipline, dialogue, scene construction, and show-don't-tell.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
 ### Skill Prompts
 
 All skills from `.skills/` are also registered as MCP Prompts. Each accepts:

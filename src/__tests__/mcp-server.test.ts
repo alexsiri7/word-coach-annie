@@ -33,7 +33,7 @@ describe("MCP Server", () => {
     });
 
     it("registers review persona prompts (review-editor, review-fan, review-author)", async () => {
-        // If any prompt registration fails, createServer() will throw
+        // Prompt registration failures cause createServer() to throw during module load
         const { createServer } = await import("../mcp/index");
         const server = createServer({ allowDestructive: true });
         expect(server).toBeDefined();
