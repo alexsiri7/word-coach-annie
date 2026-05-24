@@ -108,8 +108,7 @@ export async function middleware(request: NextRequest) {
 
     // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
     // This prevents brute-force attacks on /api/auth/login even though that path is public.
-    const rateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-    if (pathname === "/api/auth/login" && !rateLimitDisabled) {
+    if (pathname === "/api/auth/login" && !(process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production")) {
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
         const result = checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {

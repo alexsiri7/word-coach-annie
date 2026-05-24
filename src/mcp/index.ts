@@ -399,6 +399,17 @@ server.tool(
     },
     async ({ nodeId, contentHash, content, blocks }) => {
         if (blocks) {
+            const hasContentBlock = blocks.some(b => b.type === "CONTENT");
+            if (hasContentBlock) {
+                logger.warn("write_scene_content: CONTENT block rejected by Annie guardrail", { nodeId });
+                return {
+                    content: [{
+                        type: "text",
+                        text: "Oh no no no. That part is yours. I will sit here and I will WAIT — but I am not writing your scene for you. Do you want to talk through what needs to happen? I can map it as beats.",
+                    }],
+                    isError: true,
+                };
+            }
             const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
@@ -1320,7 +1331,7 @@ ${focus.annotations.filter(a => !a.resolved).length > 0
                 role: "user",
                 content: {
                     type: "text",
-                    text: contextHeader + skill.instructions,
+                    text: ANNIE_HARD_RULE + contextHeader + skill.instructions,
                 },
             }],
         };

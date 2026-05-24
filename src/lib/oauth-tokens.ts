@@ -8,12 +8,10 @@ import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { getJwtKey, safeEqual, JWT_ISSUER } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
-const JWT_AUDIENCE_MCP_ACCESS = "word-coach-annie:mcp_access";
-const JWT_AUDIENCE_MCP_REFRESH = "word-coach-annie:mcp_refresh";
-
-function audienceFor(type: "mcp_access" | "mcp_refresh"): string {
-  return type === "mcp_access" ? JWT_AUDIENCE_MCP_ACCESS : JWT_AUDIENCE_MCP_REFRESH;
-}
+const JWT_AUDIENCES = {
+  mcp_access: "word-coach-annie:mcp_access",
+  mcp_refresh: "word-coach-annie:mcp_refresh",
+} as const;
 
 // Access token: 1 hour
 export const ACCESS_TOKEN_TTL = 60 * 60;
@@ -36,7 +34,7 @@ export async function createMcpToken(
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(JWT_ISSUER)
-    .setAudience(audienceFor(payload.type))
+    .setAudience(JWT_AUDIENCES[payload.type])
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(key);
@@ -52,7 +50,7 @@ export async function verifyMcpToken(
     const { payload } = await jwtVerify(token, key, {
       algorithms: ["HS256"],
       issuer: JWT_ISSUER,
-      audience: audienceFor(expectedType),
+      audience: JWT_AUDIENCES[expectedType],
     });
     if (
       payload.type !== expectedType ||

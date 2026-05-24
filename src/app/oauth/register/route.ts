@@ -138,13 +138,6 @@ export async function POST(request: NextRequest) {
   await registerClient(registration, { ip, userId: userId ?? undefined });
   logger.info("oauth-client-registered", { clientId, ip, userId });
 
-  return NextResponse.json(
-    {
-      client_id: registration.client_id,
-      client_name: registration.client_name,
-      redirect_uris: registration.redirect_uris,
-      grant_types: registration.grant_types,
-    },
-    { status: 201 }
-  );
+  const { client_id, client_name, redirect_uris, grant_types } = registration;
+  return NextResponse.json({ client_id, client_name, redirect_uris, grant_types }, { status: 201 });
 }
