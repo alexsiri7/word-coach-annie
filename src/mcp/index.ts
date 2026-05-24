@@ -401,11 +401,13 @@ server.tool(
         if (blocks) {
             const hasContentBlock = blocks.some(b => b.type === "CONTENT");
             if (hasContentBlock) {
+                logger.warn("write_scene_content: CONTENT block rejected by Annie guardrail", { nodeId });
                 return {
                     content: [{
                         type: "text",
                         text: "Oh no no no. That part is yours. I will sit here and I will WAIT — but I am not writing your scene for you. Do you want to talk through what needs to happen? I can map it as beats.",
                     }],
+                    isError: true,
                 };
             }
             const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);

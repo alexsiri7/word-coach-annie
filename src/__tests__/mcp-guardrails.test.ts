@@ -40,13 +40,16 @@ describe("Annie Hard Rule Enforcement", () => {
             expect(writeSceneSection).toContain("Oh no no no. That part is yours.");
         });
 
-        it("should still allow BEAT blocks through (no guard on BEAT type)", () => {
+        it("writeSceneContentFromBlocks call should remain after the CONTENT guard", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
             // After the guard, the normal writeSceneContentFromBlocks call remains
             expect(writeSceneSection).toContain("writeSceneContentFromBlocks");
+            // Guard must branch on hasContentBlock being truthy, not falsy
+            expect(writeSceneSection).toContain("if (hasContentBlock)");
+            expect(writeSceneSection).not.toContain("if (!hasContentBlock)");
         });
     });
 });
