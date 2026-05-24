@@ -53,3 +53,25 @@ describe("Annie Hard Rule Enforcement", () => {
         });
     });
 });
+
+describe("plan_beats prompt", () => {
+    it("should register a plan_beats prompt", () => {
+        expect(mcpSource).toContain('"plan_beats"');
+    });
+
+    it("should load the scene-drafting-assistant skill", () => {
+        const planBeatsSection = mcpSource.slice(
+            mcpSource.indexOf('"plan_beats"'),
+            mcpSource.indexOf('"plan_beats"') + 3000
+        );
+        expect(planBeatsSection).toContain('loadSkill("scene-drafting-assistant")');
+    });
+
+    it("should prepend ANNIE_HARD_RULE in plan_beats prompt", () => {
+        const planBeatsSection = mcpSource.slice(
+            mcpSource.indexOf('"plan_beats"'),
+            mcpSource.indexOf('"plan_beats"') + 3000
+        );
+        expect(planBeatsSection).toContain("ANNIE_HARD_RULE + contextHeader + skill.instructions");
+    });
+});

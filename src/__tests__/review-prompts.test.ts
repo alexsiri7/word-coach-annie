@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReviewPrompt, REVIEW_PROMPTS } from "@/lib/review-prompts";
+import { buildReviewPrompt, buildPlanBeatsPrompt, REVIEW_PROMPTS } from "@/lib/review-prompts";
 import type { SceneStatus } from "@/lib/types";
 
 describe("REVIEW_PROMPTS", () => {
@@ -51,5 +51,28 @@ describe("buildReviewPrompt", () => {
   it("title is included verbatim in the prompt prefix", () => {
     const result = buildReviewPrompt("OUTLINE", "The Opening Scene");
     expect(result).toContain("[Scene: The Opening Scene]");
+  });
+});
+
+describe("buildPlanBeatsPrompt", () => {
+  it("returns a non-empty string", () => {
+    const result = buildPlanBeatsPrompt(undefined);
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("prepends scene title when provided", () => {
+    const result = buildPlanBeatsPrompt("The Confrontation");
+    expect(result).toMatch(/^\[Scene: The Confrontation\]/);
+  });
+
+  it("omits title prefix when title is undefined", () => {
+    const result = buildPlanBeatsPrompt(undefined);
+    expect(result).not.toMatch(/^\[Scene:/);
+  });
+
+  it("prompt references beats or blueprint", () => {
+    const result = buildPlanBeatsPrompt(undefined);
+    expect(result.toLowerCase()).toMatch(/beat|blueprint|scaffold/);
   });
 });

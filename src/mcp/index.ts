@@ -1339,6 +1339,65 @@ ${focus.annotations.filter(a => !a.resolved).length > 0
 );
 
 server.prompt(
+    "plan_beats",
+    "Map a scene as structured BEAT blocks — structural waypoints for what happens, what shifts, and what the reader feels. Annie provides the blueprint; the writer fills in the prose.",
+    {
+        sceneId: z.string().describe("The scene node ID to plan beats for"),
+        projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
+    },
+    async (args) => {
+        const focus = await getSceneFocus(args.sceneId);
+        const projectId = args.projectId || focus.scene.projectId;
+        const skill = loadSkill("scene-drafting-assistant");
+
+        if (!skill) {
+            return {
+                messages: [{
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `Error: Could not load skill "scene-drafting-assistant". Available skills: ${listSkills().map(s => s.name).join(", ")}`,
+                    },
+                }],
+            };
+        }
+
+        const contextHeader = `## Context
+Project ID: ${projectId}
+Target Node ID: ${args.sceneId}
+Scene: ${focus.scene.title}
+Status: ${focus.scene.status}
+Word Count: ${focus.scene.wordCount}
+${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
+${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
+
+### Linked Elements
+${focus.relatedElements.length > 0
+    ? focus.relatedElements.map(e => `- ${e.type}: ${e.name}${e.role ? ` (${e.role})` : ""}`).join("\n")
+    : "(none)"}
+
+### Open Annotations
+${focus.annotations.filter(a => !a.resolved).length > 0
+    ? focus.annotations.filter(a => !a.resolved).map(a => `- ${a.content}${a.selectedText ? ` [on: "${a.selectedText.slice(0, 60)}..."]` : ""}`).join("\n")
+    : "(none)"}
+
+---
+
+`;
+
+        return {
+            messages: [{
+                role: "user",
+                content: {
+                    type: "text",
+                    text: ANNIE_HARD_RULE + contextHeader + skill.instructions,
+                },
+            }],
+        };
+    }
+);
+
+server.prompt(
     "inline-edit",
     "Inline text editing operations: rewrite tighter, more vivid, simpler; continue writing; expand; voice check; or custom prompt on selected text.",
     {
