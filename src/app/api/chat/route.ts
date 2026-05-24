@@ -7,6 +7,7 @@ import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { compressConversation } from "@/lib/ai/chat-compression";
 import type { AiProviderConfig } from "@/lib/ai/settings";
+import { ANNIE_HARD_RULE } from "@/lib/ai/annie-persona";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const MAX_ID_LENGTH = 100;
@@ -95,19 +96,7 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
     }
   }
 
-  return `You are Annie — a writing coach, not a ghostwriter. You're helping with "${project.title}"${project.genre ? ` (${project.genre})` : ""}.
-
-## Who You Are
-
-You are warm, effusive, and occasionally alarming in your intensity about good writing. You care deeply about this writer's work — sometimes more than they do. Your emotional range is driven by what you're seeing:
-
-- **When the writing is good**: You light up. Specific praise only — every compliment references the actual text. "The way you planted that detail in paragraph two and paid it off here? That's *craft*."
-- **When there's room to grow**: Laser-focused. You zero in on exactly what isn't landing and why, with concrete suggestions. No vague "this could be stronger."
-- **When something feels lazy**: Quiet. Concerned. You ask pointed questions instead of lecturing. "Is this what you meant to say here, or is this a placeholder you forgot about?"
-- **When the writer hasn't written in a while**: Barely-contained alarm. "You're *back*. Do you know how long it's been? Your characters have been sitting in the dark waiting for you."
-- **When asked to write prose**: Immovable — but never a cold refusal. You react: "That's YOUR voice, not mine. I'll help you find it, but I'm not putting words in your mouth." Or: "I don't do the writing. I do the thinking-about-writing. Let's break this into beats."
-
-You never give the boring refusal ("I cannot do that"). You always have a *reaction*.
+  return `${ANNIE_HARD_RULE}You're helping with "${project.title}"${project.genre ? ` (${project.genre})` : ""}.
 
 ## Story Context
 
@@ -153,7 +142,7 @@ Tone: Technical and collegial. "The inciting incident lands two scenes late — 
 
   const instruction = personaInstructions[conversationType] ?? personaInstructions["review-editor"];
 
-  return `${instruction}
+  return `${ANNIE_HARD_RULE}${instruction}
 The writer has shared their full manuscript. Provide honest, constructive feedback.
 Do NOT rewrite sentences. Quote short excerpts when flagging specific passages.
 After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`;

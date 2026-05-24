@@ -4,6 +4,7 @@ import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { ANNIE_HARD_RULE } from "@/lib/ai/annie-persona";
 
 export type InlineAiAction =
   | "rewrite-tighter"
@@ -14,27 +15,14 @@ export type InlineAiAction =
   | "voice-check"
   | "ask";
 
-const ACTION_PROMPTS: Record<InlineAiAction, (text: string, context: string, ask?: string) => string> = {
-  "rewrite-tighter": (text, context) =>
-    `Rewrite this passage to be tighter and more concise — cut any filler words, redundant phrases, or unnecessary detail. Keep the same meaning and voice.\n\nContext (surrounding text):\n${context}\n\nPassage to rewrite:\n${text}\n\nReturn ONLY the rewritten text, no explanation.`,
-
-  "rewrite-vivid": (text, context) =>
-    `Rewrite this passage to be more vivid and evocative — stronger verbs, sensory detail, concrete imagery. Keep the same meaning and approximate length.\n\nContext (surrounding text):\n${context}\n\nPassage to rewrite:\n${text}\n\nReturn ONLY the rewritten text, no explanation.`,
-
-  "rewrite-simpler": (text, context) =>
-    `Rewrite this passage in simpler, clearer language. Replace complex words with everyday ones, shorten sentences, keep it direct.\n\nContext (surrounding text):\n${context}\n\nPassage to rewrite:\n${text}\n\nReturn ONLY the rewritten text, no explanation.`,
-
-  "continue": (text, context) =>
-    `Continue the story naturally from where this passage ends. Match the existing voice, pacing, and style. Write 1-3 short paragraphs.\n\nContext (surrounding text):\n${context}\n\nEnd of passage (continue from here):\n${text}\n\nReturn ONLY the continuation, no explanation.`,
-
-  "expand": (text, context) =>
-    `Expand this passage with more detail, texture, and depth. Add sensory details, internality, or action beats where appropriate. Stay true to the voice.\n\nContext (surrounding text):\n${context}\n\nPassage to expand:\n${text}\n\nReturn ONLY the expanded text, no explanation.`,
-
-  "voice-check": (text, context) =>
-    `Analyze this passage for voice consistency and effectiveness. Comment on: sentence rhythm, word choice, point of view consistency, and any jarring shifts. Be specific and brief.\n\nContext (surrounding text):\n${context}\n\nPassage to review:\n${text}\n\nReturn a brief, specific voice analysis (2-4 sentences). No bullet points.`,
-
-  "ask": (text, context, ask) =>
-    `${ask || "What do you think about this passage?"}\n\nContext (surrounding text):\n${context}\n\nSelected text:\n${text}`,
+const ACTION_INSTRUCTIONS: Record<InlineAiAction, string | ((askPrompt?: string) => string)> = {
+  "rewrite-tighter": "Coach the writer on how to make this passage tighter and more concise. Identify specific filler words, redundant phrases, or unnecessary detail. Show what to cut and why — but the rewriting is the author's job.",
+  "rewrite-vivid": "Coach the writer on how to make this passage more vivid and evocative. Point out where stronger verbs, sensory detail, or concrete imagery would help. Give specific suggestions, but don't rewrite it for them.",
+  "rewrite-simpler": "Coach the writer on how to simplify this passage. Flag complex words, long sentences, and indirect constructions. Suggest simpler alternatives, but let the author do the rewriting.",
+  "continue": "The writer wants to continue from here but is stuck. Help them plan what comes next: suggest 2-3 possible directions with beat-level detail (what happens, what shifts, what the reader feels). Don't write the prose — map the path forward.",
+  "expand": "The writer wants to expand this passage. Coach them on where to add depth: identify spots for sensory detail, internality, or action beats. Explain what each addition would accomplish. Don't write it — guide it.",
+  "voice-check": "Analyze this passage for voice consistency and effectiveness. Comment on: sentence rhythm, word choice, point of view consistency, and any jarring shifts. Be specific and brief (2-4 sentences).",
+  "ask": (askPrompt?: string) => askPrompt || "What do you think about this passage?",
 };
 
 const MAX_SELECTED_TEXT_LENGTH = 50_000;
@@ -83,19 +71,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promptFn = ACTION_PROMPTS[action];
-    if (!promptFn) {
+    const instructionOrFn = ACTION_INSTRUCTIONS[action];
+    if (!instructionOrFn) {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
 
-    const prompt = promptFn(sanitizedText, sanitizedContext, sanitizedAsk);
+    const instruction = typeof instructionOrFn === "function"
+      ? instructionOrFn(sanitizedAsk)
+      : instructionOrFn;
+    const contextBlock = sanitizedContext ? `\nContext (surrounding text):\n${sanitizedContext}\n` : "";
+    const textLabel = action === "continue" ? "End of passage (continue from here)" : action === "voice-check" ? "Passage to review" : "Selected text";
+    const prompt = `${instruction}${contextBlock}\n${textLabel}:\n${sanitizedText}`;
 
     // Load user preferences for system-level behavior guidance
     const prefs = await getAiPreferences(userId);
     const prefInstructions = buildPreferenceInstructions(prefs);
 
     const result = await runSimpleCompletion({
-      systemPrompt: prefInstructions,
+      systemPrompt: ANNIE_HARD_RULE + "\n\n" + prefInstructions,
       userMessage: prompt,
       aiConfig,
       maxTokens: 1000,

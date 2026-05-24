@@ -31,6 +31,10 @@ vi.mock("@/lib/sanitize-server", () => ({
   sanitizeInput: vi.fn((x: string) => x),
 }));
 
+vi.mock("@/lib/ai/annie-persona", () => ({
+  ANNIE_HARD_RULE: "ANNIE_HARD_RULE_MOCK",
+}));
+
 import { POST } from "@/app/api/ai-inline/route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -100,6 +104,39 @@ describe("POST /api/ai-inline", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.result).toBe("Rewritten text result");
+  });
+
+  it("passes ANNIE_HARD_RULE in systemPrompt", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const req = makeRequest({ selectedText: "Some text", action: "rewrite-tighter" });
+    await POST(req);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemPrompt: expect.stringContaining("ANNIE_HARD_RULE_MOCK"),
+      })
+    );
+  });
+
+  it("uses coaching instructions for continue action (not prose)", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const req = makeRequest({ selectedText: "Some text", action: "continue" });
+    await POST(req);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMessage: expect.stringContaining("suggest 2-3 possible directions"),
+      })
+    );
+  });
+
+  it("uses coaching instructions for expand action (not prose)", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const req = makeRequest({ selectedText: "Some text", action: "expand" });
+    await POST(req);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMessage: expect.stringContaining("Coach them on where to add depth"),
+      })
+    );
   });
 
   it("returns 503 when AI is not configured", async () => {

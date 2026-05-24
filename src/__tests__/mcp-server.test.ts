@@ -31,4 +31,11 @@ describe("MCP Server", () => {
         const server = createServer();
         expect(server).toBeDefined();
     });
+
+    it("registers review persona prompts (review-editor, review-fan, review-author)", async () => {
+        // If any prompt registration fails, createServer() will throw
+        const { createServer } = await import("../mcp/index");
+        const server = createServer({ allowDestructive: true });
+        expect(server).toBeDefined();
+    });
 });
