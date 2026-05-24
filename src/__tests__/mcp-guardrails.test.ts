@@ -55,6 +55,9 @@ describe("Annie Hard Rule Enforcement", () => {
 });
 
 describe("plan_beats prompt", () => {
+    // Slice anchor: indexOf('"plan_beats"') finds the server.prompt("plan_beats", ...) declaration.
+    // The string "plan_beats" only appears once in the file (as the prompt name), so this is safe.
+    // Slice length of 3000 chars covers the full handler (~2000 chars); increase if handler grows.
     it("should register a plan_beats prompt", () => {
         expect(mcpSource).toContain('"plan_beats"');
     });
@@ -73,5 +76,15 @@ describe("plan_beats prompt", () => {
             mcpSource.indexOf('"plan_beats"') + 3000
         );
         expect(planBeatsSection).toContain("ANNIE_HARD_RULE + contextHeader + skill.instructions");
+    });
+
+    it("should include scene status, chapter, and word count in context header", () => {
+        const planBeatsSection = mcpSource.slice(
+            mcpSource.indexOf('"plan_beats"'),
+            mcpSource.indexOf('"plan_beats"') + 3000
+        );
+        expect(planBeatsSection).toContain("Status:");
+        expect(planBeatsSection).toContain("Chapter:");
+        expect(planBeatsSection).toContain("Word Count:");
     });
 });

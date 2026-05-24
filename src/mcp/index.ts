@@ -1367,6 +1367,7 @@ Project ID: ${projectId}
 Target Node ID: ${args.sceneId}
 Scene: ${focus.scene.title}
 Status: ${focus.scene.status}
+Chapter: ${focus.scene.chapterTitle || "N/A"}
 Word Count: ${focus.scene.wordCount}
 ${focus.scene.prevScene ? `Previous Scene: ${focus.scene.prevScene.title}` : ""}
 ${focus.scene.nextScene ? `Next Scene: ${focus.scene.nextScene.title}` : ""}
