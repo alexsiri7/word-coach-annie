@@ -43,6 +43,7 @@ interface SceneEditorProps {
   showFocusButton?: boolean;
   timelineScenes?: TimelineSceneItem[];
   linkedCharacters?: StoryObject[];
+  onReviewScene?: () => void;
 }
 
 export function SceneEditor({
@@ -52,6 +53,7 @@ export function SceneEditor({
   showFocusButton = true,
   timelineScenes,
   linkedCharacters = [],
+  onReviewScene,
 }: SceneEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -405,6 +407,7 @@ export function SceneEditor({
         showCritiquePanel={showCritiquePanel}
         onToggleSceneContext={() => setShowSceneContext((v) => !v)}
         showSceneContext={showSceneContext}
+        onReviewScene={onReviewScene}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">

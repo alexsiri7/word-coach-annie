@@ -25,6 +25,7 @@ import {
   Mic,
   Sparkles,
   PanelRight,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,7 @@ interface EditorToolbarProps {
   showCritiquePanel?: boolean;
   onToggleSceneContext?: () => void;
   showSceneContext?: boolean;
+  onReviewScene?: () => void;
 }
 
 export function EditorToolbar({
@@ -91,6 +93,7 @@ export function EditorToolbar({
   showCritiquePanel,
   onToggleSceneContext,
   showSceneContext,
+  onReviewScene,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
@@ -254,6 +257,18 @@ export function EditorToolbar({
             aria-pressed={showSceneContext}
           >
             <PanelRight className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onReviewScene && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onReviewScene}
+            aria-label="Review this scene"
+          >
+            <ClipboardCheck className="h-4 w-4" />
           </Button>
         )}
 
