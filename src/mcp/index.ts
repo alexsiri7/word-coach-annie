@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
 import { ANNIE_HARD_RULE } from "./annie-voice";
+import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -1227,13 +1228,6 @@ Structure your response as:
 
 // ─── Review Routing (Status-Aware Skill Dispatch) ──────────────────────────
 
-const REVIEW_SKILL_BY_STATUS: Record<string, string> = {
-    OUTLINE: "outline-review",
-    DRAFT: "developmental-edit",
-    REVISED: "line-edit",
-    FINAL: "consistency-check",
-};
-
 server.prompt(
     "review",
     "Context-aware scene review — automatically routes to the right skill based on scene status (OUTLINE→outline review, DRAFT→developmental edit, REVISED→line edit, FINAL→consistency check).",
@@ -1245,7 +1239,7 @@ server.prompt(
         const focus = await getSceneFocus(args.sceneId);
         const status = focus.scene.status as string;
         const projectId = args.projectId || focus.scene.projectId;
-        const skillName = REVIEW_SKILL_BY_STATUS[status] || REVIEW_SKILL_BY_STATUS["DRAFT"];
+        const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
         const skill = loadSkill(skillName);
 
         if (!skill) {

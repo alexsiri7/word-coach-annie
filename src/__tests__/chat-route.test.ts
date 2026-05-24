@@ -35,9 +35,20 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("@/mcp/tools/coaching", () => ({
+  getSceneFocus: vi.fn(),
+}));
+
+vi.mock("@/mcp/skills", () => ({
+  loadSkill: vi.fn(),
+  listSkills: vi.fn(async () => []),
+}));
+
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
+import { getSceneFocus } from "@/mcp/tools/coaching";
+import { loadSkill } from "@/mcp/skills";
 import { NextRequest } from "next/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -360,5 +371,119 @@ describe("DELETE /api/chat", () => {
 
     const remaining = await testPrisma.chatMessage.findMany({ where: { conversationId: conversation.id } });
     expect(remaining).toHaveLength(0);
+  });
+});
+
+describe("POST /api/chat — reviewSceneId skill routing", () => {
+  let projectId: string;
+  let conversationId: string;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true } as never);
+    vi.mocked(loadSkill).mockReturnValue(null);
+
+    const project = await testPrisma.project.create({
+      data: { title: "Review Test", author: "Author" },
+    });
+    projectId = project.id;
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId, title: "Review chat" },
+    });
+    conversationId = conversation.id;
+  });
+
+  it("injects skill note into system prompt when reviewSceneId resolves", async () => {
+    vi.mocked(getSceneFocus).mockResolvedValue({
+      scene: { id: "scene-1", title: "Act One", status: "DRAFT", projectId, synopsis: "", projectTitle: "Review Test", wordCount: 500, chapterTitle: "Ch 1", prevScene: null, nextScene: null },
+      timelineScenes: [],
+    } as never);
+    vi.mocked(loadSkill).mockReturnValue({
+      metadata: { name: "Developmental Edit", description: "Big-picture feedback" },
+      instructions: "Focus on structure and pacing.",
+    } as never);
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "Review this scene", reviewSceneId: "scene-1" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).toContain("## Active Skill: Developmental Edit");
+    expect(call.systemPrompt).toContain("Focus on structure and pacing.");
+    expect(vi.mocked(loadSkill)).toHaveBeenCalledWith("developmental-edit");
+  });
+
+  it("routes OUTLINE status to outline-review skill", async () => {
+    vi.mocked(getSceneFocus).mockResolvedValue({
+      scene: { id: "scene-2", title: "Ch 1 S1", status: "OUTLINE", projectId, synopsis: "", projectTitle: "Review Test", wordCount: 100, chapterTitle: "Ch 1", prevScene: null, nextScene: null },
+      timelineScenes: [],
+    } as never);
+    vi.mocked(loadSkill).mockReturnValue({
+      metadata: { name: "Outline Review", description: "Plot structure check" },
+      instructions: "Review the outline.",
+    } as never);
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "Review outline", reviewSceneId: "scene-2" }));
+
+    expect(vi.mocked(loadSkill)).toHaveBeenCalledWith("outline-review");
+  });
+
+  it("falls back to DRAFT skill for unknown scene status", async () => {
+    vi.mocked(getSceneFocus).mockResolvedValue({
+      scene: { id: "scene-3", title: "Unknown", status: "UNKNOWN_STATUS", projectId, synopsis: "", projectTitle: "Review Test", wordCount: 0, chapterTitle: null, prevScene: null, nextScene: null },
+      timelineScenes: [],
+    } as never);
+    vi.mocked(loadSkill).mockReturnValue({
+      metadata: { name: "Developmental Edit", description: "" },
+      instructions: "",
+    } as never);
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "Review this", reviewSceneId: "scene-3" }));
+
+    expect(vi.mocked(loadSkill)).toHaveBeenCalledWith("developmental-edit");
+  });
+
+  it("gracefully degrades and returns 200 when getSceneFocus throws", async () => {
+    vi.mocked(getSceneFocus).mockRejectedValue(new Error("Scene not found"));
+
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId, message: "Review this", reviewSceneId: "bad-id" }));
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(logger).warn).toHaveBeenCalledWith(
+      "Could not load review skill for scene",
+      expect.objectContaining({ reviewSceneId: "bad-id" }),
+    );
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).not.toContain("## Active Skill:");
+  });
+
+  it("omits skill note when reviewSceneId is not provided", async () => {
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "General question" }));
+
+    expect(vi.mocked(getSceneFocus)).not.toHaveBeenCalled();
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).not.toContain("## Active Skill:");
+  });
+
+  it("ignores skill and logs warning when reviewSceneId belongs to a different project", async () => {
+    vi.mocked(getSceneFocus).mockResolvedValue({
+      scene: { id: "scene-x", title: "Other Scene", status: "DRAFT", projectId: "other-project-id", synopsis: "", projectTitle: "Other Novel", wordCount: 0, chapterTitle: null, prevScene: null, nextScene: null },
+      timelineScenes: [],
+    } as never);
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "Review this", reviewSceneId: "scene-x" }));
+
+    expect(vi.mocked(loadSkill)).not.toHaveBeenCalled();
+    expect(vi.mocked(logger).warn).toHaveBeenCalledWith(
+      "reviewSceneId belongs to a different project — ignoring",
+      expect.objectContaining({ reviewSceneId: "scene-x" }),
+    );
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).not.toContain("## Active Skill:");
   });
 });

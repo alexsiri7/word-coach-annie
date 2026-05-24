@@ -9,6 +9,7 @@ import { compressConversation } from "@/lib/ai/chat-compression";
 import type { AiProviderConfig } from "@/lib/ai/settings";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { loadSkill } from "@/mcp/skills";
+import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const MAX_ID_LENGTH = 100;
@@ -349,23 +350,24 @@ export async function POST(request: NextRequest) {
       ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
       : "";
 
-    // Load review skill based on scene status (mirrors REVIEW_SKILL_BY_STATUS from mcp/index.ts)
-    const REVIEW_SKILL_BY_STATUS: Record<string, string> = {
-      OUTLINE: "outline-review",
-      DRAFT: "developmental-edit",
-      REVISED: "line-edit",
-      FINAL: "consistency-check",
-    };
-
     let skillNote = "";
     if (reviewSceneId) {
       try {
         const focus = await getSceneFocus(reviewSceneId);
-        const status = focus.scene.status as string;
-        const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
-        const skill = loadSkill(skillName);
-        if (skill) {
-          skillNote = `\n\n## Active Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${skill.instructions}`;
+        // Verify the scene belongs to the conversation's project before using its data
+        if (focus.scene.projectId !== conversation.projectId) {
+          logger.warn("reviewSceneId belongs to a different project — ignoring", {
+            reviewSceneId,
+            sceneProjId: focus.scene.projectId,
+            convProjId: conversation.projectId,
+          });
+        } else {
+          const status = focus.scene.status as string;
+          const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
+          const skill = loadSkill(skillName);
+          if (skill) {
+            skillNote = `\n\n## Active Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${skill.instructions}`;
+          }
         }
       } catch (err) {
         logger.warn("Could not load review skill for scene", { reviewSceneId, err });

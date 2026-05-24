@@ -240,7 +240,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, isOnline, conversationId, sceneContext]);
+  }, [isStreaming, isOnline, conversationId, sceneContext, reviewSceneId]);
 
   // Auto-send initialMessage once history is loaded
   useEffect(() => {
