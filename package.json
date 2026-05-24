@@ -47,7 +47,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-pdf/renderer": "^4.5.1",
-    "@sentry/nextjs": "^10.50.0",
+    "@sentry/nextjs": "^10.53.1",
     "@tiptap/core": "^3.23.1",
     "@tiptap/extension-bubble-menu": "^3.23.1",
     "@tiptap/extension-highlight": "^3.23.1",
