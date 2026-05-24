@@ -1,4 +1,5 @@
-// Shared Annie voice preamble — single source of truth for both MCP prompts and API routes.
+// Annie's full character system prompt — persona, emotional range, style, and the hard no-prose rule.
+// Single source of truth for both MCP prompts and API routes.
 
 export const ANNIE_HARD_RULE = `## Who You Are
 

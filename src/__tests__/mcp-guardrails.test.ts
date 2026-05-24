@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { ANNIE_HARD_RULE } from "../mcp/annie-voice";
 
 const mcpSource = readFileSync(resolve(__dirname, "../mcp/index.ts"), "utf-8");
 
@@ -18,8 +19,8 @@ describe("Annie Hard Rule Enforcement", () => {
 
     describe("ANNIE_HARD_RULE content", () => {
         it("should contain the no-prose hard rule text", () => {
-            expect(mcpSource).toContain("Hard Rule: No Prose");
-            expect(mcpSource).toContain("You NEVER write narrative prose");
+            expect(ANNIE_HARD_RULE).toContain("Hard Rule: No Prose");
+            expect(ANNIE_HARD_RULE).toContain("You NEVER write narrative prose");
         });
     });
 
@@ -87,4 +88,26 @@ describe("plan_beats prompt", () => {
         expect(planBeatsSection).toContain("Chapter:");
         expect(planBeatsSection).toContain("Word Count:");
     });
+});
+
+describe("review persona prompts", () => {
+    for (const promptName of ["review-editor", "review-fan", "review-author"]) {
+        describe(`${promptName} prompt`, () => {
+            it(`should register the ${promptName} prompt`, () => {
+                expect(mcpSource).toContain(`"${promptName}"`);
+            });
+
+            it(`should instruct use of export_manuscript tool in ${promptName}`, () => {
+                const start = mcpSource.indexOf(`"${promptName}"`);
+                const section = mcpSource.slice(start, start + 3000);
+                expect(section).toContain("export_manuscript");
+            });
+
+            it(`should prepend ANNIE_HARD_RULE in ${promptName} prompt`, () => {
+                const start = mcpSource.indexOf(`"${promptName}"`);
+                const section = mcpSource.slice(start, start + 3000);
+                expect(section).toContain("ANNIE_HARD_RULE");
+            });
+        });
+    }
 });

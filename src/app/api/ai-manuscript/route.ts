@@ -60,6 +60,7 @@ Format as a structured report. List specific potential issues with scene referen
  * POST /api/ai-manuscript — run manuscript-level analysis
  *
  * Uses shared manuscript context from MCP coaching module.
+ * System prompt always includes Annie's full persona (ANNIE_HARD_RULE).
  */
 export async function POST(request: NextRequest) {
   try {
