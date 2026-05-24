@@ -314,8 +314,6 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
     </div>
   );
 
-  const savedLabel = currentMeta ? `Saved ${formatTimestamp(currentMeta.createdAt)}` : null;
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -442,8 +440,8 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
 
             {review && !loading && (
               <div className="p-3">
-                {savedLabel && (
-                  <p className="text-[11px] text-muted-foreground mb-2">{savedLabel}</p>
+                {currentMeta && (
+                  <p className="text-[11px] text-muted-foreground mb-2">Saved {formatTimestamp(currentMeta.createdAt)}</p>
                 )}
                 {activeTab === "consensus"
                   ? renderConsensusTab(review.consensus)

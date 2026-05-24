@@ -202,7 +202,7 @@ export async function GET(
     const { searchParams } = request.nextUrl;
     const rawLimit = parseInt(searchParams.get("limit") || "20", 10) || 20;
     const limit = Math.min(Math.max(rawLimit, 1), 100);
-    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10), 0);
 
     const [rows, total] = await Promise.all([
       prisma.peerReview.findMany({
