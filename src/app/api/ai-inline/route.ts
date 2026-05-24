@@ -80,7 +80,11 @@ export async function POST(request: NextRequest) {
       ? instructionOrFn(sanitizedAsk)
       : instructionOrFn;
     const contextBlock = sanitizedContext ? `\nContext (surrounding text):\n${sanitizedContext}\n` : "";
-    const textLabel = action === "continue" ? "End of passage (continue from here)" : action === "voice-check" ? "Passage to review" : "Selected text";
+    const TEXT_LABELS: Partial<Record<InlineAiAction, string>> = {
+      "continue": "End of passage (continue from here)",
+      "voice-check": "Passage to review",
+    };
+    const textLabel = TEXT_LABELS[action] ?? "Selected text";
     const prompt = `${instruction}${contextBlock}\n${textLabel}:\n${sanitizedText}`;
 
     // Load user preferences for system-level behavior guidance
