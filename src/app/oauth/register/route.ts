@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
   };
 
   await registerClient(registration, { ip, userId: userId ?? undefined });
-  logger.info("oauth-client-registered", { clientId, ip, userId: userId ?? null });
+  logger.info("oauth-client-registered", { clientId, ip, userId });
 
   return NextResponse.json(
     {
