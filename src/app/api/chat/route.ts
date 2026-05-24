@@ -7,6 +7,8 @@ import { sanitizeInput } from "@/lib/sanitize-server";
 import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { compressConversation } from "@/lib/ai/chat-compression";
 import type { AiProviderConfig } from "@/lib/ai/settings";
+import { getSceneFocus } from "@/mcp/tools/coaching";
+import { loadSkill } from "@/mcp/skills";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const MAX_ID_LENGTH = 100;
@@ -250,10 +252,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { conversationId, message, sceneContext } = body as {
+    const { conversationId, message, sceneContext, reviewSceneId } = body as {
       conversationId: string;
       message: string;
       sceneContext?: string;
+      reviewSceneId?: string;
     };
 
     if (!conversationId || !message) {
@@ -346,13 +349,36 @@ export async function POST(request: NextRequest) {
       ? `\n\nThe user currently has this scene open:\n${sceneContext.slice(0, 2000)}`
       : "";
 
+    // Load review skill based on scene status (mirrors REVIEW_SKILL_BY_STATUS from mcp/index.ts)
+    const REVIEW_SKILL_BY_STATUS: Record<string, string> = {
+      OUTLINE: "outline-review",
+      DRAFT: "developmental-edit",
+      REVISED: "line-edit",
+      FINAL: "consistency-check",
+    };
+
+    let skillNote = "";
+    if (reviewSceneId) {
+      try {
+        const focus = await getSceneFocus(reviewSceneId);
+        const status = focus.scene.status as string;
+        const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
+        const skill = loadSkill(skillName);
+        if (skill) {
+          skillNote = `\n\n## Active Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${skill.instructions}`;
+        }
+      } catch (err) {
+        logger.warn("Could not load review skill for scene", { reviewSceneId, err });
+      }
+    }
+
     // Load user preferences and add to system prompt
     const prefs = await getAiPreferences(userId);
     const prefInstructions = buildPreferenceInstructions(prefs);
 
     // Run ADK agent (handles tool loop, dynamic tool loading internally)
     const agentPromise = runChatAgent({
-      systemPrompt: systemPrompt + summaryBlock + sceneNote + "\n\n" + prefInstructions,
+      systemPrompt: systemPrompt + summaryBlock + sceneNote + skillNote + "\n\n" + prefInstructions,
       chatHistory: windowMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,
