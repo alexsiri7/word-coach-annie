@@ -63,6 +63,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
+import { buildReviewPrompt } from "@/lib/review-prompts";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat" | "peer-review";
 
@@ -702,14 +703,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   timelineScenes={timelineScenes}
                   linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
                   onReviewScene={() => {
-                    const REVIEW_PROMPTS: Record<SceneStatus, string> = {
-                      OUTLINE: "Please review this scene outline. Focus on plot structure, story purpose, and what this scene needs to accomplish.",
-                      DRAFT: "Please give me developmental feedback on this draft. Focus on structure, pacing, character behaviour, and emotional landing.",
-                      REVISED: "Please give me a line-level review of this scene. Focus on rhythm, word choice, clarity, and voice.",
-                      FINAL: "Please do a continuity and consistency check on this scene against the rest of the story.",
-                    };
-                    const prompt = REVIEW_PROMPTS[(selectedNode.status as SceneStatus) || "DRAFT"];
-                    const fullPrompt = selectedNode.title ? `[Scene: ${selectedNode.title}] ${prompt}` : prompt;
+                    const fullPrompt = buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title);
                     setReviewManuscript(fullPrompt);
                     setReviewConversationId(null);
                     setActiveTab("ai-chat");
