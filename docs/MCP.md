@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **67 tools** and **13 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **67 tools** and **16 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -815,6 +815,39 @@ the prose.
 |-------|------|-------------|
 | `sceneId` | string | The scene node ID to plan beats for |
 | `projectId` | string? | Project ID (auto-detected from scene if omitted) |
+
+---
+
+#### `review-editor`
+Review manuscript as a seasoned acquisitions editor — commercial viability, hook strength, pacing, character arc payoff.
+
+Uses `export_manuscript` to load the full manuscript, then applies an acquisitions-editor lens: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-fan`
+Review manuscript as an avid genre reader — visceral reader response, emotional reactions, genre expectations.
+
+Uses `export_manuscript` to load the full manuscript, then reacts as a genre reader: hook, hold, ending satisfaction, genre promise delivery, and specific moment reactions.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-author`
+Review manuscript as a published peer author — craft-level feedback on prose, POV, dialogue, scene construction.
+
+Uses `export_manuscript` to load the full manuscript, then applies craft-level peer review: prose rhythm, POV discipline, dialogue quality, scene construction, show-don't-tell, inciting incident timing.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
 
 ---
 

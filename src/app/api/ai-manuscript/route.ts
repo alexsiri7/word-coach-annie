@@ -4,6 +4,7 @@ import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
@@ -59,6 +60,7 @@ Format as a structured report. List specific potential issues with scene referen
  * POST /api/ai-manuscript — run manuscript-level analysis
  *
  * Uses shared manuscript context from MCP coaching module.
+ * System prompt always includes Annie's full persona (ANNIE_HARD_RULE).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
     const prefInstructions = buildPreferenceInstructions(prefs);
 
     const result = await runSimpleCompletion({
-      systemPrompt: prefInstructions,
+      systemPrompt: ANNIE_HARD_RULE + (prefInstructions ? `\n\n${prefInstructions}` : ""),
       userMessage: prompt,
       aiConfig,
       maxTokens: 2000,

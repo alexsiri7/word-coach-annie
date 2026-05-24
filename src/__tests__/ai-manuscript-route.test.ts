@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
 
 // Mock Prisma
 vi.mock("@/lib/db", () => ({
@@ -127,6 +128,26 @@ describe("POST /api/ai-manuscript", () => {
     const body = await res.json();
     expect(body.result).toBe("Analysis result text");
     expect(body.analysisType).toBe("consistency-check");
+  });
+
+  it("prepends ANNIE_HARD_RULE to system prompt when no preference instructions", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const { buildPreferenceInstructions } = await import("@/lib/ai/settings");
+    vi.mocked(buildPreferenceInstructions).mockReturnValueOnce("");
+    const req = makeRequest({ projectId: "proj-1", analysisType: "plot-threads" });
+    await POST(req);
+    const call = vi.mocked(runSimpleCompletion).mock.calls[0][0];
+    expect(call.systemPrompt).toBe(ANNIE_HARD_RULE);
+  });
+
+  it("prepends ANNIE_HARD_RULE with double-newline separator when preference instructions exist", async () => {
+    const { runSimpleCompletion } = await import("@/lib/ai/adk-agent");
+    const { buildPreferenceInstructions } = await import("@/lib/ai/settings");
+    vi.mocked(buildPreferenceInstructions).mockReturnValueOnce("Write concisely.");
+    const req = makeRequest({ projectId: "proj-1", analysisType: "plot-threads" });
+    await POST(req);
+    const call = vi.mocked(runSimpleCompletion).mock.calls[0][0];
+    expect(call.systemPrompt).toBe(ANNIE_HARD_RULE + "\n\nWrite concisely.");
   });
 
   it("returns 503 when AI is not configured", async () => {
