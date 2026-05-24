@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **67 tools** and **12 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **67 tools** and **13 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -803,6 +803,18 @@ Deep manuscript-level analysis.
 |-------|------|-------------|
 | `projectId` | string | The project ID |
 | `analysisType` | enum | `plot-threads`, `character-arcs`, `consistency-check` |
+
+---
+
+#### `plan_beats`
+Map a scene as structured BEAT blocks — structural waypoints for what happens, what
+shifts, and what the reader feels. Annie provides the blueprint; the writer fills in
+the prose.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `sceneId` | string | The scene node ID to plan beats for |
+| `projectId` | string? | Project ID (auto-detected from scene if omitted) |
 
 ---
 

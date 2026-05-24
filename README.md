@@ -118,7 +118,7 @@ The `-T` flag disables pseudo-tty allocation for clean stdio communication.
 
 ### Writing Skills (MCP Prompts)
 
-Eight curated instruction sets registered as MCP Prompts, plus 4 built-in coaching prompts:
+Eight curated instruction sets registered as MCP Prompts, plus 5 built-in coaching prompts:
 
 **Skills** (from `.skills/`):
 - **Developmental Edit** — structural/story-level feedback
@@ -135,6 +135,7 @@ Eight curated instruction sets registered as MCP Prompts, plus 4 built-in coachi
 - **scene-coaching** — status-adaptive coaching for a single scene
 - **inline-edit** — inline text operations (rewrite, continue, expand, voice-check)
 - **manuscript-analysis** — project-level analysis (plot threads, character arcs, consistency)
+- **plan_beats** — map a scene as structured BEAT blocks; Annie provides the blueprint, writer fills the prose
 
 ## Development
 

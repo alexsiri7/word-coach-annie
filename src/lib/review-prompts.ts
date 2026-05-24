@@ -22,3 +22,10 @@ export function buildReviewPrompt(
   const prompt = REVIEW_PROMPTS[status];
   return title ? `[Scene: ${title}] ${prompt}` : prompt;
 }
+
+const PLAN_BEATS_PROMPT =
+  "Help me plan this scene as structured BEAT blocks — map what happens, what shifts, and what the reader should feel. I'll write the prose; you give me the blueprint.";
+
+export function buildPlanBeatsPrompt(title: string | undefined): string {
+  return title ? `[Scene: ${title}] ${PLAN_BEATS_PROMPT}` : PLAN_BEATS_PROMPT;
+}

@@ -63,7 +63,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
-import { buildReviewPrompt } from "@/lib/review-prompts";
+import { buildReviewPrompt, buildPlanBeatsPrompt } from "@/lib/review-prompts";
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat" | "peer-review";
 
@@ -705,6 +705,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   onReviewScene={() => {
                     const fullPrompt = buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title);
                     setReviewManuscript(fullPrompt);
+                    setReviewConversationId(null);
+                    setActiveTab("ai-chat");
+                    setSelectedNodeId(null);
+                    setSelectedObjectId(null);
+                  }}
+                  onPlanBeats={() => {
+                    const prompt = buildPlanBeatsPrompt(selectedNode.title);
+                    setReviewManuscript(prompt);
                     setReviewConversationId(null);
                     setActiveTab("ai-chat");
                     setSelectedNodeId(null);

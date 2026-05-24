@@ -26,6 +26,7 @@ import {
   Sparkles,
   PanelRight,
   ClipboardCheck,
+  LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ interface EditorToolbarProps {
   onToggleSceneContext?: () => void;
   showSceneContext?: boolean;
   onReviewScene?: () => void;
+  onPlanBeats?: () => void;
 }
 
 export function EditorToolbar({
@@ -94,6 +96,7 @@ export function EditorToolbar({
   onToggleSceneContext,
   showSceneContext,
   onReviewScene,
+  onPlanBeats,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
@@ -257,6 +260,18 @@ export function EditorToolbar({
             aria-pressed={showSceneContext}
           >
             <PanelRight className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onPlanBeats && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onPlanBeats}
+            aria-label="Plan scene beats"
+          >
+            <LayoutList className="h-4 w-4" />
           </Button>
         )}
 

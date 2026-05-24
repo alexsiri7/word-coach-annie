@@ -44,6 +44,7 @@ interface SceneEditorProps {
   timelineScenes?: TimelineSceneItem[];
   linkedCharacters?: StoryObject[];
   onReviewScene?: () => void;
+  onPlanBeats?: () => void;
 }
 
 export function SceneEditor({
@@ -54,6 +55,7 @@ export function SceneEditor({
   timelineScenes,
   linkedCharacters = [],
   onReviewScene,
+  onPlanBeats,
 }: SceneEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -408,6 +410,7 @@ export function SceneEditor({
         onToggleSceneContext={() => setShowSceneContext((v) => !v)}
         showSceneContext={showSceneContext}
         onReviewScene={onReviewScene}
+        onPlanBeats={onPlanBeats}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
