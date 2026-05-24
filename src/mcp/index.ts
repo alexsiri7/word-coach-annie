@@ -1230,7 +1230,7 @@ Structure your response as:
 
 type SceneFocus = Awaited<ReturnType<typeof getSceneFocus>>;
 
-function makeProjectReviewPrompt(projectId: string, modeTitle: string, instructions: string) {
+function _makeProjectReviewPrompt(projectId: string, modeTitle: string, instructions: string) {
     return {
         messages: [{
             role: "user" as const,
