@@ -5,6 +5,7 @@ import * as structureTools from "@/mcp/tools/structure";
 import * as projectTools from "@/mcp/tools/projects";
 import * as storyObjectTools from "@/mcp/tools/story-objects";
 import * as universeTools from "@/mcp/tools/universes";
+import * as writingTaskTools from "@/mcp/tools/writing-tasks";
 import { StaleWriteError } from "@/mcp/content-hash";
 import { prisma } from "@/lib/db";
 
@@ -477,5 +478,49 @@ describe("MCP Universe Tools", () => {
         await universeTools.unlinkProjectFromUniverse(p.id);
         const universe2 = await universeTools.getUniverse(u.id);
         expect(universe2.projects).toHaveLength(0);
+    });
+});
+
+describe("MCP Writing Task Tools", () => {
+    let projectId: string;
+
+    beforeEach(async () => {
+        const project = await ProjectsController.createProject({ title: "Test Project" });
+        projectId = project.id;
+    });
+
+    it("createWritingTask creates and returns task", async () => {
+        const task = await writingTaskTools.createWritingTask({
+            projectId,
+            name: "Draft scene",
+            energy: "Dramatic",
+        });
+        expect(task.name).toBe("Draft scene");
+        expect(task.energy).toBe("Dramatic");
+        expect(task.completed).toBe(false);
+    });
+
+    it("listWritingTasks returns created tasks", async () => {
+        await writingTaskTools.createWritingTask({ projectId, name: "Task A" });
+        await writingTaskTools.createWritingTask({ projectId, name: "Task B" });
+        const result = await writingTaskTools.listWritingTasks({ projectId });
+        expect(result.tasks).toHaveLength(2);
+        expect(result.total).toBe(2);
+    });
+
+    it("completeWritingTask marks task done", async () => {
+        const task = await writingTaskTools.createWritingTask({ projectId, name: "Task" });
+        const completed = await writingTaskTools.completeWritingTask(task.id);
+        expect(completed.completed).toBe(true);
+    });
+
+    it("listWritingTasks filters by completed status", async () => {
+        const task = await writingTaskTools.createWritingTask({ projectId, name: "Task" });
+        await writingTaskTools.completeWritingTask(task.id);
+        await writingTaskTools.createWritingTask({ projectId, name: "Open task" });
+
+        const openOnly = await writingTaskTools.listWritingTasks({ projectId, completed: false });
+        expect(openOnly.tasks).toHaveLength(1);
+        expect(openOnly.tasks[0].name).toBe("Open task");
     });
 });

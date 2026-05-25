@@ -96,6 +96,17 @@ describe("Writing Tasks API", () => {
       );
       expect(res.status).toBe(400);
     });
+
+    it("returns 404 when projectId references non-existent project", async () => {
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", {
+          projectId: "nonexistent-id",
+          name: "Some task",
+        })
+      );
+      expect(res.status).toBe(404);
+    });
   });
 
   describe("GET /api/writing-tasks", () => {
@@ -119,6 +130,12 @@ describe("Writing Tasks API", () => {
       const { GET } = await import("@/app/api/writing-tasks/route");
       const res = await GET(makeGetRequest("/api/writing-tasks"));
       expect(res.status).toBe(400);
+    });
+
+    it("returns 404 when projectId references non-existent project", async () => {
+      const { GET } = await import("@/app/api/writing-tasks/route");
+      const res = await GET(makeGetRequest("/api/writing-tasks?projectId=nonexistent-id"));
+      expect(res.status).toBe(404);
     });
   });
 

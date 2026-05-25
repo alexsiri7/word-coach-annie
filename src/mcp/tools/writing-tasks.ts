@@ -37,6 +37,6 @@ export async function createWritingTask(params: {
 
 export async function completeWritingTask(taskId: string) {
     const result = await WritingTaskController.completeWritingTask(taskId);
-    mcpCache.invalidatePrefix("writingTasks:");
+    mcpCache.invalidatePrefix(`writingTasks:${result.projectId}:`);
     return result;
 }

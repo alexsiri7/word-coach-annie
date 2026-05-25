@@ -4,6 +4,7 @@ import { WritingTaskCreateSchema } from "@/schemas/writing-tasks";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
     try {
@@ -20,6 +21,11 @@ export async function GET(request: NextRequest) {
         const userId = getCurrentUserId(request);
         const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
+
+        const projectExists = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
+        if (!projectExists) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        }
 
         const importance = searchParams.get("importance");
         const size = searchParams.get("size");
@@ -62,6 +68,11 @@ export async function POST(request: NextRequest) {
         const userId = getCurrentUserId(request);
         const access = await verifyProjectWriteAccess(parsed.data.projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
+
+        const projectExists = await prisma.project.findUnique({ where: { id: parsed.data.projectId }, select: { id: true } });
+        if (!projectExists) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        }
 
         const task = await WritingTaskController.createWritingTask({
             ...parsed.data,

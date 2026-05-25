@@ -150,7 +150,7 @@ Tools are registered in `src/lib/ai/tool-registry.ts` using Zod schemas (shared 
 
 ### MCP Server (external agents)
 
-`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, DatabaseSafety, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
+`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 73 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, DatabaseSafety, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
 
 Six writing skills are registered as **MCP Prompts** (discoverable via `list_prompts`, invocable via `get_prompt`).
 

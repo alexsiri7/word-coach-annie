@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **70 tools** and **16 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **73 tools** and **16 prompts** for full read/write access to all project data.
 
 ## Connection
 
