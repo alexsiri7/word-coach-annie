@@ -392,16 +392,18 @@ server.tool(
     }
 );
 
+// Note: insert_beat bypasses the prose-writing guard because the payload is beat
+// text only — no CONTENT blocks are written, so the guard condition never fires.
 server.tool(
     "insert_beat",
-    "Insert a new beat block after a specified paragraph index in a scene. The payload contains only beat text — no CONTENT blocks — so Annie's prose-writing guard never fires.",
+    "Insert a new beat block after a specified paragraph index in a scene. Use this tool for structural waypoints (beats), not prose — it writes only a BEAT block, keeping Annie's structural-vs-prose separation intact.",
     {
         nodeId: z.string().describe("The scene node ID"),
         afterParagraphIndex: z
             .number()
             .int()
             .describe(
-                "Insert the beat after this paragraph index (from read_scene_content paragraphs array). Use -1 to insert before all existing blocks.",
+                "Insert the beat after this block index (from read_scene_content paragraphs array — includes both CONTENT and BEAT blocks). Use -1 to insert before all existing blocks.",
             ),
         beatContent: z.string().describe("The beat text to insert (structural waypoint — not prose)"),
         sceneContentHash: z

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { StructureController } from "@/lib/controllers/structure";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { insertBeat } from "@/mcp/tools/structure";
+import { computeContentHash, StaleWriteError } from "@/mcp/content-hash";
 
 describe("StructureController", () => {
     describe("parseSceneContent", () => {
@@ -390,6 +391,23 @@ describe("StructureController", () => {
                 expect(result.versionId).toBeDefined();
                 expect(result.wordCount).toBeDefined();
                 expect(result.createdAt).toBeDefined();
+            });
+
+            it("rejects insert when sceneContentHash is stale", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+
+                const staleHash = computeContentHash("stale-content");
+                await expect(insertBeat(scene.id, 0, "New beat", staleHash)).rejects.toThrow(StaleWriteError);
+            });
+
+            it("accepts insert when sceneContentHash matches current content", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+
+                const current = await StructureController.readSceneContent(scene.id);
+                const hash = computeContentHash(current.content);
+                await expect(insertBeat(scene.id, 0, "New beat", hash)).resolves.toBeDefined();
             });
         });
 
