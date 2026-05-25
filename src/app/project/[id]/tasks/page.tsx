@@ -162,7 +162,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 md:px-16 lg:px-24 py-10 md:py-12">
           {loading ? (
             <div className="space-y-6 animate-pulse">
@@ -289,7 +289,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
