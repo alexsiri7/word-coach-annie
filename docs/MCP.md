@@ -837,6 +837,23 @@ Returns the updated `WritingTask` with `completed: true`.
 
 ---
 
+#### `update_writing_task`
+Update fields on an existing writing task. All fields except `taskId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `taskId` | string | The writing task ID to update |
+| `name` | string? | New one-line task description |
+| `whatIsNeeded` | string? | Updated context — two sentences max |
+| `importance` | `"Critical" \| "High" \| "Medium"`? | Updated priority level |
+| `size` | `"Small" \| "Medium" \| "Large"`? | Updated effort size |
+| `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Updated energy type |
+| `completed` | boolean? | Mark task complete (`true`) or incomplete (`false`) |
+
+Returns the updated `WritingTask` object.
+
+---
+
 ### Skills
 
 #### `list_skills`

@@ -93,21 +93,7 @@ export class WritingTaskController {
     }
 
     static async completeWritingTask(taskId: string) {
-        const existing = await prisma.writingTask.findUnique({
-            where: { id: taskId },
-            select: { id: true },
-        });
-        if (!existing) throw new Error(`Writing task not found: ${taskId}`);
-
-        const task = await prisma.writingTask.update({
-            where: { id: taskId },
-            data: { completed: true },
-            include: {
-                scene: { select: { id: true, title: true } },
-            },
-        });
-
-        return serializeTask(task);
+        return WritingTaskController.updateWritingTask(taskId, { completed: true });
     }
 
     static async updateWritingTask(
