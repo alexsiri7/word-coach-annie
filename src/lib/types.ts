@@ -163,5 +163,3 @@ export interface WritingTask {
   updatedAt: string;
   scene?: { id: string; title: string } | null;
 }
-
-

@@ -38,7 +38,7 @@ export class WritingTaskController {
         });
         if (!project) throw new Error(`Project not found: ${projectId}`);
 
-        const where: Record<string, unknown> = { projectId };
+        const where: Prisma.WritingTaskWhereInput = { projectId };
         if (completed !== undefined) where.completed = completed;
         if (importance) where.importance = importance;
         if (size) where.size = size;
