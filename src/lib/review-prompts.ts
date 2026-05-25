@@ -15,24 +15,24 @@ export const REVIEW_PROMPTS: Record<SceneStatus, string> = {
     "Please do a continuity and consistency check on this scene against the rest of the story.",
 };
 
-export function buildReviewPrompt(
-  status: SceneStatus,
-  title: string | undefined
-): string {
-  const prompt = REVIEW_PROMPTS[status];
+function withTitle(prompt: string, title: string | undefined): string {
   return title ? `[Scene: ${title}] ${prompt}` : prompt;
+}
+
+export function buildReviewPrompt(status: SceneStatus, title: string | undefined): string {
+  return withTitle(REVIEW_PROMPTS[status], title);
 }
 
 const PLAN_BEATS_PROMPT =
   "Help me plan this scene as structured BEAT blocks — map what happens, what shifts, and what the reader should feel. I'll write the prose; you give me the blueprint.";
 
 export function buildPlanBeatsPrompt(title: string | undefined): string {
-  return title ? `[Scene: ${title}] ${PLAN_BEATS_PROMPT}` : PLAN_BEATS_PROMPT;
+  return withTitle(PLAN_BEATS_PROMPT, title);
 }
 
 const CANON_CHECK_PROMPT =
   "Please run a canon check on this scene — cross-reference the prose against the story bible and flag any contradictions (attribute mismatches, behavioural inconsistencies, timeline issues). For each finding, ask me whether to update the story object or revise the prose.";
 
 export function buildCanonCheckPrompt(title: string | undefined): string {
-  return title ? `[Scene: ${title}] ${CANON_CHECK_PROMPT}` : CANON_CHECK_PROMPT;
+  return withTitle(CANON_CHECK_PROMPT, title);
 }

@@ -429,6 +429,16 @@ test.describe('Visual regression – Annie', () => {
     })
   })
 
+  test('landing page', async ({ page }) => {
+    await page.goto('/landing')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    await expect(page).toHaveScreenshot('landing.png', {
+      animations: 'disabled',
+    })
+  })
+
   test('dmca page', async ({ page }) => {
     await page.goto('/dmca')
     await page.waitForSelector('main', { timeout: 20_000 })

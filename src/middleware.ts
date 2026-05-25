@@ -20,6 +20,7 @@ const PUBLIC_PATHS = [
     "/api/auth/google",
     "/api/auth/me",
     "/login",
+    "/landing",
     "/privacy",
     "/terms",
     "/.well-known/oauth-authorization-server",
@@ -208,6 +209,11 @@ export async function middleware(request: NextRequest) {
     // Not authenticated — return 401 for API, redirect for pages
     if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Unauthenticated root visitors see the landing page instead of login
+    if (pathname === "/") {
+        return NextResponse.redirect(new URL("/landing", request.url));
     }
 
     const loginUrl = new URL("/login", request.url);

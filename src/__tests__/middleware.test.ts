@@ -150,6 +150,29 @@ describe("middleware", () => {
         expect(res.headers.get("location")).toContain("from=%2Fdashboard");
     });
 
+    it("redirects unauthenticated / to /landing", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/");
+        const res = await middleware(req);
+        expect(res.status).toBe(307);
+        expect(res.headers.get("location")).toContain("/landing");
+    });
+
+    it("does not include 'from' param in root redirect", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/");
+        const res = await middleware(req);
+        const location = res.headers.get("location") ?? "";
+        expect(location).not.toContain("from=");
+    });
+
+    it("allows /landing path without auth", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/landing");
+        const res = await middleware(req);
+        expect(res.status).toBe(200);
+    });
+
     describe("rate limiting", () => {
         it("returns 429 when JWT user exceeds chat rate limit", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
