@@ -20,6 +20,7 @@ import {
     writeSceneContent,
     writeSceneContentFromBlocks,
     updateParagraph,
+    insertBeat,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -387,6 +388,31 @@ server.tool(
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
         const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// Note: insert_beat bypasses the prose-writing guard because the payload is beat
+// text only — no CONTENT blocks are written, so the guard condition never fires.
+server.tool(
+    "insert_beat",
+    "Insert a new beat block after a specified paragraph index in a scene. Use this tool for structural waypoints (beats), not prose — it writes only a BEAT block, keeping Annie's structural-vs-prose separation intact.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        afterParagraphIndex: z
+            .number()
+            .int()
+            .describe(
+                "Insert the beat after this block index (from read_scene_content paragraphs array — includes both CONTENT and BEAT blocks). Use -1 to insert before all existing blocks.",
+            ),
+        beatContent: z.string().describe("The beat text to insert (structural waypoint — not prose)"),
+        sceneContentHash: z
+            .string()
+            .optional()
+            .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
+    },
+    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) => {
+        const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

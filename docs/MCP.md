@@ -248,6 +248,20 @@ words (typos, punctuation, wording fixes) rather than replacing them with AI-gen
 
 ---
 
+#### `insert_beat`
+Insert a new beat block at a specific position in a scene. Because the payload contains
+only beat text (no CONTENT blocks), Annie's prose-writing guard never fires — prefer this
+tool over `write_scene_content` when adding structural waypoints without touching prose.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `nodeId` | string | The scene node ID |
+| `afterParagraphIndex` | number | Insert beat after this block index (0-based, from `read_scene_content` blocks array — includes both CONTENT and BEAT blocks). Use `-1` to prepend before all existing blocks. |
+| `beatContent` | string | The beat text to insert (structural waypoint — not prose) |
+| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content` for stale detection |
+
+---
+
 #### `get_scene_versions`
 List version history of a scene (timestamps and word counts).
 
