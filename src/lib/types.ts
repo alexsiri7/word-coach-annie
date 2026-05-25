@@ -141,4 +141,27 @@ export interface Annotation {
   updatedAt: string;
 }
 
+import type {
+  WritingTaskImportanceValue as WritingTaskImportance,
+  WritingTaskSizeValue as WritingTaskSize,
+  WritingTaskEnergyValue as WritingTaskEnergy,
+} from "@/schemas/writing-tasks";
+
+export type { WritingTaskImportance, WritingTaskSize, WritingTaskEnergy };
+
+export interface WritingTask {
+  id: string;
+  projectId: string;
+  sceneId?: string | null;
+  name: string;
+  whatIsNeeded: string;
+  importance: WritingTaskImportance;
+  size: WritingTaskSize;
+  energy: WritingTaskEnergy;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  scene?: { id: string; title: string } | null;
+}
+
 

@@ -41,8 +41,8 @@ beforeEach(async () => {
       "OAuthClient", "GoogleDocExport", "GoogleCredential", "ChatMessage",
       "UserAiSettings", "AiSettings", "WritingSession", "Relationship",
       "Annotation", "ContentVersion", "StoryObject", "StructureNode",
-      "ProjectShare", "WorldObjectTimelineEntry", "WorldObject", "Project",
-      "Universe", "User", "HashnodeCredential", "HashnodeExport"
+      "ProjectShare", "WorldObjectTimelineEntry", "WorldObject", "WritingTask",
+      "Project", "Universe", "User", "HashnodeCredential", "HashnodeExport"
     CASCADE`
   );
 });

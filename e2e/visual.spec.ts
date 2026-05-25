@@ -363,8 +363,42 @@ async function mockFocusModeApi(page: Page) {
   )
 }
 
+const MOCK_WRITING_TASKS = {
+  tasks: [
+    {
+      id: 'wt-1',
+      projectId: 'proj-1',
+      sceneId: null,
+      name: 'Revise the opening confrontation',
+      whatIsNeeded: 'Punch up the dialogue — Mira sounds passive.',
+      importance: 'Critical',
+      size: 'Medium',
+      energy: 'Dramatic',
+      completed: false,
+      createdAt: '2026-03-01T10:00:00Z',
+      updatedAt: '2026-03-01T10:00:00Z',
+      scene: null,
+    },
+    {
+      id: 'wt-2',
+      projectId: 'proj-1',
+      sceneId: 'sc-1',
+      name: 'Add foreshadowing in Throne Room',
+      whatIsNeeded: 'Plant the crown motif earlier.',
+      importance: 'High',
+      size: 'Small',
+      energy: 'Introspective',
+      completed: true,
+      createdAt: '2026-02-15T10:00:00Z',
+      updatedAt: '2026-03-05T10:00:00Z',
+      scene: { id: 'sc-1', title: 'Throne Room' },
+    },
+  ],
+  total: 2,
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
-// 5 screens × 3 viewports (desktop, mobile, dark-desktop) = 15 screenshots
+// 6 screens × 3 viewports (desktop, mobile, dark-desktop) = 18 screenshots
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
@@ -471,6 +505,24 @@ test.describe('Visual regression – Annie', () => {
     await page.getByText('Annotations').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('annotations.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('tasks page populated', async ({ page }) => {
+    await page.route('**/api/writing-tasks*', route =>
+      route.fulfill({ json: MOCK_WRITING_TASKS, status: 200 })
+    )
+    await page.route(
+      url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+      route => route.fulfill({ json: MOCK_PROJECTS.projects[0], status: 200 })
+    )
+    await page.goto('/project/proj-1/tasks')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Writing Tasks').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('tasks.png', {
       animations: 'disabled',
     })
   })

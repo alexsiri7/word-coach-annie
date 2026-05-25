@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **67 tools** and **16 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **70 tools** and **16 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -742,6 +742,51 @@ Gather character profiles and scene dialogue for voice consistency analysis.
 |-------|------|-------------|
 | `projectId` | string | The project ID |
 | `sceneId` | string | The scene to analyze |
+
+---
+
+### Writing Tasks
+
+#### `list_writing_tasks`
+List writing tasks for a project, with optional filtering.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project to list tasks for |
+| `completed` | boolean? | Filter by completion status |
+| `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Filter by energy type — key dimension for mood-matched task selection |
+| `importance` | `"Critical" \| "High" \| "Medium"`? | Filter by importance |
+| `size` | `"Large" \| "Medium" \| "Small"`? | Filter by size |
+
+Returns `{ tasks: WritingTask[], total: number }`.
+
+---
+
+#### `create_writing_task`
+Create a new writing task for a project, optionally linked to a scene.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project to attach the task to |
+| `name` | string | Task name (required, non-empty) |
+| `whatIsNeeded` | string? | Two sentences max — enough context to remember the idea |
+| `importance` | `"Critical" \| "High" \| "Medium"`? | Priority level (default `"Medium"`) |
+| `size` | `"Large" \| "Medium" \| "Small"`? | Effort size (default `"Medium"`) |
+| `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Energy type required (default `"Technical"`) |
+| `sceneId` | string? | Optional scene (StructureNode) to associate the task with |
+
+Returns the created `WritingTask` object.
+
+---
+
+#### `complete_writing_task`
+Mark a writing task as completed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `taskId` | string | The task ID to mark complete |
+
+Returns the updated `WritingTask` with `completed: true`.
 
 ---
 
