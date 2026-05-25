@@ -747,3 +747,56 @@ Import a project from a JSON export file.
 **Body**: JSON export data (project object)
 
 **Errors**: `401` unauthenticated (Google OAuth mode only)
+
+---
+
+## Writing Tasks
+
+### `GET /api/writing-tasks`
+List writing tasks for a project.
+
+**Query params**: `projectId` (required), `completed` (boolean), `energy`, `importance`, `size`
+
+**Response**: `{ tasks: WritingTask[], total: number }`
+
+**Errors**: `400` if `projectId` missing; `401` unauthenticated
+
+---
+
+### `POST /api/writing-tasks`
+Create a new writing task.
+
+**Body**: `{ projectId: string, name: string, whatIsNeeded?: string, importance?: string, size?: string, energy?: string, sceneId?: string }`
+
+**Response**: Created `WritingTask` object (status 201).
+
+**Errors**: `400` validation failure (missing `projectId` or empty `name`); `401` unauthenticated
+
+---
+
+### `PATCH /api/writing-tasks/:id`
+Update a writing task's fields.
+
+**Body**: Any subset of `{ name, whatIsNeeded, importance, size, energy, completed }`
+
+**Response**: Updated `WritingTask` object.
+
+**Errors**: `400` empty body (no fields to update); `404` task not found; `401`/`403` unauthorized
+
+---
+
+### `DELETE /api/writing-tasks/:id`
+Delete a writing task.
+
+**Response**: `{ success: true }`
+
+**Errors**: `404` task not found; `401`/`403` unauthorized
+
+---
+
+### `POST /api/writing-tasks/:id/complete`
+Mark a writing task as complete.
+
+**Response**: Updated `WritingTask` with `completed: true`.
+
+**Errors**: `404` task not found; `401`/`403` unauthorized

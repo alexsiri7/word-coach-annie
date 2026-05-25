@@ -47,6 +47,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -64,11 +65,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           fetch(`/api/projects/${projectId}`),
         ]);
         if (!tasksRes.ok) throw new Error("Failed to load tasks");
+        if (!projectRes.ok) throw new Error("Failed to load project");
         const [tasksData, proj] = await Promise.all([tasksRes.json(), projectRes.json()]);
         setTasks(tasksData.tasks ?? []);
         setProjectTitle(proj.title ?? "");
       } catch (err) {
-        console.error(err);
+        console.error("[tasks/page] loadData failed", err);
         setError("Failed to load tasks. Please try again.");
       } finally {
         setLoading(false);
@@ -78,9 +80,14 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   }, [projectId, filters]);
 
   async function handleComplete(taskId: string) {
-    const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
-    if (res.ok) {
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
+      if (!res.ok) throw new Error(`Server responded ${res.status}`);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)));
+    } catch (err) {
+      console.error("[tasks/page] handleComplete failed", err);
+      setActionError("Could not mark task as complete. Please try again.");
     }
   }
 
@@ -147,6 +154,10 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   {taskCount} {taskCount === 1 ? "task" : "tasks"} &middot; {completedCount} completed
                 </p>
               </header>
+
+              {actionError && (
+                <p className="text-sm text-destructive mb-4">{actionError}</p>
+              )}
 
               {/* Filter bar */}
               <div className="mb-8 space-y-3">

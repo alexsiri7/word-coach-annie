@@ -141,9 +141,13 @@ export interface Annotation {
   updatedAt: string;
 }
 
-export type WritingTaskImportance = "Critical" | "High" | "Medium";
-export type WritingTaskSize = "Small" | "Medium" | "Large";
-export type WritingTaskEnergy = "Introspective" | "Dramatic" | "Technical";
+import type {
+  WritingTaskImportanceValue as WritingTaskImportance,
+  WritingTaskSizeValue as WritingTaskSize,
+  WritingTaskEnergyValue as WritingTaskEnergy,
+} from "@/schemas/writing-tasks";
+
+export type { WritingTaskImportance, WritingTaskSize, WritingTaskEnergy };
 
 export interface WritingTask {
   id: string;

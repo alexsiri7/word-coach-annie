@@ -640,8 +640,14 @@ server.tool(
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Filter by energy type — key dimension for mood-matched task selection"),
     },
     async (params) => {
-        const result = await listWritingTasks(params);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await listWritingTasks(params);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("list_writing_tasks: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error listing writing tasks: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -658,8 +664,14 @@ server.tool(
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Energy type required (default: Technical)"),
     },
     async (params) => {
-        const result = await createWritingTask(params);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await createWritingTask(params);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("create_writing_task: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error creating writing task: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -670,8 +682,14 @@ server.tool(
         taskId: z.string().describe("The writing task ID to mark complete"),
     },
     async ({ taskId }) => {
-        const result = await completeWritingTask(taskId);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await completeWritingTask(taskId);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("complete_writing_task: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error completing writing task: ${message}` }], isError: true };
+        }
     }
 );
 

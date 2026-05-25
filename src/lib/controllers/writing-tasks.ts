@@ -1,4 +1,26 @@
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
+
+type WritingTaskWithScene = Prisma.WritingTaskGetPayload<{
+    include: { scene: { select: { id: true; title: true } } };
+}>;
+
+function serializeTask(t: WritingTaskWithScene) {
+    return {
+        id: t.id,
+        projectId: t.projectId,
+        sceneId: t.sceneId,
+        name: t.name,
+        whatIsNeeded: t.whatIsNeeded,
+        importance: t.importance,
+        size: t.size,
+        energy: t.energy,
+        completed: t.completed,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+        scene: t.scene,
+    };
+}
 
 export class WritingTaskController {
     static async listWritingTasks(params: {
@@ -34,20 +56,7 @@ export class WritingTaskController {
         ]);
 
         return {
-            tasks: tasks.map((t) => ({
-                id: t.id,
-                projectId: t.projectId,
-                sceneId: t.sceneId,
-                name: t.name,
-                whatIsNeeded: t.whatIsNeeded,
-                importance: t.importance,
-                size: t.size,
-                energy: t.energy,
-                completed: t.completed,
-                createdAt: t.createdAt.toISOString(),
-                updatedAt: t.updatedAt.toISOString(),
-                scene: t.scene,
-            })),
+            tasks: tasks.map(serializeTask),
             total,
         };
     }
@@ -84,20 +93,7 @@ export class WritingTaskController {
             },
         });
 
-        return {
-            id: task.id,
-            projectId: task.projectId,
-            sceneId: task.sceneId,
-            name: task.name,
-            whatIsNeeded: task.whatIsNeeded,
-            importance: task.importance,
-            size: task.size,
-            energy: task.energy,
-            completed: task.completed,
-            createdAt: task.createdAt.toISOString(),
-            updatedAt: task.updatedAt.toISOString(),
-            scene: task.scene,
-        };
+        return serializeTask(task);
     }
 
     static async completeWritingTask(taskId: string) {
@@ -115,20 +111,7 @@ export class WritingTaskController {
             },
         });
 
-        return {
-            id: task.id,
-            projectId: task.projectId,
-            sceneId: task.sceneId,
-            name: task.name,
-            whatIsNeeded: task.whatIsNeeded,
-            importance: task.importance,
-            size: task.size,
-            energy: task.energy,
-            completed: task.completed,
-            createdAt: task.createdAt.toISOString(),
-            updatedAt: task.updatedAt.toISOString(),
-            scene: task.scene,
-        };
+        return serializeTask(task);
     }
 
     static async updateWritingTask(
@@ -168,20 +151,7 @@ export class WritingTaskController {
             },
         });
 
-        return {
-            id: task.id,
-            projectId: task.projectId,
-            sceneId: task.sceneId,
-            name: task.name,
-            whatIsNeeded: task.whatIsNeeded,
-            importance: task.importance,
-            size: task.size,
-            energy: task.energy,
-            completed: task.completed,
-            createdAt: task.createdAt.toISOString(),
-            updatedAt: task.updatedAt.toISOString(),
-            scene: task.scene,
-        };
+        return serializeTask(task);
     }
 
     static async deleteWritingTask(taskId: string) {

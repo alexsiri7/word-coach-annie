@@ -360,3 +360,9 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - Read view for clean chapter/scene display
 - Annotations with range-based comments and Google Docs sync
 - Timeline view for visual story mapping
+
+### M14: Writing Tasks (Completed)
+- WritingTask Prisma model with project/scene associations
+- REST API: CRUD + completion endpoint (GET, POST, PATCH, DELETE, POST /complete)
+- MCP tools: list_writing_tasks, create_writing_task, complete_writing_task
+- /project/[id]/tasks UI page with Energy/Importance/Size/Completion filters

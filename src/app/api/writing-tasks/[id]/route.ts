@@ -43,6 +43,9 @@ export async function PATCH(
         }
 
         const data = { ...parsed.data };
+        if (Object.keys(data).length === 0) {
+            return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+        }
         if (data.name !== undefined) data.name = sanitizeInput(data.name);
         if (data.whatIsNeeded !== undefined) data.whatIsNeeded = sanitizeInput(data.whatIsNeeded);
 
