@@ -125,6 +125,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [reviewManuscript, setReviewManuscript] = useState<string | null>(null);
   const [reviewSceneId, setReviewSceneId] = useState<string | null>(null);
 
+  function openAiChat(prompt: string, sceneId?: string) {
+    setReviewManuscript(prompt);
+    setReviewSceneId(sceneId ?? null);
+    setReviewConversationId(null);
+    setActiveTab("ai-chat");
+    setSelectedNodeId(null);
+    setSelectedObjectId(null);
+  }
+
   // Data fetching
   const fetchProject = useCallback(async () => {
     const res = await fetch(`/api/projects/${projectId}`);
@@ -705,31 +714,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
                   timelineScenes={timelineScenes}
                   linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
-                  onReviewScene={() => {
-                    const fullPrompt = buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title);
-                    setReviewManuscript(fullPrompt);
-                    setReviewSceneId(selectedNode.id);
-                    setReviewConversationId(null);
-                    setActiveTab("ai-chat");
-                    setSelectedNodeId(null);
-                    setSelectedObjectId(null);
-                  }}
-                  onPlanBeats={() => {
-                    const prompt = buildPlanBeatsPrompt(selectedNode.title);
-                    setReviewManuscript(prompt);
-                    setReviewConversationId(null);
-                    setActiveTab("ai-chat");
-                    setSelectedNodeId(null);
-                    setSelectedObjectId(null);
-                  }}
-                  onCanonCheck={() => {
-                    const prompt = buildCanonCheckPrompt(selectedNode.title);
-                    setReviewManuscript(prompt);
-                    setReviewConversationId(null);
-                    setActiveTab("ai-chat");
-                    setSelectedNodeId(null);
-                    setSelectedObjectId(null);
-                  }}
+                  onReviewScene={() => openAiChat(buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title), selectedNode.id)}
+                  onPlanBeats={() => openAiChat(buildPlanBeatsPrompt(selectedNode.title))}
+                  onCanonCheck={() => openAiChat(buildCanonCheckPrompt(selectedNode.title))}
                 />
               </ErrorBoundary>
             ) : (

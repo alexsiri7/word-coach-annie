@@ -14,7 +14,6 @@ export async function GET() {
 
         const text = await registry.metrics();
         return new Response(text, {
-            status: 200,
             headers: { "Content-Type": registry.contentType },
         });
     } catch (e) {
