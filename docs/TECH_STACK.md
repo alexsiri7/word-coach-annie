@@ -40,6 +40,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | Google APIs | googleapis | Google Docs export, Drive |
 | OAuth | google-auth-library | Google authentication |
 | MCP | @modelcontextprotocol/sdk | AI tool integration server |
+| Metrics | prom-client 15.1.3 | Prometheus metrics registry; exposed via `GET /api/metrics` |
 
 ### Database Schema (Prisma)
 

@@ -19,6 +19,9 @@ export async function GET() {
         });
     } catch (e) {
         logger.error("metrics scrape failed", e);
-        return new Response("Service unavailable", { status: 503 });
+        return new Response("Service unavailable", {
+            status: 503,
+            headers: { "Content-Type": "text/plain" },
+        });
     }
 }

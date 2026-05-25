@@ -8,6 +8,12 @@ interface MetricsState {
   usersGauge: Gauge<string>;
 }
 
+/**
+ * Guard against hot-module replacement in development re-registering metrics.
+ * prom-client throws if you register a metric name twice in the same registry.
+ * Caching on globalThis survives HMR restarts; in production each invocation
+ * gets a fresh module context so this is a no-op there.
+ */
 const globalForMetrics = globalThis as unknown as {
   metricsState: MetricsState | undefined;
 };
@@ -15,6 +21,9 @@ const globalForMetrics = globalThis as unknown as {
 function createMetrics(): MetricsState {
   const registry = new Registry();
 
+  // TODO(#239-followup): increment these in Next.js middleware once
+  // middleware instrumentation is in scope. Exported here so the registry
+  // is consistent when they are wired up.
   const httpRequestCounter = new Counter({
     name: "annie_http_requests_total",
     help: "Total HTTP requests by method, path, and status",

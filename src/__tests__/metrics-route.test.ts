@@ -71,5 +71,6 @@ describe("GET /api/metrics", () => {
 
         const res = await GET();
         expect(res.status).toBe(503);
+        expect(await res.text()).toBe("Service unavailable");
     });
 });
