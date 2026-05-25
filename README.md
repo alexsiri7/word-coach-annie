@@ -100,6 +100,14 @@ Add to your `claude_desktop_config.json`:
 
 The `-T` flag disables pseudo-tty allocation for clean stdio communication.
 
+### Claude Code CLI
+
+The project includes `.claude/settings.json` that auto-connects Claude Code to the MCP server with non-destructive tools pre-approved (no confirmation prompts):
+
+```bash
+claude   # Run from project root; auto-connects to MCP
+```
+
 ### Tool Categories
 
 | Category | Tools | Examples |

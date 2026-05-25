@@ -266,6 +266,14 @@ The project root includes a `.gemini/` configuration that auto-connects Gemini C
 gemini   # Run from project root; auto-connects to MCP
 ```
 
+### Claude Code CLI
+
+The project includes `.claude/settings.json` that auto-connects Claude Code to the MCP server with non-destructive tools pre-approved (no confirmation prompts):
+
+```bash
+claude   # Run from project root; auto-connects to MCP
+```
+
 ### HTTP Proxy
 
 For web-based MCP clients, the app exposes an HTTP MCP proxy at `POST /api/mcp`.
