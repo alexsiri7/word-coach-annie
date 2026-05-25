@@ -715,7 +715,7 @@ server.tool(
     "Update fields on an existing writing task. All fields are optional — only provided fields are changed.",
     {
         taskId: z.string().describe("The writing task ID to update"),
-        name: z.string().optional().describe("New one-line task description"),
+        name: z.string().min(1).optional().describe("New one-line task description"),
         whatIsNeeded: z.string().optional().describe("Updated context — two sentences max"),
         importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Updated importance"),
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Updated size estimate"),
