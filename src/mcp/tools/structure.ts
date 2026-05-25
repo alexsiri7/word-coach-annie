@@ -83,6 +83,8 @@ type FlatParagraph = {
     content: string;
 };
 
+// [\s\S]*? instead of .*? so <p> elements with embedded newlines are matched in full.
+// Only use with match() — the /g flag makes lastIndex stateful, so exec() in a loop would fail across call sites.
 const P_TAG_RE = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
 
 function flattenBlocksToParagraphs(
@@ -111,6 +113,13 @@ function flattenBlocksToParagraphs(
     return result;
 }
 
+/**
+ * Splits `blockContent` after the paragraph at the given 0-based position.
+ * Returns [left, right] where left includes paragraphs 0..afterNthParagraph
+ * and right contains the remainder. right is "" when splitting after the last paragraph.
+ *
+ * @param afterNthParagraph - 0-based index of the paragraph to split after
+ */
 function splitAtParagraph(blockContent: string, afterNthParagraph: number): [string, string] {
     let count = 0;
     const re = /<\/p>/gi;
@@ -169,12 +178,18 @@ export async function updateParagraph(
         blocks[entry.blockIndex] = { type: "BEAT", content };
     } else {
         const blockContent = blocks[entry.blockIndex].content;
+        // Count how many <p> elements are in this block
         const matches = blockContent.match(P_TAG_RE);
         if (!matches || matches.length <= 1) {
             blocks[entry.blockIndex] = { type: "CONTENT", content };
         } else {
-            matches[entry.positionWithinBlock] = content;
-            blocks[entry.blockIndex] = { type: "CONTENT", content: matches.join("") };
+            // Use positional splits to replace only the target paragraph, preserving
+            // any inter-<p> content (e.g. whitespace) that match().join("") would drop.
+            const pos = entry.positionWithinBlock;
+            const before = pos === 0 ? "" : splitAtParagraph(blockContent, pos - 1)[0];
+            const restFromTarget = pos === 0 ? blockContent : splitAtParagraph(blockContent, pos - 1)[1];
+            const [, after] = splitAtParagraph(restFromTarget, 0);
+            blocks[entry.blockIndex] = { type: "CONTENT", content: before + content + after };
         }
     }
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
@@ -206,7 +221,7 @@ export async function insertBeat(
         blocks.splice(0, 0, { type: "BEAT", content: beatContent });
     } else {
         const entry = flat[afterParagraphIndex];
-        // Count how many <p> tags are in this block
+        // Count how many <p> elements are in this block
         const blockContent = blocks[entry.blockIndex].content;
         const matches = blockContent.match(P_TAG_RE);
         const isLastPInBlock = entry.type === "BEAT" || !matches || entry.positionWithinBlock === matches.length - 1;

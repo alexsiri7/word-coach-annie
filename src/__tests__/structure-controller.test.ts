@@ -448,6 +448,32 @@ describe("StructureController", () => {
                 expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After last" });
             });
 
+            it("treats non-<p> CONTENT block as a single atomic paragraph", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContentFromBlocks(scene.id, [
+                    { type: "CONTENT", content: "raw text without p tags" },
+                ]);
+                await insertBeat(scene.id, 0, "After raw");
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(2);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "raw text without p tags" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After raw" });
+            });
+
+            it("splits block containing attributed <p> tags correctly", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(
+                    scene.id,
+                    '<p class="a">First</p><p class="b">Second</p>',
+                );
+                await insertBeat(scene.id, 0, "Mid beat");
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(3);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: '<p class="a">First</p>' });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "Mid beat" });
+                expect(read.blocks[2]).toEqual({ type: "CONTENT", content: '<p class="b">Second</p>' });
+            });
+
             it("out-of-range uses total paragraph count not block count", async () => {
                 const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
                 await StructureController.writeSceneContent(scene.id, "<p>A</p><p>B</p><p>C</p>");

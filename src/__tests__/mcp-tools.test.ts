@@ -117,6 +117,45 @@ describe("MCP Structure Tools", () => {
         expect(updated.paragraphs[2].content).toBe("<p>More text</p>");
     });
 
+    it("updateParagraph patches middle paragraph inside a multi-paragraph CONTENT block", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(scene.id, "<p>P1</p><p>P2</p><p>P3</p>", contentHash);
+        const read = await structureTools.readSceneContent(scene.id);
+        const para = read.paragraphs[1];
+        await structureTools.updateParagraph(scene.id, 1, "<p>Updated P2</p>", para.contentHash);
+        const updated = await structureTools.readSceneContent(scene.id);
+        expect(updated.paragraphs).toHaveLength(3);
+        expect(updated.paragraphs[0].content).toBe("<p>P1</p>");
+        expect(updated.paragraphs[1].content).toBe("<p>Updated P2</p>");
+        expect(updated.paragraphs[2].content).toBe("<p>P3</p>");
+    });
+
+    it("updateParagraph patches first paragraph inside a multi-paragraph CONTENT block", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(scene.id, "<p>A</p><p>B</p>", contentHash);
+        const read = await structureTools.readSceneContent(scene.id);
+        await structureTools.updateParagraph(scene.id, 0, "<p>Updated A</p>", read.paragraphs[0].contentHash);
+        const updated = await structureTools.readSceneContent(scene.id);
+        expect(updated.paragraphs[0].content).toBe("<p>Updated A</p>");
+        expect(updated.paragraphs[1].content).toBe("<p>B</p>");
+    });
+
+    it("readSceneContent paragraphs correctly splits CONTENT block with attributed <p> tags", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(
+            scene.id,
+            '<p class="indent">First</p><p data-id="2">Second</p>',
+            contentHash,
+        );
+        const result = await structureTools.readSceneContent(scene.id);
+        expect(result.paragraphs).toHaveLength(2);
+        expect(result.paragraphs[0].content).toBe('<p class="indent">First</p>');
+        expect(result.paragraphs[1].content).toBe('<p data-id="2">Second</p>');
+    });
+
     it("updateParagraph rejects stale paragraphContentHash", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         const { contentHash } = await structureTools.readSceneContent(scene.id);
