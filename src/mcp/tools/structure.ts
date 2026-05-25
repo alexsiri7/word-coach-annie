@@ -75,16 +75,67 @@ export async function deleteNode(nodeId: string) {
     return result;
 }
 
+type FlatParagraph = {
+    globalIndex: number;
+    blockIndex: number;
+    positionWithinBlock: number;
+    type: "CONTENT" | "BEAT";
+    content: string;
+};
+
+const P_TAG_RE = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
+
+function flattenBlocksToParagraphs(
+    blocks: { type: "CONTENT" | "BEAT"; content: string }[],
+): FlatParagraph[] {
+    const result: FlatParagraph[] = [];
+    let globalIndex = 0;
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+        const block = blocks[blockIndex];
+        if (block.type === "BEAT") {
+            result.push({ globalIndex, blockIndex, positionWithinBlock: 0, type: "BEAT", content: block.content });
+            globalIndex++;
+        } else {
+            const matches = block.content.match(P_TAG_RE);
+            if (!matches || matches.length === 0) {
+                result.push({ globalIndex, blockIndex, positionWithinBlock: 0, type: "CONTENT", content: block.content });
+                globalIndex++;
+            } else {
+                for (let i = 0; i < matches.length; i++) {
+                    result.push({ globalIndex, blockIndex, positionWithinBlock: i, type: "CONTENT", content: matches[i] });
+                    globalIndex++;
+                }
+            }
+        }
+    }
+    return result;
+}
+
+function splitAtParagraph(blockContent: string, afterNthParagraph: number): [string, string] {
+    let count = 0;
+    const re = /<\/p>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(blockContent)) !== null) {
+        count++;
+        if (count === afterNthParagraph + 1) {
+            const splitPos = match.index + match[0].length;
+            return [blockContent.slice(0, splitPos), blockContent.slice(splitPos)];
+        }
+    }
+    return [blockContent, ""];
+}
+
 export async function readSceneContent(nodeId: string) {
     const raw = await mcpCache.getOrSet(
         `sceneContent:${nodeId}`,
         () => StructureController.readSceneContent(nodeId),
     );
-    const paragraphs = raw.blocks.map((block, index) => ({
-        index,
-        type: block.type,
-        content: block.content,
-        contentHash: computeContentHash(String(index), block.type, block.content),
+    const flat = flattenBlocksToParagraphs(raw.blocks);
+    const paragraphs = flat.map((entry) => ({
+        index: entry.globalIndex,
+        type: entry.type,
+        content: entry.content,
+        contentHash: computeContentHash(String(entry.globalIndex), entry.type, entry.content),
     }));
     return {
         ...raw,
@@ -105,15 +156,27 @@ export async function updateParagraph(
         verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
     }
     const blocks = current.blocks;
-    if (index < 0 || index >= blocks.length) {
-        throw new Error(`Paragraph index ${index} out of range (0–${blocks.length - 1})`);
+    const flat = flattenBlocksToParagraphs(blocks);
+    if (index < 0 || index >= flat.length) {
+        throw new Error(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
     }
-    const block = blocks[index];
+    const entry = flat[index];
     if (paragraphContentHash !== undefined) {
-        const expected = computeContentHash(String(index), block.type, block.content);
+        const expected = computeContentHash(String(index), entry.type, entry.content);
         verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
-    blocks[index] = { type: block.type, content };
+    if (entry.type === "BEAT") {
+        blocks[entry.blockIndex] = { type: "BEAT", content };
+    } else {
+        const blockContent = blocks[entry.blockIndex].content;
+        const matches = blockContent.match(P_TAG_RE);
+        if (!matches || matches.length <= 1) {
+            blocks[entry.blockIndex] = { type: "CONTENT", content };
+        } else {
+            matches[entry.positionWithinBlock] = content;
+            blocks[entry.blockIndex] = { type: "CONTENT", content: matches.join("") };
+        }
+    }
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();
@@ -131,14 +194,39 @@ export async function insertBeat(
         verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
     }
     const blocks = current.blocks;
+    const flat = flattenBlocksToParagraphs(blocks);
+    const totalParagraphs = flat.length;
     // afterParagraphIndex of -1 means "insert at the very beginning"
-    if (afterParagraphIndex < -1 || afterParagraphIndex >= blocks.length) {
+    if (afterParagraphIndex < -1 || afterParagraphIndex >= totalParagraphs) {
         throw new Error(
-            `afterParagraphIndex ${afterParagraphIndex} out of range (-1–${blocks.length - 1})`
+            `afterParagraphIndex ${afterParagraphIndex} out of range (-1–${totalParagraphs - 1})`
         );
     }
-    const insertAt = afterParagraphIndex + 1;
-    blocks.splice(insertAt, 0, { type: "BEAT", content: beatContent });
+    if (afterParagraphIndex === -1) {
+        blocks.splice(0, 0, { type: "BEAT", content: beatContent });
+    } else {
+        const entry = flat[afterParagraphIndex];
+        // Count how many <p> tags are in this block
+        const blockContent = blocks[entry.blockIndex].content;
+        const matches = blockContent.match(P_TAG_RE);
+        const isLastPInBlock = entry.type === "BEAT" || !matches || entry.positionWithinBlock === matches.length - 1;
+
+        if (isLastPInBlock) {
+            // Insert beat after this block (no split needed)
+            blocks.splice(entry.blockIndex + 1, 0, { type: "BEAT", content: beatContent });
+        } else {
+            // Split the CONTENT block at the paragraph boundary
+            const [left, right] = splitAtParagraph(blockContent, entry.positionWithinBlock);
+            const replacement: { type: "CONTENT" | "BEAT"; content: string }[] = [
+                { type: "CONTENT", content: left },
+                { type: "BEAT", content: beatContent },
+            ];
+            if (right.trim() !== "") {
+                replacement.push({ type: "CONTENT", content: right });
+            }
+            blocks.splice(entry.blockIndex, 1, ...replacement);
+        }
+    }
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();

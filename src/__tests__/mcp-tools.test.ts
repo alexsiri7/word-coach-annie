@@ -88,6 +88,18 @@ describe("MCP Structure Tools", () => {
         expect(result.paragraphs[0].contentHash).toHaveLength(64);
     });
 
+    it("readSceneContent paragraphs splits multi-paragraph CONTENT blocks", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(scene.id, "<p>P1</p><p>P2</p><!-- beat: B1 --><p>P3</p>", contentHash);
+        const result = await structureTools.readSceneContent(scene.id);
+        expect(result.paragraphs).toHaveLength(4);
+        expect(result.paragraphs[0]).toMatchObject({ index: 0, type: "CONTENT", content: "<p>P1</p>" });
+        expect(result.paragraphs[1]).toMatchObject({ index: 1, type: "CONTENT", content: "<p>P2</p>" });
+        expect(result.paragraphs[2]).toMatchObject({ index: 2, type: "BEAT", content: "B1" });
+        expect(result.paragraphs[3]).toMatchObject({ index: 3, type: "CONTENT", content: "<p>P3</p>" });
+    });
+
     it("updateParagraph patches a single paragraph by index", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         const { contentHash } = await structureTools.readSceneContent(scene.id);
