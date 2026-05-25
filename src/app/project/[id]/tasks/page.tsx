@@ -38,6 +38,39 @@ interface Filters {
   completed?: boolean;
 }
 
+function FilterRow({
+  label,
+  options,
+  activeValue,
+  colors,
+  onToggle,
+}: {
+  label: string;
+  options: readonly string[];
+  activeValue: string | undefined;
+  colors: Record<string, string>;
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">{label}</span>
+      {options.map((v) => (
+        <button
+          key={v}
+          onClick={() => onToggle(v)}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            activeValue === v
+              ? colors[v]
+              : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
+          }`}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function TasksPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const projectId = resolvedParams.id;
@@ -161,54 +194,9 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
               {/* Filter bar */}
               <div className="mb-8 space-y-3">
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Energy</span>
-                  {ENERGY_OPTIONS.map((e) => (
-                    <button
-                      key={e}
-                      onClick={() => toggleFilter("energy", e)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                        filters.energy === e
-                          ? ENERGY_COLORS[e]
-                          : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
-                      }`}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Importance</span>
-                  {IMPORTANCE_OPTIONS.map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => toggleFilter("importance", v)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                        filters.importance === v
-                          ? IMPORTANCE_COLORS[v]
-                          : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Size</span>
-                  {SIZE_OPTIONS.map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => toggleFilter("size", v)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                        filters.size === v
-                          ? SIZE_COLORS[v]
-                          : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
+                <FilterRow label="Energy" options={ENERGY_OPTIONS} activeValue={filters.energy} colors={ENERGY_COLORS} onToggle={(v) => toggleFilter("energy", v)} />
+                <FilterRow label="Importance" options={IMPORTANCE_OPTIONS} activeValue={filters.importance} colors={IMPORTANCE_COLORS} onToggle={(v) => toggleFilter("importance", v)} />
+                <FilterRow label="Size" options={SIZE_OPTIONS} activeValue={filters.size} colors={SIZE_COLORS} onToggle={(v) => toggleFilter("size", v)} />
                 <div className="flex flex-wrap gap-2 items-center">
                   <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Status</span>
                   <button

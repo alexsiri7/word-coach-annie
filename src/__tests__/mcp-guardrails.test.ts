@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { ANNIE_HARD_RULE } from "../mcp/annie-voice";
+import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "../mcp/annie-voice";
 
 const mcpSource = readFileSync(resolve(__dirname, "../mcp/index.ts"), "utf-8");
 
@@ -87,6 +87,37 @@ describe("plan_beats prompt", () => {
         expect(planBeatsSection).toContain("Status:");
         expect(planBeatsSection).toContain("Chapter:");
         expect(planBeatsSection).toContain("Word Count:");
+    });
+});
+
+describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
+    it("should identify Claude as a structural collaborator", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("structural collaborator");
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("prose belongs to the writer");
+    });
+
+    it("should instruct beat-only writes via write_scene_content", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("write_scene_content");
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("BEAT");
+    });
+
+    it("should include stale-write protection guidance", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("paragraphContentHash");
+    });
+});
+
+describe("get_initial_instructions tool registration", () => {
+    it("should register get_initial_instructions in index.ts", () => {
+        expect(mcpSource).toContain('"get_initial_instructions"');
+    });
+
+    it("should return CLAUDE_COLLABORATION_INSTRUCTIONS as text", () => {
+        const toolSection = mcpSource.slice(
+            mcpSource.indexOf('"get_initial_instructions"'),
+            mcpSource.indexOf('"get_initial_instructions"') + 500
+        );
+        expect(toolSection).toContain("CLAUDE_COLLABORATION_INSTRUCTIONS");
+        expect(toolSection).toContain('type: "text"');
     });
 });
 

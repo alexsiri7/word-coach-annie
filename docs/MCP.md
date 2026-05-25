@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **70 tools** and **16 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **71 tools** and **16 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -683,6 +683,23 @@ Export/sync a project or universe to Google Docs. Creates or updates a document.
 | `projectId` | string? | Project ID (for STORY_READER/STORY_INTERNAL modes) |
 | `universeId` | string? | Universe ID (for UNIVERSE mode) |
 | `exportMode` | enum | `UNIVERSE`, `STORY_INTERNAL`, or `STORY_READER` |
+
+---
+
+### Session Setup
+
+#### `get_initial_instructions`
+Returns static guidelines for how Claude should collaborate with Annie. Call this at the
+start of a session to establish the correct collaboration model.
+
+No parameters.
+
+Returns a markdown string covering:
+- Claude's role as a structural collaborator (not co-author)
+- When to default to beats, annotations, and editorial flags over prose
+- When to write prose (author's explicit request)
+- Correct tool usage for beats and editorial corrections
+- Stale-write protection reminder
 
 ---
 
