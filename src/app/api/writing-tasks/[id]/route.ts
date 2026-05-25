@@ -42,14 +42,15 @@ export async function PATCH(
             );
         }
 
-        const data = { ...parsed.data };
-        if (Object.keys(data).length === 0) {
+        if (Object.keys(parsed.data).length === 0) {
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });
         }
-        if (data.name !== undefined) data.name = sanitizeInput(data.name);
-        if (data.whatIsNeeded !== undefined) data.whatIsNeeded = sanitizeInput(data.whatIsNeeded);
 
-        const task = await WritingTaskController.updateWritingTask(id, data);
+        const task = await WritingTaskController.updateWritingTask(id, {
+            ...parsed.data,
+            ...(parsed.data.name !== undefined && { name: sanitizeInput(parsed.data.name) }),
+            ...(parsed.data.whatIsNeeded !== undefined && { whatIsNeeded: sanitizeInput(parsed.data.whatIsNeeded) }),
+        });
 
         return NextResponse.json(task);
     } catch (error) {
