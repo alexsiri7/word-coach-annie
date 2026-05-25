@@ -186,9 +186,8 @@ export async function updateParagraph(
             // Use positional splits to replace only the target paragraph, preserving
             // any inter-<p> content (e.g. whitespace) that match().join("") would drop.
             const pos = entry.positionWithinBlock;
-            const before = pos === 0 ? "" : splitAtParagraph(blockContent, pos - 1)[0];
-            const restFromTarget = pos === 0 ? blockContent : splitAtParagraph(blockContent, pos - 1)[1];
-            const [, after] = splitAtParagraph(restFromTarget, 0);
+            const [before, rest] = pos === 0 ? ["", blockContent] : splitAtParagraph(blockContent, pos - 1);
+            const [, after] = splitAtParagraph(rest, 0);
             blocks[entry.blockIndex] = { type: "CONTENT", content: before + content + after };
         }
     }
