@@ -72,8 +72,7 @@ function FilterRow({
 }
 
 export default function TasksPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const projectId = resolvedParams.id;
+  const { id: projectId } = use(params);
   const router = useRouter();
   const [tasks, setTasks] = useState<WritingTask[]>([]);
   const [projectTitle, setProjectTitle] = useState("");

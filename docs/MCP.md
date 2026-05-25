@@ -20,6 +20,10 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
+### Claude Code CLI
+
+The repo ships `.claude/settings.json` which auto-registers the MCP server and pre-approves all non-destructive tools for Claude Code. Run `claude` from the project root — no manual configuration required.
+
 ### HTTP Transport (Web Clients)
 
 Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for details.
