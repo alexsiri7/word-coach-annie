@@ -24,33 +24,40 @@ describe("Annie Hard Rule Enforcement", () => {
         });
     });
 
-    describe("write_scene_content rejects CONTENT blocks", () => {
-        it("should contain a guard that checks for CONTENT blocks", () => {
+    describe("write_scene_content allows CONTENT blocks (author in control)", () => {
+        it("should NOT contain a hard guard that checks for CONTENT blocks", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            expect(writeSceneSection).toContain('blocks.some(b => b.type === "CONTENT")');
+            expect(writeSceneSection).not.toContain('blocks.some(b => b.type === "CONTENT")');
         });
 
-        it("should return Annie's refusal message for CONTENT blocks", () => {
+        it("should NOT return Annie's refusal message for CONTENT blocks", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            expect(writeSceneSection).toContain("Oh no no no. That part is yours.");
+            expect(writeSceneSection).not.toContain("Oh no no no. That part is yours.");
         });
 
-        it("writeSceneContentFromBlocks call should remain after the CONTENT guard", () => {
+        it("should call writeSceneContentFromBlocks directly without a CONTENT guard", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            // After the guard, the normal writeSceneContentFromBlocks call remains
             expect(writeSceneSection).toContain("writeSceneContentFromBlocks");
-            // Guard must branch on hasContentBlock being truthy, not falsy
-            expect(writeSceneSection).toContain("if (hasContentBlock)");
-            expect(writeSceneSection).not.toContain("if (!hasContentBlock)");
+            expect(writeSceneSection).not.toContain("if (hasContentBlock)");
+        });
+
+        it("should describe write_scene_content with BEAT-by-default, CONTENT-on-request semantics", () => {
+            const toolDescSection = mcpSource.slice(
+                mcpSource.indexOf('"write_scene_content"'),
+                mcpSource.indexOf('"write_scene_content"') + 500
+            );
+            expect(toolDescSection).toContain("BEAT blocks by default");
+            expect(toolDescSection).toContain("CONTENT blocks are permitted only when the author explicitly requests prose");
+            expect(toolDescSection).not.toContain("Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks");
         });
     });
 });
@@ -96,9 +103,16 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("prose belongs to the writer");
     });
 
-    it("should instruct beat-only writes via write_scene_content", () => {
+    it("should default to BEAT blocks in write_scene_content instructions", () => {
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("write_scene_content");
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("BEAT");
+    });
+
+    it("should permit CONTENT blocks when the author explicitly requests prose", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain(
+            "use CONTENT blocks only when the author explicitly asks you to write prose"
+        );
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).not.toContain("never CONTENT blocks");
     });
 
     it("should include stale-write protection guidance", () => {

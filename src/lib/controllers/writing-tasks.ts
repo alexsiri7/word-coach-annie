@@ -70,23 +70,21 @@ export class WritingTaskController {
         size?: string;
         energy?: string;
     }) {
-        const { projectId, sceneId, name, whatIsNeeded, importance, size, energy } = params;
-
         const project = await prisma.project.findUnique({
-            where: { id: projectId },
+            where: { id: params.projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new Error(`Project not found: ${params.projectId}`);
 
         const task = await prisma.writingTask.create({
             data: {
-                projectId,
-                name: name.trim(),
-                ...(sceneId !== undefined && { sceneId }),
-                ...(whatIsNeeded !== undefined && { whatIsNeeded }),
-                ...(importance !== undefined && { importance }),
-                ...(size !== undefined && { size }),
-                ...(energy !== undefined && { energy }),
+                projectId: params.projectId,
+                name: params.name.trim(),
+                sceneId: params.sceneId,
+                whatIsNeeded: params.whatIsNeeded,
+                importance: params.importance,
+                size: params.size,
+                energy: params.energy,
             },
             include: {
                 scene: { select: { id: true, title: true } },
@@ -131,21 +129,16 @@ export class WritingTaskController {
         });
         if (!existing) throw new Error(`Writing task not found: ${taskId}`);
 
-        const updateData: Record<string, unknown> = {};
-        if (data.name !== undefined) updateData.name = data.name.trim();
-        if (data.whatIsNeeded !== undefined) updateData.whatIsNeeded = data.whatIsNeeded;
-        if (data.importance !== undefined) updateData.importance = data.importance;
-        if (data.size !== undefined) updateData.size = data.size;
-        if (data.energy !== undefined) updateData.energy = data.energy;
-        if (data.completed !== undefined) updateData.completed = data.completed;
-
-        if (Object.keys(updateData).length === 0) {
-            throw new Error("No fields to update");
-        }
-
         const task = await prisma.writingTask.update({
             where: { id: taskId },
-            data: updateData,
+            data: {
+                name: data.name?.trim(),
+                whatIsNeeded: data.whatIsNeeded,
+                importance: data.importance,
+                size: data.size,
+                energy: data.energy,
+                completed: data.completed,
+            },
             include: {
                 scene: { select: { id: true, title: true } },
             },
