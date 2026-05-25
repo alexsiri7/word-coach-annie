@@ -162,7 +162,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 md:px-16 lg:px-24 py-10 md:py-12">
           {loading ? (
             <div className="space-y-6 animate-pulse">
@@ -228,7 +228,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   <ListTodo className="h-12 w-12 opacity-20 mb-4" />
                   <p className="text-lg font-editorial italic">No tasks found</p>
                   <p className="text-sm mt-1 opacity-70">
-                    {Object.keys(filters).length > 0
+                    {Object.values(filters).some(v => v !== undefined)
                       ? "Try adjusting your filters"
                       : "Writing tasks created by Annie will appear here"}
                   </p>
@@ -272,9 +272,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                               {task.size}
                             </span>
                             {task.scene && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-overlay text-text-secondary">
+                              <button
+                                onClick={() => router.push(`/project/${projectId}?scene=${task.scene!.id}`)}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-overlay text-text-secondary hover:bg-surface-sunken transition-colors cursor-pointer"
+                              >
                                 {task.scene.title}
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -286,7 +289,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

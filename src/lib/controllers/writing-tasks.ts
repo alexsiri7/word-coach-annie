@@ -44,20 +44,18 @@ export class WritingTaskController {
         if (size) where.size = size;
         if (energy) where.energy = energy;
 
-        const [tasks, total] = await Promise.all([
-            prisma.writingTask.findMany({
-                where,
-                include: {
-                    scene: { select: { id: true, title: true } },
-                },
-                orderBy: { createdAt: "desc" },
-            }),
-            prisma.writingTask.count({ where }),
-        ]);
+        const tasks = await prisma.writingTask.findMany({
+            where,
+            include: {
+                scene: { select: { id: true, title: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
 
+        const serialized = tasks.map(serializeTask);
         return {
-            tasks: tasks.map(serializeTask),
-            total,
+            tasks: serialized,
+            total: serialized.length,
         };
     }
 

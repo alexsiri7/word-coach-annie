@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Eye,
   ClipboardList,
+  ListTodo,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -394,6 +395,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-label="Annotations"
         >
           <ClipboardList className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/tasks`)}
+          aria-label="Writing tasks"
+        >
+          <ListTodo className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
