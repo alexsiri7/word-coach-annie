@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, use } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckSquare, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -132,7 +132,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const taskCount = tasks.length;
-  const completedCount = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
+  const completedCount = tasks.filter((t) => t.completed).length;
 
   return (
     <div className="flex flex-col h-screen bg-surface">
