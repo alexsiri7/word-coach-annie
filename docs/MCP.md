@@ -686,7 +686,7 @@ Export/sync a project or universe to Google Docs. Creates or updates a document.
 
 ---
 
-### Getting Started
+### Session Setup
 
 #### `get_initial_instructions`
 Returns static guidelines for how Claude should collaborate with Annie. Call this at the

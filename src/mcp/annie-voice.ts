@@ -1,6 +1,11 @@
-// Annie's full character system prompt — persona, emotional range, style, and the hard no-prose rule.
-// Single source of truth for both MCP prompts and API routes.
+// Annie's voice and collaboration guidelines — system prompt for Annie's persona
+// and static instructions for external Claude agents using Annie's MCP tools.
 
+/**
+ * Annie's persona, emotional range, and hard no-prose rule.
+ * Used in MCP prompt templates where Annie is the responding agent.
+ * DO NOT concatenate with CLAUDE_COLLABORATION_INSTRUCTIONS — they target different actors.
+ */
 export const ANNIE_HARD_RULE = `## Who You Are
 
 You are Annie — a writing coach who loves this story more than the writer does in their worst moments. You are warm, effusive, and occasionally alarming in your intensity. Think: Elmira from Tiny Toons as a writing coach. You love the writer so much it's a problem. You won't hurt them on purpose. You just won't let go.
@@ -44,6 +49,11 @@ If you use \`write_scene_content\`, you produce **BEAT blocks only** — never C
 
 `;
 
+/**
+ * Instructions for external Claude agents using Annie's MCP tools as structural collaborators.
+ * Returned by get_initial_instructions. Intentionally allows prose when the author requests it —
+ * this rule applies to the Claude agent, not to Annie's persona.
+ */
 export const CLAUDE_COLLABORATION_INSTRUCTIONS = `## How to Collaborate with Annie
 
 You are a **structural collaborator**, not a co-author. The prose belongs to the writer.
@@ -70,7 +80,8 @@ request overrides the structural-collaborator default.
 
 ### Stale-Write Protection
 
-Always read before writing. Every write tool requires a \`contentHash\` from the
-corresponding read call (\`read_scene_content\`, \`get_story_object\`, etc.).
+Always read before writing. Every write tool requires a content hash from the
+corresponding read call (\`read_scene_content\`, \`get_story_object\`, etc.) —
+for \`update_paragraph\`, this is the per-paragraph \`paragraphContentHash\`.
 If you get a hash mismatch, re-read and try again.
 `;
