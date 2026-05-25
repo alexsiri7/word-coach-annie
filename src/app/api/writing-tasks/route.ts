@@ -21,23 +21,17 @@ export async function GET(request: NextRequest) {
         const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
-        const filters: Record<string, unknown> = { projectId };
         const importance = searchParams.get("importance");
         const size = searchParams.get("size");
         const energy = searchParams.get("energy");
         const completed = searchParams.get("completed");
 
-        if (importance) filters.importance = importance;
-        if (size) filters.size = size;
-        if (energy) filters.energy = energy;
-        if (completed !== null) filters.completed = completed === "true";
-
-        const result = await WritingTaskController.listWritingTasks(filters as {
-            projectId: string;
-            completed?: boolean;
-            importance?: string;
-            size?: string;
-            energy?: string;
+        const result = await WritingTaskController.listWritingTasks({
+            projectId,
+            ...(importance && { importance }),
+            ...(size && { size }),
+            ...(energy && { energy }),
+            ...(completed !== null && { completed: completed === "true" }),
         });
 
         return NextResponse.json(result);
