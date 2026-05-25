@@ -35,6 +35,21 @@ export async function createWritingTask(params: {
     return result;
 }
 
+export async function updateWritingTask(params: {
+    taskId: string;
+    name?: string;
+    whatIsNeeded?: string;
+    importance?: string;
+    size?: string;
+    energy?: string;
+    completed?: boolean;
+}) {
+    const { taskId, ...data } = params;
+    const result = await WritingTaskController.updateWritingTask(taskId, data);
+    mcpCache.invalidatePrefix("writingTasks:");
+    return result;
+}
+
 export async function completeWritingTask(taskId: string) {
     const result = await WritingTaskController.completeWritingTask(taskId);
     mcpCache.invalidatePrefix("writingTasks:");

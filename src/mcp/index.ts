@@ -46,6 +46,7 @@ import {
     listWritingTasks,
     createWritingTask,
     completeWritingTask,
+    updateWritingTask,
 } from "./tools/writing-tasks";
 import {
     listRelationships,
@@ -705,6 +706,30 @@ server.tool(
             logger.error("complete_writing_task: failed", e);
             const message = e instanceof Error ? e.message : String(e);
             return { content: [{ type: "text", text: `Error completing writing task: ${message}` }], isError: true };
+        }
+    }
+);
+
+server.tool(
+    "update_writing_task",
+    "Update fields on an existing writing task. All fields are optional — only provided fields are changed.",
+    {
+        taskId: z.string().describe("The writing task ID to update"),
+        name: z.string().optional().describe("New one-line task description"),
+        whatIsNeeded: z.string().optional().describe("Updated context — two sentences max"),
+        importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Updated importance"),
+        size: z.enum(["Small", "Medium", "Large"]).optional().describe("Updated size estimate"),
+        energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Updated energy type"),
+        completed: z.boolean().optional().describe("Mark task complete or incomplete"),
+    },
+    async (params) => {
+        try {
+            const result = await updateWritingTask(params);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_writing_task: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating writing task: ${message}` }], isError: true };
         }
     }
 );
