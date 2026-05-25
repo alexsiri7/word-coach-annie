@@ -120,6 +120,38 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
     });
 });
 
+describe("update_paragraph intent field", () => {
+    const updateParagraphSection = mcpSource.slice(
+        mcpSource.indexOf('"update_paragraph"'),
+        mcpSource.indexOf('"update_paragraph"') + 1500
+    );
+
+    it("should include intent enum in the update_paragraph schema", () => {
+        expect(updateParagraphSection).toContain("intent");
+        expect(updateParagraphSection).toContain("editorial");
+        expect(updateParagraphSection).toContain("creative");
+    });
+
+    it("should describe the prose-writing guard exemption in the intent field description", () => {
+        expect(updateParagraphSection).toContain("prose-writing guard does not apply");
+    });
+
+    it("ANNIE_HARD_RULE should contain editorial intent exemption", () => {
+        expect(ANNIE_HARD_RULE).toContain("intent: 'editorial'");
+        expect(ANNIE_HARD_RULE).toContain("editorial intent");
+    });
+
+    it("CLAUDE_COLLABORATION_INSTRUCTIONS should mention intent: 'editorial' for editorial corrections", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain('intent: "editorial"');
+    });
+
+    it("update_paragraph handler should not destructure intent (semantic signal only)", () => {
+        const handlerArgsMatch = updateParagraphSection.match(/async \(\{([^}]+)\}\)/);
+        expect(handlerArgsMatch).not.toBeNull();
+        expect(handlerArgsMatch![1]).not.toContain("intent");
+    });
+});
+
 describe("get_initial_instructions tool registration", () => {
     it("should register get_initial_instructions in index.ts", () => {
         expect(mcpSource).toContain('"get_initial_instructions"');
