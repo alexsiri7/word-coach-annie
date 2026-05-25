@@ -228,7 +228,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   <ListTodo className="h-12 w-12 opacity-20 mb-4" />
                   <p className="text-lg font-editorial italic">No tasks found</p>
                   <p className="text-sm mt-1 opacity-70">
-                    {Object.keys(filters).length > 0
+                    {Object.values(filters).some(v => v !== undefined)
                       ? "Try adjusting your filters"
                       : "Writing tasks created by Annie will appear here"}
                   </p>
