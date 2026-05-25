@@ -8,6 +8,23 @@ All endpoints are REST JSON APIs under `/api/`. Requests that modify data requir
 
 ---
 
+## Observability
+
+### `GET /api/metrics`
+Returns Prometheus-format metrics for the Annie service.
+
+**Authentication**: None required (public endpoint).
+
+**Response**: `200 text/plain` with Prometheus text format. Metrics include:
+- `annie_http_requests_total{method, path, status}` — request counter
+- `annie_http_request_duration_seconds{method, path}` — latency histogram
+- `annie_projects_total` — gauge: total projects in database
+- `annie_users_total` — gauge: total users in database
+
+**Error**: `503 Service Unavailable` if the database is unreachable.
+
+---
+
 ## Authentication
 
 ### `POST /api/auth/login`

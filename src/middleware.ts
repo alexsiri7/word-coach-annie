@@ -14,6 +14,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
     "/api/health",
+    "/api/metrics",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/google",

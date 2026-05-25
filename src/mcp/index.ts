@@ -1230,18 +1230,6 @@ Structure your response as:
 
 type SceneFocus = Awaited<ReturnType<typeof getSceneFocus>>;
 
-function makeProjectReviewPrompt(projectId: string, modeTitle: string, instructions: string) {
-    return {
-        messages: [{
-            role: "user" as const,
-            content: {
-                type: "text" as const,
-                text: `${ANNIE_HARD_RULE}Project ID: ${projectId}\n\n## Review Mode: ${modeTitle}\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\n${instructions}\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
-            },
-        }],
-    };
-}
-
 server.prompt(
     "review",
     "Context-aware scene review — automatically routes to the right skill based on scene status (OUTLINE→outline review, DRAFT→developmental edit, REVISED→line edit, FINAL→consistency check).",
