@@ -272,9 +272,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                               {task.size}
                             </span>
                             {task.scene && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-overlay text-text-secondary">
+                              <button
+                                onClick={() => router.push(`/project/${projectId}?scene=${task.scene!.id}`)}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-overlay text-text-secondary hover:bg-surface-sunken transition-colors cursor-pointer"
+                              >
                                 {task.scene.title}
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
