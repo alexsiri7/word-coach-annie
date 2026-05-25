@@ -376,13 +376,14 @@ server.tool(
 
 server.tool(
     "update_paragraph",
-    "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Optionally also accepts sceneContentHash for scene-level stale detection.",
+    "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Optionally also accepts sceneContentHash for scene-level stale detection. Set intent: 'editorial' when correcting or rearranging the author's existing words rather than replacing them with AI-generated prose.",
     {
         nodeId: z.string().describe("The scene node ID"),
         index: z.number().int().describe("The paragraph index from the paragraphs array"),
         content: z.string().describe("New content for this paragraph (must match the existing type — CONTENT or BEAT)"),
         paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
         sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+        intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
         const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
