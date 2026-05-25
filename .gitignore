@@ -65,7 +65,8 @@ data/*.db-journal
 
 # Gas Town (added by gt)
 .runtime/
-.claude/
+.claude/*
+!.claude/settings.json
 .logs/
 __pycache__/
 state.json
