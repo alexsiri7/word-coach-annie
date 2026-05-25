@@ -42,6 +42,11 @@ import {
     batchDeleteStoryObjects,
 } from "./tools/story-objects";
 import {
+    listWritingTasks,
+    createWritingTask,
+    completeWritingTask,
+} from "./tools/writing-tasks";
+import {
     listRelationships,
     createRelationship,
     deleteRelationship,
@@ -618,6 +623,54 @@ server.tool(
     async ({ objectIds }) => {
         const guard = destructiveGuard(); if (guard) return guard;
         const result = await batchDeleteStoryObjects(objectIds);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Writing Task Tools ───────────────────────────────────────────────────────
+
+server.tool(
+    "list_writing_tasks",
+    "List writing tasks for a project. Filter by importance (Critical/High/Medium), size (Small/Medium/Large), energy (Introspective/Dramatic/Technical), or completion status.",
+    {
+        projectId: z.string().describe("The project ID"),
+        completed: z.boolean().optional().describe("Filter by completion status (default: shows all)"),
+        importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Filter by importance"),
+        size: z.enum(["Small", "Medium", "Large"]).optional().describe("Filter by size"),
+        energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Filter by energy type — key dimension for mood-matched task selection"),
+    },
+    async (params) => {
+        const result = await listWritingTasks(params);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "create_writing_task",
+    "Create a new writing task for a project, optionally linked to a scene.",
+    {
+        projectId: z.string().describe("The project ID"),
+        sceneId: z.string().optional().describe("Optional scene/node ID to link the task to"),
+        name: z.string().describe("One-line task description"),
+        whatIsNeeded: z.string().optional().describe("Two sentences max — enough context to remember the idea"),
+        importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Task importance (default: Medium)"),
+        size: z.enum(["Small", "Medium", "Large"]).optional().describe("Estimated writing size (default: Medium)"),
+        energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Energy type required (default: Technical)"),
+    },
+    async (params) => {
+        const result = await createWritingTask(params);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "complete_writing_task",
+    "Mark a writing task as completed.",
+    {
+        taskId: z.string().describe("The writing task ID to mark complete"),
+    },
+    async ({ taskId }) => {
+        const result = await completeWritingTask(taskId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

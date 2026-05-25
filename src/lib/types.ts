@@ -141,4 +141,23 @@ export interface Annotation {
   updatedAt: string;
 }
 
+export type WritingTaskImportance = "Critical" | "High" | "Medium";
+export type WritingTaskSize = "Small" | "Medium" | "Large";
+export type WritingTaskEnergy = "Introspective" | "Dramatic" | "Technical";
+
+export interface WritingTask {
+  id: string;
+  projectId: string;
+  sceneId?: string | null;
+  name: string;
+  whatIsNeeded: string;
+  importance: WritingTaskImportance;
+  size: WritingTaskSize;
+  energy: WritingTaskEnergy;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  scene?: { id: string; title: string } | null;
+}
+
 

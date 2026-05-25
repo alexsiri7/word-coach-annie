@@ -68,6 +68,7 @@ model Project {
   writingSessions  WritingSession[]
   shares           ProjectShare[]
   peerReviews      PeerReview[]
+  writingTasks     WritingTask[]
 
   @@index([userId])
 }
@@ -147,6 +148,7 @@ model StructureNode {
   parent          StructureNode?   @relation("StructureNodeToStructureNode", fields: [parentId], references: [id], onDelete: Cascade)
   children        StructureNode[]  @relation("StructureNodeToStructureNode")
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  writingTasks    WritingTask[]
 
   @@index([parentId, orderIndex])
   @@index([projectId])
@@ -365,4 +367,24 @@ model HashnodeExport {
 
   @@unique([projectId, nodeId, credentialId])
   @@index([projectId])
+}
+
+model WritingTask {
+  id           String         @id @default(cuid())
+  projectId    String
+  sceneId      String?
+  name         String
+  whatIsNeeded String         @default("")
+  importance   String         @default("Medium")
+  size         String         @default("Medium")
+  energy       String         @default("Technical")
+  completed    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene        StructureNode? @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([sceneId])
+  @@index([projectId, completed])
 }
