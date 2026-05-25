@@ -24,33 +24,30 @@ describe("Annie Hard Rule Enforcement", () => {
         });
     });
 
-    describe("write_scene_content rejects CONTENT blocks", () => {
-        it("should contain a guard that checks for CONTENT blocks", () => {
+    describe("write_scene_content allows CONTENT blocks (author in control)", () => {
+        it("should NOT contain a hard guard that checks for CONTENT blocks", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            expect(writeSceneSection).toContain('blocks.some(b => b.type === "CONTENT")');
+            expect(writeSceneSection).not.toContain('blocks.some(b => b.type === "CONTENT")');
         });
 
-        it("should return Annie's refusal message for CONTENT blocks", () => {
+        it("should NOT return Annie's refusal message for CONTENT blocks", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            expect(writeSceneSection).toContain("Oh no no no. That part is yours.");
+            expect(writeSceneSection).not.toContain("Oh no no no. That part is yours.");
         });
 
-        it("writeSceneContentFromBlocks call should remain after the CONTENT guard", () => {
+        it("should call writeSceneContentFromBlocks directly without a CONTENT guard", () => {
             const writeSceneSection = mcpSource.slice(
                 mcpSource.indexOf('"write_scene_content"'),
                 mcpSource.indexOf('"write_scene_content"') + 2000
             );
-            // After the guard, the normal writeSceneContentFromBlocks call remains
             expect(writeSceneSection).toContain("writeSceneContentFromBlocks");
-            // Guard must branch on hasContentBlock being truthy, not falsy
-            expect(writeSceneSection).toContain("if (hasContentBlock)");
-            expect(writeSceneSection).not.toContain("if (!hasContentBlock)");
+            expect(writeSceneSection).not.toContain("if (hasContentBlock)");
         });
     });
 });

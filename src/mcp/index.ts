@@ -351,7 +351,7 @@ server.tool(
 
 server.tool(
     "write_scene_content",
-    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks or raw HTML prose. Creates a new version. Requires contentHash from read_scene_content to prevent stale overwrites.",
+    "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie uses BEAT blocks by default; CONTENT blocks are permitted only when the author explicitly requests prose. Creates a new version. Requires contentHash from read_scene_content to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The scene node ID"),
         contentHash: z.string().describe("The contentHash from read_scene_content — ensures you are writing over the version you read"),
@@ -363,17 +363,6 @@ server.tool(
     },
     async ({ nodeId, contentHash, content, blocks }) => {
         if (blocks) {
-            const hasContentBlock = blocks.some(b => b.type === "CONTENT");
-            if (hasContentBlock) {
-                logger.warn("write_scene_content: CONTENT block rejected by Annie guardrail", { nodeId });
-                return {
-                    content: [{
-                        type: "text",
-                        text: "Oh no no no. That part is yours. I will sit here and I will WAIT — but I am not writing your scene for you. Do you want to talk through what needs to happen? I can map it as beats.",
-                    }],
-                    isError: true,
-                };
-            }
             const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
