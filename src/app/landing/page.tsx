@@ -133,7 +133,7 @@ export default function LandingPage() {
                 Export anywhere
               </h3>
               <p className="text-sm text-text-secondary">
-                Export your manuscript to Markdown, PDF, or Google Docs. Your
+                Export your manuscript to Markdown, PDF, or EPUB. Your
                 work is always portable and fully yours.
               </p>
             </div>
