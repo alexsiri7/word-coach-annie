@@ -144,6 +144,12 @@ describe("update_paragraph intent field", () => {
     it("CLAUDE_COLLABORATION_INSTRUCTIONS should mention intent: 'editorial' for editorial corrections", () => {
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain('intent: "editorial"');
     });
+
+    it("update_paragraph handler should not destructure intent (semantic signal only)", () => {
+        const handlerArgsMatch = updateParagraphSection.match(/async \(\{([^}]+)\}\)/);
+        expect(handlerArgsMatch).not.toBeNull();
+        expect(handlerArgsMatch![1]).not.toContain("intent");
+    });
 });
 
 describe("get_initial_instructions tool registration", () => {
