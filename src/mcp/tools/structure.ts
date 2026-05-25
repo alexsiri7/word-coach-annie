@@ -120,6 +120,31 @@ export async function updateParagraph(
     return result;
 }
 
+export async function insertBeat(
+    nodeId: string,
+    afterParagraphIndex: number,
+    beatContent: string,
+    sceneContentHash?: string,
+) {
+    const current = await StructureController.readSceneContent(nodeId);
+    if (sceneContentHash !== undefined) {
+        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
+    }
+    const blocks = current.blocks;
+    // afterParagraphIndex of -1 means "insert at the very beginning"
+    if (afterParagraphIndex < -1 || afterParagraphIndex >= blocks.length) {
+        throw new Error(
+            `afterParagraphIndex ${afterParagraphIndex} out of range (-1–${blocks.length - 1})`
+        );
+    }
+    const insertAt = afterParagraphIndex + 1;
+    blocks.splice(insertAt, 0, { type: "BEAT", content: beatContent });
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
 export async function writeSceneContent(nodeId: string, content: string, contentHash?: string) {
     if (contentHash !== undefined) {
         const current = await StructureController.readSceneContent(nodeId);

@@ -20,6 +20,7 @@ import {
     writeSceneContent,
     writeSceneContentFromBlocks,
     updateParagraph,
+    insertBeat,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -387,6 +388,29 @@ server.tool(
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
         const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "insert_beat",
+    "Insert a new beat block after a specified paragraph index in a scene. The payload contains only beat text — no CONTENT blocks — so Annie's prose-writing guard never fires.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        afterParagraphIndex: z
+            .number()
+            .int()
+            .describe(
+                "Insert the beat after this paragraph index (from read_scene_content paragraphs array). Use -1 to insert before all existing blocks.",
+            ),
+        beatContent: z.string().describe("The beat text to insert (structural waypoint — not prose)"),
+        sceneContentHash: z
+            .string()
+            .optional()
+            .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
+    },
+    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) => {
+        const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

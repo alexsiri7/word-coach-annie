@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { StructureController } from "@/lib/controllers/structure";
 import { ProjectsController } from "@/lib/controllers/projects";
+import { insertBeat } from "@/mcp/tools/structure";
 
 describe("StructureController", () => {
     describe("parseSceneContent", () => {
@@ -320,6 +321,75 @@ describe("StructureController", () => {
                 const withoutText = open.find((a) => a.content === "Without text");
                 expect(withoutText).toBeDefined();
                 expect(withoutText!.selectedText).toBeNull();
+            });
+        });
+
+        describe("insertBeat", () => {
+            it("inserts beat after given index", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(
+                    scene.id,
+                    "<p>Before</p><!-- beat: Existing --><p>After</p>"
+                );
+
+                const result = await insertBeat(scene.id, 0, "New beat");
+                expect(result.nodeId).toBe(scene.id);
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(4);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "<p>Before</p>" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "New beat" });
+                expect(read.blocks[2]).toEqual({ type: "BEAT", content: "Existing" });
+                expect(read.blocks[3]).toEqual({ type: "CONTENT", content: "<p>After</p>" });
+            });
+
+            it("inserts beat at index -1 (before all blocks)", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Existing</p>");
+
+                await insertBeat(scene.id, -1, "First beat");
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(2);
+                expect(read.blocks[0]).toEqual({ type: "BEAT", content: "First beat" });
+                expect(read.blocks[1]).toEqual({ type: "CONTENT", content: "<p>Existing</p>" });
+            });
+
+            it("throws if afterParagraphIndex is out of range", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Only</p>");
+
+                await expect(insertBeat(scene.id, 99, "Bad")).rejects.toThrow("out of range");
+                await expect(insertBeat(scene.id, -2, "Bad")).rejects.toThrow("out of range");
+            });
+
+            it("shifts existing blocks correctly", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContentFromBlocks(scene.id, [
+                    { type: "CONTENT", content: "<p>A</p>" },
+                    { type: "BEAT", content: "Existing beat" },
+                    { type: "CONTENT", content: "<p>C</p>" },
+                ]);
+
+                await insertBeat(scene.id, 1, "Between beat and C");
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(4);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "<p>A</p>" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "Existing beat" });
+                expect(read.blocks[2]).toEqual({ type: "BEAT", content: "Between beat and C" });
+                expect(read.blocks[3]).toEqual({ type: "CONTENT", content: "<p>C</p>" });
+            });
+
+            it("returns scene metadata", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+
+                const result = await insertBeat(scene.id, 0, "A beat");
+                expect(result.nodeId).toBe(scene.id);
+                expect(result.versionId).toBeDefined();
+                expect(result.wordCount).toBeDefined();
+                expect(result.createdAt).toBeDefined();
             });
         });
 
