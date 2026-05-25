@@ -6,7 +6,7 @@ import { listSkills, loadSkill } from "./skills";
 import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
-import { ANNIE_HARD_RULE } from "./annie-voice";
+import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 
 // Tool implementations
@@ -1574,6 +1574,17 @@ server.tool(
     async () => {
         const skills = listSkills();
         return { content: [{ type: "text", text: JSON.stringify(skills, null, 2) }] };
+    }
+);
+
+// ─── Initial Instructions Tool ───────────────────────────────────────────────
+
+server.tool(
+    "get_initial_instructions",
+    "Returns static guidelines for how Claude should collaborate with Annie. Call this at the start of a session to establish the correct collaboration model: structural collaborator by default, beats and annotations over prose, correct tool usage.",
+    {},
+    async () => {
+        return { content: [{ type: "text", text: CLAUDE_COLLABORATION_INSTRUCTIONS }] };
     }
 );
 
