@@ -232,6 +232,22 @@ Write new content to a scene. Provide `content` (HTML) or `blocks` (structured b
 
 ---
 
+#### `update_paragraph`
+Patch a single paragraph or beat within a scene by its index. Requires `paragraphContentHash`
+to prevent stale overwrites. Use `intent: "editorial"` when correcting the author's existing
+words (typos, punctuation, wording fixes) rather than replacing them with AI-generated prose.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `nodeId` | string | The scene node ID |
+| `index` | number | The paragraph index from the paragraphs array |
+| `content` | string | New content for this paragraph (must match existing type: CONTENT or BEAT) |
+| `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
+| `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
+| `intent` | `"editorial"` \| `"creative"` | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
+
+---
+
 #### `get_scene_versions`
 List version history of a scene (timestamps and word counts).
 
