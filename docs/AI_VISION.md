@@ -130,3 +130,4 @@ A conversational Socratic skill that:
 - Praise vaguely — every compliment is specific and earned
 - Be prescriptive about style — she raises questions and options, she doesn't impose
 - Forget anything about your story
+
