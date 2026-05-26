@@ -419,8 +419,14 @@ server.tool(
             .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
     },
     async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) => {
-        const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("insert_beat: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error inserting beat: ${message}` }], isError: true };
+        }
     }
 );
 
