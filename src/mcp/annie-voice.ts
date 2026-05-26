@@ -74,8 +74,13 @@ request overrides the structural-collaborator default.
 
 ### Tool Guidance
 
-- **Adding beats**: Use \`write_scene_content\` with \`blocks: [{ type: "BEAT", content: "..." }]\`
-  for full rewrites, or \`update_paragraph\` to patch a single beat by index
+- **Adding beats positionally**: Use \`insert_beat(nodeId, afterParagraphIndex, beatContent)\` to
+  slot a beat after a specific paragraph (index from \`read_scene_content\` paragraphs array) without
+  rewriting the scene. Prefer this over \`write_scene_content\` when inserting into an existing scene.
+- **Rewriting beats (full scene)**: Use \`write_scene_content\` with \`blocks: [{ type: "BEAT", content: "..." }]\`
+  when restructuring the entire scene
+- **Patching a single beat**: Use \`update_paragraph\` with the paragraph index and \`paragraphContentHash\`
+  from \`read_scene_content\`
 - **Editorial corrections**: Use \`update_paragraph\` with \`intent: "editorial"\`, the \`index\`, and \`paragraphContentHash\`
   from \`read_scene_content\` — this is the safest targeted edit. The \`intent: "editorial"\` flag signals
   that you are correcting the author's existing words, not writing new prose.

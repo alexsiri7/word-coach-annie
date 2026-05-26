@@ -260,7 +260,7 @@ tool over `write_scene_content` when adding structural waypoints without touchin
 | Param | Type | Description |
 |-------|------|-------------|
 | `nodeId` | string | The scene node ID |
-| `afterParagraphIndex` | number | Insert beat after this block index (0-based, from `read_scene_content` blocks array — includes both CONTENT and BEAT blocks). Use `-1` to prepend before all existing blocks. |
+| `afterParagraphIndex` | number | Scene-level paragraph index (from `read_scene_content` paragraphs array). Each `<p>` element and each BEAT block counts as one paragraph. Use `-1` to insert before all paragraphs. When the target falls inside a CONTENT block, the block is split automatically. |
 | `beatContent` | string | The beat text to insert (structural waypoint — not prose) |
 | `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content` for stale detection |
 
