@@ -156,6 +156,33 @@ describe("MCP Structure Tools", () => {
         expect(result.paragraphs[1].content).toBe('<p data-id="2">Second</p>');
     });
 
+    it("readSceneContent paragraphs handles <p> elements with embedded newlines", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(
+            scene.id,
+            "<p>Line1\nLine2</p><p>Single line</p>",
+            contentHash,
+        );
+        const result = await structureTools.readSceneContent(scene.id);
+        expect(result.paragraphs).toHaveLength(2);
+        expect(result.paragraphs[0].content).toBe("<p>Line1\nLine2</p>");
+        expect(result.paragraphs[1].content).toBe("<p>Single line</p>");
+    });
+
+    it("updateParagraph preserves whitespace between <p> elements", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const { contentHash } = await structureTools.readSceneContent(scene.id);
+        await structureTools.writeSceneContent(scene.id, "<p>A</p>\n<p>B</p>\n<p>C</p>", contentHash);
+        const read = await structureTools.readSceneContent(scene.id);
+        await structureTools.updateParagraph(scene.id, 1, "<p>Updated</p>", read.paragraphs[1].contentHash);
+        const updated = await structureTools.readSceneContent(scene.id);
+        expect(updated.paragraphs).toHaveLength(3);
+        expect(updated.paragraphs[0].content).toBe("<p>A</p>");
+        expect(updated.paragraphs[1].content).toBe("<p>Updated</p>");
+        expect(updated.paragraphs[2].content).toBe("<p>C</p>");
+    });
+
     it("updateParagraph rejects stale paragraphContentHash", async () => {
         const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
         const { contentHash } = await structureTools.readSceneContent(scene.id);
