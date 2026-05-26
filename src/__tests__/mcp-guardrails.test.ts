@@ -175,6 +175,10 @@ describe("cross_reference_story_bible has no human approval gate", () => {
     it("cross_reference_story_bible tool description should not mention confirmation flow", () => {
         expect(mcpSource).not.toContain("confirmation flow");
     });
+
+    it("cross_reference_story_bible Step 3 should use indicative language, not ask-for-confirmation language", () => {
+        expect(mcpSource).toContain("indicate which is the source of truth");
+    });
 });
 
 describe("review persona prompts", () => {
