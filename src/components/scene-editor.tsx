@@ -299,20 +299,16 @@ export function SceneEditor({
   };
 
   const addTask = useCallback(async (name: string) => {
-    try {
-      const res = await fetch("/api/writing-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          sceneId: node.id,
-          name,
-        }),
-      });
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    } catch (err) {
-      console.error("[scene-editor] addTask failed", err);
-    }
+    const res = await fetch("/api/writing-tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId,
+        sceneId: node.id,
+        name,
+      }),
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
   }, [projectId, node.id]);
 
   const insertBeat = useCallback(() => {

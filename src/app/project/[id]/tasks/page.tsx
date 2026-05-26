@@ -119,15 +119,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     loadData();
   }, [projectId, filters]);
 
-  async function handleComplete(taskId: string) {
+  async function handleComplete(taskId: string): Promise<boolean> {
     setActionError(null);
     try {
       const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)));
+      return true;
     } catch (err) {
       console.error("[tasks/page] handleComplete failed", err);
       setActionError("Could not mark task as complete. Please try again.");
+      return false;
     }
   }
 
@@ -253,9 +255,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   {tasks.map((task) => (
                     <div
                       key={task.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleTaskClick(task)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleTaskClick(task);
+                        }
+                      }}
                       className={`bg-surface border border-border rounded-lg p-4 transition-all cursor-pointer ${
-                        task.completed ? "opacity-60" : "hover:border-accent/40"
+                        task.completed ? "opacity-60" : "hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent/50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -333,8 +343,8 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         variant="outline"
                         size="sm"
                         onClick={async () => {
-                          await handleComplete(selectedTask.id);
-                          setSelectedTask(null);
+                          const ok = await handleComplete(selectedTask.id);
+                          if (ok) setSelectedTask(null);
                         }}
                       >
                         Mark as complete

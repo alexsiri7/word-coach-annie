@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -114,6 +114,23 @@ export function EditorToolbar({
   const [taskName, setTaskName] = useState("");
   const [addingTask, setAddingTask] = useState(false);
   const [taskPopoverOpen, setTaskPopoverOpen] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
+
+  const handleSubmitTask = useCallback(async () => {
+    if (!taskName.trim() || addingTask) return;
+    setAddingTask(true);
+    setTaskError(null);
+    try {
+      await onAddTask!(taskName.trim());
+      setTaskName("");
+      setTaskPopoverOpen(false);
+    } catch {
+      setTaskError("Could not add task. Please try again.");
+    } finally {
+      setAddingTask(false);
+    }
+  }, [taskName, addingTask, onAddTask]);
+
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
       <div className="flex items-center gap-0.5 mr-3 shrink-0">
@@ -222,17 +239,8 @@ export function EditorToolbar({
                 placeholder="Task name…"
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === "Enter" && taskName.trim() && !addingTask) {
-                    setAddingTask(true);
-                    try {
-                      await onAddTask(taskName.trim());
-                      setTaskName("");
-                      setTaskPopoverOpen(false);
-                    } finally {
-                      setAddingTask(false);
-                    }
-                  }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSubmitTask();
                 }}
                 className="h-8 text-sm mb-2"
                 autoFocus
@@ -241,20 +249,13 @@ export function EditorToolbar({
                 size="sm"
                 className="w-full h-8 text-xs"
                 disabled={!taskName.trim() || addingTask}
-                onClick={async () => {
-                  if (!taskName.trim() || addingTask) return;
-                  setAddingTask(true);
-                  try {
-                    await onAddTask(taskName.trim());
-                    setTaskName("");
-                    setTaskPopoverOpen(false);
-                  } finally {
-                    setAddingTask(false);
-                  }
-                }}
+                onClick={handleSubmitTask}
               >
                 {addingTask ? "Adding…" : "Add Task"}
               </Button>
+              {taskError && (
+                <p className="text-xs text-destructive mt-1">{taskError}</p>
+              )}
             </PopoverContent>
           </Popover>
         )}
