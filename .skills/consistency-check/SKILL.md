@@ -167,4 +167,3 @@ Use this skill when the author wants to verify that their manuscript is internal
 - Focus on reader-facing issues. Internal notes and outlines don't need the same consistency rigor.
 - Prioritize by severity: a character changing eye color mid-book is more critical than a minor timeline ambiguity.
 - When updating story objects, add a note explaining what was changed and why — e.g., "Updated eye color to match Ch. 3 prose description".
-- When updating story objects after confirmation, include a note in the story object's notes field about what was changed and why (e.g., "Updated eye color to match Ch. 3 description per author confirmation").

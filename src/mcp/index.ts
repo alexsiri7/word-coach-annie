@@ -1247,7 +1247,7 @@ server.tool(
 
 server.tool(
     "cross_reference_story_bible",
-    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says. ",
+    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says.",
     {
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),

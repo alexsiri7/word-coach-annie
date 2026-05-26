@@ -167,6 +167,16 @@ describe("get_initial_instructions tool registration", () => {
     });
 });
 
+describe("cross_reference_story_bible has no human approval gate", () => {
+    it("should NOT instruct the model to wait for author confirmation", () => {
+        expect(mcpSource).not.toContain("Never silently overwrite. Always ask before making changes.");
+    });
+
+    it("cross_reference_story_bible tool description should not mention confirmation flow", () => {
+        expect(mcpSource).not.toContain("confirmation flow");
+    });
+});
+
 describe("review persona prompts", () => {
     for (const promptName of ["review-editor", "review-fan", "review-author"]) {
         describe(`${promptName} prompt`, () => {
