@@ -409,6 +409,78 @@ describe("StructureController", () => {
                 const hash = computeContentHash(current.content);
                 await expect(insertBeat(scene.id, 0, "New beat", hash)).resolves.toBeDefined();
             });
+
+            it("splits single CONTENT block when inserting after first paragraph", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>P1</p><p>P2</p><p>P3</p>");
+
+                await insertBeat(scene.id, 0, "After P1");
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(3);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "<p>P1</p>" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After P1" });
+                expect(read.blocks[2]).toEqual({ type: "CONTENT", content: "<p>P2</p><p>P3</p>" });
+            });
+
+            it("splits single CONTENT block when inserting after middle paragraph", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>P1</p><p>P2</p><p>P3</p>");
+
+                await insertBeat(scene.id, 1, "After P2");
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(3);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "<p>P1</p><p>P2</p>" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After P2" });
+                expect(read.blocks[2]).toEqual({ type: "CONTENT", content: "<p>P3</p>" });
+            });
+
+            it("does not create empty CONTENT block when inserting after last paragraph", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>P1</p><p>P2</p><p>P3</p>");
+
+                await insertBeat(scene.id, 2, "After last");
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(2);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "<p>P1</p><p>P2</p><p>P3</p>" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After last" });
+            });
+
+            it("treats non-<p> CONTENT block as a single atomic paragraph", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContentFromBlocks(scene.id, [
+                    { type: "CONTENT", content: "raw text without p tags" },
+                ]);
+                await insertBeat(scene.id, 0, "After raw");
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(2);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: "raw text without p tags" });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "After raw" });
+            });
+
+            it("splits block containing attributed <p> tags correctly", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(
+                    scene.id,
+                    '<p class="a">First</p><p class="b">Second</p>',
+                );
+                await insertBeat(scene.id, 0, "Mid beat");
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.blocks).toHaveLength(3);
+                expect(read.blocks[0]).toEqual({ type: "CONTENT", content: '<p class="a">First</p>' });
+                expect(read.blocks[1]).toEqual({ type: "BEAT", content: "Mid beat" });
+                expect(read.blocks[2]).toEqual({ type: "CONTENT", content: '<p class="b">Second</p>' });
+            });
+
+            it("out-of-range uses total paragraph count not block count", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>A</p><p>B</p><p>C</p>");
+
+                await expect(insertBeat(scene.id, 3, "Bad")).rejects.toThrow("out of range");
+                await expect(insertBeat(scene.id, -2, "Bad")).rejects.toThrow("out of range");
+            });
         });
 
         describe("writeSceneContentFromBlocks", () => {
