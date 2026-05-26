@@ -404,7 +404,7 @@ server.tool(
             .number()
             .int()
             .describe(
-                "Insert the beat after this block index (from read_scene_content paragraphs array — includes both CONTENT and BEAT blocks). Use -1 to insert before all existing blocks.",
+                "Scene-level paragraph index (from read_scene_content paragraphs array). Each <p> element and each BEAT block is one paragraph. Use -1 to insert before all paragraphs, 0 to insert after the first paragraph, etc. When the target falls inside a CONTENT block, the block is split automatically.",
             ),
         beatContent: z.string().describe("The beat text to insert (structural waypoint — not prose)"),
         sceneContentHash: z
