@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -27,9 +28,16 @@ import {
   PanelRight,
   ClipboardCheck,
   LayoutList,
+  ListTodo,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -69,6 +77,7 @@ interface EditorToolbarProps {
   onReviewScene?: () => void;
   onPlanBeats?: () => void;
   onCanonCheck?: () => void;
+  onAddTask?: (name: string) => Promise<void>;
 }
 
 export function EditorToolbar({
@@ -100,7 +109,11 @@ export function EditorToolbar({
   onReviewScene,
   onPlanBeats,
   onCanonCheck,
+  onAddTask,
 }: EditorToolbarProps) {
+  const [taskName, setTaskName] = useState("");
+  const [addingTask, setAddingTask] = useState(false);
+  const [taskPopoverOpen, setTaskPopoverOpen] = useState(false);
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
       <div className="flex items-center gap-0.5 mr-3 shrink-0">
@@ -191,6 +204,61 @@ export function EditorToolbar({
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 shrink-0 pr-2">
+        {onAddTask && (
+          <Popover open={taskPopoverOpen} onOpenChange={setTaskPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Add writing task for this scene"
+              >
+                <ListTodo className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <p className="text-xs font-semibold text-text-muted mb-2">Add Task</p>
+              <Input
+                placeholder="Task name…"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && taskName.trim() && !addingTask) {
+                    setAddingTask(true);
+                    try {
+                      await onAddTask(taskName.trim());
+                      setTaskName("");
+                      setTaskPopoverOpen(false);
+                    } finally {
+                      setAddingTask(false);
+                    }
+                  }
+                }}
+                className="h-8 text-sm mb-2"
+                autoFocus
+              />
+              <Button
+                size="sm"
+                className="w-full h-8 text-xs"
+                disabled={!taskName.trim() || addingTask}
+                onClick={async () => {
+                  if (!taskName.trim() || addingTask) return;
+                  setAddingTask(true);
+                  try {
+                    await onAddTask(taskName.trim());
+                    setTaskName("");
+                    setTaskPopoverOpen(false);
+                  } finally {
+                    setAddingTask(false);
+                  }
+                }}
+              >
+                {addingTask ? "Adding…" : "Add Task"}
+              </Button>
+            </PopoverContent>
+          </Popover>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
