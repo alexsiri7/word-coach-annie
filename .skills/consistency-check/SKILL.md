@@ -1,6 +1,6 @@
 ---
 name: consistency-check
-description: Cross-reference world elements, characters, and settings for contradictions across the manuscript — including story bible cross-referencing with confirmation flow
+description: Cross-reference world elements, characters, and settings for contradictions across the manuscript — including story bible cross-referencing
 required_tools:
   - get_outline
   - read_scene_content
@@ -91,25 +91,20 @@ Use this skill when the author wants to verify that their manuscript is internal
 
 8. **Compile findings** into a structured consistency report (see Output Format below).
 
-### Phase 5: Confirmation Flow for Story Object Sync
+### Phase 5: Story Object Sync
 
-9. **Present each mismatch** between the story bible and the prose to the author. For each mismatch, show:
-   - What the story bible says
-   - What the prose says
-   - Which scene contains the discrepancy
+9. **For each mismatch** between the story bible and the prose, determine the best resolution and apply it immediately:
 
-10. **Ask the author which is the source of truth.** Never silently overwrite. For each mismatch, offer three options:
-
-    - **Option A: Update the story bible** — "The prose is correct. Update the story object to match."
+    - **Option A: Update the story bible** — When the prose is specific and detailed and the story object is vague or missing the detail.
       → Use `update_story_object` to sync the story bible entry with what the prose says.
 
-    - **Option B: Flag the scene for revision** — "The story bible is correct. The prose needs editing."
-      → Use `add_annotation` on the scene to mark the specific passage for the author to revise, noting what the correct value should be.
+    - **Option B: Flag the scene for revision** — When the story object definition is explicit and the prose contradicts it.
+      → Use `add_annotation` on the scene to mark the specific passage for revision, noting what the correct value should be.
 
-    - **Option C: Keep both versions** — "This difference is intentional."
-      → The author confirms the discrepancy is deliberate (e.g., unreliable narrator, character growth, regional dialect differences). No changes needed.
+    - **Option C: Keep both versions** — When the difference could be intentional (unreliable narrator, character growth, regional dialect).
+      → Document in the report as an ambiguous item.
 
-11. **Wait for author confirmation before making any changes.** Present all mismatches first, let the author decide on each one, then execute the chosen actions.
+    **When in doubt between A and B, prefer B (add annotation).** Annotations are non-destructive; the author can review and dismiss. Changing the story bible is harder to reverse.
 
 ## Output Format
 
@@ -171,5 +166,5 @@ Use this skill when the author wants to verify that their manuscript is internal
 - Some apparent inconsistencies are intentional (unreliable narrator, character lying). Note these as "ambiguous" rather than flagging as errors.
 - Focus on reader-facing issues. Internal notes and outlines don't need the same consistency rigor.
 - Prioritize by severity: a character changing eye color mid-book is more critical than a minor timeline ambiguity.
-- **Never silently change story objects or prose.** Always present the mismatch and let the author choose.
+- When updating story objects, add a note explaining what was changed and why — e.g., "Updated eye color to match Ch. 3 prose description".
 - When updating story objects after confirmation, include a note in the story object's notes field about what was changed and why (e.g., "Updated eye color to match Ch. 3 description per author confirmation").

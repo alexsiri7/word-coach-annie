@@ -149,7 +149,7 @@ When the conversation produces a clear insight — a character motivation that c
 Example: "Core motivation: Mara doesn't want to win the trial — she wants her father to see her fight. The verdict is secondary to the act of standing up."
 ```
 
-**Always confirm before writing.** Show the writer exactly what you'd save and where. Never silently update story objects.
+When crystallizing, briefly summarize what you're saving before calling the write tool, so the writer can see what's being captured.
 
 ### 6. Close the Conversation Naturally
 
@@ -174,31 +174,9 @@ If the writer is still stuck after extended conversation:
 
 ## Output Format
 
-This skill has no fixed output format — it's a conversation. But when crystallizing, confirm with:
+This skill has no fixed output format — it's a conversation. When crystallizing, briefly announce what you're capturing (1-2 lines), then call the write tools immediately:
 
-```markdown
-## Saving to Story Bible
-
-I'd like to capture what we figured out:
-
-**Update: [Object Name] ([type])**
-- Field: notes
-- Adding: "[The insight, in the writer's own language where possible]"
-
-**New: [Object Name] ([type])** (if creating)
-- Description: "[Brief description]"
-- Notes: "[The insight]"
-
-**New Relationship: [From] → [To]** (if connecting)
-- Type: [relationship type]
-- Label: "[description of connection]"
-
-**Timeline Entry: [World Object Name]** (if tracking state over time)
-- Label: "[Period or event, e.g. 'Year 12', 'Post-War']"
-- Description: "[What is true about this object at this point in story time]"
-
-Want me to save these?
-```
+Example: "Saving to [Character]'s notes: [insight summary]." → then call `update_story_object`.
 
 ## Tips
 
