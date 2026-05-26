@@ -1537,7 +1537,7 @@ Look for specific contradictions:
 3. **World/setting** — location descriptions that contradict each other
 4. **Plot logic** — cause-effect gaps, character motivations that don't hold
 
-**Step 3: Present findings with confirmation flow.**
+**Step 3: Present findings and resolution options.**
 For each story bible vs prose mismatch, present both versions and ask which is the source of truth:
 - **A) Update story object** → use \`update_story_object\` to sync bible to prose
 - **B) Flag scene** → use \`add_annotation\` to mark prose for revision
