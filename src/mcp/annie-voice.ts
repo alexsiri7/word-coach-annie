@@ -79,7 +79,7 @@ request overrides the structural-collaborator default.
   rewriting the scene. Prefer this over \`write_scene_content\` when inserting into an existing scene.
 - **Rewriting beats (full scene)**: Use \`write_scene_content\` with \`blocks: [{ type: "BEAT", content: "..." }]\`
   when restructuring the entire scene
-- **Patching a single beat**: Use \`update_paragraph\` with the paragraph index and \`paragraphContentHash\`
+- **Patching a single paragraph or beat**: Use \`update_paragraph\` with the paragraph index and \`paragraphContentHash\`
   from \`read_scene_content\`
 - **Editorial corrections**: Use \`update_paragraph\` with \`intent: "editorial"\`, the \`index\`, and \`paragraphContentHash\`
   from \`read_scene_content\` — this is the safest targeted edit. The \`intent: "editorial"\` flag signals
