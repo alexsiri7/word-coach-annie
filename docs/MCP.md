@@ -244,7 +244,7 @@ words (typos, punctuation, wording fixes) rather than replacing them with AI-gen
 | `content` | string | New content for this paragraph (must match existing type: CONTENT or BEAT) |
 | `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
 | `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
-| `intent` | `"editorial"` \| `"creative"` | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
+| `intent` | (`"editorial"` \| `"creative"`)? | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
 
 ---
 

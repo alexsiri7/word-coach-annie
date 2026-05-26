@@ -29,7 +29,10 @@ export async function PATCH(
         const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
-        const body = await request.json().catch(() => null);
+        const body = await request.json().catch((err) => {
+            logger.warn("PATCH /api/writing-tasks/[id]: invalid JSON body", err);
+            return null;
+        });
         if (body === null) {
             return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
         }

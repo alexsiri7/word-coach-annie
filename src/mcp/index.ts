@@ -386,8 +386,14 @@ server.tool(
         intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
-        const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_paragraph: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating paragraph: ${message}` }], isError: true };
+        }
     }
 );
 

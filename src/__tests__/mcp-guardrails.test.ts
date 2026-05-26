@@ -121,9 +121,11 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
 });
 
 describe("update_paragraph intent field", () => {
+    // 2500-char window matches plan_beats pattern and provides ample headroom
+    // for future field additions. Current definition is ~1200 chars.
     const updateParagraphSection = mcpSource.slice(
         mcpSource.indexOf('"update_paragraph"'),
-        mcpSource.indexOf('"update_paragraph"') + 1500
+        mcpSource.indexOf('"update_paragraph"') + 2500
     );
 
     it("should include intent enum in the update_paragraph schema", () => {
