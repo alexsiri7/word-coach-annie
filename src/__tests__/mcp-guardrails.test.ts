@@ -175,25 +175,31 @@ describe("cross_reference_story_bible has no human approval gate", () => {
     it("cross_reference_story_bible tool description should not mention confirmation flow", () => {
         expect(mcpSource).not.toContain("confirmation flow");
     });
+
+    it("cross_reference_story_bible Step 3 should use indicative language, not ask-for-confirmation language", () => {
+        expect(mcpSource).toContain("indicate which is the source of truth");
+    });
 });
 
 describe("review persona prompts", () => {
+    it("buildReviewPrompt helper should include ANNIE_HARD_RULE and export_manuscript", () => {
+        const helperStart = mcpSource.indexOf("function buildReviewPrompt");
+        expect(helperStart).toBeGreaterThan(-1);
+        const helperSection = mcpSource.slice(helperStart, helperStart + 1000);
+        expect(helperSection).toContain("ANNIE_HARD_RULE");
+        expect(helperSection).toContain("export_manuscript");
+    });
+
     for (const promptName of ["review-editor", "review-fan", "review-author"]) {
         describe(`${promptName} prompt`, () => {
             it(`should register the ${promptName} prompt`, () => {
                 expect(mcpSource).toContain(`"${promptName}"`);
             });
 
-            it(`should instruct use of export_manuscript tool in ${promptName}`, () => {
+            it(`should call buildReviewPrompt in ${promptName}`, () => {
                 const start = mcpSource.indexOf(`"${promptName}"`);
                 const section = mcpSource.slice(start, start + 3000);
-                expect(section).toContain("export_manuscript");
-            });
-
-            it(`should prepend ANNIE_HARD_RULE in ${promptName} prompt`, () => {
-                const start = mcpSource.indexOf(`"${promptName}"`);
-                const section = mcpSource.slice(start, start + 3000);
-                expect(section).toContain("ANNIE_HARD_RULE");
+                expect(section).toContain("buildReviewPrompt");
             });
         });
     }
