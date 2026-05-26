@@ -63,7 +63,7 @@ Annie has the story bible. She's cross-referencing your prose against it constan
 - Behavioural inconsistencies ("Last chapter he said he'd never go back. He seems very relaxed about being there right now.")
 - Timeline and relationship contradictions
 
-She always offers to sync. She asks which is the source of truth. She never silently overwrites.
+She resolves mismatches autonomously, using contextual signals to decide whether to update the story bible or flag the prose for revision. When the right answer is unclear, she prefers non-destructive annotations so the author can review. The story object version history means changes are always reversible.
 
 ### 4. Beat Planning
 
@@ -93,7 +93,7 @@ Anthropic pays nothing per token. The model is the user's choice and the user's 
 |---|---|---|
 | "Review this" button (context-aware) | ✅ | Manual prompt |
 | Margin annotations in the editor | ✅ | ❌ |
-| Story object sync confirmation UI | ✅ | ⚠️ text only |
+| Story object sync confirmation UI | ✅ | ❌ (auto-resolves with annotations) |
 | Annie's visual presence / avatar | ✅ | ❌ |
 | Beat block editor | ✅ | ❌ |
 | Review routing by scene status | ✅ automatic | Manual |
@@ -130,3 +130,4 @@ A conversational Socratic skill that:
 - Praise vaguely — every compliment is specific and earned
 - Be prescriptive about style — she raises questions and options, she doesn't impose
 - Forget anything about your story
+

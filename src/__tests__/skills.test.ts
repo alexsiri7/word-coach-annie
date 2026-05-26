@@ -71,6 +71,22 @@ describe("MCP Skills", () => {
             expect(skill!.metadata.name).toBe("consistency-check");
             expect(skill!.instructions).toContain("# Consistency Check");
             expect(skill!.metadata.required_tools).toContain("export_story_bible");
+
+            // Regression: Phase 5 must NOT require human approval before writing
+            expect(skill!.instructions).not.toContain("Wait for author confirmation");
+            expect(skill!.instructions).not.toContain("Never silently overwrite");
+        });
+
+        it("should load the story-development-chat skill without confirmation gates", () => {
+            const skill = loadSkill("story-development-chat");
+
+            expect(skill).not.toBeNull();
+            expect(skill!.metadata.name).toBe("story-development-chat");
+            expect(skill!.instructions).toContain("# Story Development Chat");
+
+            // Regression: must not require human confirmation before crystallizing
+            expect(skill!.instructions).not.toContain("Always confirm before writing");
+            expect(skill!.instructions).not.toContain("Want me to save these?");
         });
 
         it("should load the plot-structure-analysis skill", () => {

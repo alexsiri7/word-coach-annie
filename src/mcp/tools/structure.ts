@@ -92,20 +92,16 @@ function flattenBlocksToParagraphs(
 ): FlatParagraph[] {
     const result: FlatParagraph[] = [];
     let globalIndex = 0;
-    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
-        const block = blocks[blockIndex];
+    for (const [blockIndex, block] of blocks.entries()) {
         if (block.type === "BEAT") {
-            result.push({ globalIndex, blockIndex, positionWithinBlock: 0, type: "BEAT", content: block.content });
-            globalIndex++;
+            result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "BEAT", content: block.content });
         } else {
             const matches = block.content.match(P_TAG_RE);
-            if (!matches || matches.length === 0) {
-                result.push({ globalIndex, blockIndex, positionWithinBlock: 0, type: "CONTENT", content: block.content });
-                globalIndex++;
+            if (!matches?.length) {
+                result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "CONTENT", content: block.content });
             } else {
-                for (let i = 0; i < matches.length; i++) {
-                    result.push({ globalIndex, blockIndex, positionWithinBlock: i, type: "CONTENT", content: matches[i] });
-                    globalIndex++;
+                for (const [i, content] of matches.entries()) {
+                    result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: i, type: "CONTENT", content });
                 }
             }
         }

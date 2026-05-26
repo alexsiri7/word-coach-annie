@@ -1247,7 +1247,7 @@ server.tool(
 
 server.tool(
     "cross_reference_story_bible",
-    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says. Includes instructions for presenting mismatches and confirmation flow.",
+    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says.",
     {
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),
@@ -1543,7 +1543,6 @@ For each story bible vs prose mismatch, present both versions and ask which is t
 - **B) Flag scene** → use \`add_annotation\` to mark prose for revision
 - **C) Keep both** → intentional difference, no action needed
 
-IMPORTANT: Never silently overwrite. Always ask before making changes.
 Only report clear, specific contradictions with scene references. Do not report vague impressions.`,
         };
 
