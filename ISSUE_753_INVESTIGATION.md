@@ -29,10 +29,10 @@ gh workflow run ci.yml --ref main
 
 The Staging → Production Pipeline will auto-trigger on CI completion.
 
-## Validation Passed
+## Validation Results
 - Type check: ✅ No errors
 - Lint: ✅ 0 errors
 - Build: ✅ Success
-- (Tests skipped - no DB available in isolated environment)
+- Tests: ⚠️ Skipped (requires TEST_DATABASE_URL, not available in isolated environment)
 
 No code changes were required for this issue.
