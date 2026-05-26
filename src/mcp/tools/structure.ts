@@ -75,16 +75,72 @@ export async function deleteNode(nodeId: string) {
     return result;
 }
 
+type FlatParagraph = {
+    globalIndex: number;
+    blockIndex: number;
+    positionWithinBlock: number;
+    type: "CONTENT" | "BEAT";
+    content: string;
+};
+
+// [\s\S]*? instead of .*? so <p> elements with embedded newlines are matched in full.
+// Only use with match() — the /g flag makes lastIndex stateful, so exec() in a loop would fail across call sites.
+const P_TAG_RE = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
+
+function flattenBlocksToParagraphs(
+    blocks: { type: "CONTENT" | "BEAT"; content: string }[],
+): FlatParagraph[] {
+    const result: FlatParagraph[] = [];
+    let globalIndex = 0;
+    for (const [blockIndex, block] of blocks.entries()) {
+        if (block.type === "BEAT") {
+            result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "BEAT", content: block.content });
+        } else {
+            const matches = block.content.match(P_TAG_RE);
+            if (!matches?.length) {
+                result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "CONTENT", content: block.content });
+            } else {
+                for (const [i, content] of matches.entries()) {
+                    result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: i, type: "CONTENT", content });
+                }
+            }
+        }
+    }
+    return result;
+}
+
+/**
+ * Splits `blockContent` after the paragraph at the given 0-based position.
+ * Returns [left, right] where left includes paragraphs 0..afterNthParagraph
+ * and right contains the remainder. right is "" when splitting after the last paragraph.
+ *
+ * @param afterNthParagraph - 0-based index of the paragraph to split after
+ */
+function splitAtParagraph(blockContent: string, afterNthParagraph: number): [string, string] {
+    let count = 0;
+    const re = /<\/p>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(blockContent)) !== null) {
+        count++;
+        if (count === afterNthParagraph + 1) {
+            const splitPos = match.index + match[0].length;
+            return [blockContent.slice(0, splitPos), blockContent.slice(splitPos)];
+        }
+    }
+    return [blockContent, ""];
+}
+
 export async function readSceneContent(nodeId: string) {
     const raw = await mcpCache.getOrSet(
         `sceneContent:${nodeId}`,
         () => StructureController.readSceneContent(nodeId),
     );
-    const paragraphs = raw.blocks.map((block, index) => ({
-        index,
-        type: block.type,
-        content: block.content,
-        contentHash: computeContentHash(String(index), block.type, block.content),
+    const flat = flattenBlocksToParagraphs(raw.blocks);
+    const paragraphs = flat.map((entry) => ({
+        index: entry.globalIndex,
+        type: entry.type,
+        content: entry.content,
+        contentHash: computeContentHash(String(entry.globalIndex), entry.type, entry.content),
     }));
     return {
         ...raw,
@@ -105,15 +161,82 @@ export async function updateParagraph(
         verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
     }
     const blocks = current.blocks;
-    if (index < 0 || index >= blocks.length) {
-        throw new Error(`Paragraph index ${index} out of range (0–${blocks.length - 1})`);
+    const flat = flattenBlocksToParagraphs(blocks);
+    if (index < 0 || index >= flat.length) {
+        throw new Error(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
     }
-    const block = blocks[index];
+    const entry = flat[index];
     if (paragraphContentHash !== undefined) {
-        const expected = computeContentHash(String(index), block.type, block.content);
+        const expected = computeContentHash(String(index), entry.type, entry.content);
         verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
-    blocks[index] = { type: block.type, content };
+    if (entry.type === "BEAT") {
+        blocks[entry.blockIndex] = { type: "BEAT", content };
+    } else {
+        const blockContent = blocks[entry.blockIndex].content;
+        // Count how many <p> elements are in this block
+        const matches = blockContent.match(P_TAG_RE);
+        if (!matches || matches.length <= 1) {
+            blocks[entry.blockIndex] = { type: "CONTENT", content };
+        } else {
+            // Use positional splits to replace only the target paragraph, preserving
+            // any inter-<p> content (e.g. whitespace) that match().join("") would drop.
+            const pos = entry.positionWithinBlock;
+            const [before, rest] = pos === 0 ? ["", blockContent] : splitAtParagraph(blockContent, pos - 1);
+            const [, after] = splitAtParagraph(rest, 0);
+            blocks[entry.blockIndex] = { type: "CONTENT", content: before + content + after };
+        }
+    }
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function insertBeat(
+    nodeId: string,
+    afterParagraphIndex: number,
+    beatContent: string,
+    sceneContentHash?: string,
+) {
+    const current = await StructureController.readSceneContent(nodeId);
+    if (sceneContentHash !== undefined) {
+        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
+    }
+    const blocks = current.blocks;
+    const flat = flattenBlocksToParagraphs(blocks);
+    const totalParagraphs = flat.length;
+    // afterParagraphIndex of -1 means "insert at the very beginning"
+    if (afterParagraphIndex < -1 || afterParagraphIndex >= totalParagraphs) {
+        throw new Error(
+            `afterParagraphIndex ${afterParagraphIndex} out of range (-1–${totalParagraphs - 1})`
+        );
+    }
+    if (afterParagraphIndex === -1) {
+        blocks.splice(0, 0, { type: "BEAT", content: beatContent });
+    } else {
+        const entry = flat[afterParagraphIndex];
+        // Count how many <p> elements are in this block
+        const blockContent = blocks[entry.blockIndex].content;
+        const matches = blockContent.match(P_TAG_RE);
+        const isLastPInBlock = entry.type === "BEAT" || !matches || entry.positionWithinBlock === matches.length - 1;
+
+        if (isLastPInBlock) {
+            // Insert beat after this block (no split needed)
+            blocks.splice(entry.blockIndex + 1, 0, { type: "BEAT", content: beatContent });
+        } else {
+            // Split the CONTENT block at the paragraph boundary
+            const [left, right] = splitAtParagraph(blockContent, entry.positionWithinBlock);
+            const replacement: { type: "CONTENT" | "BEAT"; content: string }[] = [
+                { type: "CONTENT", content: left },
+                { type: "BEAT", content: beatContent },
+            ];
+            if (right.trim() !== "") {
+                replacement.push({ type: "CONTENT", content: right });
+            }
+            blocks.splice(entry.blockIndex, 1, ...replacement);
+        }
+    }
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();

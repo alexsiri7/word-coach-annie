@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useState, useMemo, use } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckSquare, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -72,8 +79,7 @@ function FilterRow({
 }
 
 export default function TasksPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const projectId = resolvedParams.id;
+  const { id: projectId } = use(params);
   const router = useRouter();
   const [tasks, setTasks] = useState<WritingTask[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
@@ -81,6 +87,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<WritingTask | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -112,15 +119,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     loadData();
   }, [projectId, filters]);
 
-  async function handleComplete(taskId: string) {
+  async function handleComplete(taskId: string): Promise<boolean> {
     setActionError(null);
     try {
       const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)));
+      return true;
     } catch (err) {
       console.error("[tasks/page] handleComplete failed", err);
       setActionError("Could not mark task as complete. Please try again.");
+      return false;
     }
   }
 
@@ -131,8 +140,16 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     }));
   }
 
+  function handleTaskClick(task: WritingTask) {
+    if (task.sceneId) {
+      router.push(`/project/${projectId}?scene=${task.sceneId}`);
+    } else {
+      setSelectedTask(task);
+    }
+  }
+
   const taskCount = tasks.length;
-  const completedCount = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
+  const completedCount = tasks.filter((t) => t.completed).length;
 
   return (
     <div className="flex flex-col h-screen bg-surface">
@@ -162,7 +179,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 md:px-16 lg:px-24 py-10 md:py-12">
           {loading ? (
             <div className="space-y-6 animate-pulse">
@@ -228,7 +245,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   <ListTodo className="h-12 w-12 opacity-20 mb-4" />
                   <p className="text-lg font-editorial italic">No tasks found</p>
                   <p className="text-sm mt-1 opacity-70">
-                    {Object.keys(filters).length > 0
+                    {Object.values(filters).some(v => v !== undefined)
                       ? "Try adjusting your filters"
                       : "Writing tasks created by Annie will appear here"}
                   </p>
@@ -238,14 +255,23 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   {tasks.map((task) => (
                     <div
                       key={task.id}
-                      className={`bg-surface border border-border rounded-lg p-4 transition-all ${
-                        task.completed ? "opacity-60" : "hover:border-accent/40"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleTaskClick(task)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleTaskClick(task);
+                        }
+                      }}
+                      className={`bg-surface border border-border rounded-lg p-4 transition-all cursor-pointer ${
+                        task.completed ? "opacity-60" : "hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent/50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         {!task.completed ? (
                           <button
-                            onClick={() => handleComplete(task.id)}
+                            onClick={(e) => { e.stopPropagation(); handleComplete(task.id); }}
                             className="mt-0.5 shrink-0 h-5 w-5 rounded border-2 border-border hover:border-accent transition-colors"
                             aria-label="Mark as complete"
                           />
@@ -283,10 +309,54 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                   ))}
                 </div>
               )}
+
+              <Dialog open={selectedTask !== null} onOpenChange={(open) => { if (!open) setSelectedTask(null); }}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className={selectedTask?.completed ? "line-through text-text-muted" : "text-text-primary"}>
+                      {selectedTask?.name}
+                    </DialogTitle>
+                    {selectedTask?.whatIsNeeded && (
+                      <DialogDescription className="text-text-secondary leading-relaxed">
+                        {selectedTask.whatIsNeeded}
+                      </DialogDescription>
+                    )}
+                  </DialogHeader>
+                  <div className="flex flex-wrap gap-1.5 pt-2">
+                    {selectedTask && (
+                      <>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ENERGY_COLORS[selectedTask.energy] ?? ""}`}>
+                          {selectedTask.energy}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${IMPORTANCE_COLORS[selectedTask.importance] ?? ""}`}>
+                          {selectedTask.importance}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${SIZE_COLORS[selectedTask.size] ?? ""}`}>
+                          {selectedTask.size}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {selectedTask && !selectedTask.completed && (
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const ok = await handleComplete(selectedTask.id);
+                          if (ok) setSelectedTask(null);
+                        }}
+                      >
+                        Mark as complete
+                      </Button>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

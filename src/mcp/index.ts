@@ -20,6 +20,7 @@ import {
     writeSceneContent,
     writeSceneContentFromBlocks,
     updateParagraph,
+    insertBeat,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -45,6 +46,7 @@ import {
     listWritingTasks,
     createWritingTask,
     completeWritingTask,
+    updateWritingTask,
 } from "./tools/writing-tasks";
 import {
     listRelationships,
@@ -397,6 +399,31 @@ server.tool(
     }
 );
 
+// Note: insert_beat bypasses the prose-writing guard because the payload is beat
+// text only — no CONTENT blocks are written, so the guard condition never fires.
+server.tool(
+    "insert_beat",
+    "Insert a new beat block after a specified paragraph index in a scene. Use this tool for structural waypoints (beats), not prose — it writes only a BEAT block, keeping Annie's structural-vs-prose separation intact.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        afterParagraphIndex: z
+            .number()
+            .int()
+            .describe(
+                "Scene-level paragraph index (from read_scene_content paragraphs array). Each <p> element and each BEAT block is one paragraph. Use -1 to insert before all paragraphs, 0 to insert after the first paragraph, etc. When the target falls inside a CONTENT block, the block is split automatically.",
+            ),
+        beatContent: z.string().describe("The beat text to insert (structural waypoint — not prose)"),
+        sceneContentHash: z
+            .string()
+            .optional()
+            .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
+    },
+    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) => {
+        const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
 server.tool(
     "get_scene_versions",
     "List the version history of a scene (timestamps and word counts)",
@@ -685,6 +712,30 @@ server.tool(
             logger.error("complete_writing_task: failed", e);
             const message = e instanceof Error ? e.message : String(e);
             return { content: [{ type: "text", text: `Error completing writing task: ${message}` }], isError: true };
+        }
+    }
+);
+
+server.tool(
+    "update_writing_task",
+    "Update fields on an existing writing task. All fields are optional — only provided fields are changed.",
+    {
+        taskId: z.string().describe("The writing task ID to update"),
+        name: z.string().min(1).optional().describe("New one-line task description"),
+        whatIsNeeded: z.string().optional().describe("Updated context — two sentences max"),
+        importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Updated importance"),
+        size: z.enum(["Small", "Medium", "Large"]).optional().describe("Updated size estimate"),
+        energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Updated energy type"),
+        completed: z.boolean().optional().describe("Mark task complete or incomplete"),
+    },
+    async (params) => {
+        try {
+            const result = await updateWritingTask(params);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_writing_task: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating writing task: ${message}` }], isError: true };
         }
     }
 );
@@ -1202,7 +1253,7 @@ server.tool(
 
 server.tool(
     "cross_reference_story_bible",
-    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says. Includes instructions for presenting mismatches and confirmation flow.",
+    "Cross-reference prose content against story object definitions. Returns all story objects (characters, locations, world elements, plotlines) with full details alongside scene text and relationship mappings. Use this to find attribute mismatches, behavioural inconsistencies, and timeline contradictions between what the story bible defines and what the prose actually says.",
     {
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),
@@ -1492,13 +1543,12 @@ Look for specific contradictions:
 3. **World/setting** — location descriptions that contradict each other
 4. **Plot logic** — cause-effect gaps, character motivations that don't hold
 
-**Step 3: Present findings with confirmation flow.**
-For each story bible vs prose mismatch, present both versions and ask which is the source of truth:
+**Step 3: Present findings.**
+For each story bible vs prose mismatch, present both versions and indicate which is the source of truth:
 - **A) Update story object** → use \`update_story_object\` to sync bible to prose
 - **B) Flag scene** → use \`add_annotation\` to mark prose for revision
 - **C) Keep both** → intentional difference, no action needed
 
-IMPORTANT: Never silently overwrite. Always ask before making changes.
 Only report clear, specific contradictions with scene references. Do not report vague impressions.`,
         };
 
@@ -1516,13 +1566,13 @@ Only report clear, specific contradictions with scene references. Do not report 
 
 // ─── Review Persona Prompts ─────────────────────────────────────────────────
 
-function manuscriptReviewPrompt(projectId: string, lensText: string) {
+function buildReviewPrompt(projectId: string, mode: string, lens: string) {
     return {
         messages: [{
             role: "user" as const,
             content: {
                 type: "text" as const,
-                text: `${ANNIE_HARD_RULE}Project ID: ${projectId}\n\n${lensText}`,
+                text: `${ANNIE_HARD_RULE}Project ID: ${projectId}\n\n## Review Mode: ${mode}\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\n${lens}\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`,
             },
         }],
     };
@@ -1532,21 +1582,33 @@ server.prompt(
     "review-editor",
     "Review manuscript as a seasoned acquisitions editor — commercial viability, hook strength, pacing, character arc payoff.",
     { projectId: z.string().describe("The project ID to review") },
-    async (args) => manuscriptReviewPrompt(args.projectId, `## Review Mode: Acquisitions Editor\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are a seasoned acquisitions editor evaluating this project for publication. Be direct, professional, and commercially minded.\n\nYour focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.\n\nTone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`)
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        "Acquisitions Editor",
+        `You are a seasoned acquisitions editor evaluating this project for publication. Be direct, professional, and commercially minded.\n\nYour focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.\n\nTone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.`,
+    )
 );
 
 server.prompt(
     "review-fan",
     "Review manuscript as an avid genre reader — visceral reader response, emotional reactions, genre expectations.",
     { projectId: z.string().describe("The project ID to review") },
-    async (args) => manuscriptReviewPrompt(args.projectId, `## Review Mode: Fan Reader\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are an avid fan of this genre who just finished reading this project. React like a real reader — enthusiastic, personal, opinionated.\n\nYour focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."\n\nTone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`)
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        "Fan Reader",
+        `You are an avid fan of this genre who just finished reading this project. React like a real reader — enthusiastic, personal, opinionated.\n\nYour focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."\n\nTone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.`,
+    )
 );
 
 server.prompt(
     "review-author",
     "Review manuscript as a published peer author — craft-level feedback on prose, POV, dialogue, scene construction.",
     { projectId: z.string().describe("The project ID to review") },
-    async (args) => manuscriptReviewPrompt(args.projectId, `## Review Mode: Peer Author\n\nUse the \`export_manuscript\` tool with this project ID to load the full manuscript text.\n\nThen apply this review lens:\n\nYou are a published author in the same genre, giving craft-level peer feedback.\n\nYour focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.\n\nTone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.\n\nAfter your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`)
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        "Peer Author",
+        `You are a published author in the same genre, giving craft-level peer feedback.\n\nYour focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.\n\nTone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.`,
+    )
 );
 
 // ─── Skills Tool ─────────────────────────────────────────────────────────────

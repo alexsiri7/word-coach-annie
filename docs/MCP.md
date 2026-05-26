@@ -20,6 +20,10 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
+### Claude Code CLI
+
+The repo ships `.claude/settings.json` which auto-registers the MCP server and pre-approves all non-destructive tools for Claude Code. Run `claude` from the project root — no manual configuration required.
+
 ### HTTP Transport (Web Clients)
 
 Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for details.
@@ -244,7 +248,21 @@ words (typos, punctuation, wording fixes) rather than replacing them with AI-gen
 | `content` | string | New content for this paragraph (must match existing type: CONTENT or BEAT) |
 | `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
 | `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
-| `intent` | (`"editorial"` \| `"creative"`)? | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
+| `intent` | `"editorial"` \| `"creative"` | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
+
+---
+
+#### `insert_beat`
+Insert a new beat block at a specific position in a scene. Because the payload contains
+only beat text (no CONTENT blocks), Annie's prose-writing guard never fires — prefer this
+tool over `write_scene_content` when adding structural waypoints without touching prose.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `nodeId` | string | The scene node ID |
+| `afterParagraphIndex` | number | Insert beat after this block index (0-based, from `read_scene_content` blocks array — includes both CONTENT and BEAT blocks). Use `-1` to prepend before all existing blocks. |
+| `beatContent` | string | The beat text to insert (structural waypoint — not prose) |
+| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content` for stale detection |
 
 ---
 
@@ -820,6 +838,23 @@ Mark a writing task as completed.
 | `taskId` | string | The task ID to mark complete |
 
 Returns the updated `WritingTask` with `completed: true`.
+
+---
+
+#### `update_writing_task`
+Update fields on an existing writing task. All fields except `taskId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `taskId` | string | The writing task ID to update |
+| `name` | string? | New one-line task description |
+| `whatIsNeeded` | string? | Updated context — two sentences max |
+| `importance` | `"Critical" \| "High" \| "Medium"`? | Updated priority level |
+| `size` | `"Small" \| "Medium" \| "Large"`? | Updated effort size |
+| `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Updated energy type |
+| `completed` | boolean? | Mark task complete (`true`) or incomplete (`false`) |
+
+Returns the updated `WritingTask` object.
 
 ---
 

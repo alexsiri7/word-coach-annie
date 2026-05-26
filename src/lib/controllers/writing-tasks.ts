@@ -38,27 +38,22 @@ export class WritingTaskController {
         });
         if (!project) throw new Error(`Project not found: ${projectId}`);
 
-        const where: Record<string, unknown> = { projectId };
+        const where: Prisma.WritingTaskWhereInput = { projectId };
         if (completed !== undefined) where.completed = completed;
         if (importance) where.importance = importance;
         if (size) where.size = size;
         if (energy) where.energy = energy;
 
-        const [tasks, total] = await Promise.all([
-            prisma.writingTask.findMany({
-                where,
-                include: {
-                    scene: { select: { id: true, title: true } },
-                },
-                orderBy: { createdAt: "desc" },
-            }),
-            prisma.writingTask.count({ where }),
-        ]);
+        const rawTasks = await prisma.writingTask.findMany({
+            where,
+            include: {
+                scene: { select: { id: true, title: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
 
-        return {
-            tasks: tasks.map(serializeTask),
-            total,
-        };
+        const tasks = rawTasks.map(serializeTask);
+        return { tasks, total: tasks.length };
     }
 
     static async createWritingTask(params: {
@@ -95,21 +90,7 @@ export class WritingTaskController {
     }
 
     static async completeWritingTask(taskId: string) {
-        const existing = await prisma.writingTask.findUnique({
-            where: { id: taskId },
-            select: { id: true },
-        });
-        if (!existing) throw new Error(`Writing task not found: ${taskId}`);
-
-        const task = await prisma.writingTask.update({
-            where: { id: taskId },
-            data: { completed: true },
-            include: {
-                scene: { select: { id: true, title: true } },
-            },
-        });
-
-        return serializeTask(task);
+        return WritingTaskController.updateWritingTask(taskId, { completed: true });
     }
 
     static async updateWritingTask(

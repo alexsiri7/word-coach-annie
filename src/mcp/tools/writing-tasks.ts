@@ -1,16 +1,6 @@
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
 import { mcpCache } from "@/lib/cache";
 
-function writingTasksKey(params: {
-    projectId: string;
-    completed?: boolean;
-    importance?: string;
-    size?: string;
-    energy?: string;
-}): string {
-    return `writingTasks:${params.projectId}:${params.completed ?? ""}:${params.importance ?? ""}:${params.size ?? ""}:${params.energy ?? ""}`;
-}
-
 export async function listWritingTasks(params: {
     projectId: string;
     completed?: boolean;
@@ -18,7 +8,8 @@ export async function listWritingTasks(params: {
     size?: string;
     energy?: string;
 }) {
-    return mcpCache.getOrSet(writingTasksKey(params), () => WritingTaskController.listWritingTasks(params));
+    const key = `writingTasks:${params.projectId}:${params.completed ?? ""}:${params.importance ?? ""}:${params.size ?? ""}:${params.energy ?? ""}`;
+    return mcpCache.getOrSet(key, () => WritingTaskController.listWritingTasks(params));
 }
 
 export async function createWritingTask(params: {
@@ -32,6 +23,25 @@ export async function createWritingTask(params: {
 }) {
     const result = await WritingTaskController.createWritingTask(params);
     mcpCache.invalidatePrefix(`writingTasks:${params.projectId}:`);
+    return result;
+}
+
+export async function updateWritingTask(params: {
+    taskId: string;
+    name?: string;
+    whatIsNeeded?: string;
+    importance?: string;
+    size?: string;
+    energy?: string;
+    completed?: boolean;
+}) {
+    const { taskId, ...data } = params;
+    if (Object.keys(data).length === 0) {
+        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+    }
+    const result = await WritingTaskController.updateWritingTask(taskId, data);
+    // broad invalidation: taskId doesn't carry projectId, so scoped invalidation is not possible without an extra DB lookup
+    mcpCache.invalidatePrefix("writingTasks:");
     return result;
 }
 
