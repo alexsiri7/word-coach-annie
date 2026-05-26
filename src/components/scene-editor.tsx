@@ -298,6 +298,19 @@ export function SceneEditor({
     setShowVersions(!showVersions);
   };
 
+  const addTask = useCallback(async (name: string) => {
+    const res = await fetch("/api/writing-tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId,
+        sceneId: node.id,
+        name,
+      }),
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+  }, [projectId, node.id]);
+
   const insertBeat = useCallback(() => {
     if (!editor) return;
     editor.chain().focus().insertContent({ type: "beatAnnotation", content: [] }).run();
@@ -414,6 +427,7 @@ export function SceneEditor({
         onReviewScene={onReviewScene}
         onPlanBeats={onPlanBeats}
         onCanonCheck={onCanonCheck}
+        onAddTask={addTask}
       />
 
       <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
