@@ -181,6 +181,36 @@ describe("cross_reference_story_bible has no human approval gate", () => {
     });
 });
 
+describe("StaleWriteError handler-level wrapping", () => {
+    const handlers = [
+        "update_project",
+        "update_node",
+        "write_scene_content",
+        "update_story_object",
+        "update_universe",
+        "update_world_object",
+        "update_timeline_entry",
+    ];
+
+    for (const handler of handlers) {
+        it(`${handler} catch block returns isError: true`, () => {
+            const start = mcpSource.indexOf(`"${handler}"`);
+            const section = mcpSource.slice(start, start + 2500);
+            expect(section).toContain("isError: true");
+            expect(section).toContain("logger.error");
+        });
+    }
+
+    it("write_scene_content throws missing-arg error inside try block (returns isError)", () => {
+        const start = mcpSource.indexOf('"write_scene_content"');
+        const section = mcpSource.slice(start, start + 2000);
+        const throwIdx = section.indexOf('throw new Error("Either');
+        const catchIdx = section.indexOf("} catch (e)");
+        expect(throwIdx).toBeGreaterThan(-1);
+        expect(catchIdx).toBeGreaterThan(throwIdx);
+    });
+});
+
 describe("review persona prompts", () => {
     it("buildReviewPrompt helper should include ANNIE_HARD_RULE and export_manuscript", () => {
         const helperStart = mcpSource.indexOf("function buildReviewPrompt");
