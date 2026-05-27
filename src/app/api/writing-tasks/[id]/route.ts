@@ -6,28 +6,33 @@ import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
+type TaskResolution =
+    | { ok: true; id: string }
+    | { ok: false; response: NextResponse };
+
+async function resolveTask(request: NextRequest, params: Promise<{ id: string }>): Promise<TaskResolution> {
+    const { id } = await params;
+    const existing = await prisma.writingTask.findUnique({
+        where: { id },
+        select: { id: true, projectId: true },
+    });
+    if (!existing) {
+        return { ok: false, response: NextResponse.json({ error: "Writing task not found" }, { status: 404 }) };
+    }
+    const userId = getCurrentUserId(request);
+    const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
+    if (!access.authorized) return { ok: false, response: access.response };
+    return { ok: true, id };
+}
+
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params;
-
-        const existing = await prisma.writingTask.findUnique({
-            where: { id },
-            select: { id: true, projectId: true },
-        });
-
-        if (!existing) {
-            return NextResponse.json(
-                { error: "Writing task not found" },
-                { status: 404 }
-            );
-        }
-
-        const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
-        if (!access.authorized) return access.response;
+        const resolved = await resolveTask(request, params);
+        if (!resolved.ok) return resolved.response;
+        const { id } = resolved;
 
         const body = await request.json().catch((err) => {
             logger.warn("PATCH /api/writing-tasks/[id]: invalid JSON body", err);
@@ -69,23 +74,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params;
-
-        const existing = await prisma.writingTask.findUnique({
-            where: { id },
-            select: { id: true, projectId: true },
-        });
-
-        if (!existing) {
-            return NextResponse.json(
-                { error: "Writing task not found" },
-                { status: 404 }
-            );
-        }
-
-        const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
-        if (!access.authorized) return access.response;
+        const resolved = await resolveTask(request, params);
+        if (!resolved.ok) return resolved.response;
+        const { id } = resolved;
 
         await WritingTaskController.deleteWritingTask(id);
 
