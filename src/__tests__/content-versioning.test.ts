@@ -88,14 +88,15 @@ describe("Content Versioning", () => {
   });
 
   it("prunes to at most 50 versions after writeSceneContent exceeds limit", async () => {
-    // Pre-populate 55 versions with distinct timestamps
+    // Pre-populate 55 versions with distinct past timestamps so that
+    // the version created by writeSceneContent (with DB-generated NOW()) is clearly newest.
     for (let i = 0; i < 55; i++) {
       await testPrisma.contentVersion.create({
         data: {
           nodeId: sceneId,
           content: `Version ${i}`,
           wordCount: 2,
-          createdAt: new Date(Date.now() + i),
+          createdAt: new Date(Date.now() - 10000 + i),
         },
       });
     }
@@ -114,14 +115,15 @@ describe("Content Versioning", () => {
   });
 
   it("does not prune when versions are at exactly the limit (50)", async () => {
-    // Pre-populate 49 versions with distinct timestamps
+    // Pre-populate 49 versions with distinct past timestamps so that
+    // the version created by writeSceneContent (with DB-generated NOW()) is clearly newest.
     for (let i = 0; i < 49; i++) {
       await testPrisma.contentVersion.create({
         data: {
           nodeId: sceneId,
           content: `Version ${i}`,
           wordCount: 2,
-          createdAt: new Date(Date.now() + i),
+          createdAt: new Date(Date.now() - 10000 + i),
         },
       });
     }

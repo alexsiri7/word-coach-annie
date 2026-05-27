@@ -4,8 +4,9 @@ import { exportManuscript } from "../mcp/tools/export";
 import { prisma } from "@/lib/db";
 
 // Mock prisma
-vi.mock("@/lib/db", () => ({
-    prisma: {
+vi.mock("@/lib/db", () => {
+    const mockPrisma = {
+        $transaction: vi.fn((fn: (tx: any) => unknown) => fn(mockPrisma)),
         structureNode: {
             findUnique: vi.fn(),
             findMany: vi.fn(),
@@ -20,8 +21,9 @@ vi.mock("@/lib/db", () => ({
             findUnique: vi.fn(),
             update: vi.fn(),
         },
-    },
-}));
+    };
+    return { prisma: mockPrisma };
+});
 
 describe("Scene Beats", () => {
     beforeEach(() => {
