@@ -218,8 +218,14 @@ server.tool(
         genre: z.string().optional().describe("New genre"),
     },
     async ({ projectId, contentHash, title, author, synopsis, genre }) => {
-        const result = await updateProject(projectId, { title, author, synopsis, genre }, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateProject(projectId, { title, author, synopsis, genre }, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_project: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating project: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -319,8 +325,14 @@ server.tool(
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
     async ({ nodeId, contentHash, ...data }) => {
-        const result = await updateNode(nodeId, data, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateNode(nodeId, data, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_node: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating node: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -364,15 +376,21 @@ server.tool(
         })).optional().describe("Structured content blocks")
     },
     async ({ nodeId, contentHash, content, blocks }) => {
-        if (blocks) {
-            const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            if (blocks) {
+                const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
+                return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+            }
+            if (content !== undefined) {
+                const result = await writeSceneContent(nodeId, content, contentHash);
+                return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+            }
+            throw new Error("Either 'content' or 'blocks' must be provided");
+        } catch (e) {
+            logger.error("write_scene_content: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error writing scene content: ${message}` }], isError: true };
         }
-        if (content !== undefined) {
-            const result = await writeSceneContent(nodeId, content, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        }
-        throw new Error("Either 'content' or 'blocks' must be provided");
     }
 );
 
@@ -584,8 +602,14 @@ server.tool(
         tags: z.string().optional().describe("New comma-separated tags"),
     },
     async ({ objectId, contentHash, ...data }) => {
-        const result = await updateStoryObject(objectId, data, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateStoryObject(objectId, data, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_story_object: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating story object: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -980,8 +1004,14 @@ server.tool(
         description: z.string().optional().describe("New description"),
     },
     async ({ universeId, contentHash, ...data }) => {
-        const result = await updateUniverse(universeId, data, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateUniverse(universeId, data, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_universe: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating universe: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -1053,8 +1083,14 @@ server.tool(
         type: z.string().optional().describe("New type"),
     },
     async ({ objectId, contentHash, ...data }) => {
-        const result = await updateWorldObject(objectId, data, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateWorldObject(objectId, data, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_world_object: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating world object: ${message}` }], isError: true };
+        }
     }
 );
 
@@ -1100,8 +1136,14 @@ server.tool(
         orderIndex: z.number().optional().describe("New order index"),
     },
     async ({ entryId, contentHash, ...data }) => {
-        const result = await updateTimelineEntry(entryId, data, contentHash);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        try {
+            const result = await updateTimelineEntry(entryId, data, contentHash);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("update_timeline_entry: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error updating timeline entry: ${message}` }], isError: true };
+        }
     }
 );
 
