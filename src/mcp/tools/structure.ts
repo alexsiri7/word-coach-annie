@@ -94,14 +94,32 @@ function flattenBlocksToParagraphs(
     let globalIndex = 0;
     for (const [blockIndex, block] of blocks.entries()) {
         if (block.type === "BEAT") {
-            result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "BEAT", content: block.content });
+            result.push({
+                globalIndex: globalIndex++,
+                blockIndex,
+                positionWithinBlock: 0,
+                type: "BEAT",
+                content: block.content,
+            });
         } else {
             const matches = block.content.match(P_TAG_RE);
             if (!matches?.length) {
-                result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: 0, type: "CONTENT", content: block.content });
+                result.push({
+                    globalIndex: globalIndex++,
+                    blockIndex,
+                    positionWithinBlock: 0,
+                    type: "CONTENT",
+                    content: block.content,
+                });
             } else {
                 for (const [i, content] of matches.entries()) {
-                    result.push({ globalIndex: globalIndex++, blockIndex, positionWithinBlock: i, type: "CONTENT", content });
+                    result.push({
+                        globalIndex: globalIndex++,
+                        blockIndex,
+                        positionWithinBlock: i,
+                        type: "CONTENT",
+                        content,
+                    });
                 }
             }
         }
