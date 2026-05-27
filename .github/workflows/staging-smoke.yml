@@ -57,7 +57,6 @@ jobs:
             -H "Content-Type: application/json" \
             --data-raw "{\"query\":\"mutation { variableUpsert(input: { projectId: \\\"$RAILWAY_PROJECT_ID\\\", environmentId: \\\"$RAILWAY_STAGING_ENVIRONMENT_ID\\\", serviceId: \\\"$RAILWAY_STAGING_SERVICE_ID\\\", name: \\\"API_TOKEN\\\", value: \\\"$API_TOKEN\\\" }) }\"}")
 
-          echo "Railway API response: $RESPONSE"
           ERRORS=$(echo "$RESPONSE" | jq -r '.errors // empty')
           if [ -n "$ERRORS" ] && [ "$ERRORS" != "null" ]; then
             echo "::error::Failed to set API_TOKEN on staging via Railway API: $ERRORS"
@@ -87,9 +86,11 @@ jobs:
           done
 
       - name: Verify API token authentication
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+            -H "Authorization: Bearer $API_TOKEN" \
             https://word-coach-annie-staging.up.railway.app/api/projects?limit=1) || STATUS="000"
           if [ "$STATUS" != "200" ]; then
             echo "::error::API token auth still failing after deploy (HTTP $STATUS)"
