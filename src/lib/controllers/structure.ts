@@ -424,29 +424,33 @@ export class StructureController {
         const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
-        const [version] = await Promise.all([
-            prisma.contentVersion.create({
-                data: { nodeId, content, wordCount },
-            }),
-            prisma.project.update({
-                where: { id: node.projectId },
-                data: { updatedAt: new Date() },
-            }),
-        ]);
+        const version = await prisma.$transaction(async (tx) => {
+            const [newVersion] = await Promise.all([
+                tx.contentVersion.create({
+                    data: { nodeId, content, wordCount },
+                }),
+                tx.project.update({
+                    where: { id: node.projectId },
+                    data: { updatedAt: new Date() },
+                }),
+            ]);
 
-        // Prune old versions (keep latest 50)
-        const allVersions = await prisma.contentVersion.findMany({
-            where: { nodeId },
-            orderBy: { createdAt: "desc" },
-            select: { id: true },
-        });
-
-        if (allVersions.length > 50) {
-            const idsToDelete = allVersions.slice(50).map((v: { id: string }) => v.id);
-            await prisma.contentVersion.deleteMany({
-                where: { id: { in: idsToDelete } },
+            // Prune old versions (keep latest 50)
+            const allVersions = await tx.contentVersion.findMany({
+                where: { nodeId },
+                orderBy: { createdAt: "desc" },
+                select: { id: true },
             });
-        }
+
+            if (allVersions.length > 50) {
+                const idsToDelete = allVersions.slice(50).map((v: { id: string }) => v.id);
+                await tx.contentVersion.deleteMany({
+                    where: { id: { in: idsToDelete } },
+                });
+            }
+
+            return newVersion;
+        });
 
         return {
             nodeId,

@@ -226,26 +226,20 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                 <FilterRow label="Size" options={SIZE_OPTIONS} activeValue={filters.size} colors={SIZE_COLORS} onToggle={(v) => toggleFilter("size", v)} />
                 <div className="flex flex-wrap gap-2 items-center">
                   <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Status</span>
-                  <button
-                    onClick={() => toggleFilter("completed", false)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                      filters.completed === false
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                        : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
-                    }`}
-                  >
-                    Open
-                  </button>
-                  <button
-                    onClick={() => toggleFilter("completed", true)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                      filters.completed === true
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                        : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
-                    }`}
-                  >
-                    Completed
-                  </button>
+                  {([
+                    { label: "Open", value: false, activeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+                    { label: "Completed", value: true, activeClass: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+                  ] as const).map(({ label, value, activeClass }) => (
+                    <button
+                      key={label}
+                      onClick={() => toggleFilter("completed", value)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        filters.completed === value ? activeClass : "bg-surface-overlay text-text-secondary hover:bg-surface-sunken"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
