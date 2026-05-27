@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { testPrisma } from "./setup";
+import { StructureController } from "../lib/controllers/structure";
 
 describe("Content Versioning", () => {
   let projectId: string;
@@ -98,12 +99,38 @@ describe("Content Versioning", () => {
         },
       });
     }
-    const { StructureController } = await import("../lib/controllers/structure");
     await StructureController.writeSceneContent(sceneId, "<p>new save</p>");
     const remaining = await testPrisma.contentVersion.findMany({
       where: { nodeId: sceneId },
     });
     expect(remaining.length).toBeLessThanOrEqual(50);
+    // Verify the newest version (the one just written) was retained
+    const latestVersions = await testPrisma.contentVersion.findMany({
+      where: { nodeId: sceneId },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+    expect(latestVersions[0].content).toBe("<p>new save</p>");
+  });
+
+  it("does not prune when versions are at exactly the limit (50)", async () => {
+    // Pre-populate 49 versions with distinct timestamps
+    for (let i = 0; i < 49; i++) {
+      await testPrisma.contentVersion.create({
+        data: {
+          nodeId: sceneId,
+          content: `Version ${i}`,
+          wordCount: 2,
+          createdAt: new Date(Date.now() + i),
+        },
+      });
+    }
+    await StructureController.writeSceneContent(sceneId, "<p>save</p>");
+    const remaining = await testPrisma.contentVersion.findMany({
+      where: { nodeId: sceneId },
+    });
+    // 49 pre-existing + 1 new = 50, exactly at the limit — no prune should occur
+    expect(remaining.length).toBe(50);
   });
 
   it("calculates word count correctly", () => {
