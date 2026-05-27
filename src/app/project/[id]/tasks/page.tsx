@@ -45,6 +45,16 @@ interface Filters {
   completed?: boolean;
 }
 
+function TaskBadges({ task }: { task: WritingTask }) {
+  return (
+    <>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ENERGY_COLORS[task.energy] ?? ""}`}>{task.energy}</span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${IMPORTANCE_COLORS[task.importance] ?? ""}`}>{task.importance}</span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${SIZE_COLORS[task.size] ?? ""}`}>{task.size}</span>
+    </>
+  );
+}
+
 function FilterRow({
   label,
   options,
@@ -288,15 +298,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                             </div>
                           )}
                           <div className="flex flex-wrap gap-1.5 mt-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ENERGY_COLORS[task.energy] ?? ""}`}>
-                              {task.energy}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${IMPORTANCE_COLORS[task.importance] ?? ""}`}>
-                              {task.importance}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${SIZE_COLORS[task.size] ?? ""}`}>
-                              {task.size}
-                            </span>
+                            <TaskBadges task={task} />
                             {task.scene && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-overlay text-text-secondary">
                                 {task.scene.title}
@@ -323,19 +325,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                     )}
                   </DialogHeader>
                   <div className="flex flex-wrap gap-1.5 pt-2">
-                    {selectedTask && (
-                      <>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ENERGY_COLORS[selectedTask.energy] ?? ""}`}>
-                          {selectedTask.energy}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${IMPORTANCE_COLORS[selectedTask.importance] ?? ""}`}>
-                          {selectedTask.importance}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${SIZE_COLORS[selectedTask.size] ?? ""}`}>
-                          {selectedTask.size}
-                        </span>
-                      </>
-                    )}
+                    {selectedTask && <TaskBadges task={selectedTask} />}
                   </div>
                   {selectedTask && !selectedTask.completed && (
                     <div className="pt-2">
