@@ -41,8 +41,8 @@ run_audit() {
     echo "=== Audit ==="
     ALLOWLIST=".audit-allowlist"
     # Capture audit JSON regardless of exit code (non-zero = vulns found)
-    AUDIT_JSON=$(npm audit --json --audit-level=high 2>/dev/null || true)
-    # Fail only on high/critical advisories NOT in the allowlist
+    AUDIT_JSON=$(npm audit --json --audit-level=moderate 2>/dev/null || true)
+    # Fail only on moderate/high/critical advisories NOT in the allowlist
     echo "$AUDIT_JSON" | node -e "
 const chunks = [];
 process.stdin.on('data', d => chunks.push(d));
@@ -55,14 +55,14 @@ process.stdin.on('end', () => {
   const audit = JSON.parse(chunks.join(''));
   const ids = Object.keys(audit.vulnerabilities || {})
     .flatMap(k => (audit.vulnerabilities[k].via || []))
-    .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical'))
+    .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical' || v.severity === 'moderate'))
     .map(v => v.url.split('/').pop());
   const novel = [...new Set(ids)].filter(id => !allow.includes(id));
   if (novel.length) {
-    console.error('New high/critical vulnerabilities not in allowlist: ' + novel.join(', '));
+    console.error('New moderate/high/critical vulnerabilities not in allowlist: ' + novel.join(', '));
     process.exit(1);
   }
-  console.log('No new high/critical vulnerabilities (allowlisted: ' + allow.length + ' known advisories).');
+  console.log('No new moderate/high/critical vulnerabilities (allowlisted: ' + allow.length + ' known advisories).');
 });
 "
 }
