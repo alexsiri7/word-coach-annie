@@ -40,31 +40,12 @@ run_build() {
 run_audit() {
     echo "=== Audit ==="
     ALLOWLIST=".audit-allowlist"
-    # Capture audit JSON regardless of exit code (non-zero = vulns found)
+    # --audit-level affects only npm's exit code, not the JSON output content.
+    # All vulnerabilities appear in the JSON regardless of this flag; the real
+    # enforcement is in audit-filter.mjs. Use || true so set -e doesn't abort
+    # before the filter can distinguish novel vs. allowlisted advisories.
     AUDIT_JSON=$(npm audit --json --audit-level=moderate 2>/dev/null || true)
-    # Fail only on moderate/high/critical advisories NOT in the allowlist
-    echo "$AUDIT_JSON" | node -e "
-const chunks = [];
-process.stdin.on('data', d => chunks.push(d));
-process.stdin.on('end', () => {
-  const fs = require('fs');
-  const allowlist = '${ALLOWLIST}';
-  const allow = fs.existsSync(allowlist)
-    ? fs.readFileSync(allowlist, 'utf8').split('\n').filter(l => l && !l.startsWith('#'))
-    : [];
-  const audit = JSON.parse(chunks.join(''));
-  const ids = Object.keys(audit.vulnerabilities || {})
-    .flatMap(k => (audit.vulnerabilities[k].via || []))
-    .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical' || v.severity === 'moderate'))
-    .map(v => v.url.split('/').pop());
-  const novel = [...new Set(ids)].filter(id => !allow.includes(id));
-  if (novel.length) {
-    console.error('New moderate/high/critical vulnerabilities not in allowlist: ' + novel.join(', '));
-    process.exit(1);
-  }
-  console.log('No new moderate/high/critical vulnerabilities (allowlisted: ' + allow.length + ' known advisories).');
-});
-"
+    echo "$AUDIT_JSON" | node scripts/audit-filter.mjs "$ALLOWLIST"
 }
 
 run_screenshots() {
