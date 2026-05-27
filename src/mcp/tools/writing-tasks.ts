@@ -40,13 +40,12 @@ export async function updateWritingTask(params: {
         throw new Error("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await WritingTaskController.updateWritingTask(taskId, data);
-    // broad invalidation: taskId doesn't carry projectId, so scoped invalidation is not possible without an extra DB lookup
-    mcpCache.invalidatePrefix("writingTasks:");
+    mcpCache.invalidatePrefix(`writingTasks:${result.projectId}:`);
     return result;
 }
 
 export async function completeWritingTask(taskId: string) {
     const result = await WritingTaskController.completeWritingTask(taskId);
-    mcpCache.invalidatePrefix("writingTasks:");
+    mcpCache.invalidatePrefix(`writingTasks:${result.projectId}:`);
     return result;
 }

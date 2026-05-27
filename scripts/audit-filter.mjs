@@ -14,7 +14,7 @@ import { readFileSync, existsSync } from 'fs';
 export function filterAuditVulnerabilities(audit, allow) {
   const ids = Object.keys(audit.vulnerabilities || {})
     .flatMap(k => (audit.vulnerabilities[k].via || []))
-    .filter(v => v && v.url && (v.severity === 'high' || v.severity === 'critical' || v.severity === 'moderate'))
+    .filter(v => v?.url && ['high', 'critical', 'moderate'].includes(v.severity))
     .map(v => v.url.split('/').pop());
   return [...new Set(ids)].filter(id => !allow.includes(id));
 }
