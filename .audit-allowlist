@@ -42,3 +42,38 @@ GHSA-492v-c6pp-mqqv
 GHSA-267c-6grr-h53f
 GHSA-36qx-fr4f-26g5
 GHSA-26hh-7cqf-hhc6
+#
+# Source: hono (via @modelcontextprotocol/sdk and prisma transitive chain)
+GHSA-92pp-h63x-v22m
+GHSA-458j-xx4x-4375
+GHSA-qp7p-654g-cw7p
+GHSA-p77w-8qqv-26rm
+GHSA-9vqf-7f2p-gf9v
+GHSA-69xw-7hcm-h432
+#
+# Source: protobufjs / @protobufjs/utf8 (via @google/genai transitive chain)
+GHSA-q6x5-8v7m-xcrf
+GHSA-2pr8-phx7-x9h3
+GHSA-fx83-v9x8-x52w
+GHSA-jggg-4jg4-v7c6
+#
+# Source: brace-expansion (via workbox-build and tooling transitive chain)
+GHSA-jxxr-4gwj-5jf2
+#
+# Source: fast-xml-parser (via @google-cloud/storage → @google/adk transitive chain)
+GHSA-gh4j-gqv2-49f6
+#
+# Source: ip-address (via socks → node-gyp → @google/adk transitive chain)
+GHSA-v2v4-37r5-5v8g
+#
+# Source: postcss (via next.js tooling transitive chain)
+GHSA-qx2v-qp2m-jg93
+#
+# Source: qs (via express → @google/adk transitive chain)
+GHSA-q8mj-m7cp-5q26
+#
+# Source: uuid (via gaxios → @google/adk transitive chain)
+GHSA-w5hq-g745-h8pq
+#
+# Source: ws (via @google/genai → @google/adk transitive chain)
+GHSA-58qx-3vcg-4xpx
