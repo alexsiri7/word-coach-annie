@@ -25,39 +25,28 @@ describe("Annie Hard Rule Enforcement", () => {
     });
 
     describe("write_scene_content allows CONTENT blocks (author in control)", () => {
+        const writeSceneSection = mcpSource.slice(
+            mcpSource.indexOf('"write_scene_content"'),
+            mcpSource.indexOf('"write_scene_content"') + 2000
+        );
+
         it("should NOT contain a hard guard that checks for CONTENT blocks", () => {
-            const writeSceneSection = mcpSource.slice(
-                mcpSource.indexOf('"write_scene_content"'),
-                mcpSource.indexOf('"write_scene_content"') + 2000
-            );
             expect(writeSceneSection).not.toContain('blocks.some(b => b.type === "CONTENT")');
         });
 
         it("should NOT return Annie's refusal message for CONTENT blocks", () => {
-            const writeSceneSection = mcpSource.slice(
-                mcpSource.indexOf('"write_scene_content"'),
-                mcpSource.indexOf('"write_scene_content"') + 2000
-            );
             expect(writeSceneSection).not.toContain("Oh no no no. That part is yours.");
         });
 
         it("should call writeSceneContentFromBlocks directly without a CONTENT guard", () => {
-            const writeSceneSection = mcpSource.slice(
-                mcpSource.indexOf('"write_scene_content"'),
-                mcpSource.indexOf('"write_scene_content"') + 2000
-            );
             expect(writeSceneSection).toContain("writeSceneContentFromBlocks");
             expect(writeSceneSection).not.toContain("if (hasContentBlock)");
         });
 
         it("should describe write_scene_content with BEAT-by-default, CONTENT-on-request semantics", () => {
-            const toolDescSection = mcpSource.slice(
-                mcpSource.indexOf('"write_scene_content"'),
-                mcpSource.indexOf('"write_scene_content"') + 500
-            );
-            expect(toolDescSection).toContain("BEAT blocks by default");
-            expect(toolDescSection).toContain("CONTENT blocks are permitted only when the author explicitly requests prose");
-            expect(toolDescSection).not.toContain("Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks");
+            expect(writeSceneSection).toContain("BEAT blocks by default");
+            expect(writeSceneSection).toContain("CONTENT blocks are permitted only when the author explicitly requests prose");
+            expect(writeSceneSection).not.toContain("Annie should ONLY use 'blocks' with type BEAT — never produce CONTENT blocks");
         });
     });
 });
@@ -66,31 +55,24 @@ describe("plan_beats prompt", () => {
     // Slice anchor: indexOf('"plan_beats"') finds the server.prompt("plan_beats", ...) declaration.
     // The string "plan_beats" only appears once in the file (as the prompt name), so this is safe.
     // Slice length of 3000 chars covers the full handler (~2000 chars); increase if handler grows.
+    const planBeatsSection = mcpSource.slice(
+        mcpSource.indexOf('"plan_beats"'),
+        mcpSource.indexOf('"plan_beats"') + 3000
+    );
+
     it("should register a plan_beats prompt", () => {
         expect(mcpSource).toContain('"plan_beats"');
     });
 
     it("should load the scene-drafting-assistant skill", () => {
-        const planBeatsSection = mcpSource.slice(
-            mcpSource.indexOf('"plan_beats"'),
-            mcpSource.indexOf('"plan_beats"') + 3000
-        );
         expect(planBeatsSection).toContain('loadSkill("scene-drafting-assistant")');
     });
 
     it("should prepend ANNIE_HARD_RULE in plan_beats prompt", () => {
-        const planBeatsSection = mcpSource.slice(
-            mcpSource.indexOf('"plan_beats"'),
-            mcpSource.indexOf('"plan_beats"') + 3000
-        );
         expect(planBeatsSection).toContain("ANNIE_HARD_RULE + contextHeader + skill.instructions");
     });
 
     it("should include scene status, chapter, and word count in context header", () => {
-        const planBeatsSection = mcpSource.slice(
-            mcpSource.indexOf('"plan_beats"'),
-            mcpSource.indexOf('"plan_beats"') + 3000
-        );
         expect(planBeatsSection).toContain("Status:");
         expect(planBeatsSection).toContain("Chapter:");
         expect(planBeatsSection).toContain("Word Count:");
