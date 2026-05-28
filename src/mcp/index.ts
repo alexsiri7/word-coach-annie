@@ -1727,7 +1727,7 @@ server.tool(
     "Return stored peer review results for a project, newest first. Use `run_peer_review` to generate a new one if none exist.",
     {
         projectId: z.string(),
-        limit: z.number().int().min(1).max(20).optional().default(5),
+        limit: z.number().int().min(1).max(20).optional().default(5).describe("Max reviews to return (1–20, default 5)"),
     },
     async ({ projectId, limit }) => {
         try {
