@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { runPeerReview } from "@/lib/ai/peer-review-service";
+import { runPeerReview, MANUSCRIPT_EMPTY, AI_NOT_CONFIGURED } from "@/lib/ai/peer-review-service";
 
 export type { ReviewFeedback, ConsensusFeedback } from "@/lib/ai/peer-review-service";
 
@@ -16,11 +16,11 @@ export async function POST(
   if (!access.authorized) return access.response;
 
   try {
-    const result = await runPeerReview(projectId);
+    const result = await runPeerReview(projectId, userId);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message === "Manuscript is empty" || message === "AI not configured") {
+    if (message === MANUSCRIPT_EMPTY || message === AI_NOT_CONFIGURED) {
       return NextResponse.json({ warning: message });
     }
     logger.error("POST /api/projects/[id]/peer-review error", error);

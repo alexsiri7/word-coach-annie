@@ -1727,7 +1727,7 @@ server.tool(
     "Return stored peer review records for a project, ordered newest-first. Each record includes all four result fields (publisher, reader, writer, consensus) as structured objects.",
     {
         projectId: z.string(),
-        limit: z.number().optional().describe("Max reviews to return (default 5)"),
+        limit: z.number().optional().describe("Max reviews to return (default 5, max 20)"),
     },
     async ({ projectId, limit = 5 }) => {
         try {

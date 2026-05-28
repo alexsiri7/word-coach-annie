@@ -109,15 +109,18 @@ function parseOrLog<T>(raw: string, role: string, fallback: T): T {
   return parsed ?? fallback;
 }
 
-export async function runPeerReview(projectId: string) {
+export const MANUSCRIPT_EMPTY = "Manuscript is empty";
+export const AI_NOT_CONFIGURED = "AI not configured";
+
+export async function runPeerReview(projectId: string, userId?: string | null) {
   const manuscript = await exportManuscript(projectId);
   if (!manuscript.trim()) {
-    throw new Error("Manuscript is empty");
+    throw new Error(MANUSCRIPT_EMPTY);
   }
 
-  const aiConfig = await getAiConfig();
+  const aiConfig = await getAiConfig(userId);
   if (!aiConfig.apiKey) {
-    throw new Error("AI not configured");
+    throw new Error(AI_NOT_CONFIGURED);
   }
 
   const truncated = manuscript.slice(0, 50000);
@@ -135,6 +138,7 @@ export async function runPeerReview(projectId: string) {
   const writer = parseOrLog(writerRaw, "writer", DEFAULT_REVIEW);
 
   let consensus: ConsensusFeedback = DEFAULT_CONSENSUS;
+  let consensusError: string | undefined;
   try {
     const synthesisRaw = await runSimpleCompletion({
       userMessage: buildSynthesisPrompt(publisherRaw, readerRaw, writerRaw),
@@ -145,8 +149,10 @@ export async function runPeerReview(projectId: string) {
     consensus = parseOrLog(synthesisRaw, "synthesis", DEFAULT_CONSENSUS);
   } catch (err) {
     logger.error("Peer review synthesis failed", err);
+    consensusError = err instanceof Error ? err.message : String(err);
   }
 
+  // DB failure intentionally propagates — the review results are not returned without persistence.
   const saved = await prisma.peerReview.create({
     data: {
       projectId,
@@ -166,5 +172,5 @@ export async function runPeerReview(projectId: string) {
     },
   });
 
-  return saved;
+  return { ...saved, ...(consensusError !== undefined && { consensusError }) };
 }
