@@ -10,6 +10,7 @@ import type { AiProviderConfig } from "@/lib/ai/settings";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { loadSkill } from "@/mcp/skills";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
+import { REVIEW_PERSONAS } from "@/lib/review-personas";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const MAX_ID_LENGTH = 100;
@@ -134,29 +135,13 @@ async function buildReviewSystemPrompt(projectId: string, conversationType: stri
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error("Project not found");
 
-  const personaInstructions: Record<string, string> = {
-    "review-editor": `You are a seasoned acquisitions editor evaluating "${project.title}" for publication. Be direct, professional, and commercially minded.
+  const persona = REVIEW_PERSONAS[conversationType];
+  if (!persona) {
+    logger.warn(`buildReviewSystemPrompt: unknown conversationType "${conversationType}", falling back to review-editor`);
+  }
+  const resolvedInstruction = (persona ?? REVIEW_PERSONAS["review-editor"]).lens(project.title);
 
-Your focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.
-
-Tone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.`,
-
-    "review-fan": `You are an avid fan of this genre who just finished reading "${project.title}". React like a real reader — enthusiastic, personal, opinionated.
-
-Your focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."
-
-Tone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.`,
-
-    "review-author": `You are a published author in the same genre as "${project.title}", giving craft-level peer feedback.
-
-Your focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.
-
-Tone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.`,
-  };
-
-  const instruction = personaInstructions[conversationType] ?? personaInstructions["review-editor"];
-
-  return `${instruction}
+  return `${resolvedInstruction}
 The writer has shared their full manuscript. Provide honest, constructive feedback.
 Do NOT rewrite sentences. Quote short excerpts when flagging specific passages.
 After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`;
