@@ -872,12 +872,14 @@ Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt
 ---
 
 #### `get_peer_reviews`
-Return stored peer review records for a project, ordered newest-first. Each record includes all four result fields (`publisher`, `reader`, `writer`, `consensus`) as structured objects.
+Return stored peer review results for a project, newest first. Use `run_peer_review` to generate a new one if none exist.
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `projectId` | string | ID of the project |
-| `limit` | number? | Max reviews to return (default 5, max 20) |
+| `limit` | integer? | Max reviews to return (1–20, default 5) |
+
+Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, and `consensus` fields.
 
 ---
 

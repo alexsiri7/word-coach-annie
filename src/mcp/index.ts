@@ -1724,17 +1724,18 @@ server.tool(
 
 server.tool(
     "get_peer_reviews",
-    "Return stored peer review records for a project, ordered newest-first. Each record includes all four result fields (publisher, reader, writer, consensus) as structured objects.",
+    "Return stored peer review results for a project, newest first. Use `run_peer_review` to generate a new one if none exist.",
     {
         projectId: z.string(),
-        limit: z.number().optional().describe("Max reviews to return (default 5, max 20)"),
+        limit: z.number().int().optional().default(5).describe("Max reviews to return (1–20, default 5, max 20)"),
     },
-    async ({ projectId, limit = 5 }) => {
+    async ({ projectId, limit }) => {
+        const clampedLimit = Math.min(Math.max(limit, 1), 20);
         try {
             const rows = await prisma.peerReview.findMany({
                 where: { projectId },
                 orderBy: { createdAt: "desc" },
-                take: Math.min(Math.max(limit, 1), 20),
+                take: clampedLimit,
             });
             return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
         } catch (e) {
