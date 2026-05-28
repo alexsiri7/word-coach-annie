@@ -8,6 +8,7 @@ import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
+import { REVIEW_PERSONAS } from "@/lib/review-personas";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -1632,8 +1633,8 @@ server.prompt(
     { projectId: z.string().describe("The project ID to review") },
     async (args) => buildReviewPrompt(
         args.projectId,
-        "Acquisitions Editor",
-        `You are a seasoned acquisitions editor evaluating this project for publication. Be direct, professional, and commercially minded.\n\nYour focus: narrative structure, pacing, opening hook, character arc payoff, thematic clarity, and publication readiness. Call out what would get flagged in a submission — a slow first act, an unsatisfying ending, unclear stakes. Be specific: quote short passages when you flag something.\n\nTone: A senior editor giving notes. Encouraging where warranted, blunt where necessary. "This works because..." and "This needs work because..." — no vague praise or vague criticism.`,
+        REVIEW_PERSONAS["review-editor"].mode,
+        REVIEW_PERSONAS["review-editor"].lens,
     )
 );
 
@@ -1643,8 +1644,8 @@ server.prompt(
     { projectId: z.string().describe("The project ID to review") },
     async (args) => buildReviewPrompt(
         args.projectId,
-        "Fan Reader",
-        `You are an avid fan of this genre who just finished reading this project. React like a real reader — enthusiastic, personal, opinionated.\n\nYour focus: did it hook you, did it hold you, did the ending satisfy? Did it deliver what the genre promises? What made you lean forward, what made you put it down? Talk about specific moments: "I loved when...", "I lost the thread at...", "I didn't buy the part where..."\n\nTone: Enthusiastic and honest, like a book club conversation. Not academic — visceral reader response. You're allowed to gush AND to be disappointed.`,
+        REVIEW_PERSONAS["review-fan"].mode,
+        REVIEW_PERSONAS["review-fan"].lens,
     )
 );
 
@@ -1654,8 +1655,8 @@ server.prompt(
     { projectId: z.string().describe("The project ID to review") },
     async (args) => buildReviewPrompt(
         args.projectId,
-        "Peer Author",
-        `You are a published author in the same genre, giving craft-level peer feedback.\n\nYour focus: prose sentence by sentence — is the rhythm working? POV discipline — any slips? Dialogue — does it sound like people or plot delivery? Scene construction — is each scene doing two things? Show-don't-tell — where is the writer explaining what they should be dramatizing? Inciting incident timing. Tension mechanics.\n\nTone: Technical and collegial. "The inciting incident lands two scenes late — here's why that matters." "This POV slip undercuts the tension you built." Treat the writer as a fellow craftsperson who can handle real notes.`,
+        REVIEW_PERSONAS["review-author"].mode,
+        REVIEW_PERSONAS["review-author"].lens,
     )
 );
 
@@ -1679,6 +1680,17 @@ server.tool(
     {},
     async () => {
         return { content: [{ type: "text", text: CLAUDE_COLLABORATION_INSTRUCTIONS }] };
+    }
+);
+
+// ─── Peer Review Prompts Tool ────────────────────────────────────────────────
+
+server.tool(
+    "get_peer_review_prompts",
+    "Return the prompt/lens text used by each of the three peer review agents (editor, fan, author). Useful for understanding what angle each reviewer takes.",
+    {},
+    async () => {
+        return { content: [{ type: "text", text: JSON.stringify(REVIEW_PERSONAS, null, 2) }] };
     }
 );
 
