@@ -172,30 +172,42 @@ export default function Dashboard() {
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
-    const res = await offlineFetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newTitle,
-        author: newAuthor,
-        synopsis: newSynopsis,
-        genre: newGenre,
-        projectType: newProjectType,
-      }),
-    });
-    if (res.ok) {
-      const project = await res.json();
-      setCreateOpen(false);
-      setCreateError(null);
-      setNewTitle("");
-      setNewAuthor("");
-      setNewSynopsis("");
-      setNewGenre("");
-      setNewProjectType("FICTION");
-      router.push(`/project/${project.id}`);
-    } else if (res.status === 403) {
-      const data = await res.json();
-      setCreateError(data.error ?? "Project limit reached.");
+    try {
+      const res = await offlineFetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTitle,
+          author: newAuthor,
+          synopsis: newSynopsis,
+          genre: newGenre,
+          projectType: newProjectType,
+        }),
+      });
+      if (res.ok) {
+        const project = await res.json();
+        setCreateOpen(false);
+        setCreateError(null);
+        setNewTitle("");
+        setNewAuthor("");
+        setNewSynopsis("");
+        setNewGenre("");
+        setNewProjectType("FICTION");
+        router.push(`/project/${project.id}`);
+      } else if (res.status === 403) {
+        const data = await res.json();
+        setCreateError(data.error ?? "Project limit reached.");
+      } else {
+        let msg = "Failed to create project. Please try again.";
+        try {
+          const data = await res.json();
+          if (data?.error) msg = data.error;
+        } catch { /* ignore parse error */ }
+        setCreateError(msg);
+      }
+    } catch (err) {
+      console.error("[handleCreate] network error", err);
+      setCreateError("A network error occurred. Please check your connection and try again.");
     }
   };
 
@@ -768,7 +780,7 @@ export default function Dashboard() {
             <p className="text-sm text-destructive">{createError}</p>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateError(null); }}>
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={!newTitle.trim()}>

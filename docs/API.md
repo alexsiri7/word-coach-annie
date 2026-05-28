@@ -97,7 +97,9 @@ Create a new project.
 
 **Response**: Project object (201)
 
-**Errors**: `401` unauthenticated (Google OAuth mode only)
+**Errors**:
+- `401` unauthenticated (Google OAuth mode only)
+- `403` active project limit reached — `{ "error": "You've reached your N active project limit. Archive a project to create a new one." }`. Default limit is **3** (stored as `maxActiveProjects` on `UserAiSettings`; can be raised via direct DB edit). Archived projects do not count.
 
 ---
 

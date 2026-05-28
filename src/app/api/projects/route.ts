@@ -110,12 +110,13 @@ export async function POST(request: NextRequest) {
 
     const { title, author, synopsis, genre, projectType } = parsed.data;
 
+    // Only enforce active project limit for authenticated users; skip in API_TOKEN/dev mode
     if (userId) {
       const [activeCount, settings] = await Promise.all([
         prisma.project.count({ where: { userId, archivedAt: null } }),
         prisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } }),
       ]);
-      const limit = settings?.maxActiveProjects ?? 3;
+      const limit = settings?.maxActiveProjects ?? 3; // matches schema @default(3)
       if (activeCount >= limit) {
         return NextResponse.json(
           { error: `You've reached your ${limit} active project limit. Archive a project to create a new one.` },

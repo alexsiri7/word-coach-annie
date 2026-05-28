@@ -707,6 +707,9 @@ describe("API: Search", () => {
     });
 });
 
+// NOTE: These tests validate the Prisma query logic that backs the limit check
+// (count, settings lookup, archivedAt filter). They do not exercise the HTTP
+// route or verify the 403 response. Route-level coverage is in projects-limit-route.test.ts.
 describe("API: Projects - active project limit", () => {
     it("allows creation when below the active project limit", async () => {
         const user = await testPrisma.user.create({ data: { email: "limit1@test.com", googleId: "g-limit-1" } });
