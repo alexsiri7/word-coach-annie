@@ -9,6 +9,8 @@ import { logger } from "@/lib/logger";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
+import { prisma } from "@/lib/db";
+import { runPeerReview } from "@/lib/ai/peer-review-service";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -1697,6 +1699,49 @@ server.tool(
             ])
         );
         return { content: [{ type: "text", text: JSON.stringify(display, null, 2) }] };
+    }
+);
+
+// ─── Run Peer Review Tool ────────────────────────────────────────────────────
+
+server.tool(
+    "run_peer_review",
+    "Trigger a full peer review of the project — runs three agents (editor, fan reader, peer author) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
+    { projectId: z.string() },
+    async ({ projectId }) => {
+        try {
+            const result = await runPeerReview(projectId);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (e) {
+            logger.error("run_peer_review: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error running peer review: ${message}` }], isError: true };
+        }
+    }
+);
+
+// ─── Get Peer Reviews Tool ────────────────────────────────────────────────────
+
+server.tool(
+    "get_peer_reviews",
+    "Return stored peer review records for a project, ordered newest-first. Each record includes all four result fields (publisher, reader, writer, consensus) as structured objects.",
+    {
+        projectId: z.string(),
+        limit: z.number().optional().describe("Max reviews to return (default 5, max 20)"),
+    },
+    async ({ projectId, limit = 5 }) => {
+        try {
+            const rows = await prisma.peerReview.findMany({
+                where: { projectId },
+                orderBy: { createdAt: "desc" },
+                take: Math.min(Math.max(limit, 1), 20),
+            });
+            return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
+        } catch (e) {
+            logger.error("get_peer_reviews: failed", e);
+            const message = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: "text", text: `Error fetching peer reviews: ${message}` }], isError: true };
+        }
     }
 );
 

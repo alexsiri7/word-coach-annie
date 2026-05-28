@@ -92,7 +92,12 @@ describe("POST /api/projects/:id/peer-review", () => {
     );
     vi.mocked(prisma.peerReview.create).mockResolvedValue({
       id: "rev-default",
+      projectId: "proj-1",
       createdAt: new Date("2026-05-01T00:00:00Z"),
+      publisher: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "publish" },
+      reader: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "loved it" },
+      writer: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "strong" },
+      consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
     } as never);
   });
 
@@ -129,8 +134,9 @@ describe("POST /api/projects/:id/peer-review", () => {
         );
       const res = await POST(makeRequest(), makeParams());
       expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.publisher.overallImpression).toBe("Good");
+      // Verify parsed data was correctly stored — route returns DB result, so check create args
+      const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+      expect((createArg.data.publisher as { overallImpression?: string })?.overallImpression).toBe("Good");
     });
 
     it("falls back to DEFAULT_REVIEW when AI returns invalid JSON", async () => {
@@ -165,9 +171,10 @@ describe("POST /api/projects/:id/peer-review", () => {
 
       const res = await POST(makeRequest(), makeParams());
       expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.publisher.overallImpression).toBe("Unable to parse review");
-      expect(body.reader.overallImpression).toBe("OK");
+      // Verify the parsed fallback was passed to the DB — route returns DB result so check create args
+      const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+      expect((createArg.data.publisher as { overallImpression?: string })?.overallImpression).toBe("Unable to parse review");
+      expect((createArg.data.reader as { overallImpression?: string })?.overallImpression).toBe("OK");
       expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
         expect.stringContaining("publisher"),
         expect.objectContaining({ raw: expect.any(String) })
@@ -215,6 +222,15 @@ describe("POST /api/projects/:id/peer-review", () => {
           synthesizedRecommendation: "Publish with minor revisions",
         })
       );
+    vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
+      id: "rev-1",
+      projectId: "proj-1",
+      createdAt: new Date("2026-05-01T00:00:00Z"),
+      publisher: { overallImpression: "Excellent", strengths: ["voice"], weaknesses: [], detailedFeedback: "Details", recommendation: "publish" },
+      reader: { overallImpression: "Loved it", strengths: ["pacing"], weaknesses: [], detailedFeedback: "Details", recommendation: "loved it" },
+      writer: { overallImpression: "Strong craft", strengths: ["dialogue"], weaknesses: [], detailedFeedback: "Details", recommendation: "strong" },
+      consensus: { pointsOfAgreement: ["well written"], pointsOfDisagreement: [], topPriorities: ["tighten pacing"], synthesizedRecommendation: "Publish with minor revisions" },
+    } as never);
 
     const res = await POST(makeRequest(), makeParams());
     expect(res.status).toBe(200);
@@ -260,13 +276,22 @@ describe("POST /api/projects/:id/peer-review", () => {
 
   // ─── DEFAULT fallback wiring ───────────────────────────────────────────────
 
-  it("uses DEFAULT_CONSENSUS when synthesis throws", async () => {
+  it("uses DEFAULT_CONSENSUS when synthesis throws and sets consensusError", async () => {
     // 3 reviewer calls succeed, synthesis rejects
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
       .mockRejectedValueOnce(new Error("synthesis timeout"));
+    vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
+      id: "rev-fallback",
+      projectId: "proj-1",
+      createdAt: new Date("2026-05-01T00:00:00Z"),
+      publisher: { overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" },
+      reader: { overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" },
+      writer: { overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" },
+      consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Unable to synthesize consensus" },
+    } as never);
 
     const res = await POST(makeRequest(), makeParams());
     expect(res.status).toBe(200);
@@ -275,6 +300,8 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(body.publisher.overallImpression).toBe("A");
     // Synthesis fell back to DEFAULT_CONSENSUS
     expect(body.consensus.synthesizedRecommendation).toBe("Unable to synthesize consensus");
+    // consensusError signals the caller that synthesis failed
+    expect(body.consensusError).toBe("synthesis timeout");
     expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
       "Peer review synthesis failed",
       expect.any(Error)
@@ -287,7 +314,12 @@ describe("POST /api/projects/:id/peer-review", () => {
     const createdAt = new Date("2026-05-01T12:00:00Z");
     vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
       id: "rev-1",
+      projectId: "proj-7",
       createdAt,
+      publisher: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" },
+      reader: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" },
+      writer: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" },
+      consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
     } as never);
 
     const res = await POST(makeRequest("proj-7"), makeParams("proj-7"));
@@ -304,18 +336,16 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(callArg.data.consensus).toBeDefined();
   });
 
-  it("does not 500 when persistence fails", async () => {
+  it("returns 500 when persistence fails", async () => {
     vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
 
     const res = await POST(makeRequest(), makeParams());
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.publisher).toBeDefined();
-    expect(body.id).toBeNull();
-    expect(body.createdAt).toBeNull();
+    expect(body.error).toMatch(/internal server error/i);
     expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
-      "Failed to persist peer review",
-      expect.objectContaining({ projectId: "proj-1" })
+      "POST /api/projects/[id]/peer-review error",
+      expect.any(Error)
     );
   });
 });

@@ -216,3 +216,34 @@ describe("review persona prompts", () => {
         });
     }
 });
+
+describe("run_peer_review and get_peer_reviews tools", () => {
+    const runSection = mcpSource.slice(
+        mcpSource.indexOf('"run_peer_review"'),
+        mcpSource.indexOf('"run_peer_review"') + 1000
+    );
+    const getSection = mcpSource.slice(
+        mcpSource.indexOf('"get_peer_reviews"'),
+        mcpSource.indexOf('"get_peer_reviews"') + 1000
+    );
+
+    it("run_peer_review returns isError: true on failure", () => {
+        expect(runSection).toContain("isError: true");
+    });
+
+    it("run_peer_review logs errors via logger.error", () => {
+        expect(runSection).toContain("logger.error");
+    });
+
+    it("get_peer_reviews clamps limit with Math.min(Math.max(...))", () => {
+        expect(getSection).toContain("Math.min(Math.max(limit");
+    });
+
+    it("get_peer_reviews returns isError: true on failure", () => {
+        expect(getSection).toContain("isError: true");
+    });
+
+    it("get_peer_reviews limit description mentions max 20", () => {
+        expect(getSection).toContain("max 20");
+    });
+});

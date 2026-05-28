@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **71 tools** and **16 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **73 tools** and **16 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -858,12 +858,26 @@ Returns the updated `WritingTask` object.
 
 ---
 
-### Skills
+### Peer Review
 
-#### `list_skills`
-List all available writing skills (structured instruction sets). Use `get_prompt` to invoke a skill.
+#### `run_peer_review`
+Trigger a full peer review of a project. Runs three AI agents in parallel — an acquisitions editor, an enthusiastic reader, and a published novelist — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
 
-No parameters.
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | ID of the project to review |
+
+Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, and `consensus` fields. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
+
+---
+
+#### `get_peer_reviews`
+Return stored peer review records for a project, ordered newest-first. Each record includes all four result fields (`publisher`, `reader`, `writer`, `consensus`) as structured objects.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | ID of the project |
+| `limit` | number? | Max reviews to return (default 5, max 20) |
 
 ---
 
@@ -875,6 +889,15 @@ No parameters.
 Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`) to its `mode` and `lens` fields.
 
 **See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author) prompts.
+
+---
+
+### Skills
+
+#### `list_skills`
+List all available writing skills (structured instruction sets). Use `get_prompt` to invoke a skill.
+
+No parameters.
 
 ---
 
