@@ -135,15 +135,11 @@ async function buildReviewSystemPrompt(projectId: string, conversationType: stri
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error("Project not found");
 
-  const personaInstructions: Record<string, string> = Object.fromEntries(
-    Object.entries(REVIEW_PERSONAS).map(([id, { lens }]) => [id, lens(project.title)])
-  );
-
-  const instruction = personaInstructions[conversationType];
-  if (!instruction) {
+  const persona = REVIEW_PERSONAS[conversationType];
+  if (!persona) {
     logger.warn(`buildReviewSystemPrompt: unknown conversationType "${conversationType}", falling back to review-editor`);
   }
-  const resolvedInstruction = instruction ?? personaInstructions["review-editor"];
+  const resolvedInstruction = (persona ?? REVIEW_PERSONAS["review-editor"]).lens(project.title);
 
   return `${resolvedInstruction}
 The writer has shared their full manuscript. Provide honest, constructive feedback.
