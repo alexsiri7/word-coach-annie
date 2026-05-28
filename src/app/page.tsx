@@ -107,6 +107,7 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
   const [deleteExported, setDeleteExported] = useState(false);
@@ -185,12 +186,16 @@ export default function Dashboard() {
     if (res.ok) {
       const project = await res.json();
       setCreateOpen(false);
+      setCreateError(null);
       setNewTitle("");
       setNewAuthor("");
       setNewSynopsis("");
       setNewGenre("");
       setNewProjectType("FICTION");
       router.push(`/project/${project.id}`);
+    } else if (res.status === 403) {
+      const data = await res.json();
+      setCreateError(data.error ?? "Project limit reached.");
     }
   };
 
@@ -703,7 +708,7 @@ export default function Dashboard() {
       </button>
 
       {/* ── Create Project Dialog ──────────────────────────── */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setCreateError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Project</DialogTitle>
@@ -759,6 +764,9 @@ export default function Dashboard() {
               />
             </div>
           </div>
+          {createError && (
+            <p className="text-sm text-destructive">{createError}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel

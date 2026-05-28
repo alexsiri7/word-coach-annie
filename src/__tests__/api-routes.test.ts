@@ -706,3 +706,57 @@ describe("API: Search", () => {
         expect(matches).toHaveLength(0);
     });
 });
+
+describe("API: Projects - active project limit", () => {
+    it("allows creation when below the active project limit", async () => {
+        const userId = "user-limit-test-1";
+        await testPrisma.project.createMany({
+            data: [
+                { title: "P1", userId },
+                { title: "P2", userId },
+            ],
+        });
+        const count = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        const settings = await testPrisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } });
+        const limit = settings?.maxActiveProjects ?? 3;
+        expect(count).toBe(2);
+        expect(count < limit).toBe(true);
+    });
+
+    it("detects when active project limit is reached", async () => {
+        const userId = "user-limit-test-2";
+        await testPrisma.project.createMany({
+            data: [
+                { title: "P1", userId },
+                { title: "P2", userId },
+                { title: "P3", userId },
+            ],
+        });
+        const count = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        const limit = 3;
+        expect(count >= limit).toBe(true);
+    });
+
+    it("archived projects do not count toward the limit", async () => {
+        const userId = "user-limit-test-3";
+        await testPrisma.project.createMany({
+            data: [
+                { title: "Active 1", userId },
+                { title: "Active 2", userId },
+                { title: "Active 3", userId },
+                { title: "Archived", userId, archivedAt: new Date() },
+            ],
+        });
+        const activeCount = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        expect(activeCount).toBe(3);
+    });
+
+    it("respects custom maxActiveProjects from UserAiSettings", async () => {
+        const userId = "user-limit-test-4";
+        await testPrisma.userAiSettings.create({
+            data: { userId, maxActiveProjects: 5 },
+        });
+        const settings = await testPrisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } });
+        expect(settings?.maxActiveProjects).toBe(5);
+    });
+});

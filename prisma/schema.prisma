@@ -275,6 +275,7 @@ model UserAiSettings {
   chatWindowSize           Int      @default(5)
   messagesUntilCompression Int      @default(15)
   compressionModel         String   @default("")
+  maxActiveProjects        Int      @default(3)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
   user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
