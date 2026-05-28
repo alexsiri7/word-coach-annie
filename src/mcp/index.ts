@@ -1634,7 +1634,7 @@ server.prompt(
     async (args) => buildReviewPrompt(
         args.projectId,
         REVIEW_PERSONAS["review-editor"].mode,
-        REVIEW_PERSONAS["review-editor"].lens,
+        REVIEW_PERSONAS["review-editor"].lens("your project"),
     )
 );
 
@@ -1645,7 +1645,7 @@ server.prompt(
     async (args) => buildReviewPrompt(
         args.projectId,
         REVIEW_PERSONAS["review-fan"].mode,
-        REVIEW_PERSONAS["review-fan"].lens,
+        REVIEW_PERSONAS["review-fan"].lens("your project"),
     )
 );
 
@@ -1656,7 +1656,7 @@ server.prompt(
     async (args) => buildReviewPrompt(
         args.projectId,
         REVIEW_PERSONAS["review-author"].mode,
-        REVIEW_PERSONAS["review-author"].lens,
+        REVIEW_PERSONAS["review-author"].lens("your project"),
     )
 );
 
@@ -1690,7 +1690,13 @@ server.tool(
     "Return the prompt/lens text used by each of the three peer review agents (editor, fan, author). Useful for understanding what angle each reviewer takes.",
     {},
     async () => {
-        return { content: [{ type: "text", text: JSON.stringify(REVIEW_PERSONAS, null, 2) }] };
+        const display = Object.fromEntries(
+            Object.entries(REVIEW_PERSONAS).map(([id, { mode, lens }]) => [
+                id,
+                { mode, lens: lens("your project") },
+            ])
+        );
+        return { content: [{ type: "text", text: JSON.stringify(display, null, 2) }] };
     }
 );
 

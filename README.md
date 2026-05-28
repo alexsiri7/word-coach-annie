@@ -27,7 +27,7 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 
 ### AI Integration
 - **AI chat panel**: Per-project streaming chat with full story context (characters, outline, current scene)
-- **MCP server**: 71 tools for agentic access to all project data (read/write scenes, manage characters, export, etc.)
+- **MCP server**: 72 tools for agentic access to all project data (read/write scenes, manage characters, export, etc.)
 - **Writing skills**: 6 curated MCP Prompts — developmental edit, line edit, consistency check, plot structure analysis, character arc review, scene drafting assistant
 
 ### Article / Non-Fiction
@@ -81,7 +81,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## MCP Server (for AI Agents)
 
-Annie includes a Model Context Protocol server with 71 tools for full read/write access to project data.
+Annie includes a Model Context Protocol server with 72 tools for full read/write access to project data.
 
 ### Claude Desktop Configuration
 
@@ -183,7 +183,7 @@ src/
 │   ├── export/             # Google Docs exporter
 │   └── db.ts               # Prisma client singleton
 ├── mcp/
-│   ├── index.ts            # MCP server (71 tools)
+│   ├── index.ts            # MCP server (72 tools)
 │   ├── tools/              # Tool implementations by category
 │   └── skills.ts           # Skill loader
 └── __tests__/              # 12 test files, 69+ tests

@@ -136,15 +136,16 @@ async function buildReviewSystemPrompt(projectId: string, conversationType: stri
   if (!project) throw new Error("Project not found");
 
   const personaInstructions: Record<string, string> = Object.fromEntries(
-    Object.entries(REVIEW_PERSONAS).map(([id, { lens }]) => [
-      id,
-      lens,
-    ])
+    Object.entries(REVIEW_PERSONAS).map(([id, { lens }]) => [id, lens(project.title)])
   );
 
-  const instruction = personaInstructions[conversationType] ?? personaInstructions["review-editor"];
+  const instruction = personaInstructions[conversationType];
+  if (!instruction) {
+    logger.warn(`buildReviewSystemPrompt: unknown conversationType "${conversationType}", falling back to review-editor`);
+  }
+  const resolvedInstruction = instruction ?? personaInstructions["review-editor"];
 
-  return `${instruction}
+  return `${resolvedInstruction}
 The writer has shared their full manuscript. Provide honest, constructive feedback.
 Do NOT rewrite sentences. Quote short excerpts when flagging specific passages.
 After your initial review, stay in conversation — answer follow-up questions and go deeper on any area the writer wants to explore.`;

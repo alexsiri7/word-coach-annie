@@ -867,6 +867,17 @@ No parameters.
 
 ---
 
+#### `get_peer_review_prompts`
+Return the prompt/lens text used by each of the three peer review agents. Useful for understanding what perspective each reviewer takes before invoking a review prompt.
+
+No parameters.
+
+Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`) to its `mode` and `lens` fields.
+
+**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author) prompts.
+
+---
+
 ## Prompts
 
 MCP Prompts are invokable via `get_prompt` and return a pre-built message ready for the AI.
