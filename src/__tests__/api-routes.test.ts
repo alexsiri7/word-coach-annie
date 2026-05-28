@@ -709,7 +709,8 @@ describe("API: Search", () => {
 
 describe("API: Projects - active project limit", () => {
     it("allows creation when below the active project limit", async () => {
-        const userId = "user-limit-test-1";
+        const user = await testPrisma.user.create({ data: { email: "limit1@test.com", googleId: "g-limit-1" } });
+        const userId = user.id;
         await testPrisma.project.createMany({
             data: [
                 { title: "P1", userId },
@@ -724,7 +725,8 @@ describe("API: Projects - active project limit", () => {
     });
 
     it("detects when active project limit is reached", async () => {
-        const userId = "user-limit-test-2";
+        const user = await testPrisma.user.create({ data: { email: "limit2@test.com", googleId: "g-limit-2" } });
+        const userId = user.id;
         await testPrisma.project.createMany({
             data: [
                 { title: "P1", userId },
@@ -738,7 +740,8 @@ describe("API: Projects - active project limit", () => {
     });
 
     it("archived projects do not count toward the limit", async () => {
-        const userId = "user-limit-test-3";
+        const user = await testPrisma.user.create({ data: { email: "limit3@test.com", googleId: "g-limit-3" } });
+        const userId = user.id;
         await testPrisma.project.createMany({
             data: [
                 { title: "Active 1", userId },
@@ -752,7 +755,8 @@ describe("API: Projects - active project limit", () => {
     });
 
     it("respects custom maxActiveProjects from UserAiSettings", async () => {
-        const userId = "user-limit-test-4";
+        const user = await testPrisma.user.create({ data: { email: "limit4@test.com", googleId: "g-limit-4" } });
+        const userId = user.id;
         await testPrisma.userAiSettings.create({
             data: { userId, maxActiveProjects: 5 },
         });
