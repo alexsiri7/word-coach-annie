@@ -106,7 +106,7 @@ Universe (1) ─────────────────┬─── (N)
 Relationship ─── links any (StructureNode | StoryObject | WorldObject) to any other entity
 
 AiSettings ─── global default AI provider config
-UserAiSettings ─── per-user AI provider config (overrides global)
+UserAiSettings ─── per-user AI provider config (overrides global) and quota overrides (e.g. maxActiveProjects)
 GoogleCredential ─── OAuth tokens per user
 GoogleDocExport ─── (entity + mode) → Google Doc ID mapping
 ```

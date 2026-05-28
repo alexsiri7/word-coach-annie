@@ -706,3 +706,64 @@ describe("API: Search", () => {
         expect(matches).toHaveLength(0);
     });
 });
+
+// NOTE: These tests validate the Prisma query logic that backs the limit check
+// (count, settings lookup, archivedAt filter). They do not exercise the HTTP
+// route or verify the 403 response. Route-level coverage is in projects-limit-route.test.ts.
+describe("API: Projects - active project limit", () => {
+    it("allows creation when below the active project limit", async () => {
+        const user = await testPrisma.user.create({ data: { email: "limit1@test.com", googleId: "g-limit-1" } });
+        const userId = user.id;
+        await testPrisma.project.createMany({
+            data: [
+                { title: "P1", userId },
+                { title: "P2", userId },
+            ],
+        });
+        const count = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        const settings = await testPrisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } });
+        const limit = settings?.maxActiveProjects ?? 3;
+        expect(count).toBe(2);
+        expect(count < limit).toBe(true);
+    });
+
+    it("detects when active project limit is reached", async () => {
+        const user = await testPrisma.user.create({ data: { email: "limit2@test.com", googleId: "g-limit-2" } });
+        const userId = user.id;
+        await testPrisma.project.createMany({
+            data: [
+                { title: "P1", userId },
+                { title: "P2", userId },
+                { title: "P3", userId },
+            ],
+        });
+        const count = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        const limit = 3;
+        expect(count >= limit).toBe(true);
+    });
+
+    it("archived projects do not count toward the limit", async () => {
+        const user = await testPrisma.user.create({ data: { email: "limit3@test.com", googleId: "g-limit-3" } });
+        const userId = user.id;
+        await testPrisma.project.createMany({
+            data: [
+                { title: "Active 1", userId },
+                { title: "Active 2", userId },
+                { title: "Active 3", userId },
+                { title: "Archived", userId, archivedAt: new Date() },
+            ],
+        });
+        const activeCount = await testPrisma.project.count({ where: { userId, archivedAt: null } });
+        expect(activeCount).toBe(3);
+    });
+
+    it("respects custom maxActiveProjects from UserAiSettings", async () => {
+        const user = await testPrisma.user.create({ data: { email: "limit4@test.com", googleId: "g-limit-4" } });
+        const userId = user.id;
+        await testPrisma.userAiSettings.create({
+            data: { userId, maxActiveProjects: 5 },
+        });
+        const settings = await testPrisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } });
+        expect(settings?.maxActiveProjects).toBe(5);
+    });
+});
