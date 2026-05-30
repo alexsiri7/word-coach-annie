@@ -60,7 +60,7 @@ export const beatsToComments = (html: string) => {
   const beats = doc.querySelectorAll('div[data-type="beat-annotation"]');
 
   beats.forEach((beat) => {
-    const content = beat.innerHTML;
+    const content = beat.textContent || "";
     const comment = doc.createComment(` beat: ${content} `);
     beat.replaceWith(comment);
   });

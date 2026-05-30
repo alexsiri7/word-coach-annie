@@ -36,7 +36,9 @@ export function sanitizeHtml(input: string): string {
 
   // Restore beat comments
   return sanitized.replace(/<span data-beat-placeholder="(\d+)"><\/span>/g, (_, idx) => {
-    return beats[parseInt(idx, 10)];
+    const beat = beats[parseInt(idx, 10)];
+    // Prevent comment breakout in restored beat comments
+    return beat.replace(/-->/g, "--&gt;");
   });
 }
 

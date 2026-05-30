@@ -56,7 +56,8 @@ export class StructureController {
     static serializeSceneContent(blocks: SceneBlock[]): string {
         return blocks.map(block => {
             if (block.type === "BEAT") {
-                return `<!-- beat: ${block.content.trim()} -->`;
+                const escaped = block.content.trim().replace(/-->/g, "--&gt;");
+                return `<!-- beat: ${escaped} -->`;
             }
             return block.content;
         }).join("");
@@ -79,6 +80,10 @@ export class StructureController {
                 // Check for nesting
                 if (segment.substring(0, closeIndex).includes("<!--")) {
                     throw new Error("Malformed scene content: Nested comments in beats are not allowed.");
+                }
+                // Check for premature comment close
+                if (segment.substring(0, closeIndex).includes("-->")) {
+                    throw new Error("Malformed scene content: Beat annotation contains comment-closing sequence.");
                 }
             }
         }

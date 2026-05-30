@@ -136,7 +136,11 @@ export async function middleware(request: NextRequest) {
         if (token && apiToken && safeEqual(token, apiToken)) {
             const rateLimited = applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
-            return NextResponse.next();
+            // Strip any client-injected identity headers — API_TOKEN has no userId
+            const requestHeaders = new Headers(request.headers);
+            requestHeaders.delete("x-user-id");
+            requestHeaders.delete("x-user-email");
+            return NextResponse.next({ request: { headers: requestHeaders } });
         }
 
         // 2. Check MCP OAuth access token (JWT with type: "mcp_access")
@@ -197,11 +201,14 @@ export async function middleware(request: NextRequest) {
         // Fall back to legacy API_TOKEN session cookie
         if (apiToken) {
             const expected = await deriveSessionToken(apiToken);
-            if (sessionCookie === expected) {
+            if (safeEqual(sessionCookie, expected)) {
                 // Rate limit legacy sessions by token
                 const rateLimited = applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;
-                return NextResponse.next();
+                const requestHeaders = new Headers(request.headers);
+                requestHeaders.delete("x-user-id");
+                requestHeaders.delete("x-user-email");
+                return NextResponse.next({ request: { headers: requestHeaders } });
             }
         }
     }
