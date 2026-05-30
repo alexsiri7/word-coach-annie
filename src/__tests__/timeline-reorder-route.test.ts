@@ -28,6 +28,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { prisma } from "@/lib/db";
+import { POST } from "@/app/api/world-objects/[id]/timeline/reorder/route";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest(
@@ -57,9 +58,6 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
       { id: "entry-1" },
     ] as any);
 
-    const { POST } = await import(
-      "@/app/api/world-objects/[id]/timeline/reorder/route"
-    );
     const res = await POST(
       makeRequest({ orderedIds: ["entry-1", "entry-from-other-wo"] }),
       mockParams
@@ -73,9 +71,6 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
   });
 
   it("returns 400 with distinct message when orderedIds contains duplicates", async () => {
-    const { POST } = await import(
-      "@/app/api/world-objects/[id]/timeline/reorder/route"
-    );
     const res = await POST(
       makeRequest({ orderedIds: ["entry-1", "entry-1"] }),
       mockParams
@@ -89,9 +84,6 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
   });
 
   it("skips the ownership DB query and succeeds when orderedIds is empty", async () => {
-    const { POST } = await import(
-      "@/app/api/world-objects/[id]/timeline/reorder/route"
-    );
     const res = await POST(makeRequest({ orderedIds: [] }), mockParams);
 
     expect(res.status).toBe(200);
@@ -104,9 +96,6 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
       { id: "e2" },
     ] as any);
 
-    const { POST } = await import(
-      "@/app/api/world-objects/[id]/timeline/reorder/route"
-    );
     const res = await POST(makeRequest({ orderedIds: ["e1", "e2"] }), mockParams);
     const body = await res.json();
 
@@ -115,9 +104,6 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
   });
 
   it("returns 400 when orderedIds is not an array", async () => {
-    const { POST } = await import(
-      "@/app/api/world-objects/[id]/timeline/reorder/route"
-    );
     const res = await POST(makeRequest({ orderedIds: "not-an-array" }), mockParams);
     const body = await res.json();
 
