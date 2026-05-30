@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+
+const ConsentUpdateSchema = z.object({
+  feature: z.enum(["sentry_replay", "claude_api"], { message: "Unknown feature" }),
+  consentGiven: z.boolean({ message: "Invalid body" }),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +31,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { feature, consentGiven } = body;
-
-    if (typeof feature !== "string" || typeof consentGiven !== "boolean") {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    const parsed = ConsentUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
-    if (!["sentry_replay", "claude_api"].includes(feature)) {
-      return NextResponse.json({ error: "Unknown feature" }, { status: 400 });
-    }
+    const { feature, consentGiven } = parsed.data;
 
     const row = await prisma.userConsent.upsert({
       where: { userId_feature: { userId, feature } },

@@ -9,7 +9,11 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    const where = userId ? { userId } : {};
+    if (!userId) {
+      logger.warn("GET /api/projects/export-all: rejected — userId is null");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const where = { userId };
 
     const projects = await prisma.project.findMany({
       where,
