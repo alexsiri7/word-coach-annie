@@ -113,6 +113,39 @@ describe("Relationships Route /api/relationships/[id]", () => {
             expect(data.label).toBe("protagonist");
         });
 
+        it("sanitizes HTML in label", async () => {
+            const { PATCH } = await import("@/app/api/relationships/[id]/route");
+            const req = mockReq(`http://localhost/api/relationships/${relationshipId}`, {
+                label: '<script>alert("xss")</script>clean',
+            });
+            const res = await PATCH(req as any, mockParams({ id: relationshipId }));
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.label).toBe("clean");
+        });
+
+        it("sanitizes inline event handler XSS in label", async () => {
+            const { PATCH } = await import("@/app/api/relationships/[id]/route");
+            const req = mockReq(`http://localhost/api/relationships/${relationshipId}`, {
+                label: '<img src=x onerror=alert(1)>safe',
+            });
+            const res = await PATCH(req as any, mockParams({ id: relationshipId }));
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.label).toBe("safe");
+        });
+
+        it("sanitizes javascript: URI XSS in label", async () => {
+            const { PATCH } = await import("@/app/api/relationships/[id]/route");
+            const req = mockReq(`http://localhost/api/relationships/${relationshipId}`, {
+                label: '<a href="javascript:alert(1)">click</a>',
+            });
+            const res = await PATCH(req as any, mockParams({ id: relationshipId }));
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.label).toBe("click");
+        });
+
         it("returns 404 for missing relationship", async () => {
             const { PATCH } = await import("@/app/api/relationships/[id]/route");
             const req = mockReq("http://localhost/api/relationships/bad", { type: "RELATED_TO" });
