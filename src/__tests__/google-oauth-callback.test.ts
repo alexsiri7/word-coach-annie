@@ -111,8 +111,7 @@ describe("Google OAuth callback - verified_email check", () => {
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
         expect(logger.warn).toHaveBeenCalledWith(
-            "Google OAuth rejected: unverified email",
-            { email: "unverified@example.com" }
+            "OAuth provider rejected user: email not verified"
         );
     });
 
@@ -135,8 +134,7 @@ describe("Google OAuth callback - verified_email check", () => {
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
         expect(logger.warn).toHaveBeenCalledWith(
-            "Google OAuth rejected: unverified email",
-            { email: "noverified@example.com" }
+            "OAuth provider rejected user: email not verified"
         );
     });
 
