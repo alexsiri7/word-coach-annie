@@ -7,13 +7,13 @@ export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
     if (!userId) {
-      return NextResponse.json([]);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const rows = await prisma.userConsent.findMany({ where: { userId } });
     return NextResponse.json(rows);
   } catch (err) {
-    logger.warn("GET /api/account/consent failed", err);
-    return NextResponse.json([]);
+    logger.error("GET /api/account/consent failed", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

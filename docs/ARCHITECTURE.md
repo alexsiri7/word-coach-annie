@@ -197,7 +197,7 @@ Three export modes: `UNIVERSE` (world-building bible), `STORY_INTERNAL` (full ma
 ## Observability
 
 - **Logging**: `src/lib/logger.ts` (structured, pino-compatible)
-- **Error tracking**: Sentry (`sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`)
+- **Error tracking**: Sentry (`sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`). Session replay is gated on user consent — users opt in via Settings → Privacy & Data, which sets `consent:sentry_replay=true` in `localStorage` and writes to the `UserConsent` DB table. Replay is disabled by default (opt-in).
 - **OpenTelemetry**: Custom spans on MCP tool calls and ADK agent operations (`src/instrumentation.ts`)
 - **Health**: `GET /api/health` returns `{"ok": true}`
 - **Metrics**: `GET /api/metrics` returns Prometheus text format (requires auth when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`)

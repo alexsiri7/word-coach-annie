@@ -3,7 +3,7 @@ import { beforeSend } from "@/lib/sentry-scrub";
 
 const replayConsented =
   typeof window === "undefined" ||
-  localStorage.getItem("consent:sentry_replay") !== "false";
+  localStorage.getItem("consent:sentry_replay") === "true";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,

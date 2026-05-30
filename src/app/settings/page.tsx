@@ -82,6 +82,7 @@ export default function SettingsPage() {
   const [replayAllowed, setReplayAllowed] = useState(true);
   const [consentLoading, setConsentLoading] = useState(true);
   const [exportingData, setExportingData] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -120,12 +121,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetch("/api/account/consent")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`consent fetch failed: ${res.status}`);
+        return res.json();
+      })
       .then((rows: Array<{ feature: string; consentGiven: boolean }>) => {
         const replay = rows.find((r) => r.feature === "sentry_replay");
         setReplayAllowed(replay?.consentGiven ?? true);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setReplayAllowed(false); // fail closed: assume opted-out on error
+      })
       .finally(() => setConsentLoading(false));
   }, []);
 
@@ -167,27 +174,43 @@ export default function SettingsPage() {
   };
 
   const handleReplayToggle = async (allowed: boolean) => {
+    const previous = replayAllowed;
     setReplayAllowed(allowed);
     localStorage.setItem("consent:sentry_replay", String(allowed));
-    await fetch("/api/account/consent", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feature: "sentry_replay", consentGiven: allowed }),
-    });
+    try {
+      const res = await fetch("/api/account/consent", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feature: "sentry_replay", consentGiven: allowed }),
+      });
+      if (!res.ok) throw new Error(`consent PUT failed: ${res.status}`);
+    } catch (err) {
+      console.error("Failed to save consent preference", err);
+      setReplayAllowed(previous);
+      localStorage.setItem("consent:sentry_replay", String(previous));
+    }
   };
 
   const handleExportData = async () => {
     setExportingData(true);
+    setExportError(null);
     try {
       const res = await fetch("/api/auth/export-data");
-      if (!res.ok) return;
+      if (!res.ok) {
+        setExportError("Export failed. Please try again.");
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `annie-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Export failed. Please check your connection and try again.");
     } finally {
       setExportingData(false);
     }
@@ -748,6 +771,9 @@ export default function SettingsPage() {
                   )}
                   Download my data
                 </Button>
+                {exportError && (
+                  <p className="text-xs text-red-500 mt-2">{exportError}</p>
+                )}
               </div>
             </div>
           )}

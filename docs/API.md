@@ -61,6 +61,71 @@ OAuth callback. Validates the code, creates/updates `GoogleCredential`, sets ses
 
 ---
 
+## Privacy & Data (GDPR)
+
+### `GET /api/auth/export-data`
+Export all personal data for the authenticated user as a ZIP archive (GDPR Article 20 — data portability).
+
+**Authentication**: Required (session cookie). Returns `401` if not authenticated.
+
+**Response**:
+- `200 application/zip` — ZIP archive (`annie-full-export-<date>.zip`) containing:
+  - `profile.json` — user profile fields (`id`, `email`, `name`, `picture`, `createdAt`, `updatedAt`)
+  - `ai-settings.json` — AI preferences (API key is **omitted** for security)
+  - `projects/<title>.json` — full project JSON for each project (same format as `/api/projects/:id/export?format=json`)
+- `401 Unauthorized` — not authenticated
+- `500 Internal Server Error` — export generation failed
+
+---
+
+### `GET /api/account/consent`
+Returns the current user's consent preferences.
+
+**Authentication**: Required (session cookie). Returns `401` if not authenticated.
+
+**Response**: Array of consent rows:
+```json
+[
+  {
+    "id": "string",
+    "userId": "string",
+    "feature": "sentry_replay | claude_api",
+    "consentGiven": true,
+    "updatedAt": "ISO timestamp"
+  }
+]
+```
+
+An empty array means the user has no explicit consent records; each feature defaults to opt-out.
+
+**Errors**:
+- `401 Unauthorized` — not authenticated
+- `500 Internal Server Error` — database error
+
+---
+
+### `PUT /api/account/consent`
+Update the authenticated user's consent preference for a specific feature.
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Body**:
+```json
+{
+  "feature": "sentry_replay | claude_api",
+  "consentGiven": true | false
+}
+```
+
+**Response**: `200` — updated consent row (same shape as GET response item)
+
+**Errors**:
+- `400 Bad Request` — missing/invalid `feature` or `consentGiven`, or unrecognised `feature` value
+- `401 Unauthorized` — not authenticated
+- `500 Internal Server Error` — database error
+
+---
+
 ## Projects
 
 ### `GET /api/projects`
