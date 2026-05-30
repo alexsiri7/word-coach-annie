@@ -861,13 +861,13 @@ Returns the updated `WritingTask` object.
 ### Peer Review
 
 #### `run_peer_review`
-Trigger a full peer review of a project. Runs **four** AI agents in parallel — an acquisitions editor, an enthusiastic reader, a published novelist, and a TV comedy writer — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
+Trigger a full peer review of a project. Runs **five** AI agents in parallel — an acquisitions editor, an enthusiastic reader, a published novelist, a TV comedy writer, and an acting coach — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `projectId` | string | ID of the project to review |
 
-Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy`, and `consensus` fields. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
+Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy`, `actor`, and `consensus` fields. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
 
 ---
 
@@ -879,18 +879,18 @@ Return stored peer review results for a project, newest first. Use `run_peer_rev
 | `projectId` | string | ID of the project |
 | `limit` | integer? | Max reviews to return (1–20, default 5) |
 
-Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy` (nullable — absent on reviews created before this field was added), and `consensus` fields.
+Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy` (nullable — absent on reviews created before this field was added), `actor` (nullable — absent on reviews created before this field was added), and `consensus` fields.
 
 ---
 
 #### `get_peer_review_prompts`
-Return the prompt/lens text used by each of the **four** peer review agents. Useful for understanding what perspective each reviewer takes before invoking a review prompt.
+Return the prompt/lens text used by each of the **five** peer review agents. Useful for understanding what perspective each reviewer takes before invoking a review prompt.
 
 No parameters.
 
-Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`, `review-comedy`) to its `mode` and `lens` fields.
+Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`, `review-comedy`, `review-actor`) to its `mode` and `lens` fields.
 
-**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author), [`review-comedy`](#review-comedy) prompts.
+**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author), [`review-comedy`](#review-comedy), [`review-actor`](#review-actor) prompts.
 
 ---
 
@@ -1004,6 +1004,17 @@ Uses `export_manuscript` to load the full manuscript, then applies craft-level p
 Review manuscript as a TV comedy writer — comedy craft feedback on setup, payoff, timing, and character-specific humour.
 
 Uses `export_manuscript` to load the full manuscript, then applies a comedy-craft lens: does the setup plant exactly what the punchline needs, is the punchline inevitable-in-retrospect, is the humour character-specific or generic, does comic relief earn its place.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-actor`
+Review manuscript as an acting coach — emotional truth, earned feeling, subtext, and whether emotional peaks have enough runway.
+
+Uses `export_manuscript` to load the full manuscript, then applies an emotional-truth lens: is each emotion justified by the setup, is the character's internal state legible, are subtext and text working together, do emotional peaks have enough runway.
 
 | Param | Type | Description |
 |-------|------|-------------|
