@@ -7,6 +7,7 @@
  * bundled into the Edge runtime (middleware). Edge always uses in-memory mode.
  */
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import type Redis from "ioredis";
 
 interface RateLimitEntry {
@@ -88,6 +89,7 @@ function checkInMemory(key: string, config: RateLimitConfig): RateLimitResult {
 // Arguments: key, now (ms), windowStart (ms), limit, windowMs (ms)
 // Returns: [count_after, oldest_in_window_or_-1]
 const RATE_LIMIT_SCRIPT = `
+redis.replicate_commands()
 local key = KEYS[1]
 local now = tonumber(ARGV[1])
 local window_start = tonumber(ARGV[2])
@@ -106,27 +108,34 @@ if count >= limit then
   return {count, tonumber(oldest[2] or now)}
 end
 
--- Add this request
-redis.call('ZADD', key, now, now .. '-' .. math.random(1e9))
+-- Add this request using Redis TIME for microsecond-precision unique member key,
+-- avoiding math.random's deterministic seed issue under concurrent load.
+local t = redis.call('TIME')
+redis.call('ZADD', key, now, now .. '-' .. t[1] .. t[2])
 -- Expire after one full window to avoid orphaned keys
 redis.call('PEXPIRE', key, window_ms)
 
 return {count + 1, -1}
 `;
 
-let _redis: Redis | null = null;
+// Stored as a Promise so concurrent callers share the same initialization
+// and never create more than one Redis client.
+let _redisPromise: Promise<Redis> | null = null;
 
 async function getRedis(): Promise<Redis> {
-    if (!_redis) {
-        // Dynamic import with webpackIgnore keeps ioredis out of the Edge bundle.
-        // This function is only called from checkRedis, which is guarded by useRedis().
-        const { default: RedisClass } = await import(/* webpackIgnore: true */ "ioredis") as { default: typeof Redis };
-        _redis = new RedisClass(env.REDIS_URL!);
-        _redis.on("error", (err) => {
-            console.error("[rate-limit] Redis error:", err);
-        });
+    if (!_redisPromise) {
+        _redisPromise = (async () => {
+            // Dynamic import with webpackIgnore keeps ioredis out of the Edge bundle.
+            // This function is only called from checkRedis, which is guarded by useRedis().
+            const { default: RedisClass } = await import(/* webpackIgnore: true */ "ioredis") as { default: typeof Redis };
+            const client = new RedisClass(env.REDIS_URL!);
+            client.on("error", (err) => {
+                logger.error("[rate-limit] Redis error:", err);
+            });
+            return client;
+        })();
     }
-    return _redis;
+    return _redisPromise;
 }
 
 async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLimitResult> {
@@ -135,7 +144,7 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
     try {
         const redis = await getRedis();
-        const [countAfter, oldestScore] = await redis.eval(
+        const [rawCount, oldestScore] = await redis.eval(
             RATE_LIMIT_SCRIPT,
             1,
             key,
@@ -145,7 +154,9 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
             config.windowMs
         ) as [number, number];
 
-        if (countAfter > config.limit || oldestScore !== -1) {
+        // rawCount > config.limit guards against stale data races where ZCARD
+        // returns a value slightly above limit before ZREMRANGEBYSCORE settles.
+        if (rawCount > config.limit || oldestScore !== -1) {
             const retryAfterMs = oldestScore + config.windowMs - now;
             return {
                 allowed: false,
@@ -157,12 +168,12 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
         return {
             allowed: true,
-            remaining: config.limit - countAfter,
+            remaining: config.limit - rawCount,
             resetMs: now + config.windowMs,
         };
     } catch (err) {
         // Fail open — allow the request but log the error so ops can investigate
-        console.error("[rate-limit] Redis check failed, allowing request:", err);
+        logger.error("[rate-limit] Redis check failed, allowing request:", err);
         return {
             allowed: true,
             remaining: config.limit - 1,
@@ -173,15 +184,24 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
-// Edge runtime (middleware) cannot use ioredis — always falls back to in-memory
+// Edge runtime (middleware) cannot use ioredis — always falls back to in-memory.
+// Evaluated per-call so that tests can override globalThis.EdgeRuntime.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isEdgeRuntime = typeof (globalThis as any).EdgeRuntime !== "undefined";
-const useRedis = () => !isEdgeRuntime && Boolean(env.REDIS_URL);
+const useRedis = () => typeof (globalThis as any).EdgeRuntime === "undefined" && Boolean(env.REDIS_URL);
 
-export function checkRateLimit(
+/**
+ * Check whether the given key has exceeded its rate limit.
+ *
+ * Always returns a `Promise<RateLimitResult>` regardless of which backend
+ * (Redis or in-memory) is active. Call sites should always `await` this.
+ *
+ * @param key    - Unique rate-limit bucket (e.g. `"chat:user-abc123"`)
+ * @param config - Limit and window size; use a preset from `RATE_LIMITS`
+ */
+export async function checkRateLimit(
     key: string,
     config: RateLimitConfig
-): RateLimitResult | Promise<RateLimitResult> {
+): Promise<RateLimitResult> {
     if (useRedis()) return checkRedis(key, config);
     return checkInMemory(key, config);
 }
@@ -204,7 +224,12 @@ export const RATE_LIMITS = {
     auth: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
 };
 
-/** Clear all entries (for testing — in-memory mode only) */
+/** Clear all in-memory entries (for testing — in-memory mode only) */
 export function resetRateLimitStore() {
     memStore.clear();
+}
+
+/** Reset the Redis client singleton (for testing only) */
+export function resetRedisClient() {
+    _redisPromise = null;
 }
