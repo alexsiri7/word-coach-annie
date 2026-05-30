@@ -509,9 +509,9 @@ Add a timeline entry.
 ---
 
 ### `PATCH /api/world-objects/:id/timeline/:entryId`
-Update a timeline entry.
+Update a timeline entry. At least one field must be provided.
 
-**Body**: `{ label?: string, description?: string, attributes?: string, orderIndex?: number }` (at least one field required)
+**Body**: `{ label?: string, description?: string, attributes?: string, orderIndex?: number }`
 
 **Errors**: `400` validation failure (no fields provided or empty `label`); `401` unauthenticated
 
