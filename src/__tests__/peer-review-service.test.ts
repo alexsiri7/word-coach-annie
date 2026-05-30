@@ -107,6 +107,12 @@ describe("runPeerReview", () => {
     expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(5);
   });
 
+  it("includes COMEDY WRITER in synthesis prompt", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    expect(calls[4][0].userMessage).toContain("COMEDY WRITER");
+  });
+
   it("returns saved record with id and createdAt", async () => {
     const result = await runPeerReview("proj-1");
     expect(result.id).toBe("rev-1");

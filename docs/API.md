@@ -636,7 +636,7 @@ Run a manuscript-level AI analysis across the full project.
 ## Peer Review
 
 ### `POST /api/projects/:id/peer-review`
-Run three parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer) against
+Run **four** parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer, Comedy Writer) against
 the full manuscript and synthesize a consensus.
 
 No request body required.
@@ -653,6 +653,7 @@ No request body required.
   },
   "reader": { "...same shape as publisher..." },
   "writer": { "...same shape as publisher..." },
+  "comedy": { "...same shape as publisher, nullable — absent on pre-comedy reviews..." },
   "consensus": {
     "pointsOfAgreement": ["string"],
     "pointsOfDisagreement": ["string"],

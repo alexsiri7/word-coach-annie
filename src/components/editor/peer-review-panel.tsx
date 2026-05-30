@@ -419,7 +419,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
             {!ran && !loading && (
               <div className="p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Get feedback from three AI reviewers: a Publisher, an Avid Reader, and an Experienced Writer.
+                  Get feedback from four AI reviewers: a Publisher, an Avid Reader, an Experienced Writer, and a Comedy Writer.
                 </p>
                 <Button size="sm" onClick={runReview}>
                   Run Peer Review
@@ -451,7 +451,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                   ? renderConsensusTab(review.consensus)
                   : review[activeTab]
                     ? renderReviewTab(review[activeTab]!)
-                    : <div className="p-4 text-center"><p className="text-sm text-muted-foreground">No comedy review available for this record.</p></div>}
+                    : <div className="p-4 text-center"><p className="text-sm text-muted-foreground">No {activeTab} review available for this record.</p></div>}
               </div>
             )}
           </div>

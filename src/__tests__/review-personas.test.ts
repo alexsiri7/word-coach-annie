@@ -73,9 +73,11 @@ describe("get_peer_review_prompts tool handler", () => {
     expect(parsed["review-editor"]).toBeDefined();
     expect(parsed["review-fan"]).toBeDefined();
     expect(parsed["review-author"]).toBeDefined();
+    expect(parsed["review-comedy"]).toBeDefined();
     expect(parsed["review-editor"].mode).toBe("Acquisitions Editor");
     expect(parsed["review-fan"].mode).toBe("Fan Reader");
     expect(parsed["review-author"].mode).toBe("Peer Author");
+    expect(parsed["review-comedy"].mode).toBe("Comedy Writer");
     expect(typeof parsed["review-editor"].lens).toBe("string");
     expect(parsed["review-editor"].lens.length).toBeGreaterThan(0);
   });
