@@ -66,11 +66,11 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
-    it("allows /api/metrics path", async () => {
+    it("blocks /api/metrics path when unauthenticated (auth required)", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/metrics");
         const res = await middleware(req);
-        expect(res.status).toBe(200);
+        expect(res.status).not.toBe(200);
     });
 
     it("allows /api/auth/login path", async () => {
