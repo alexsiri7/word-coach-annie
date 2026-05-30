@@ -65,6 +65,9 @@ MANUSCRIPT:
 ${manuscript}`;
 }
 
+// NOTE: This prompt is intentionally more detailed than the REVIEW_PERSONAS["review-comedy"].lens
+// string, which is a short display label. The full system prompt here provides the step-by-step
+// review lens the AI uses during evaluation; REVIEW_PERSONAS only holds the human-readable mode/lens.
 function buildComedyPrompt(manuscript: string): string {
   return `You are a TV comedy writer with 15 years of experience in writers' rooms for network and streaming shows.
 Background: You know what makes a joke land technically — setup, payoff, white space, character-specificity.
