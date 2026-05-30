@@ -2,9 +2,12 @@
  * Sliding window rate limiter.
  * Uses Redis (sorted-set) when REDIS_URL is set; falls back to an in-memory
  * Map for single-instance deployments.
+ *
+ * ioredis is loaded lazily via dynamic import with webpackIgnore so it is NOT
+ * bundled into the Edge runtime (middleware). Edge always uses in-memory mode.
  */
-import Redis from "ioredis";
 import { env } from "@/lib/env";
+import type Redis from "ioredis";
 
 interface RateLimitEntry {
     timestamps: number[];
@@ -113,9 +116,12 @@ return {count + 1, -1}
 
 let _redis: Redis | null = null;
 
-function getRedis(): Redis {
+async function getRedis(): Promise<Redis> {
     if (!_redis) {
-        _redis = new Redis(env.REDIS_URL!);
+        // Dynamic import with webpackIgnore keeps ioredis out of the Edge bundle.
+        // This function is only called from checkRedis, which is guarded by useRedis().
+        const { default: RedisClass } = await import(/* webpackIgnore: true */ "ioredis") as { default: typeof Redis };
+        _redis = new RedisClass(env.REDIS_URL!);
         _redis.on("error", (err) => {
             console.error("[rate-limit] Redis error:", err);
         });
@@ -128,7 +134,7 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
     const windowStart = now - config.windowMs;
 
     try {
-        const redis = getRedis();
+        const redis = await getRedis();
         const [countAfter, oldestScore] = await redis.eval(
             RATE_LIMIT_SCRIPT,
             1,
@@ -167,7 +173,10 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
-const useRedis = () => Boolean(env.REDIS_URL);
+// Edge runtime (middleware) cannot use ioredis — always falls back to in-memory
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isEdgeRuntime = typeof (globalThis as any).EdgeRuntime !== "undefined";
+const useRedis = () => !isEdgeRuntime && Boolean(env.REDIS_URL);
 
 export function checkRateLimit(
     key: string,
