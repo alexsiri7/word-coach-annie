@@ -47,6 +47,7 @@ const DEFAULT_SAVED = {
   reader: { overallImpression: "Great", strengths: ["voice"], weaknesses: [], detailedFeedback: "Good.", recommendation: "loved it" },
   writer: { overallImpression: "Great", strengths: ["voice"], weaknesses: [], detailedFeedback: "Good.", recommendation: "strong" },
   comedy: { overallImpression: "Great", strengths: ["timing"], weaknesses: [], detailedFeedback: "Good.", recommendation: "sharp" },
+  actor: { overallImpression: "Great", strengths: ["emotional truth"], weaknesses: [], detailedFeedback: "Earned.", recommendation: "emotionally earned" },
   consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
 };
 
@@ -93,24 +94,30 @@ describe("runPeerReview", () => {
     const longManuscript = "x".repeat(100000);
     vi.mocked(exportManuscript).mockResolvedValueOnce(longManuscript);
     await runPeerReview("proj-1");
-    // All 4 runSimpleCompletion calls receive the truncated manuscript
+    // All 5 reviewer calls receive the truncated manuscript; the 6th call (synthesis) does not embed the raw manuscript
     const calls = vi.mocked(runSimpleCompletion).mock.calls;
-    for (const [arg] of calls.slice(0, 4)) {
+    for (const [arg] of calls.slice(0, 5)) {
       // Each prompt embeds the manuscript — check it contains exactly 50k x's
       expect(arg.userMessage).toContain("x".repeat(50000));
       expect(arg.userMessage).not.toContain("x".repeat(50001));
     }
   });
 
-  it("makes exactly 5 AI calls (4 reviewers + 1 synthesis)", async () => {
+  it("makes exactly 6 AI calls (5 reviewers + 1 synthesis)", async () => {
     await runPeerReview("proj-1");
-    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(5);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(6);
   });
 
   it("includes COMEDY WRITER in synthesis prompt", async () => {
     await runPeerReview("proj-1");
     const calls = vi.mocked(runSimpleCompletion).mock.calls;
-    expect(calls[4][0].userMessage).toContain("COMEDY WRITER");
+    expect(calls[5][0].userMessage).toContain("COMEDY WRITER");
+  });
+
+  it("includes ACTING COACH in synthesis prompt", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    expect(calls[5][0].userMessage).toContain("ACTING COACH");
   });
 
   it("returns saved record with id and createdAt", async () => {
@@ -125,6 +132,7 @@ describe("runPeerReview", () => {
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "E", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "emotionally earned" }))
       .mockRejectedValueOnce(new Error("rate limit exceeded"));
 
     const result = await runPeerReview("proj-1");

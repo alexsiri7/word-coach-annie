@@ -1673,6 +1673,17 @@ server.prompt(
     )
 );
 
+server.prompt(
+    "review-actor",
+    "Review manuscript as an acting coach — emotional truth, earned feeling, subtext, and whether emotional peaks have enough runway.",
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        REVIEW_PERSONAS["review-actor"].mode,
+        REVIEW_PERSONAS["review-actor"].lens("your project"),
+    )
+);
+
 // ─── Skills Tool ─────────────────────────────────────────────────────────────
 
 server.tool(

@@ -26,6 +26,7 @@ interface PeerReviewResult {
   reader: ReviewFeedback;
   writer: ReviewFeedback;
   comedy?: ReviewFeedback;
+  actor?: ReviewFeedback;
   consensus: ConsensusFeedback;
   warning?: string;
 }
@@ -48,6 +49,7 @@ interface ReviewDetail {
   reader: ReviewFeedback;
   writer: ReviewFeedback;
   comedy?: ReviewFeedback;
+  actor?: ReviewFeedback;
   consensus: ConsensusFeedback;
 }
 
@@ -56,13 +58,14 @@ interface PeerReviewPanelProps {
   onStartChat: (message: string) => void;
 }
 
-type TabKey = "publisher" | "reader" | "writer" | "comedy" | "consensus";
+type TabKey = "publisher" | "reader" | "writer" | "comedy" | "actor" | "consensus";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "publisher", label: "Publisher" },
   { key: "reader", label: "Reader" },
   { key: "writer", label: "Writer" },
   { key: "comedy", label: "Comedy" },
+  { key: "actor", label: "Actor" },
   { key: "consensus", label: "Consensus" },
 ];
 
@@ -101,6 +104,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
       reader: detail.reader,
       writer: detail.writer,
       comedy: detail.comedy,
+      actor: detail.actor,
       consensus: detail.consensus,
     });
     setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
@@ -419,7 +423,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
             {!ran && !loading && (
               <div className="p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Get feedback from four AI reviewers: a Publisher, an Avid Reader, an Experienced Writer, and a Comedy Writer.
+                  Get feedback from five AI reviewers: a Publisher, an Avid Reader, an Experienced Writer, a Comedy Writer, and an Acting Coach.
                 </p>
                 <Button size="sm" onClick={runReview}>
                   Run Peer Review

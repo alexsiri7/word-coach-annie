@@ -65,9 +65,6 @@ MANUSCRIPT:
 ${manuscript}`;
 }
 
-// NOTE: This prompt is intentionally more detailed than the REVIEW_PERSONAS["review-comedy"].lens
-// string, which is a short display label. The full system prompt here provides the step-by-step
-// review lens the AI uses during evaluation; REVIEW_PERSONAS only holds the human-readable mode/lens.
 function buildComedyPrompt(manuscript: string): string {
   return `You are a TV comedy writer with 15 years of experience in writers' rooms for network and streaming shows.
 Background: You know what makes a joke land technically — setup, payoff, white space, character-specificity.
@@ -82,15 +79,30 @@ MANUSCRIPT:
 ${manuscript}`;
 }
 
-function buildSynthesisPrompt(publisher: string, reader: string, writer: string, comedy: string): string {
-  return `Four reviewers just read the same manuscript. Here are their reviews:
+function buildActorPrompt(manuscript: string): string {
+  return `You are an acting coach reading this manuscript for emotional truth and earned feeling.
+Background: You've coached actors and directors for 20 years. You can spot an unearned emotion from a mile away.
+Review lens: Is each emotion justified by the setup that preceded it, or declared by the prose and expected to land on credit? Is the character's internal state legible — do readers know what the character is feeling and why, without being told directly? Are subtext and text working together or fighting each other? Do emotional peaks have enough runway? Are there places where the writing tells the reader to feel something rather than creating the conditions to feel it? Apply the same test to humour: is a funny moment funny because of who this character is in this situation, or because the author needed a laugh there?
+
+Be specific — quote the passage and explain exactly what's missing. A drama teacher who has seen every shortcut and won't let you take them.
+
+Return ONLY valid JSON matching this schema (no markdown fences):
+{"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"emotionally earned|mostly earned|needs more runway|emotionally hollow"}
+
+MANUSCRIPT:
+${manuscript}`;
+}
+
+function buildSynthesisPrompt(publisher: string, reader: string, writer: string, comedy: string, actor: string): string {
+  return `Five reviewers just read the same manuscript. Here are their reviews:
 
 PUBLISHER: ${publisher}
 READER: ${reader}
 WRITER: ${writer}
 COMEDY WRITER: ${comedy}
+ACTING COACH: ${actor}
 
-Synthesise a consensus. Identify what all agree on, what they disagree on, and the top 3 revision priorities.
+Synthesise a consensus. Identify what all five agree on, what they disagree on, and the top 3 revision priorities.
 
 Return ONLY valid JSON (no markdown fences):
 {"pointsOfAgreement":["..."],"pointsOfDisagreement":["..."],"topPriorities":["..."],"synthesizedRecommendation":"..."}`;
@@ -145,23 +157,25 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
 
   const JSON_OPTS = { responseMimeType: "application/json", temperature: 0.3 } as const;
 
-  const [publisherRaw, readerRaw, writerRaw, comedyRaw] = await Promise.all([
+  const [publisherRaw, readerRaw, writerRaw, comedyRaw, actorRaw] = await Promise.all([
     runSimpleCompletion({ userMessage: buildPublisherPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
     runSimpleCompletion({ userMessage: buildReaderPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
     runSimpleCompletion({ userMessage: buildWriterPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
     runSimpleCompletion({ userMessage: buildComedyPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
+    runSimpleCompletion({ userMessage: buildActorPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
   ]);
 
   const publisher = parseOrLog(publisherRaw, "publisher", DEFAULT_REVIEW);
   const reader = parseOrLog(readerRaw, "reader", DEFAULT_REVIEW);
   const writer = parseOrLog(writerRaw, "writer", DEFAULT_REVIEW);
   const comedy = parseOrLog(comedyRaw, "comedy", DEFAULT_REVIEW);
+  const actor = parseOrLog(actorRaw, "actor", DEFAULT_REVIEW);
 
   let consensus: ConsensusFeedback = DEFAULT_CONSENSUS;
   let consensusError: string | undefined;
   try {
     const synthesisRaw = await runSimpleCompletion({
-      userMessage: buildSynthesisPrompt(publisherRaw, readerRaw, writerRaw, comedyRaw),
+      userMessage: buildSynthesisPrompt(publisherRaw, readerRaw, writerRaw, comedyRaw, actorRaw),
       aiConfig,
       maxTokens: 2000,
       ...JSON_OPTS,
@@ -180,6 +194,7 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
       reader: reader as unknown as Prisma.InputJsonValue,
       writer: writer as unknown as Prisma.InputJsonValue,
       comedy: comedy as unknown as Prisma.InputJsonValue,
+      actor: actor as unknown as Prisma.InputJsonValue,
       consensus: consensus as unknown as Prisma.InputJsonValue,
     },
     select: {
@@ -190,6 +205,7 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
       reader: true,
       writer: true,
       comedy: true,
+      actor: true,
       consensus: true,
     },
   });
