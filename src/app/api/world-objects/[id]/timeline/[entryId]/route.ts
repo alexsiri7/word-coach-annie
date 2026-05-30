@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { TimelineEntryUpdateSchema } from "@/schemas/timeline";
 
 async function verifyWorldObjectAccess(worldObjectId: string, userId: string | null) {
     const wo = await prisma.worldObject.findUnique({
@@ -37,7 +38,14 @@ export async function PATCH(
         if (notOwned) return notOwned;
 
         const body = await request.json();
-        const entry = await UniversesController.updateTimelineEntry(entryId, body);
+        const parsed = TimelineEntryUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0].message },
+                { status: 400 }
+            );
+        }
+        const entry = await UniversesController.updateTimelineEntry(entryId, parsed.data);
         return NextResponse.json(entry);
     } catch (error: unknown) {
         logger.error("Route error", error);

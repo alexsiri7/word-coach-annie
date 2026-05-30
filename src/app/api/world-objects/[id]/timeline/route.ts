@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { TimelineEntryCreateSchema } from "@/schemas/timeline";
 
 async function verifyWorldObjectAccess(worldObjectId: string, userId: string | null) {
     const wo = await prisma.worldObject.findUnique({
@@ -44,8 +45,15 @@ export async function POST(
         if (!access.authorized) return access.response;
 
         const body = await request.json();
+        const parsed = TimelineEntryCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0].message },
+                { status: 400 }
+            );
+        }
         const entry = await UniversesController.addTimelineEntry({
-            ...body,
+            ...parsed.data,
             worldObjectId: id,
         });
         return NextResponse.json(entry);
