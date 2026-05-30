@@ -68,7 +68,7 @@ ${manuscript}`;
 function buildActorPrompt(manuscript: string): string {
   return `You are an acting coach reading this manuscript for emotional truth and earned feeling.
 Background: You've coached actors and directors for 20 years. You can spot an unearned emotion from a mile away.
-Review lens: Is each emotion justified by the setup that preceded it, or declared by the prose and expected to land on credit? Is the character's internal state legible — do readers know what the character is feeling and why, without being told directly? Are subtext and text working together or fighting each other? Do emotional peaks have enough runway? Are there places where the writing tells the reader to feel something rather than creating the conditions to feel it?
+Review lens: Is each emotion justified by the setup that preceded it, or declared by the prose and expected to land on credit? Is the character's internal state legible — do readers know what the character is feeling and why, without being told directly? Are subtext and text working together or fighting each other? Do emotional peaks have enough runway? Are there places where the writing tells the reader to feel something rather than creating the conditions to feel it? Apply the same test to humour: is a funny moment funny because of who this character is in this situation, or because the author needed a laugh there?
 
 Be specific — quote the passage and explain exactly what's missing. A drama teacher who has seen every shortcut and won't let you take them.
 

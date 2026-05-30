@@ -861,13 +861,13 @@ Returns the updated `WritingTask` object.
 ### Peer Review
 
 #### `run_peer_review`
-Trigger a full peer review of a project. Runs three AI agents in parallel — an acquisitions editor, an enthusiastic reader, and a published novelist — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
+Trigger a full peer review of a project. Runs four AI agents in parallel — an acquisitions editor, an enthusiastic reader, a published novelist, and an acting coach — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `projectId` | string | ID of the project to review |
 
-Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, and `consensus` fields. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
+Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `actor`, and `consensus` fields. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
 
 ---
 
@@ -879,18 +879,18 @@ Return stored peer review results for a project, newest first. Use `run_peer_rev
 | `projectId` | string | ID of the project |
 | `limit` | integer? | Max reviews to return (1–20, default 5) |
 
-Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, and `consensus` fields.
+Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `actor`, and `consensus` fields.
 
 ---
 
 #### `get_peer_review_prompts`
-Return the prompt/lens text used by each of the three peer review agents. Useful for understanding what perspective each reviewer takes before invoking a review prompt.
+Return the prompt/lens text used by each of the four peer review agents. Useful for understanding what perspective each reviewer takes before invoking a review prompt.
 
 No parameters.
 
-Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`) to its `mode` and `lens` fields.
+Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`, `review-actor`) to its `mode` and `lens` fields.
 
-**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author) prompts.
+**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author), [`review-actor`](#review-actor) prompts.
 
 ---
 
@@ -993,6 +993,17 @@ Uses `export_manuscript` to load the full manuscript, then reacts as a genre rea
 Review manuscript as a published peer author — craft-level feedback on prose, POV, dialogue, scene construction.
 
 Uses `export_manuscript` to load the full manuscript, then applies craft-level peer review: prose rhythm, POV discipline, dialogue quality, scene construction, show-don't-tell, inciting incident timing.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-actor`
+Review manuscript as an acting coach — emotional truth, earned feeling, subtext, and whether emotional peaks have enough runway.
+
+Uses `export_manuscript` to load the full manuscript, then evaluates whether each emotion is justified by the setup that preceded it, whether the character's internal state is legible, and whether humour lands because of character rather than authorial convenience.
 
 | Param | Type | Description |
 |-------|------|-------------|

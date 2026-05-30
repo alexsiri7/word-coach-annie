@@ -184,8 +184,8 @@ describe("POST /api/projects/:id/peer-review", () => {
 
   // ─── Happy path ────────────────────────────────────────────────────────────
 
-  it("returns 200 with publisher, reader, writer, consensus keys", async () => {
-    // Override synthesis to return consensus-shaped JSON
+  it("returns 200 with publisher, reader, writer, actor, consensus keys", async () => {
+    // Override all 4 reviewer + 1 synthesis calls with specific JSON
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(
         JSON.stringify({
@@ -216,6 +216,15 @@ describe("POST /api/projects/:id/peer-review", () => {
       )
       .mockResolvedValueOnce(
         JSON.stringify({
+          overallImpression: "Emotionally earned",
+          strengths: ["subtext"],
+          weaknesses: [],
+          detailedFeedback: "Emotion is justified.",
+          recommendation: "emotionally earned",
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
           pointsOfAgreement: ["well written"],
           pointsOfDisagreement: [],
           topPriorities: ["tighten pacing"],
@@ -229,6 +238,7 @@ describe("POST /api/projects/:id/peer-review", () => {
       publisher: { overallImpression: "Excellent", strengths: ["voice"], weaknesses: [], detailedFeedback: "Details", recommendation: "publish" },
       reader: { overallImpression: "Loved it", strengths: ["pacing"], weaknesses: [], detailedFeedback: "Details", recommendation: "loved it" },
       writer: { overallImpression: "Strong craft", strengths: ["dialogue"], weaknesses: [], detailedFeedback: "Details", recommendation: "strong" },
+      actor: { overallImpression: "Emotionally earned", strengths: ["subtext"], weaknesses: [], detailedFeedback: "Emotion is justified.", recommendation: "emotionally earned" },
       consensus: { pointsOfAgreement: ["well written"], pointsOfDisagreement: [], topPriorities: ["tighten pacing"], synthesizedRecommendation: "Publish with minor revisions" },
     } as never);
 
@@ -238,8 +248,10 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(body).toHaveProperty("publisher");
     expect(body).toHaveProperty("reader");
     expect(body).toHaveProperty("writer");
+    expect(body).toHaveProperty("actor");
     expect(body).toHaveProperty("consensus");
     expect(body.publisher.overallImpression).toBe("Excellent");
+    expect(body.actor.overallImpression).toBe("Emotionally earned");
     expect(body.consensus.synthesizedRecommendation).toBe("Publish with minor revisions");
   });
 
@@ -335,6 +347,7 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(callArg.data.publisher).toBeDefined();
     expect(callArg.data.reader).toBeDefined();
     expect(callArg.data.writer).toBeDefined();
+    expect(callArg.data.actor).toBeDefined();
     expect(callArg.data.consensus).toBeDefined();
   });
 

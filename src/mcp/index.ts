@@ -1700,7 +1700,7 @@ server.tool(
 
 server.tool(
     "get_peer_review_prompts",
-    "Return the prompt/lens text used by each of the three peer review agents (editor, fan, author). Useful for understanding what angle each reviewer takes.",
+    "Return the prompt/lens text used by each of the four peer review agents (editor, fan, author, actor). Useful for understanding what angle each reviewer takes.",
     {},
     async () => {
         const display = Object.fromEntries(

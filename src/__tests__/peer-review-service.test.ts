@@ -93,7 +93,7 @@ describe("runPeerReview", () => {
     const longManuscript = "x".repeat(100000);
     vi.mocked(exportManuscript).mockResolvedValueOnce(longManuscript);
     await runPeerReview("proj-1");
-    // All 5 runSimpleCompletion calls receive the truncated manuscript
+    // All 4 reviewer calls receive the truncated manuscript; the 5th call (synthesis) does not embed the raw manuscript
     const calls = vi.mocked(runSimpleCompletion).mock.calls;
     for (const [arg] of calls.slice(0, 4)) {
       // Each prompt embeds the manuscript — check it contains exactly 50k x's
