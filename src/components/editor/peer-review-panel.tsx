@@ -447,11 +447,17 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                 {currentMeta && (
                   <p className="text-[11px] text-muted-foreground mb-2">Saved {formatTimestamp(currentMeta.createdAt)}</p>
                 )}
-                {activeTab === "consensus"
-                  ? renderConsensusTab(review.consensus)
-                  : review[activeTab]
-                    ? renderReviewTab(review[activeTab]!)
-                    : <div className="p-4 text-center"><p className="text-sm text-muted-foreground">No {activeTab} review available for this record.</p></div>}
+                {activeTab === "consensus" ? (
+                  renderConsensusTab(review.consensus)
+                ) : review[activeTab] ? (
+                  renderReviewTab(review[activeTab]!)
+                ) : (
+                  <div className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No {activeTab} review available for this record.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
