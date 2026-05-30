@@ -83,6 +83,9 @@ describe("UniversesController", () => {
         expect(woWithTimeline.timeline[1].label).toBe("E1");
     });
 
+    // Note: these tests cover the controller-layer defense (UniversesController.reorderTimelineEntries).
+    // The route-layer guard in reorder/route.ts returns 400 before this controller throw can produce a 500;
+    // that HTTP-level behavior is covered in src/__tests__/timeline-reorder-route.test.ts.
     it("should reject orderedIds that belong to a different world object", async () => {
         const u = await UniversesController.createUniverse({ title: "U1" });
         const wo1 = await UniversesController.createWorldObject({ universeId: u.id, type: "CHARACTER", name: "Hero" });
