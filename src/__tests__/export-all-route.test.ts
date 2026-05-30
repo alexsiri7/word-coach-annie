@@ -41,7 +41,6 @@ describe("GET /api/projects/export-all", () => {
   });
 
   it("returns 401 when no userId (API_TOKEN mode)", async () => {
-    vi.mocked(getCurrentUserId).mockReturnValue(null);
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(401);
