@@ -4,14 +4,15 @@ import { REVIEW_PERSONAS } from "@/lib/review-personas";
 describe("REVIEW_PERSONAS", () => {
   const personaIds = Object.keys(REVIEW_PERSONAS);
 
-  it("defines exactly three personas", () => {
-    expect(personaIds).toHaveLength(3);
+  it("defines exactly four personas", () => {
+    expect(personaIds).toHaveLength(4);
   });
 
-  it("defines all three expected persona ids", () => {
+  it("defines all four expected persona ids", () => {
     expect(personaIds).toContain("review-editor");
     expect(personaIds).toContain("review-fan");
     expect(personaIds).toContain("review-author");
+    expect(personaIds).toContain("review-comedy");
   });
 
   it("each persona has a non-empty mode string", () => {
@@ -49,10 +50,14 @@ describe("REVIEW_PERSONAS", () => {
     const lens = REVIEW_PERSONAS["review-author"].lens("x").toLowerCase();
     expect(lens).toMatch(/craft|prose/);
   });
+
+  it("comedy lens mentions comedy or joke", () => {
+    expect(REVIEW_PERSONAS["review-comedy"].lens("x").toLowerCase()).toMatch(/comedy|joke/);
+  });
 });
 
 describe("get_peer_review_prompts tool handler", () => {
-  it("returns a text content block with all three personas serialized", () => {
+  it("returns a text content block with all four personas serialized", () => {
     const display = Object.fromEntries(
       Object.entries(REVIEW_PERSONAS).map(([id, { mode, lens }]) => [
         id,

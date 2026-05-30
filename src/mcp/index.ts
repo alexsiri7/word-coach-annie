@@ -1662,6 +1662,17 @@ server.prompt(
     )
 );
 
+server.prompt(
+    "review-comedy",
+    "Review manuscript as a TV comedy writer — whether the jokes land, setup/punchline mechanics, comic timing, and character-specific humour.",
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        REVIEW_PERSONAS["review-comedy"].mode,
+        REVIEW_PERSONAS["review-comedy"].lens("your project"),
+    )
+);
+
 // ─── Skills Tool ─────────────────────────────────────────────────────────────
 
 server.tool(
