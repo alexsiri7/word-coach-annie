@@ -37,10 +37,17 @@ describe("GET /api/auth/export-data", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
   });
 
-  it("returns 401 for unauthenticated request", async () => {
+  it("returns ZIP with null profile for API_TOKEN / dev mode (no userId)", async () => {
+    // In production, middleware blocks unauthenticated requests before reaching this
+    // handler. When userId is null here, it means API_TOKEN auth — no specific user.
     const { GET } = await import("@/app/api/auth/export-data/route");
     const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/zip");
+    const buf = Buffer.from(await res.arrayBuffer());
+    const zip = await JSZip.loadAsync(buf);
+    const profile = JSON.parse(await zip.file("profile.json")!.async("string"));
+    expect(profile).toBeNull();
   });
 
   it("returns 401 when userId exists but user is not in DB", async () => {
