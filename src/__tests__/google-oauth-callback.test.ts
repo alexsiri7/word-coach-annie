@@ -110,6 +110,8 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
+        // Exact single-argument assertion intentionally guards against PII re-introduction:
+        // if { email } or any second argument were added back, this assertion would fail.
         expect(logger.warn).toHaveBeenCalledWith(
             "OAuth provider rejected user: email not verified"
         );
@@ -133,6 +135,8 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toContain("/login?error=email_not_verified");
+        // Exact single-argument assertion intentionally guards against PII re-introduction:
+        // if { email } or any second argument were added back, this assertion would fail.
         expect(logger.warn).toHaveBeenCalledWith(
             "OAuth provider rejected user: email not verified"
         );
