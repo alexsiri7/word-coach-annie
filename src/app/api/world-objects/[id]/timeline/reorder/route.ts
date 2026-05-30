@@ -32,6 +32,21 @@ export async function POST(
                 { status: 400 }
             );
         }
+
+        // Verify all IDs belong to this world object before reordering
+        if (orderedIds.length > 0) {
+            const owned = await prisma.worldObjectTimelineEntry.findMany({
+                where: { id: { in: orderedIds }, worldObjectId: id },
+                select: { id: true },
+            });
+            if (owned.length !== orderedIds.length) {
+                return NextResponse.json(
+                    { error: "Some timeline entries do not belong to this world object" },
+                    { status: 400 }
+                );
+            }
+        }
+
         await UniversesController.reorderTimelineEntries(id, orderedIds);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
