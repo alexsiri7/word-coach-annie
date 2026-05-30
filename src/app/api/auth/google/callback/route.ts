@@ -97,9 +97,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!userInfo.verified_email) {
-            logger.warn("Google OAuth rejected: unverified email", {
-                email: userInfo.email,
-            });
+            logger.warn("OAuth provider rejected user: email not verified");
             return NextResponse.redirect(
                 new URL("/login?error=email_not_verified", baseUrl)
             );
