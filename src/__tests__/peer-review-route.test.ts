@@ -243,15 +243,16 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(body.consensus.synthesizedRecommendation).toBe("Publish with minor revisions");
   });
 
-  it("makes 4 AI calls (3 reviewers + 1 synthesis)", async () => {
+  it("makes 5 AI calls (4 reviewers + 1 synthesis)", async () => {
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "earned" }))
       .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Go" }));
 
     await POST(makeRequest(), makeParams());
-    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(4);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(5);
   });
 
   // ─── Warning guards ────────────────────────────────────────────────────────
@@ -277,11 +278,12 @@ describe("POST /api/projects/:id/peer-review", () => {
   // ─── DEFAULT fallback wiring ───────────────────────────────────────────────
 
   it("uses DEFAULT_CONSENSUS when synthesis throws and sets consensusError", async () => {
-    // 3 reviewer calls succeed, synthesis rejects
+    // 4 reviewer calls succeed, synthesis rejects
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "earned" }))
       .mockRejectedValueOnce(new Error("synthesis timeout"));
     vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
       id: "rev-fallback",
