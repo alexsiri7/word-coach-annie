@@ -14,6 +14,14 @@ vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
 }));
 
+vi.mock("@/lib/auth", () => ({
+    isAuthEnabled: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock("@/lib/api-auth", () => ({
+    getCurrentUserId: vi.fn().mockReturnValue("user-1"),
+}));
+
 vi.mock("@/lib/metrics", () => {
     const projectsSet = vi.fn();
     const usersSet = vi.fn();
@@ -26,19 +34,28 @@ vi.mock("@/lib/metrics", () => {
     return { registry, projectsGauge: { set: projectsSet }, usersGauge: { set: usersSet } };
 });
 
+import { NextRequest } from "next/server";
 import { projectsGauge, usersGauge } from "@/lib/metrics";
+import { isAuthEnabled } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { GET } from "../app/api/metrics/route";
+
+function mockRequest() {
+    return new NextRequest("http://localhost/api/metrics");
+}
 
 describe("GET /api/metrics", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        (isAuthEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
+        (getCurrentUserId as ReturnType<typeof vi.fn>).mockReturnValue("user-1");
     });
 
     it("returns 200 with Prometheus text on success", async () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(5);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(10);
 
-        const res = await GET();
+        const res = await GET(mockRequest());
         expect(res.status).toBe(200);
 
         const body = await res.text();
@@ -50,7 +67,7 @@ describe("GET /api/metrics", () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(42);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(7);
 
-        await GET();
+        await GET(mockRequest());
 
         expect(projectsGauge.set).toHaveBeenCalledWith(42);
         expect(usersGauge.set).toHaveBeenCalledWith(7);
@@ -60,8 +77,17 @@ describe("GET /api/metrics", () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(1);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(1);
 
-        const res = await GET();
+        const res = await GET(mockRequest());
         expect(res.headers.get("Content-Type")).toContain("text/plain");
+    });
+
+    it("returns 401 when auth is enabled and no user", async () => {
+        (isAuthEnabled as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        (getCurrentUserId as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+        const res = await GET(mockRequest());
+        expect(res.status).toBe(401);
+        expect(await res.text()).toBe("Unauthorized");
     });
 
     it("returns 503 on DB error", async () => {
@@ -69,7 +95,7 @@ describe("GET /api/metrics", () => {
             new Error("Connection refused")
         );
 
-        const res = await GET();
+        const res = await GET(mockRequest());
         expect(res.status).toBe(503);
         expect(await res.text()).toBe("Service unavailable");
     });

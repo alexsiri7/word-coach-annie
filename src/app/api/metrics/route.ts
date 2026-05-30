@@ -1,8 +1,14 @@
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { registry, projectsGauge, usersGauge } from "@/lib/metrics";
 import { logger } from "@/lib/logger";
+import { getCurrentUserId } from "@/lib/api-auth";
+import { isAuthEnabled } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    if (isAuthEnabled() && !getCurrentUserId(request)) {
+        return new Response("Unauthorized", { status: 401 });
+    }
     try {
         const [projects, users] = await Promise.all([
             prisma.project.count(),
