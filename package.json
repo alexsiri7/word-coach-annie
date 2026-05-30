@@ -6,7 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "dev:secure": "next dev --experimental-https -H 0.0.0.0",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",

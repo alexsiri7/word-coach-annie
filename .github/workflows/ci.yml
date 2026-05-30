@@ -138,6 +138,9 @@ jobs:
 
       - name: Start server and run E2E tests
         run: |
+          # Standalone server requires static assets to be copied manually
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
           npm start &
           # Wait for server to be ready
           for i in $(seq 1 30); do
@@ -148,6 +151,7 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
           PORT: 3000
+          HOSTNAME: 0.0.0.0
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
