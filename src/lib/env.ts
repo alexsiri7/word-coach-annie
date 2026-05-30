@@ -27,6 +27,9 @@ const envSchema = z.object({
   REQUESTY_API_KEY: z.string().optional(),
   REQUESTY_MODEL: z.string().optional(),
 
+  // Distributed rate limiting (optional — single-instance falls back to in-memory)
+  REDIS_URL: z.string().optional(),
+
   // Auth & Security
   API_TOKEN: z.string().optional(),
   JWT_SECRET: z.string().optional(),

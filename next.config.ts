@@ -26,7 +26,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // isomorphic-dompurify: externalized because its ESM/CJS hybrid does not bundle correctly
   // under webpack in Next.js 16 (peer issue with dompurify's jsdom path).
-  serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify"],
+  // ioredis: uses node:diagnostics_channel (Node.js built-in) which webpack cannot bundle
+  serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify", "ioredis"],
   experimental: {
     optimizePackageImports: [
       "lucide-react",

@@ -39,7 +39,7 @@ const validBody = { redirect_uris: ["http://localhost:3000/cb"] };
 describe("POST /oauth/register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(checkRateLimit).mockReturnValue({ allowed: true, remaining: 5, resetMs: 0 });
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 5, resetMs: 0 });
     vi.mocked(countClientsByIpInWindow).mockResolvedValue(0);
     vi.mocked(countTotalClients).mockResolvedValue(0);
   });
@@ -53,7 +53,7 @@ describe("POST /oauth/register", () => {
   });
 
   it("returns 429 when in-memory rate limit exceeded", async () => {
-    vi.mocked(checkRateLimit).mockReturnValue({
+    vi.mocked(checkRateLimit).mockResolvedValue({
       allowed: false,
       remaining: 0,
       resetMs: Date.now() + 1000,
