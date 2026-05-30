@@ -85,6 +85,7 @@ describe("POST /api/projects/[id]/report", () => {
   });
 
   it("does not include project author name in GitHub issue body", async () => {
+    mockFindUnique.mockResolvedValue({ id: "proj1", title: "My Story", author: "Jane Doe" });
     const res = await POST(
       makeRequest({ category: "copyright" }),
       { params: Promise.resolve({ id: "proj1" }) }
@@ -93,6 +94,7 @@ describe("POST /api/projects/[id]/report", () => {
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
     expect(body.body).not.toContain("Author:");
+    expect(body.body).not.toContain("Jane Doe");
   });
 
   it("strips query params and hash from URL in GitHub issue body", async () => {

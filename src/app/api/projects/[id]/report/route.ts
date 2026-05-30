@@ -60,6 +60,7 @@ export async function POST(
   if (url && typeof url === "string") {
     try {
       const u = new URL(url);
+      // pathname only — strips query params and hash to avoid leaking PII (e.g. ref= tracking params)
       if (["http:", "https:"].includes(u.protocol)) safeUrl = escapeMarkdown(u.pathname);
     } catch { /* ignore invalid URLs */ }
   }
