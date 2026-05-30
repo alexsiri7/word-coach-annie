@@ -116,7 +116,8 @@ export async function PATCH(
     let body: Record<string, unknown>;
     try {
       body = await request.json();
-    } catch {
+    } catch (parseError) {
+      logger.warn("PATCH /api/relationships/[id] invalid JSON body", parseError);
       return NextResponse.json(
         { error: "Invalid JSON body" },
         { status: 400 }
