@@ -40,15 +40,27 @@ describe("GET /api/projects/export-all", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
   });
 
+  it("returns 401 when no userId (API_TOKEN mode)", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    const { GET } = await import("@/app/api/projects/export-all/route");
+    const res = await GET(makeGetRequest());
+    expect(res.status).toBe(401);
+  });
+
   it("returns 404 when user has 0 projects", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue("user-no-projects");
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(404);
   });
 
   it("returns ZIP with projects for authenticated user", async () => {
-    await testPrisma.project.create({ data: { title: "Project A", author: "Author" } });
-    await testPrisma.project.create({ data: { title: "Project B", author: "Author" } });
+    vi.mocked(getCurrentUserId).mockReturnValue("user-zip");
+    const user = await testPrisma.user.create({
+      data: { id: "user-zip", email: "zip@test.com", googleId: "g-zip" },
+    });
+    await testPrisma.project.create({ data: { title: "Project A", author: "Author", userId: user.id } });
+    await testPrisma.project.create({ data: { title: "Project B", author: "Author", userId: user.id } });
 
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
@@ -63,7 +75,11 @@ describe("GET /api/projects/export-all", () => {
   });
 
   it("response has correct content-type and content-disposition headers", async () => {
-    await testPrisma.project.create({ data: { title: "Solo Project", author: "Author" } });
+    vi.mocked(getCurrentUserId).mockReturnValue("user-headers");
+    const user = await testPrisma.user.create({
+      data: { id: "user-headers", email: "headers@test.com", googleId: "g-headers" },
+    });
+    await testPrisma.project.create({ data: { title: "Solo Project", author: "Author", userId: user.id } });
 
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
