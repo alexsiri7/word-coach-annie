@@ -37,8 +37,11 @@ export function sanitizeHtml(input: string): string {
   // Restore beat comments
   return sanitized.replace(/<span data-beat-placeholder="(\d+)"><\/span>/g, (_, idx) => {
     const beat = beats[parseInt(idx, 10)];
-    // Prevent comment breakout in restored beat comments
-    return beat.replace(/-->/g, "--&gt;");
+    // Prevent comment breakout: escape any --> inside the comment body,
+    // but preserve the structural closing delimiter.
+    // Beat format: <!-- beat: <content> -->
+    const inner = beat.slice(5, -3); // strip "<!--" and "-->"
+    return `<!--${inner.replace(/-->/g, "--&gt;")}-->`;
   });
 }
 
