@@ -65,10 +65,10 @@ function makeRateLimitResponse(
  * - Feedback submission (POST /api/feedback): 5/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
-function applyRateLimit(
+async function applyRateLimit(
     request: NextRequest,
     userKey: string
-): NextResponse | null {
+): Promise<NextResponse | null> {
     const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
@@ -80,8 +80,8 @@ function applyRateLimit(
 
     const method = request.method;
 
-    function tryLimit(key: string, config: { limit: number; windowMs: number }): NextResponse | null {
-        const result = checkRateLimit(key, config);
+    async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
+        const result = await checkRateLimit(key, config);
         if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
         return null;
     }
@@ -112,7 +112,7 @@ export async function middleware(request: NextRequest) {
     // This prevents brute-force attacks on /api/auth/login even though that path is public.
     if (pathname === "/api/auth/login" && !(process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production")) {
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
-        const result = checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
+        const result = await checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {
             return makeRateLimitResponse(RATE_LIMITS.auth, result.retryAfterMs!, result.resetMs);
         }
@@ -134,7 +134,7 @@ export async function middleware(request: NextRequest) {
 
         // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks)
         if (token && apiToken && safeEqual(token, apiToken)) {
-            const rateLimited = applyRateLimit(request, "apitoken");
+            const rateLimited = await applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
             return NextResponse.next();
         }
@@ -143,7 +143,7 @@ export async function middleware(request: NextRequest) {
         if (token) {
             const mcpSession = await verifyMcpToken(token, "mcp_access");
             if (mcpSession) {
-                const rateLimited = applyRateLimit(request, mcpSession.userId);
+                const rateLimited = await applyRateLimit(request, mcpSession.userId);
                 if (rateLimited) return rateLimited;
 
                 Sentry.setUser({
@@ -176,7 +176,7 @@ export async function middleware(request: NextRequest) {
         const session = await verifySessionToken(sessionCookie);
         if (session) {
             // Rate limit by authenticated user ID
-            const rateLimited = applyRateLimit(request, session.userId);
+            const rateLimited = await applyRateLimit(request, session.userId);
             if (rateLimited) return rateLimited;
 
             // Set Sentry user context for error attribution
@@ -199,7 +199,7 @@ export async function middleware(request: NextRequest) {
             const expected = await deriveSessionToken(apiToken);
             if (sessionCookie === expected) {
                 // Rate limit legacy sessions by token
-                const rateLimited = applyRateLimit(request, "apitoken");
+                const rateLimited = await applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;
                 return NextResponse.next();
             }

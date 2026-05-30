@@ -1,7 +1,10 @@
 /**
- * In-memory sliding window rate limiter.
- * Tracks request timestamps per key and enforces requests-per-window limits.
+ * Sliding window rate limiter.
+ * Uses Redis (sorted-set) when REDIS_URL is set; falls back to an in-memory
+ * Map for single-instance deployments.
  */
+import Redis from "ioredis";
+import { env } from "@/lib/env";
 
 interface RateLimitEntry {
     timestamps: number[];
@@ -14,11 +17,19 @@ interface RateLimitConfig {
     windowMs: number;
 }
 
-const store = new Map<string, RateLimitEntry>();
+interface RateLimitResult {
+    allowed: boolean;
+    remaining: number;
+    resetMs: number;
+    retryAfterMs?: number;
+}
+
+// ── In-Memory Store ────────────────────────────────────────────────────────────
+
+const memStore = new Map<string, RateLimitEntry>();
 
 /** Evict expired entries periodically to prevent memory leaks */
 const CLEANUP_INTERVAL_MS = 60_000;
-let lastCleanup = Date.now();
 
 /**
  * Maximum window across all rate limit configs.
@@ -26,66 +37,144 @@ let lastCleanup = Date.now();
  * entries (e.g. hourly limits) when a short-window request triggers cleanup.
  */
 const MAX_WINDOW_MS = 3_600_000; // 1 hour — matches the longest windowMs in RATE_LIMITS
+let lastCleanup = Date.now();
 
-function cleanup() {
+function memCleanup() {
     const now = Date.now();
     if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
     lastCleanup = now;
-
     const cutoff = now - MAX_WINDOW_MS;
-    for (const [key, entry] of store) {
+    for (const [key, entry] of memStore) {
         entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
-        if (entry.timestamps.length === 0) {
-            store.delete(key);
-        }
+        if (entry.timestamps.length === 0) memStore.delete(key);
     }
 }
 
-/**
- * Check and consume a rate limit token for the given key.
- * Returns { allowed: true, remaining, resetMs } or { allowed: false, remaining: 0, resetMs, retryAfterMs }.
- */
-export function checkRateLimit(
-    key: string,
-    config: RateLimitConfig
-): {
-    allowed: boolean;
-    remaining: number;
-    resetMs: number;
-    retryAfterMs?: number;
-} {
+function checkInMemory(key: string, config: RateLimitConfig): RateLimitResult {
     const now = Date.now();
     const windowStart = now - config.windowMs;
+    memCleanup();
 
-    cleanup();
-
-    let entry = store.get(key);
+    let entry = memStore.get(key);
     if (!entry) {
         entry = { timestamps: [] };
-        store.set(key, entry);
+        memStore.set(key, entry);
     }
-
-    // Remove timestamps outside the window
     entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
 
     if (entry.timestamps.length >= config.limit) {
-        // Find when the oldest timestamp in the window will expire
         const oldestInWindow = entry.timestamps[0];
-        const retryAfterMs = oldestInWindow + config.windowMs - now;
         return {
             allowed: false,
             remaining: 0,
             resetMs: oldestInWindow + config.windowMs,
-            retryAfterMs,
+            retryAfterMs: oldestInWindow + config.windowMs - now,
         };
     }
-
     entry.timestamps.push(now);
     return {
         allowed: true,
         remaining: config.limit - entry.timestamps.length,
         resetMs: now + config.windowMs,
     };
+}
+
+// ── Redis Store ────────────────────────────────────────────────────────────────
+
+// Lua script for atomic sliding-window check-and-consume.
+// Arguments: key, now (ms), windowStart (ms), limit, windowMs (ms)
+// Returns: [count_after, oldest_in_window_or_-1]
+const RATE_LIMIT_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window_start = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local window_ms = tonumber(ARGV[4])
+
+-- Remove expired entries
+redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start)
+
+-- Current count
+local count = redis.call('ZCARD', key)
+
+if count >= limit then
+  -- Return oldest member score so caller can compute retryAfterMs
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  return {count, tonumber(oldest[2] or now)}
+end
+
+-- Add this request
+redis.call('ZADD', key, now, now .. '-' .. math.random(1e9))
+-- Expire after one full window to avoid orphaned keys
+redis.call('PEXPIRE', key, window_ms)
+
+return {count + 1, -1}
+`;
+
+let _redis: Redis | null = null;
+
+function getRedis(): Redis {
+    if (!_redis) {
+        _redis = new Redis(env.REDIS_URL!);
+        _redis.on("error", (err) => {
+            console.error("[rate-limit] Redis error:", err);
+        });
+    }
+    return _redis;
+}
+
+async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLimitResult> {
+    const now = Date.now();
+    const windowStart = now - config.windowMs;
+
+    try {
+        const redis = getRedis();
+        const [countAfter, oldestScore] = await redis.eval(
+            RATE_LIMIT_SCRIPT,
+            1,
+            key,
+            now,
+            windowStart,
+            config.limit,
+            config.windowMs
+        ) as [number, number];
+
+        if (countAfter > config.limit || oldestScore !== -1) {
+            const retryAfterMs = oldestScore + config.windowMs - now;
+            return {
+                allowed: false,
+                remaining: 0,
+                resetMs: oldestScore + config.windowMs,
+                retryAfterMs: Math.max(0, retryAfterMs),
+            };
+        }
+
+        return {
+            allowed: true,
+            remaining: config.limit - countAfter,
+            resetMs: now + config.windowMs,
+        };
+    } catch (err) {
+        // Fail open — allow the request but log the error so ops can investigate
+        console.error("[rate-limit] Redis check failed, allowing request:", err);
+        return {
+            allowed: true,
+            remaining: config.limit - 1,
+            resetMs: now + config.windowMs,
+        };
+    }
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────────
+
+const useRedis = () => Boolean(env.REDIS_URL);
+
+export function checkRateLimit(
+    key: string,
+    config: RateLimitConfig
+): RateLimitResult | Promise<RateLimitResult> {
+    if (useRedis()) return checkRedis(key, config);
+    return checkInMemory(key, config);
 }
 
 /** Rate limit configs */
@@ -106,7 +195,7 @@ export const RATE_LIMITS = {
     auth: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
 };
 
-/** Clear all entries (for testing) */
+/** Clear all entries (for testing — in-memory mode only) */
 export function resetRateLimitStore() {
-    store.clear();
+    memStore.clear();
 }

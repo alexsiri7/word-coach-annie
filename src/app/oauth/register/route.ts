@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   // Per-IP throttle to limit client registration abuse
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
   if (process.env.DISABLE_RATE_LIMIT !== "true") {
-    const rl = checkRateLimit(`oauth-register:${ip}`, { limit: 5, windowMs: 3_600_000 });
+    const rl = await checkRateLimit(`oauth-register:${ip}`, { limit: 5, windowMs: 3_600_000 });
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "rate_limited", error_description: "too many registration attempts" },
