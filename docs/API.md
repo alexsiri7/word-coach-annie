@@ -502,7 +502,18 @@ List timeline entries for a world object.
 ### `POST /api/world-objects/:id/timeline`
 Add a timeline entry.
 
-**Body**: `{ title: string, description?: string, orderIndex?: number }`
+**Body**: `{ label: string, description?: string, attributes?: string, orderIndex?: number, projectId?: string }`
+
+**Errors**: `400` validation failure (missing or empty `label`); `401` unauthenticated
+
+---
+
+### `PATCH /api/world-objects/:id/timeline/:entryId`
+Update a timeline entry.
+
+**Body**: `{ label?: string, description?: string, attributes?: string, orderIndex?: number }` (at least one field required)
+
+**Errors**: `400` validation failure (no fields provided or empty `label`); `401` unauthenticated
 
 ---
 
