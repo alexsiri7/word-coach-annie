@@ -136,7 +136,9 @@ export async function middleware(request: NextRequest) {
         if (token && apiToken && safeEqual(token, apiToken)) {
             const rateLimited = await applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
-            return NextResponse.next();
+            const requestHeaders = new Headers(request.headers);
+            requestHeaders.set("x-auth-mode", "apitoken");
+            return NextResponse.next({ request: { headers: requestHeaders } });
         }
 
         // 2. Check MCP OAuth access token (JWT with type: "mcp_access")

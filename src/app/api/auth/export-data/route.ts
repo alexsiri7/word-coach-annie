@@ -9,8 +9,30 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
+    const isApiTokenMode = request.headers.get("x-auth-mode") === "apitoken";
+
+    if (!userId && !isApiTokenMode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!userId) {
+      // API_TOKEN mode — no specific user, return an empty zip
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      const passthrough = new PassThrough();
+      archive.pipe(passthrough);
+      await archive.finalize();
+      const chunks: Buffer[] = [];
+      for await (const chunk of passthrough) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      const timestamp = new Date().toISOString().slice(0, 10);
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="annie-full-export-${timestamp}.zip"`,
+        },
+      });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
