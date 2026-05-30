@@ -186,8 +186,7 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
 // Edge runtime (middleware) cannot use ioredis — always falls back to in-memory.
 // Evaluated per-call so that tests can override globalThis.EdgeRuntime.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const useRedis = () => typeof (globalThis as any).EdgeRuntime === "undefined" && Boolean(env.REDIS_URL);
+const useRedis = () => typeof (globalThis as Record<string, unknown>).EdgeRuntime === "undefined" && Boolean(env.REDIS_URL);
 
 /**
  * Check whether the given key has exceeded its rate limit.
