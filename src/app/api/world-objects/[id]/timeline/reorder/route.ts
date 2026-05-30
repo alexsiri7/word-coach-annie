@@ -19,8 +19,8 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     try {
-        const { id } = await params;
         const userId = getCurrentUserId(request);
         const access = await verifyWorldObjectAccess(id, userId);
         if (!access.authorized) return access.response;
@@ -32,10 +32,32 @@ export async function POST(
                 { status: 400 }
             );
         }
+
+        // Verify all IDs belong to this world object before reordering
+        if (orderedIds.length > 0) {
+            const uniqueIds = new Set(orderedIds);
+            if (uniqueIds.size !== orderedIds.length) {
+                return NextResponse.json(
+                    { error: "orderedIds contains duplicate entries" },
+                    { status: 400 }
+                );
+            }
+            const owned = await prisma.worldObjectTimelineEntry.findMany({
+                where: { id: { in: orderedIds }, worldObjectId: id },
+                select: { id: true },
+            });
+            if (owned.length !== orderedIds.length) {
+                return NextResponse.json(
+                    { error: "Some timeline entries do not belong to this world object" },
+                    { status: 400 }
+                );
+            }
+        }
+
         await UniversesController.reorderTimelineEntries(id, orderedIds);
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
-        logger.error("POST /api/world-objects/[id]/timeline/reorder error", error);
+        logger.error("POST /api/world-objects/[id]/timeline/reorder error", { error, worldObjectId: id });
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
