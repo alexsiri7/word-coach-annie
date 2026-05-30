@@ -10,10 +10,12 @@ import {
 const mockEval = vi.fn();
 
 vi.mock("ioredis", () => ({
-    default: vi.fn().mockImplementation(() => ({
-        eval: mockEval,
-        on: vi.fn(),
-    })),
+    default: vi.fn().mockImplementation(function () {
+        return {
+            eval: mockEval,
+            on: vi.fn(),
+        };
+    }),
 }));
 
 // ── In-Memory Path ─────────────────────────────────────────────────────────────
