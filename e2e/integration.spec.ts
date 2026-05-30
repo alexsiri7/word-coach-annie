@@ -879,6 +879,18 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
+  // ── l-1) GDPR data export ──────────────────────────────────────────
+  test('export-data returns zip for authenticated user', async ({ request }) => {
+    const res = await request.get('/api/auth/export-data', { headers: AUTH_HEADERS })
+    expect(res.status()).toBe(200)
+    expect(res.headers()['content-type']).toContain('application/zip')
+  })
+
+  test('export-data returns 401 for unauthenticated request', async ({ request }) => {
+    const res = await request.get('/api/auth/export-data')
+    expect(res.status()).toBe(401)
+  })
+
   // ── l) JSON export → re-import round-trip ──────────────────────────
   test('JSON export data can be used to recreate a project', async ({
     request,
