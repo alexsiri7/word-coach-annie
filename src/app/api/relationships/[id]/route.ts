@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -144,7 +145,7 @@ export async function PATCH(
 
     const data: Record<string, unknown> = {};
     if (type !== undefined) data.type = type;
-    if (label !== undefined) data.label = label;
+    if (label !== undefined) data.label = sanitizeInput(label);
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
