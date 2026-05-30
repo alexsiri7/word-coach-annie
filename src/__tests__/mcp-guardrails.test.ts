@@ -202,7 +202,7 @@ describe("review persona prompts", () => {
         expect(helperSection).toContain("export_manuscript");
     });
 
-    for (const promptName of ["review-editor", "review-fan", "review-author"]) {
+    for (const promptName of ["review-editor", "review-fan", "review-author", "review-actor"]) {
         describe(`${promptName} prompt`, () => {
             it(`should register the ${promptName} prompt`, () => {
                 expect(mcpSource).toContain(`"${promptName}"`);
