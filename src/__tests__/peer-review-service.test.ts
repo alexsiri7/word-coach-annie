@@ -46,7 +46,7 @@ const DEFAULT_SAVED = {
   publisher: { overallImpression: "Great", strengths: ["voice"], weaknesses: [], detailedFeedback: "Good.", recommendation: "publish" },
   reader: { overallImpression: "Great", strengths: ["voice"], weaknesses: [], detailedFeedback: "Good.", recommendation: "loved it" },
   writer: { overallImpression: "Great", strengths: ["voice"], weaknesses: [], detailedFeedback: "Good.", recommendation: "strong" },
-  actor: { overallImpression: "Great", strengths: ["emotional truth"], weaknesses: [], detailedFeedback: "Earned.", recommendation: "emotionally earned" },
+  comedy: { overallImpression: "Great", strengths: ["timing"], weaknesses: [], detailedFeedback: "Good.", recommendation: "sharp" },
   consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
 };
 
@@ -93,7 +93,7 @@ describe("runPeerReview", () => {
     const longManuscript = "x".repeat(100000);
     vi.mocked(exportManuscript).mockResolvedValueOnce(longManuscript);
     await runPeerReview("proj-1");
-    // All 4 reviewer calls receive the truncated manuscript; the 5th call (synthesis) does not embed the raw manuscript
+    // All 4 runSimpleCompletion calls receive the truncated manuscript
     const calls = vi.mocked(runSimpleCompletion).mock.calls;
     for (const [arg] of calls.slice(0, 4)) {
       // Each prompt embeds the manuscript — check it contains exactly 50k x's
@@ -107,6 +107,12 @@ describe("runPeerReview", () => {
     expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(5);
   });
 
+  it("includes COMEDY WRITER in synthesis prompt", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    expect(calls[4][0].userMessage).toContain("COMEDY WRITER");
+  });
+
   it("returns saved record with id and createdAt", async () => {
     const result = await runPeerReview("proj-1");
     expect(result.id).toBe("rev-1");
@@ -118,7 +124,7 @@ describe("runPeerReview", () => {
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
-      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "emotionally earned" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
       .mockRejectedValueOnce(new Error("rate limit exceeded"));
 
     const result = await runPeerReview("proj-1");

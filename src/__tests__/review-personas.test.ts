@@ -12,7 +12,7 @@ describe("REVIEW_PERSONAS", () => {
     expect(personaIds).toContain("review-editor");
     expect(personaIds).toContain("review-fan");
     expect(personaIds).toContain("review-author");
-    expect(personaIds).toContain("review-actor");
+    expect(personaIds).toContain("review-comedy");
   });
 
   it("each persona has a non-empty mode string", () => {
@@ -51,14 +51,13 @@ describe("REVIEW_PERSONAS", () => {
     expect(lens).toMatch(/craft|prose/);
   });
 
-  it("actor lens mentions emotional truth or feeling", () => {
-    const lens = REVIEW_PERSONAS["review-actor"].lens("x").toLowerCase();
-    expect(lens).toMatch(/emotional|feeling/);
+  it("comedy lens mentions comedy or joke", () => {
+    expect(REVIEW_PERSONAS["review-comedy"].lens("x").toLowerCase()).toMatch(/comedy|joke/);
   });
 });
 
 describe("get_peer_review_prompts tool handler", () => {
-  it("returns a text content block with all three personas serialized", () => {
+  it("returns a text content block with all four personas serialized", () => {
     const display = Object.fromEntries(
       Object.entries(REVIEW_PERSONAS).map(([id, { mode, lens }]) => [
         id,
@@ -74,11 +73,11 @@ describe("get_peer_review_prompts tool handler", () => {
     expect(parsed["review-editor"]).toBeDefined();
     expect(parsed["review-fan"]).toBeDefined();
     expect(parsed["review-author"]).toBeDefined();
-    expect(parsed["review-actor"]).toBeDefined();
+    expect(parsed["review-comedy"]).toBeDefined();
     expect(parsed["review-editor"].mode).toBe("Acquisitions Editor");
     expect(parsed["review-fan"].mode).toBe("Fan Reader");
     expect(parsed["review-author"].mode).toBe("Peer Author");
-    expect(parsed["review-actor"].mode).toBe("Acting Coach");
+    expect(parsed["review-comedy"].mode).toBe("Comedy Writer");
     expect(typeof parsed["review-editor"].lens).toBe("string");
     expect(parsed["review-editor"].lens.length).toBeGreaterThan(0);
   });

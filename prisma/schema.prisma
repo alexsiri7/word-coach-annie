@@ -246,7 +246,7 @@ model PeerReview {
   publisher Json
   reader    Json
   writer    Json
-  actor     Json?
+  comedy    Json?
   consensus Json
   createdAt DateTime @default(now())
 
