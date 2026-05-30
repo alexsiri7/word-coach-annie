@@ -200,7 +200,7 @@ Three export modes: `UNIVERSE` (world-building bible), `STORY_INTERNAL` (full ma
 - **Error tracking**: Sentry (`sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`)
 - **OpenTelemetry**: Custom spans on MCP tool calls and ADK agent operations (`src/instrumentation.ts`)
 - **Health**: `GET /api/health` returns `{"ok": true}`
-- **Metrics**: `GET /api/metrics` returns Prometheus text format (public endpoint; see `src/lib/metrics.ts`)
+- **Metrics**: `GET /api/metrics` returns Prometheus text format (requires auth when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`)
 
 ## Infrastructure
 

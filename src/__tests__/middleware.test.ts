@@ -70,7 +70,7 @@ describe("middleware", () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/metrics");
         const res = await middleware(req);
-        expect(res.status).not.toBe(200);
+        expect(res.status).toBe(401);
     });
 
     it("allows /api/auth/login path", async () => {

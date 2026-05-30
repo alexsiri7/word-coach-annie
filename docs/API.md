@@ -13,15 +13,16 @@ All endpoints are REST JSON APIs under `/api/`. Requests that modify data requir
 ### `GET /api/metrics`
 Returns Prometheus-format metrics for the Annie service.
 
-**Authentication**: None required (public endpoint).
+**Authentication**: Required when auth is enabled (`AUTH_ENABLED=true`). Pass a session cookie or `Authorization: Bearer <API_TOKEN>` header.
 
-**Response**: `200 text/plain` with Prometheus text format. Metrics include:
-- `annie_http_requests_total{method, path, status}` — request counter
-- `annie_http_request_duration_seconds{method, path}` — latency histogram
-- `annie_projects_total` — gauge: total projects in database
-- `annie_users_total` — gauge: total users in database
-
-**Error**: `503 Service Unavailable` if the database is unreachable.
+**Response**:
+- `200 text/plain` — Prometheus text format (metrics payload). Metrics include:
+  - `annie_http_requests_total{method, path, status}` — request counter
+  - `annie_http_request_duration_seconds{method, path}` — latency histogram
+  - `annie_projects_total` — gauge: total projects in database
+  - `annie_users_total` — gauge: total users in database
+- `401 Unauthorized` — auth is enabled and no valid session/token provided
+- `503 Service Unavailable` — database is unreachable
 
 ---
 

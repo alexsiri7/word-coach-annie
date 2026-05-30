@@ -14,14 +14,6 @@ vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({
-    isAuthEnabled: vi.fn().mockReturnValue(false),
-}));
-
-vi.mock("@/lib/api-auth", () => ({
-    getCurrentUserId: vi.fn().mockReturnValue("user-1"),
-}));
-
 vi.mock("@/lib/metrics", () => {
     const projectsSet = vi.fn();
     const usersSet = vi.fn();
@@ -36,19 +28,17 @@ vi.mock("@/lib/metrics", () => {
 
 import { NextRequest } from "next/server";
 import { projectsGauge, usersGauge } from "@/lib/metrics";
-import { isAuthEnabled } from "@/lib/auth";
-import { getCurrentUserId } from "@/lib/api-auth";
 import { GET } from "../app/api/metrics/route";
 
 function mockRequest() {
     return new NextRequest("http://localhost/api/metrics");
 }
 
+// Auth is enforced by middleware (not the route handler). These tests verify
+// the handler's behaviour once a request has already passed auth.
 describe("GET /api/metrics", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        (isAuthEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
-        (getCurrentUserId as ReturnType<typeof vi.fn>).mockReturnValue("user-1");
     });
 
     it("returns 200 with Prometheus text on success", async () => {
@@ -81,13 +71,15 @@ describe("GET /api/metrics", () => {
         expect(res.headers.get("Content-Type")).toContain("text/plain");
     });
 
-    it("returns 401 when auth is enabled and no user", async () => {
-        (isAuthEnabled as ReturnType<typeof vi.fn>).mockReturnValue(true);
-        (getCurrentUserId as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    it("returns 200 for API_TOKEN bearer sessions (no x-user-id header set by middleware)", async () => {
+        // API_TOKEN sessions: middleware authenticates and passes through without setting x-user-id.
+        // The route handler must not perform its own auth check — middleware is the gatekeeper.
+        (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(3);
+        (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(5);
 
-        const res = await GET(mockRequest());
-        expect(res.status).toBe(401);
-        expect(await res.text()).toBe("Unauthorized");
+        const req = new NextRequest("http://localhost/api/metrics"); // no Authorization header — simulates post-middleware state
+        const res = await GET(req);
+        expect(res.status).toBe(200);
     });
 
     it("returns 503 on DB error", async () => {
