@@ -188,11 +188,9 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
   }, [projectId]);
 
   const toggleHistory = useCallback(() => {
-    setHistoryOpen((prev) => {
-      if (!prev && history === null) void fetchHistory();
-      return !prev;
-    });
-  }, [history, fetchHistory]);
+    if (!historyOpen && history === null) void fetchHistory();
+    setHistoryOpen((prev) => !prev);
+  }, [historyOpen, history, fetchHistory]);
 
   const loadFromHistory = useCallback(async (id: string) => {
     setLoading(true);
