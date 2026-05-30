@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,11 @@ export default function SettingsPage() {
   const [hashnodeDisconnecting, setHashnodeDisconnecting] = useState(false);
   const [hashnodeError, setHashnodeError] = useState("");
 
+  // Privacy & Data state
+  const [replayAllowed, setReplayAllowed] = useState(true);
+  const [consentLoading, setConsentLoading] = useState(true);
+  const [exportingData, setExportingData] = useState(false);
+
 
   useEffect(() => {
     fetch("/api/ai-settings")
@@ -111,6 +116,17 @@ export default function SettingsPage() {
       .then((data) => setGoogleDocsConnected(data.connected ?? false))
       .catch(console.error)
       .finally(() => setGoogleDocsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/account/consent")
+      .then((res) => res.json())
+      .then((rows: Array<{ feature: string; consentGiven: boolean }>) => {
+        const replay = rows.find((r) => r.feature === "sentry_replay");
+        setReplayAllowed(replay?.consentGiven ?? true);
+      })
+      .catch(console.error)
+      .finally(() => setConsentLoading(false));
   }, []);
 
   const handleHashnodeConnect = async () => {
@@ -147,6 +163,33 @@ export default function SettingsPage() {
       setHashnodeDisconnectOpen(false);
     } finally {
       setHashnodeDisconnecting(false);
+    }
+  };
+
+  const handleReplayToggle = async (allowed: boolean) => {
+    setReplayAllowed(allowed);
+    localStorage.setItem("consent:sentry_replay", String(allowed));
+    await fetch("/api/account/consent", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feature: "sentry_replay", consentGiven: allowed }),
+    });
+  };
+
+  const handleExportData = async () => {
+    setExportingData(true);
+    try {
+      const res = await fetch("/api/auth/export-data");
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `annie-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingData(false);
     }
   };
 
@@ -650,6 +693,65 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+
+        {/* Privacy & Data */}
+        <div className="glass-card p-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="h-4 w-4 text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">Privacy & Data</h2>
+          </div>
+          {consentLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-text-primary">Session recording (Sentry replay)</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Anonymised recordings of errors to help fix bugs. Manuscript content is masked.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={replayAllowed}
+                  onClick={() => handleReplayToggle(!replayAllowed)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    replayAllowed ? "bg-accent" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      replayAllowed ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="border-t border-border pt-4">
+                <p className="text-sm text-text-primary mb-1">Download your data</p>
+                <p className="text-xs text-text-muted mb-3">
+                  Export all your projects, settings, and account data as a ZIP file (GDPR Article 20).
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportData}
+                  disabled={exportingData}
+                  className="gap-1.5"
+                >
+                  {exportingData ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Download my data
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

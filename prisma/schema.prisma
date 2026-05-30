@@ -43,6 +43,19 @@ model User {
   projects   Project[]
   universes  Universe[]
   aiSettings UserAiSettings?
+  consents   UserConsent[]
+}
+
+model UserConsent {
+  id           String   @id @default(cuid())
+  userId       String
+  feature      String   // "sentry_replay" | "claude_api"
+  consentGiven Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature])
+  @@index([userId])
 }
 
 model Project {

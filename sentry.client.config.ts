@@ -1,6 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
 import { beforeSend } from "@/lib/sentry-scrub";
 
+const replayConsented =
+  typeof window === "undefined" ||
+  localStorage.getItem("consent:sentry_replay") !== "false";
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -12,8 +16,8 @@ Sentry.init({
 
   // Session replay: capture 1% of sessions, 100% on error
   // Masking handles PII — full error sample rate maximises debugging signal
-  replaysSessionSampleRate: 0.01,
-  replaysOnErrorSampleRate: 1.0,
+  replaysSessionSampleRate: replayConsented ? 0.01 : 0,
+  replaysOnErrorSampleRate: replayConsented ? 1.0 : 0,
 
   integrations: [
     Sentry.replayIntegration({
