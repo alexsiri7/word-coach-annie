@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch projects and AI settings in parallel
     const [projects, aiSettings] = await Promise.all([
       prisma.project.findMany({
         where: { userId },
@@ -28,7 +27,6 @@ export async function GET(request: NextRequest) {
       prisma.userAiSettings.findUnique({ where: { userId } }),
     ]);
 
-    // Create ZIP archive
     const archive = archiver("zip", { zlib: { level: 9 } });
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
@@ -66,7 +64,6 @@ export async function GET(request: NextRequest) {
       name: "ai-settings.json",
     });
 
-    // Add each project as a JSON file
     for (const project of projects) {
       const data = await exportProjectJson(project.id);
       const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
@@ -77,7 +74,6 @@ export async function GET(request: NextRequest) {
 
     await archive.finalize();
 
-    // Collect the stream into a buffer
     const chunks: Buffer[] = [];
     for await (const chunk of passthrough) {
       chunks.push(Buffer.from(chunk));

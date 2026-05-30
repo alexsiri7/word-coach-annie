@@ -84,7 +84,6 @@ export default function SettingsPage() {
   const [exportingData, setExportingData] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-
   useEffect(() => {
     fetch("/api/ai-settings")
       .then((res) => res.json())
