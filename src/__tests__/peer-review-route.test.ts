@@ -97,6 +97,7 @@ describe("POST /api/projects/:id/peer-review", () => {
       publisher: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "publish" },
       reader: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "loved it" },
       writer: { overallImpression: "Great book", strengths: ["compelling voice"], weaknesses: ["slow pacing"], detailedFeedback: "Overall well done.", recommendation: "strong" },
+      comedy: { overallImpression: "Great book", strengths: ["timing"], weaknesses: [], detailedFeedback: "Good comedy.", recommendation: "sharp" },
       consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
     } as never);
   });
@@ -119,8 +120,9 @@ describe("POST /api/projects/:id/peer-review", () => {
         detailedFeedback: "",
         recommendation: "publish",
       }) + "\n```";
-      // synthesis also returns same shape, set consensus mock after the 3 reviewer mocks
+      // synthesis also returns same shape, set consensus mock after the 4 reviewer mocks
       vi.mocked(runSimpleCompletion)
+        .mockResolvedValueOnce(fencedJson)
         .mockResolvedValueOnce(fencedJson)
         .mockResolvedValueOnce(fencedJson)
         .mockResolvedValueOnce(fencedJson)
@@ -160,6 +162,15 @@ describe("POST /api/projects/:id/peer-review", () => {
             recommendation: "revise",
           })
         ) // writer OK
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            overallImpression: "Decent",
+            strengths: [],
+            weaknesses: [],
+            detailedFeedback: "",
+            recommendation: "sharp",
+          })
+        ) // comedy OK
         .mockResolvedValueOnce(
           JSON.stringify({
             pointsOfAgreement: [],
@@ -216,6 +227,15 @@ describe("POST /api/projects/:id/peer-review", () => {
       )
       .mockResolvedValueOnce(
         JSON.stringify({
+          overallImpression: "Funny stuff",
+          strengths: ["timing"],
+          weaknesses: [],
+          detailedFeedback: "Details",
+          recommendation: "sharp",
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
           pointsOfAgreement: ["well written"],
           pointsOfDisagreement: [],
           topPriorities: ["tighten pacing"],
@@ -229,6 +249,7 @@ describe("POST /api/projects/:id/peer-review", () => {
       publisher: { overallImpression: "Excellent", strengths: ["voice"], weaknesses: [], detailedFeedback: "Details", recommendation: "publish" },
       reader: { overallImpression: "Loved it", strengths: ["pacing"], weaknesses: [], detailedFeedback: "Details", recommendation: "loved it" },
       writer: { overallImpression: "Strong craft", strengths: ["dialogue"], weaknesses: [], detailedFeedback: "Details", recommendation: "strong" },
+      comedy: { overallImpression: "Funny stuff", strengths: ["timing"], weaknesses: [], detailedFeedback: "Details", recommendation: "sharp" },
       consensus: { pointsOfAgreement: ["well written"], pointsOfDisagreement: [], topPriorities: ["tighten pacing"], synthesizedRecommendation: "Publish with minor revisions" },
     } as never);
 
@@ -238,20 +259,22 @@ describe("POST /api/projects/:id/peer-review", () => {
     expect(body).toHaveProperty("publisher");
     expect(body).toHaveProperty("reader");
     expect(body).toHaveProperty("writer");
+    expect(body).toHaveProperty("comedy");
     expect(body).toHaveProperty("consensus");
     expect(body.publisher.overallImpression).toBe("Excellent");
     expect(body.consensus.synthesizedRecommendation).toBe("Publish with minor revisions");
   });
 
-  it("makes 4 AI calls (3 reviewers + 1 synthesis)", async () => {
+  it("makes 5 AI calls (4 reviewers + 1 synthesis)", async () => {
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
       .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Go" }));
 
     await POST(makeRequest(), makeParams());
-    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(4);
+    expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(5);
   });
 
   // ─── Warning guards ────────────────────────────────────────────────────────
@@ -277,11 +300,12 @@ describe("POST /api/projects/:id/peer-review", () => {
   // ─── DEFAULT fallback wiring ───────────────────────────────────────────────
 
   it("uses DEFAULT_CONSENSUS when synthesis throws and sets consensusError", async () => {
-    // 3 reviewer calls succeed, synthesis rejects
+    // 4 reviewer calls succeed, synthesis rejects
     vi.mocked(runSimpleCompletion)
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
       .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
       .mockRejectedValueOnce(new Error("synthesis timeout"));
     vi.mocked(prisma.peerReview.create).mockResolvedValueOnce({
       id: "rev-fallback",
@@ -290,6 +314,7 @@ describe("POST /api/projects/:id/peer-review", () => {
       publisher: { overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" },
       reader: { overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" },
       writer: { overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" },
+      comedy: { overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" },
       consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Unable to synthesize consensus" },
     } as never);
 
@@ -319,6 +344,7 @@ describe("POST /api/projects/:id/peer-review", () => {
       publisher: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" },
       reader: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" },
       writer: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" },
+      comedy: { overallImpression: "Great book", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" },
       consensus: { pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Publish" },
     } as never);
 

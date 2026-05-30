@@ -25,6 +25,7 @@ interface PeerReviewResult {
   publisher: ReviewFeedback;
   reader: ReviewFeedback;
   writer: ReviewFeedback;
+  comedy?: ReviewFeedback;
   consensus: ConsensusFeedback;
   warning?: string;
 }
@@ -46,6 +47,7 @@ interface ReviewDetail {
   publisher: ReviewFeedback;
   reader: ReviewFeedback;
   writer: ReviewFeedback;
+  comedy?: ReviewFeedback;
   consensus: ConsensusFeedback;
 }
 
@@ -54,12 +56,13 @@ interface PeerReviewPanelProps {
   onStartChat: (message: string) => void;
 }
 
-type TabKey = "publisher" | "reader" | "writer" | "consensus";
+type TabKey = "publisher" | "reader" | "writer" | "comedy" | "consensus";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "publisher", label: "Publisher" },
   { key: "reader", label: "Reader" },
   { key: "writer", label: "Writer" },
+  { key: "comedy", label: "Comedy" },
   { key: "consensus", label: "Consensus" },
 ];
 
@@ -97,6 +100,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
       publisher: detail.publisher,
       reader: detail.reader,
       writer: detail.writer,
+      comedy: detail.comedy,
       consensus: detail.consensus,
     });
     setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
@@ -415,7 +419,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
             {!ran && !loading && (
               <div className="p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Get feedback from three AI reviewers: a Publisher, an Avid Reader, and an Experienced Writer.
+                  Get feedback from four AI reviewers: a Publisher, an Avid Reader, an Experienced Writer, and a Comedy Writer.
                 </p>
                 <Button size="sm" onClick={runReview}>
                   Run Peer Review
@@ -443,9 +447,17 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                 {currentMeta && (
                   <p className="text-[11px] text-muted-foreground mb-2">Saved {formatTimestamp(currentMeta.createdAt)}</p>
                 )}
-                {activeTab === "consensus"
-                  ? renderConsensusTab(review.consensus)
-                  : renderReviewTab(review[activeTab])}
+                {activeTab === "consensus" ? (
+                  renderConsensusTab(review.consensus)
+                ) : review[activeTab] ? (
+                  renderReviewTab(review[activeTab]!)
+                ) : (
+                  <div className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No {activeTab} review available for this record.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

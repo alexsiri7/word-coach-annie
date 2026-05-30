@@ -1662,6 +1662,17 @@ server.prompt(
     )
 );
 
+server.prompt(
+    "review-comedy",
+    "Review manuscript as a TV comedy writer — whether the jokes land, setup/punchline mechanics, comic timing, and character-specific humour.",
+    { projectId: z.string().describe("The project ID to review") },
+    async (args) => buildReviewPrompt(
+        args.projectId,
+        REVIEW_PERSONAS["review-comedy"].mode,
+        REVIEW_PERSONAS["review-comedy"].lens("your project"),
+    )
+);
+
 // ─── Skills Tool ─────────────────────────────────────────────────────────────
 
 server.tool(
@@ -1689,7 +1700,7 @@ server.tool(
 
 server.tool(
     "get_peer_review_prompts",
-    "Return the prompt/lens text used by each of the three peer review agents (editor, fan, author). Useful for understanding what angle each reviewer takes.",
+    "Return the prompt/lens text used by each of the four peer review agents (editor, fan, author, comedy writer). Useful for understanding what angle each reviewer takes.",
     {},
     async () => {
         const display = Object.fromEntries(
@@ -1706,7 +1717,7 @@ server.tool(
 
 server.tool(
     "run_peer_review",
-    "Trigger a full peer review of the project — runs three agents (editor, fan reader, peer author) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
+    "Trigger a full peer review of the project — runs four agents (editor, fan reader, peer author, comedy writer) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
     { projectId: z.string() },
     async ({ projectId }) => {
         try {
