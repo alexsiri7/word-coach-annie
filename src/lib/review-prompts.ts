@@ -23,16 +23,16 @@ export function buildReviewPrompt(status: SceneStatus, title: string | undefined
   return withTitle(REVIEW_PROMPTS[status], title);
 }
 
-const PLAN_BEATS_PROMPT =
-  "Help me plan this scene as structured BEAT blocks — map what happens, what shifts, and what the reader should feel. I'll write the prose; you give me the blueprint.";
-
 export function buildPlanBeatsPrompt(title: string | undefined): string {
-  return withTitle(PLAN_BEATS_PROMPT, title);
+  return withTitle(
+    "Help me plan this scene as structured BEAT blocks — map what happens, what shifts, and what the reader should feel. I'll write the prose; you give me the blueprint.",
+    title
+  );
 }
 
-const CANON_CHECK_PROMPT =
-  "Please run a canon check on this scene — cross-reference the prose against the story bible and flag any contradictions (attribute mismatches, behavioural inconsistencies, timeline issues). For each finding, ask me whether to update the story object or revise the prose.";
-
 export function buildCanonCheckPrompt(title: string | undefined): string {
-  return withTitle(CANON_CHECK_PROMPT, title);
+  return withTitle(
+    "Please run a canon check on this scene — cross-reference the prose against the story bible and flag any contradictions (attribute mismatches, behavioural inconsistencies, timeline issues). For each finding, ask me whether to update the story object or revise the prose.",
+    title
+  );
 }
