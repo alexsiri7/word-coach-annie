@@ -36,7 +36,7 @@ export async function POST(
   // Verify the project exists (anyone can report, no auth required for read-accessible content)
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, title: true, author: true },
+    select: { id: true, title: true },
   });
 
   if (!project) {
@@ -53,24 +53,18 @@ export async function POST(
     );
   }
 
-  // Get reporter identity if available
-  const reporterEmail = request.headers.get("x-user-email");
-  const reporterId = request.headers.get("x-user-id");
-
   // Build GitHub issue — escape all user-controlled fields to prevent markdown injection
   const categoryLabel = CATEGORY_LABELS[category] || escapeMarkdown(category);
   const safeTitle = escapeMarkdown(project.title ?? "");
-  const safeAuthor = project.author ? escapeMarkdown(project.author) : "";
   let safeUrl = "";
   if (url && typeof url === "string") {
     try {
       const u = new URL(url);
-      if (["http:", "https:"].includes(u.protocol)) safeUrl = escapeMarkdown(u.toString());
+      // pathname only — strips query params and hash to avoid leaking PII (e.g. ref= tracking params)
+      if (["http:", "https:"].includes(u.protocol)) safeUrl = escapeMarkdown(u.pathname);
     } catch { /* ignore invalid URLs */ }
   }
   const safeDetails = details?.trim() ? sanitizeInput(details.trim()).slice(0, 4000) : "";
-  const safeReporterEmail = reporterEmail ? escapeMarkdown(reporterEmail) : null;
-  const safeReporterId = reporterId ? escapeMarkdown(reporterId) : null;
 
   const title = `Content Report: ${categoryLabel} — "${safeTitle}"`;
 
@@ -79,10 +73,7 @@ export async function POST(
     "",
     `**Project:** ${safeTitle} (ID: \`${project.id}\`)`,
   ];
-  if (safeAuthor) bodyParts.push(`**Author:** ${safeAuthor}`);
   if (safeUrl) bodyParts.push(`**URL:** ${safeUrl}`);
-  if (safeReporterEmail) bodyParts.push(`**Reporter:** ${safeReporterEmail}`);
-  else if (safeReporterId) bodyParts.push(`**Reporter ID:** ${safeReporterId}`);
 
   if (safeDetails) {
     bodyParts.push("", "### Details", safeDetails);
