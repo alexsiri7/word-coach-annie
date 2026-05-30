@@ -9,44 +9,45 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // In API_TOKEN / dev mode userId is null; skip user/AI-settings lookup
+    const user = userId
+      ? await prisma.user.findUnique({ where: { id: userId } })
+      : null;
 
     const [projects, aiSettings] = await Promise.all([
       prisma.project.findMany({
-        where: { userId },
+        where: userId ? { userId } : {},
         select: { id: true, title: true },
         orderBy: { title: "asc" },
       }),
-      prisma.userAiSettings.findUnique({ where: { userId } }),
+      userId
+        ? prisma.userAiSettings.findUnique({ where: { userId } })
+        : Promise.resolve(null),
     ]);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
 
-    // Add profile (safe fields only)
-    archive.append(
-      JSON.stringify(
-        {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          picture: user.picture,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
-        },
-        null,
-        2
-      ),
-      { name: "profile.json" }
-    );
+    // Add profile (safe fields only; omitted in API_TOKEN mode where user is null)
+    if (user) {
+      archive.append(
+        JSON.stringify(
+          {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            picture: user.picture,
+            createdAt: user.createdAt.toISOString(),
+            updatedAt: user.updatedAt.toISOString(),
+          },
+          null,
+          2
+        ),
+        { name: "profile.json" }
+      );
+    }
 
     // Add AI settings (omit apiKey for security)
     const safeAiSettings = aiSettings
