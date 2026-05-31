@@ -174,22 +174,28 @@ describe("StaleWriteError handler-level wrapping", () => {
         "update_timeline_entry",
     ];
 
+    it("mcpRun helper returns isError: true on failure", () => {
+        // All handlers delegate to mcpRun, which centralises error handling.
+        expect(mcpSource).toContain("isError: true");
+        expect(mcpSource).toContain("logger.error");
+    });
+
     for (const handler of handlers) {
-        it(`${handler} catch block returns isError: true`, () => {
+        it(`${handler} delegates to mcpRun for error handling`, () => {
             const start = mcpSource.indexOf(`"${handler}"`);
             const section = mcpSource.slice(start, start + 2500);
-            expect(section).toContain("isError: true");
-            expect(section).toContain("logger.error");
+            expect(section).toContain("mcpRun");
         });
     }
 
-    it("write_scene_content throws missing-arg error inside try block (returns isError)", () => {
+    it("write_scene_content throws missing-arg error inside mcpRun callback (returns isError)", () => {
         const start = mcpSource.indexOf('"write_scene_content"');
         const section = mcpSource.slice(start, start + 2000);
         const throwIdx = section.indexOf('throw new Error("Either');
-        const catchIdx = section.indexOf("} catch (e)");
+        // The throw is inside an mcpRun async callback — mcpRun's own catch block
+        // handles it and returns isError: true. Verify the throw exists and mcpRun wraps it.
         expect(throwIdx).toBeGreaterThan(-1);
-        expect(catchIdx).toBeGreaterThan(throwIdx);
+        expect(section).toContain("mcpRun");
     });
 });
 
