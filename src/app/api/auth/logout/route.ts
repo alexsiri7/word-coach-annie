@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     if (sessionCookie) {
         const session = await verifySessionToken(sessionCookie);
-        if (session?.jti && session.userId) {
+        if (session?.jti) {
             // Use SESSION_MAX_AGE as a safe upper bound for blocklist expiry.
             // Actual token exp = iat + SESSION_MAX_AGE; using now + SESSION_MAX_AGE is always >= actual exp.
             const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
