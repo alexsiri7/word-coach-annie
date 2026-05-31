@@ -1,8 +1,8 @@
 /**
  * AES-256-GCM encryption for sensitive values stored in the database.
  *
- * Uses ENCRYPTION_KEY env var (or falls back to API_TOKEN).
- * When neither is set, throws by default. To allow plaintext storage in
+ * Uses ENCRYPTION_KEY env var exclusively.
+ * When unset, throws by default. To allow plaintext storage in
  * local dev, set ALLOW_PLAINTEXT_STORAGE=true.
  *
  * Encrypted format: "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
@@ -17,17 +17,20 @@ const PREFIX = "enc:v1:";
 let encryptionWarningLogged = false;
 
 function getEncryptionKey(): Buffer | null {
-    const keySource = env.ENCRYPTION_KEY || env.API_TOKEN;
+    // Use only ENCRYPTION_KEY — do not reuse API_TOKEN as an encryption key.
+    // API_TOKEN is an authentication bearer token; reusing it here would allow
+    // key-confusion attacks if the token is rotated or leaked.
+    const keySource = env.ENCRYPTION_KEY;
     if (!keySource) {
         if (process.env.ALLOW_PLAINTEXT_STORAGE !== "true") {
             throw new Error(
-                "[crypto] ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "[crypto] ENCRYPTION_KEY must be set. " +
                 "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         }
         if (!encryptionWarningLogged) {
             console.warn(
-                "[crypto] No ENCRYPTION_KEY or API_TOKEN set — " +
+                "[crypto] No ENCRYPTION_KEY set — " +
                 "encryption is disabled, values stored as plaintext. " +
                 "(ALLOW_PLAINTEXT_STORAGE=true)"
             );

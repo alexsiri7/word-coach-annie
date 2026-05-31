@@ -56,17 +56,15 @@ describe("crypto", () => {
         });
     });
 
-    describe("with API_TOKEN fallback", () => {
+    describe("with API_TOKEN set but no ENCRYPTION_KEY", () => {
         beforeEach(() => {
             delete process.env.ENCRYPTION_KEY;
-            process.env.API_TOKEN = "fallback-api-token";
+            process.env.API_TOKEN = "some-api-token";
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
         });
 
-        it("uses API_TOKEN when ENCRYPTION_KEY is not set", () => {
-            const plaintext = "sk-secret";
-            const encrypted = encrypt(plaintext);
-            expect(isEncrypted(encrypted)).toBe(true);
-            expect(decrypt(encrypted)).toBe(plaintext);
+        it("throws even when API_TOKEN is set — API_TOKEN must not be used as encryption key", () => {
+            expect(() => encrypt("sk-secret")).toThrow("ENCRYPTION_KEY must be set");
         });
     });
 
@@ -85,7 +83,7 @@ describe("crypto", () => {
         it("throws when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
             expect(() => encrypt("sk-no-encryption")).toThrow(
-                "ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "ENCRYPTION_KEY must be set. " +
                 "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         });
@@ -93,7 +91,7 @@ describe("crypto", () => {
         it("throws on decrypt when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
             expect(() => decrypt("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff")).toThrow(
-                "ENCRYPTION_KEY or API_TOKEN must be set. " +
+                "ENCRYPTION_KEY must be set. " +
                 "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         });
@@ -107,12 +105,12 @@ describe("crypto", () => {
 
         it("throws when ALLOW_PLAINTEXT_STORAGE is '1' (strict string check)", () => {
             process.env.ALLOW_PLAINTEXT_STORAGE = "1";
-            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY or API_TOKEN must be set");
+            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY must be set");
         });
 
         it("throws when ALLOW_PLAINTEXT_STORAGE is 'TRUE' (case-sensitive check)", () => {
             process.env.ALLOW_PLAINTEXT_STORAGE = "TRUE";
-            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY or API_TOKEN must be set");
+            expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY must be set");
         });
     });
 
