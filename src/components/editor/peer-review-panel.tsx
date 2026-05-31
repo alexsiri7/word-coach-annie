@@ -99,15 +99,9 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const applyReviewDetail = useCallback((detail: ReviewDetail) => {
-    setReview({
-      publisher: detail.publisher,
-      reader: detail.reader,
-      writer: detail.writer,
-      comedy: detail.comedy,
-      actor: detail.actor,
-      consensus: detail.consensus,
-    });
-    setCurrentMeta({ id: detail.id, createdAt: detail.createdAt });
+    const { id, createdAt, ...reviewFields } = detail;
+    setReview(reviewFields);
+    setCurrentMeta({ id, createdAt });
     setRan(true);
   }, []);
 
