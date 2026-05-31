@@ -25,6 +25,7 @@ function getEncryptionKey(): Buffer | null {
         if (process.env.ALLOW_PLAINTEXT_STORAGE !== "true") {
             throw new Error(
                 "[crypto] ENCRYPTION_KEY must be set. " +
+                "Generate one with: openssl rand -hex 32\n" +
                 "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
             );
         }
@@ -82,7 +83,12 @@ export function decrypt(value: string): string {
     if (!key) return value;
 
     const parts = value.slice(PREFIX.length).split(":");
-    if (parts.length !== 2) return value;
+    if (parts.length !== 2) {
+        throw new Error(
+            `[crypto] Malformed ciphertext (expected enc:v1:<iv>:<payload>, got ${parts.length} parts). ` +
+            "This may indicate data corruption or an incomplete write."
+        );
+    }
 
     const iv = Buffer.from(parts[0], "hex");
     const payload = Buffer.from(parts[1], "hex");
@@ -91,12 +97,17 @@ export function decrypt(value: string): string {
     const tag = payload.subarray(payload.length - 16);
     const ciphertext = payload.subarray(0, payload.length - 16);
 
-    const decipher = createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAuthTag(tag);
-    const decrypted = Buffer.concat([
-        decipher.update(ciphertext),
-        decipher.final(),
-    ]);
+    let decrypted: Buffer;
+    try {
+        const decipher = createDecipheriv(ALGORITHM, key, iv);
+        decipher.setAuthTag(tag);
+        decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (e) {
+        throw new Error(
+            "[crypto] GCM authentication failed — ciphertext may be tampered or ENCRYPTION_KEY may have changed. " +
+            `Original: ${(e as Error).message}`
+        );
+    }
 
     return decrypted.toString("utf8");
 }

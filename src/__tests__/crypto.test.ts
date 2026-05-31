@@ -63,6 +63,10 @@ describe("crypto", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
         });
 
+        afterEach(() => {
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+        });
+
         it("throws even when API_TOKEN is set — API_TOKEN must not be used as encryption key", () => {
             expect(() => encrypt("sk-secret")).toThrow("ENCRYPTION_KEY must be set");
         });
@@ -82,17 +86,13 @@ describe("crypto", () => {
 
         it("throws when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
-            expect(() => encrypt("sk-no-encryption")).toThrow(
-                "ENCRYPTION_KEY must be set. " +
-                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
-            );
+            expect(() => encrypt("sk-no-encryption")).toThrow("ENCRYPTION_KEY must be set");
         });
 
         it("throws on decrypt when ALLOW_PLAINTEXT_STORAGE is not set", () => {
             delete process.env.ALLOW_PLAINTEXT_STORAGE;
             expect(() => decrypt("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff")).toThrow(
-                "ENCRYPTION_KEY must be set. " +
-                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
+                "ENCRYPTION_KEY must be set"
             );
         });
 

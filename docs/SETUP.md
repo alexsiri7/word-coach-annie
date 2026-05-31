@@ -104,9 +104,11 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 
 | Variable | Description |
 |----------|-------------|
-| `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
+| `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. **Required** when storing AI API keys; set `ALLOW_PLAINTEXT_STORAGE=true` in local dev to opt out. |
 | `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
 | `ALLOWED_EMAILS` | Comma-separated list of Google emails allowed to sign in. When unset, any Google account can sign in. |
+
+> **Migration note:** Prior to this release, `ENCRYPTION_KEY` fell back to `API_TOKEN`. This fallback has been removed for security. If you relied on it, set `ENCRYPTION_KEY` explicitly before upgrading. Generate one with: `openssl rand -hex 32`
 
 ### Optional
 
