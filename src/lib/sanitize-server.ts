@@ -70,7 +70,14 @@ export function escapeHtml(input: string): string {
 /**
  * Wraps user-controlled content in XML-like tags to signal to the LLM
  * that this is user-provided data, not instructions. Mitigates prompt injection.
- * Use for all user-controlled strings embedded in prompts.
+ *
+ * Use this for user-controlled strings embedded in AI prompts. Prefer this helper
+ * over inline template literals so that encoding changes only need one update.
+ *
+ * NOTE: Content is NOT escaped. If user content contains the closing tag string
+ * (e.g. "</manuscript>"), it will structurally break the XML boundary.
+ * This is intentional: the system-prompt instruction ("treat as data") is the
+ * primary defence, not XML parsing. Do not use in strict XML contexts.
  *
  * Example: wrapUserContent("project-title", project.title)
  * → "<project-title>My Story</project-title>"

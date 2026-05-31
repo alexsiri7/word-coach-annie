@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { getAiConfig } from "@/lib/ai/settings";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { exportManuscript } from "@/mcp/tools/export";
+import { wrapUserContent } from "@/lib/sanitize-server";
 
 export interface ReviewFeedback {
   overallImpression: string;
@@ -34,9 +35,7 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 {"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"publish|revise|pass"}`,
     userMessage: `Review the following manuscript. Provide structured feedback covering commercial viability, hook and opening strength, pacing issues, character appeal, and what you would ask the author to revise.
 
-<manuscript>
-${manuscript}
-</manuscript>`,
+${wrapUserContent("manuscript", manuscript)}`,
   };
 }
 
@@ -53,9 +52,7 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 {"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"loved it|liked it|struggled|abandoned"}`,
     userMessage: `Review the following manuscript and provide your honest reader feedback.
 
-<manuscript>
-${manuscript}
-</manuscript>`,
+${wrapUserContent("manuscript", manuscript)}`,
   };
 }
 
@@ -71,9 +68,7 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 {"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"strong|promising|needs work|major revision"}`,
     userMessage: `Give craft feedback. Be specific about what works technically and what doesn't. Reference specific moments.
 
-<manuscript>
-${manuscript}
-</manuscript>`,
+${wrapUserContent("manuscript", manuscript)}`,
   };
 }
 
@@ -89,9 +84,7 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 {"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"sharp|some work needed|not landing"}`,
     userMessage: `Review the following manuscript for comedy craft. Be specific and mechanical — cite the exact moments that work or fail.
 
-<manuscript>
-${manuscript}
-</manuscript>`,
+${wrapUserContent("manuscript", manuscript)}`,
   };
 }
 
@@ -107,9 +100,7 @@ Return ONLY valid JSON matching this schema (no markdown fences):
 {"overallImpression":"...","strengths":["..."],"weaknesses":["..."],"detailedFeedback":"...","recommendation":"emotionally earned|mostly earned|needs more runway|emotionally hollow"}`,
     userMessage: `Be specific — quote the passage and explain exactly what's missing. A drama teacher who has seen every shortcut and won't let you take them.
 
-<manuscript>
-${manuscript}
-</manuscript>`,
+${wrapUserContent("manuscript", manuscript)}`,
   };
 }
 
