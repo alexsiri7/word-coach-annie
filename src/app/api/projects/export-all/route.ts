@@ -9,10 +9,8 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
-      logger.warn("GET /api/projects/export-all: rejected — userId is null");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Middleware already rejects unauthenticated requests.
+    // When userId is null, the client is using API_TOKEN (dev/service mode).
     const where = { userId };
 
     const projects = await prisma.project.findMany({
