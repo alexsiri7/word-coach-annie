@@ -174,22 +174,28 @@ describe("StaleWriteError handler-level wrapping", () => {
         "update_timeline_entry",
     ];
 
+    it("mcpRun helper returns isError: true on failure", () => {
+        // All handlers delegate to mcpRun, which centralises error handling.
+        expect(mcpSource).toContain("isError: true");
+        expect(mcpSource).toContain("logger.error");
+    });
+
     for (const handler of handlers) {
-        it(`${handler} catch block returns isError: true`, () => {
+        it(`${handler} delegates to mcpRun for error handling`, () => {
             const start = mcpSource.indexOf(`"${handler}"`);
             const section = mcpSource.slice(start, start + 2500);
-            expect(section).toContain("isError: true");
-            expect(section).toContain("logger.error");
+            expect(section).toContain("mcpRun");
         });
     }
 
-    it("write_scene_content throws missing-arg error inside try block (returns isError)", () => {
+    it("write_scene_content throws missing-arg error inside mcpRun callback (returns isError)", () => {
         const start = mcpSource.indexOf('"write_scene_content"');
         const section = mcpSource.slice(start, start + 2000);
         const throwIdx = section.indexOf('throw new Error("Either');
-        const catchIdx = section.indexOf("} catch (e)");
+        // The throw is inside an mcpRun async callback — mcpRun's own catch block
+        // handles it and returns isError: true. Verify the throw exists and mcpRun wraps it.
         expect(throwIdx).toBeGreaterThan(-1);
-        expect(catchIdx).toBeGreaterThan(throwIdx);
+        expect(section).toContain("mcpRun");
     });
 });
 
@@ -227,12 +233,12 @@ describe("run_peer_review and get_peer_reviews tools", () => {
         mcpSource.indexOf('"get_peer_reviews"') + 1000
     );
 
-    it("run_peer_review returns isError: true on failure", () => {
-        expect(runSection).toContain("isError: true");
+    it("run_peer_review delegates error handling to mcpRun", () => {
+        expect(runSection).toContain("mcpRun");
     });
 
-    it("run_peer_review logs errors via logger.error", () => {
-        expect(runSection).toContain("logger.error");
+    it("run_peer_review passes an error prefix to mcpRun", () => {
+        expect(runSection).toContain("Error running peer review");
     });
 
     it("get_peer_reviews clamps limit with Math.min(Math.max(...))", () => {

@@ -39,6 +39,22 @@ describe("REVIEW_PERSONAS", () => {
     }
   });
 
+  it("each persona lens wraps the project title in XML tags", () => {
+    for (const id of personaIds) {
+      const result = REVIEW_PERSONAS[id].lens("Test Novel");
+      expect(result).toContain("<project-title>Test Novel</project-title>");
+    }
+  });
+
+  it("each persona lens does not escape XML characters in the title (known limitation)", () => {
+    // wrapUserContent passes content through verbatim — no escaping.
+    // See sanitize-server.ts JSDoc for rationale.
+    for (const id of personaIds) {
+      const result = REVIEW_PERSONAS[id].lens("My <Special> Story");
+      expect(result).toContain("<project-title>My <Special> Story</project-title>");
+    }
+  });
+
   it("editor lens mentions acquisitions editor", () => {
     expect(REVIEW_PERSONAS["review-editor"].lens("x").toLowerCase()).toContain("acquisitions editor");
   });

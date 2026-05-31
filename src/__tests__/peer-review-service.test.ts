@@ -103,6 +103,28 @@ describe("runPeerReview", () => {
     }
   });
 
+  it("passes systemPrompt separately from userMessage for all reviewers", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    // First 5 calls are reviewer prompts; call 6 is the synthesis (no systemPrompt).
+    for (const [arg] of calls.slice(0, 5)) {
+      expect(arg.systemPrompt).toBeDefined();
+      expect(arg.systemPrompt).not.toBe("");
+      expect(arg.userMessage).toContain("<manuscript>");
+    }
+  });
+
+  it("synthesis call uses only userMessage with no systemPrompt", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    // Call 6 (index 5) is synthesis — it embeds AI-generated reviewer JSON, not user data,
+    // so it intentionally has no systemPrompt (lower injection risk).
+    const synthesisArg = calls[5][0];
+    expect(synthesisArg.systemPrompt).toBeUndefined();
+    expect(synthesisArg.userMessage).toContain("COMEDY WRITER");
+    expect(synthesisArg.userMessage).toContain("ACTING COACH");
+  });
+
   it("makes exactly 6 AI calls (5 reviewers + 1 synthesis)", async () => {
     await runPeerReview("proj-1");
     expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(6);

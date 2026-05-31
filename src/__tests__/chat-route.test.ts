@@ -166,7 +166,8 @@ describe("POST /api/chat", () => {
     await POST(makePostRequest({ conversationId: linkedConversation.id, message: "Tell me about the Hero" }));
 
     const call = vi.mocked(runChatAgent).mock.lastCall![0];
-    expect(call.systemPrompt).toContain("Shared Universe: The Realm");
+    expect(call.systemPrompt).toContain("Shared Universe");
+    expect(call.systemPrompt).toContain("<universe-title>The Realm</universe-title>");
     expect(call.systemPrompt).toContain("The Hero");
     expect(call.systemPrompt).toContain("[Origin]");
   });
