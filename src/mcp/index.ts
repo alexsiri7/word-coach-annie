@@ -167,6 +167,24 @@ function destructiveGuard(): { content: [{ type: "text"; text: string }]; isErro
     return null;
 }
 
+type McpResult = { content: [{ type: "text"; text: string }]; isError?: true };
+
+/** Shared try-catch wrapper for tool handlers that return JSON results. */
+async function mcpRun(
+    logLabel: string,
+    errorPrefix: string,
+    fn: () => Promise<unknown>
+): Promise<McpResult> {
+    try {
+        const result = await fn();
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (e) {
+        logger.error(`${logLabel}: failed`, e);
+        const message = e instanceof Error ? e.message : String(e);
+        return { content: [{ type: "text", text: `${errorPrefix}: ${message}` }], isError: true };
+    }
+}
+
 // ─── Project Tools ───────────────────────────────────────────────────────────
 
 server.tool(
@@ -220,16 +238,9 @@ server.tool(
         synopsis: z.string().optional().describe("New synopsis"),
         genre: z.string().optional().describe("New genre"),
     },
-    async ({ projectId, contentHash, title, author, synopsis, genre }) => {
-        try {
-            const result = await updateProject(projectId, { title, author, synopsis, genre }, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_project: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating project: ${message}` }], isError: true };
-        }
-    }
+    async ({ projectId, contentHash, title, author, synopsis, genre }) =>
+        mcpRun("update_project", "Error updating project", () =>
+            updateProject(projectId, { title, author, synopsis, genre }, contentHash))
 );
 
 server.tool(
@@ -327,16 +338,8 @@ server.tool(
         orderIndex: z.number().optional().describe("New order index"),
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
-    async ({ nodeId, contentHash, ...data }) => {
-        try {
-            const result = await updateNode(nodeId, data, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_node: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating node: ${message}` }], isError: true };
-        }
-    }
+    async ({ nodeId, contentHash, ...data }) =>
+        mcpRun("update_node", "Error updating node", () => updateNode(nodeId, data, contentHash))
 );
 
 server.tool(
@@ -378,23 +381,12 @@ server.tool(
             content: z.string()
         })).optional().describe("Structured content blocks")
     },
-    async ({ nodeId, contentHash, content, blocks }) => {
-        try {
-            if (blocks) {
-                const result = await writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
-                return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-            }
-            if (content !== undefined) {
-                const result = await writeSceneContent(nodeId, content, contentHash);
-                return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-            }
+    async ({ nodeId, contentHash, content, blocks }) =>
+        mcpRun("write_scene_content", "Error writing scene content", async () => {
+            if (blocks) return writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
+            if (content !== undefined) return writeSceneContent(nodeId, content, contentHash);
             throw new Error("Either 'content' or 'blocks' must be provided");
-        } catch (e) {
-            logger.error("write_scene_content: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error writing scene content: ${message}` }], isError: true };
-        }
-    }
+        })
 );
 
 server.tool(
@@ -408,16 +400,9 @@ server.tool(
         sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
         intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     },
-    async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) => {
-        try {
-            const result = await updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_paragraph: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating paragraph: ${message}` }], isError: true };
-        }
-    }
+    async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) =>
+        mcpRun("update_paragraph", "Error updating paragraph", () =>
+            updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash))
 );
 
 // Note: insert_beat bypasses the prose-writing guard because the payload is beat
@@ -439,16 +424,9 @@ server.tool(
             .optional()
             .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
     },
-    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) => {
-        try {
-            const result = await insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("insert_beat: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error inserting beat: ${message}` }], isError: true };
-        }
-    }
+    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) =>
+        mcpRun("insert_beat", "Error inserting beat", () =>
+            insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash))
 );
 
 server.tool(
@@ -604,16 +582,9 @@ server.tool(
         role: z.string().nullable().optional().describe("New role (null to clear)"),
         tags: z.string().optional().describe("New comma-separated tags"),
     },
-    async ({ objectId, contentHash, ...data }) => {
-        try {
-            const result = await updateStoryObject(objectId, data, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_story_object: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating story object: ${message}` }], isError: true };
-        }
-    }
+    async ({ objectId, contentHash, ...data }) =>
+        mcpRun("update_story_object", "Error updating story object", () =>
+            updateStoryObject(objectId, data, contentHash))
 );
 
 server.tool(
@@ -695,16 +666,8 @@ server.tool(
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Filter by size"),
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Filter by energy type — key dimension for mood-matched task selection"),
     },
-    async (params) => {
-        try {
-            const result = await listWritingTasks(params);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("list_writing_tasks: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error listing writing tasks: ${message}` }], isError: true };
-        }
-    }
+    async (params) =>
+        mcpRun("list_writing_tasks", "Error listing writing tasks", () => listWritingTasks(params))
 );
 
 server.tool(
@@ -719,16 +682,8 @@ server.tool(
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Estimated writing size (default: Medium)"),
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Energy type required (default: Technical)"),
     },
-    async (params) => {
-        try {
-            const result = await createWritingTask(params);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("create_writing_task: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error creating writing task: ${message}` }], isError: true };
-        }
-    }
+    async (params) =>
+        mcpRun("create_writing_task", "Error creating writing task", () => createWritingTask(params))
 );
 
 server.tool(
@@ -737,16 +692,8 @@ server.tool(
     {
         taskId: z.string().describe("The writing task ID to mark complete"),
     },
-    async ({ taskId }) => {
-        try {
-            const result = await completeWritingTask(taskId);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("complete_writing_task: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error completing writing task: ${message}` }], isError: true };
-        }
-    }
+    async ({ taskId }) =>
+        mcpRun("complete_writing_task", "Error completing writing task", () => completeWritingTask(taskId))
 );
 
 server.tool(
@@ -761,16 +708,8 @@ server.tool(
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Updated energy type"),
         completed: z.boolean().optional().describe("Mark task complete or incomplete"),
     },
-    async (params) => {
-        try {
-            const result = await updateWritingTask(params);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_writing_task: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating writing task: ${message}` }], isError: true };
-        }
-    }
+    async (params) =>
+        mcpRun("update_writing_task", "Error updating writing task", () => updateWritingTask(params))
 );
 
 server.tool(
@@ -1006,16 +945,9 @@ server.tool(
         title: z.string().optional().describe("New title"),
         description: z.string().optional().describe("New description"),
     },
-    async ({ universeId, contentHash, ...data }) => {
-        try {
-            const result = await updateUniverse(universeId, data, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_universe: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating universe: ${message}` }], isError: true };
-        }
-    }
+    async ({ universeId, contentHash, ...data }) =>
+        mcpRun("update_universe", "Error updating universe", () =>
+            updateUniverse(universeId, data, contentHash))
 );
 
 server.tool(
@@ -1085,16 +1017,9 @@ server.tool(
         tags: z.string().optional().describe("New tags"),
         type: z.string().optional().describe("New type"),
     },
-    async ({ objectId, contentHash, ...data }) => {
-        try {
-            const result = await updateWorldObject(objectId, data, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_world_object: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating world object: ${message}` }], isError: true };
-        }
-    }
+    async ({ objectId, contentHash, ...data }) =>
+        mcpRun("update_world_object", "Error updating world object", () =>
+            updateWorldObject(objectId, data, contentHash))
 );
 
 server.tool(
@@ -1138,16 +1063,9 @@ server.tool(
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
-    async ({ entryId, contentHash, ...data }) => {
-        try {
-            const result = await updateTimelineEntry(entryId, data, contentHash);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("update_timeline_entry: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error updating timeline entry: ${message}` }], isError: true };
-        }
-    }
+    async ({ entryId, contentHash, ...data }) =>
+        mcpRun("update_timeline_entry", "Error updating timeline entry", () =>
+            updateTimelineEntry(entryId, data, contentHash))
 );
 
 server.tool(
@@ -1730,16 +1648,8 @@ server.tool(
     "run_peer_review",
     "Trigger a full peer review of the project — runs four agents (editor, fan reader, peer author, comedy writer) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
     { projectId: z.string() },
-    async ({ projectId }) => {
-        try {
-            const result = await runPeerReview(projectId);
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } catch (e) {
-            logger.error("run_peer_review: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error running peer review: ${message}` }], isError: true };
-        }
-    }
+    async ({ projectId }) =>
+        mcpRun("run_peer_review", "Error running peer review", () => runPeerReview(projectId))
 );
 
 // ─── Get Peer Reviews Tool ────────────────────────────────────────────────────
