@@ -233,12 +233,12 @@ describe("run_peer_review and get_peer_reviews tools", () => {
         mcpSource.indexOf('"get_peer_reviews"') + 1000
     );
 
-    it("run_peer_review returns isError: true on failure", () => {
-        expect(runSection).toContain("isError: true");
+    it("run_peer_review delegates error handling to mcpRun", () => {
+        expect(runSection).toContain("mcpRun");
     });
 
-    it("run_peer_review logs errors via logger.error", () => {
-        expect(runSection).toContain("logger.error");
+    it("run_peer_review passes an error prefix to mcpRun", () => {
+        expect(runSection).toContain("Error running peer review");
     });
 
     it("get_peer_reviews clamps limit with Math.min(Math.max(...))", () => {
