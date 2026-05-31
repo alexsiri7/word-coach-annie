@@ -53,6 +53,10 @@ export async function GET(request: NextRequest) {
  * On denial, redirects with error=access_denied.
  */
 export async function POST(request: NextRequest) {
+  const nonce = request.headers.get("x-nonce") ?? "";
+  if (!nonce) {
+    logger.warn("POST /oauth/authorize: x-nonce header missing — inline scripts will be CSP-blocked");
+  }
   const formData = await request.formData();
 
   const csrfForm = formData.get("csrf_token") as string | null;
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Use JS redirect: form-action 'self' CSP covers where the form POSTs (same-origin),
     // but Chrome also enforces it on server 3xx destinations. A JS navigation via
     // window.location.replace() is not subject to form-action CSP.
-    return renderJsRedirectPage(redirectUrl.toString());
+    return renderJsRedirectPage(redirectUrl.toString(), nonce);
   }
 
   // Re-validate everything on the POST (params come from hidden fields)
@@ -145,12 +149,12 @@ export async function POST(request: NextRequest) {
   // For localhost redirects (CLI tools via SSH, etc.), show the code on a page
   // so the user can copy it manually if the redirect can't reach the local server.
   if (redirectUrl.hostname === "localhost" || redirectUrl.hostname === "127.0.0.1") {
-    return renderCodePage(authCode.code, redirectUrl.toString());
+    return renderCodePage(authCode.code, redirectUrl.toString(), nonce);
   }
 
   // Use JS redirect (not 303) so the cross-origin callback URL isn't subject to
   // form-action CSP enforcement. Chrome enforces form-action on 3xx destinations too.
-  return renderJsRedirectPage(redirectUrl.toString());
+  return renderJsRedirectPage(redirectUrl.toString(), nonce);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,9 +261,9 @@ async function validateRequest(request: NextRequest): Promise<{
  * Used instead of a 303 redirect so the destination is not subject to
  * the page's form-action CSP (Chrome enforces form-action on 3xx targets).
  */
-function renderJsRedirectPage(url: string): NextResponse {
+function renderJsRedirectPage(url: string, nonce: string): NextResponse {
   const safeUrl = JSON.stringify(url);
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Redirecting…</title></head><body><script>window.location.replace(${safeUrl});<\/script></body></html>`;
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Redirecting…</title></head><body><script nonce="${nonce}">window.location.replace(${safeUrl});<\/script></body></html>`;
   return new NextResponse(html, {
     status: 200,
     headers: {
@@ -281,7 +285,7 @@ function redirectToLogin(request: NextRequest): NextResponse {
  * Render a page that shows the authorization code for manual copy
  * and also attempts an automatic redirect (works when localhost is reachable).
  */
-function renderCodePage(code: string, redirectUrl: string): NextResponse {
+function renderCodePage(code: string, redirectUrl: string, nonce: string): NextResponse {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -348,17 +352,18 @@ function renderCodePage(code: string, redirectUrl: string): NextResponse {
     <h1>Authorization Approved</h1>
     <p class="description">Copy this code and paste it back into your CLI tool.</p>
     <div class="code-box" id="code" title="Click to select">${escapeHtml(code)}</div>
-    <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+    <button class="copy-btn" id="copy-btn">Copy Code</button>
     <p class="copied" id="copied">Copied to clipboard!</p>
     <p class="redirect-note">Attempting automatic redirect...</p>
   </div>
-  <script>
+  <script nonce="${nonce}">
     function copyCode() {
       navigator.clipboard.writeText(${JSON.stringify(code)}).then(function() {
         document.getElementById('copied').style.display = 'block';
         document.querySelector('.copy-btn').textContent = 'Copied!';
       });
     }
+    document.getElementById('copy-btn').addEventListener('click', copyCode);
     // Try the redirect anyway — works if localhost is reachable
     setTimeout(function() { window.location.href = ${JSON.stringify(redirectUrl)}; }, 500);
   </script>
