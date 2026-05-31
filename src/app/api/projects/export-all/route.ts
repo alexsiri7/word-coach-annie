@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import { exportProjectJson } from "@/lib/export-json";
@@ -9,11 +10,13 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
+    // In Google auth mode (multi-user), a null userId means unauthenticated — reject.
+    // In API_TOKEN mode (single-user), userId is always null; allow and export all projects.
+    if (isGoogleAuthMode() && !userId) {
       logger.warn("GET /api/projects/export-all: rejected — userId is null");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const where = { userId };
+    const where = userId ? { userId } : {};
 
     const projects = await prisma.project.findMany({
       where,

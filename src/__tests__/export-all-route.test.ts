@@ -8,6 +8,10 @@ vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => null),
 }));
 
+vi.mock("@/lib/auth", () => ({
+  isGoogleAuthMode: vi.fn(() => true),
+}));
+
 vi.mock("@/lib/export-json", () => ({
   exportProjectJson: vi.fn(async (id: string) => ({
     exportVersion: 1,
@@ -23,6 +27,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,9 +43,10 @@ describe("GET /api/projects/export-all", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(isGoogleAuthMode).mockReturnValue(true);
   });
 
-  it("returns 401 when no userId (API_TOKEN mode)", async () => {
+  it("returns 401 when no userId in Google auth mode", async () => {
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(401);
@@ -87,6 +93,25 @@ describe("GET /api/projects/export-all", () => {
     expect(res.headers.get("content-disposition")).toContain("attachment");
     expect(res.headers.get("content-disposition")).toContain("annie-export-");
     expect(res.headers.get("content-disposition")).toContain(".zip");
+  });
+
+  it("returns 200 with ZIP when userId is null in API_TOKEN mode", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(isGoogleAuthMode).mockReturnValue(false);
+
+    const user = await testPrisma.user.create({
+      data: { id: "any-user", email: "any@test.com", googleId: "g-any" },
+    });
+    await testPrisma.project.create({
+      data: { title: "Token Project", author: "Author", userId: user.id },
+    });
+
+    const { GET } = await import("@/app/api/projects/export-all/route");
+    const res = await GET(makeGetRequest());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/zip");
+    expect(res.headers.get("content-disposition")).toMatch(/attachment.*\.zip/);
   });
 
   it("scopes to user when userId is present", async () => {
