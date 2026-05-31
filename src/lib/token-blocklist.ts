@@ -22,10 +22,9 @@ export async function revokeToken(jti: string, userId: string, expiresAt: Date):
     } catch (err) {
         // P2002 = unique constraint: token already revoked — idempotent, ignore.
         // Any other error is unexpected; log at ERROR for on-call visibility.
-        if ((err as { code?: string }).code === "P2002") {
-            return;
+        if ((err as { code?: string }).code !== "P2002") {
+            logger.error("[token-blocklist] Failed to revoke token:", err);
         }
-        logger.error("[token-blocklist] Failed to revoke token:", err);
     }
 }
 
