@@ -9,11 +9,10 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
-      logger.warn("GET /api/projects/export-all: rejected — userId is null");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const where = { userId };
+    // Scope to the authenticated user's projects, or to unowned (null userId)
+    // projects in API_TOKEN/dev mode. This prevents cross-user data leakage
+    // while still allowing dev/E2E workflows without a real user session.
+    const where = { userId: userId ?? null };
 
     const projects = await prisma.project.findMany({
       where,

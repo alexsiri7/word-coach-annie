@@ -37,10 +37,12 @@ describe("GET /api/auth/export-data", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
   });
 
-  it("returns 401 for unauthenticated request", async () => {
+  it("returns ZIP in API_TOKEN/dev mode (null userId, no unowned projects)", async () => {
     const { GET } = await import("@/app/api/auth/export-data/route");
     const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+    // In API_TOKEN/dev mode (userId=null), export scopes to unowned projects and returns a ZIP
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/zip");
   });
 
   it("returns 401 when userId exists but user is not in DB", async () => {

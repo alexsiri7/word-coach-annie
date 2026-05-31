@@ -9,39 +9,46 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    // In API_TOKEN/dev mode (userId is null), skip user profile lookup and scope
+    // to unowned projects. This allows dev/E2E workflows without a real user session
+    // while preventing cross-user data leakage in production.
+    const user = userId
+      ? await prisma.user.findUnique({ where: { id: userId } })
+      : null;
+
+    if (userId && !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const [projects, aiSettings] = await Promise.all([
       prisma.project.findMany({
-        where: { userId },
+        where: { userId: userId ?? null },
         select: { id: true, title: true },
         orderBy: { title: "asc" },
       }),
-      prisma.userAiSettings.findUnique({ where: { userId } }),
+      userId
+        ? prisma.userAiSettings.findUnique({ where: { userId } })
+        : Promise.resolve(null),
     ]);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
 
-    // Add profile (safe fields only)
+    // Add profile (safe fields only); null in API_TOKEN/dev mode
     archive.append(
       JSON.stringify(
-        {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          picture: user.picture,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
-        },
+        user
+          ? {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              picture: user.picture,
+              createdAt: user.createdAt.toISOString(),
+              updatedAt: user.updatedAt.toISOString(),
+            }
+          : null,
         null,
         2
       ),

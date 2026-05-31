@@ -40,10 +40,10 @@ describe("GET /api/projects/export-all", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
   });
 
-  it("returns 401 when no userId (API_TOKEN mode)", async () => {
+  it("returns 404 when no userId and no unowned projects (API_TOKEN mode)", async () => {
     const { GET } = await import("@/app/api/projects/export-all/route");
     const res = await GET(makeGetRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 
   it("returns 404 when user has 0 projects", async () => {
