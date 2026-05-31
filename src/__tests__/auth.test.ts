@@ -64,6 +64,13 @@ describe("JWT session tokens", () => {
         expect(verified!.picture).toBe("https://example.com/pic.jpg");
     });
 
+    it("includes a jti claim in created tokens", async () => {
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
+        const verified = await verifySessionToken(token);
+        expect(verified?.jti).toBeDefined();
+        expect(typeof verified?.jti).toBe("string");
+    });
+
     it("returns null for invalid JWT", async () => {
         const result = await verifySessionToken("invalid.token.here");
         expect(result).toBeNull();
@@ -271,8 +278,12 @@ describe("middleware auth logic", () => {
 
     describe("logout endpoint logic", () => {
         it("clears session cookie", async () => {
+            const { NextRequest } = await import("next/server");
             const { POST } = await import("@/app/api/auth/logout/route");
-            const res = await POST();
+            const req = new NextRequest("http://localhost/api/auth/logout", {
+                method: "POST",
+            });
+            const res = await POST(req);
             expect(res.status).toBe(200);
             const setCookie = res.headers.get("set-cookie");
             expect(setCookie).toContain("annie_session=");

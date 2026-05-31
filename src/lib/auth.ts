@@ -12,7 +12,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "annie_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const SESSION_MAX_AGE = 60 * 60 * 24; // 24 hours — reduced from 30 days; revocation handles the rest
 
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE };
 
@@ -25,6 +25,7 @@ export interface SessionPayload {
     email: string;
     name: string;
     picture?: string;
+    jti?: string; // present on tokens created after the blocklist was added
 }
 
 /**
@@ -74,6 +75,7 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
         .setAudience(JWT_AUDIENCE_SESSION)
         .setIssuedAt()
         .setExpirationTime(`${SESSION_MAX_AGE}s`)
+        .setJti(crypto.randomUUID())
         .sign(key);
 }
 
@@ -90,12 +92,24 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
             audience: JWT_AUDIENCE_SESSION,
         });
         if (payload.userId && payload.email) {
-            return {
+            const session: SessionPayload = {
                 userId: payload.userId as string,
                 email: payload.email as string,
                 name: (payload.name as string) || "",
                 picture: payload.picture as string | undefined,
+                jti: payload.jti as string | undefined,
             };
+
+            // Check revocation blocklist in Node.js contexts.
+            // Edge runtime (middleware) skips this — short token lifetime is the compensating control.
+            if (session.jti && typeof (globalThis as Record<string, unknown>).EdgeRuntime === "undefined") {
+                const { isTokenRevoked } = await import("@/lib/token-blocklist");
+                if (await isTokenRevoked(session.jti)) {
+                    return null;
+                }
+            }
+
+            return session;
         }
         return null;
     } catch (err) {
