@@ -404,3 +404,13 @@ model WritingTask {
   @@index([sceneId])
   @@index([projectId, completed])
 }
+
+model RevokedToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String
+  revokedAt DateTime @default(now())
+  expiresAt DateTime // mirrors JWT exp — for cleanup
+
+  @@index([expiresAt])
+}
