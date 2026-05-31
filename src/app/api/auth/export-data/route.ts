@@ -9,8 +9,46 @@ import { logger } from "@/lib/logger";
 export async function GET(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
+
+    // API_TOKEN mode: no user identity — export projects with no owner
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const projects = await prisma.project.findMany({
+        where: { userId: null },
+        select: { id: true, title: true },
+        orderBy: { title: "asc" },
+      });
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      const passthrough = new PassThrough();
+      archive.pipe(passthrough);
+
+      for (const project of projects) {
+        const data = await exportProjectJson(project.id);
+        const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
+        archive.append(JSON.stringify(data, null, 2), {
+          name: `projects/${safeTitle}.json`,
+        });
+      }
+
+      await archive.finalize();
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of passthrough) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `annie-full-export-${timestamp}.zip`;
+
+      logger.info("GET /api/auth/export-data: API_TOKEN mode export", {});
+
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });

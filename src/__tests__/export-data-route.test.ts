@@ -37,10 +37,11 @@ describe("GET /api/auth/export-data", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
   });
 
-  it("returns 401 for unauthenticated request", async () => {
+  it("returns 200 with zip in API_TOKEN mode (no userId)", async () => {
     const { GET } = await import("@/app/api/auth/export-data/route");
     const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/zip");
   });
 
   it("returns 401 when userId exists but user is not in DB", async () => {
