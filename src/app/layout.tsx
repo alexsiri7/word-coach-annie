@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { SyncToast } from "@/components/sync-toast";
@@ -40,11 +41,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? "";
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
@@ -53,6 +55,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           <a
             href="#main-content"

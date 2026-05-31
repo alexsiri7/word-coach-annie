@@ -11,6 +11,23 @@ import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
+function buildCsp(nonce: string): string {
+    return [
+        "default-src 'self'",
+        // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
+        `script-src 'self' 'nonce-${nonce}'`,
+        // style-src: unsafe-inline retained — 22+ inline style= attributes require it (SEC-011 note).
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://fonts.googleapis.com https://fonts.gstatic.com",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ].join("; ");
+}
+
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
     "/api/health",
@@ -100,9 +117,21 @@ async function applyRateLimit(
 }
 
 export async function middleware(request: NextRequest) {
+    const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+    const csp = buildCsp(nonce);
+
+    // Helper: NextResponse.next() with nonce injected into request headers + CSP on response
+    function nextWithNonce(extraHeaders?: Headers): NextResponse {
+        const reqHeaders = new Headers(extraHeaders ?? request.headers);
+        reqHeaders.set("x-nonce", nonce);
+        const res = NextResponse.next({ request: { headers: reqHeaders } });
+        res.headers.set("Content-Security-Policy", csp);
+        return res;
+    }
+
     // No auth configured → pass through (local dev mode)
     if (!isAuthEnabled()) {
-        return NextResponse.next();
+        return nextWithNonce();
     }
 
     const { pathname } = request.nextUrl;
@@ -116,12 +145,12 @@ export async function middleware(request: NextRequest) {
         if (!result.allowed) {
             return makeRateLimitResponse(RATE_LIMITS.auth, result.retryAfterMs!, result.resetMs);
         }
-        return NextResponse.next();
+        return nextWithNonce();
     }
 
     // Allow public paths through
     if (isPublicPath(pathname)) {
-        return NextResponse.next();
+        return nextWithNonce();
     }
 
     // Check Authorization header (programmatic / MCP access)
@@ -136,7 +165,7 @@ export async function middleware(request: NextRequest) {
         if (token && apiToken && safeEqual(token, apiToken)) {
             const rateLimited = await applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;
-            return NextResponse.next();
+            return nextWithNonce();
         }
 
         // 2. Check MCP OAuth access token (JWT with type: "mcp_access")
@@ -154,9 +183,7 @@ export async function middleware(request: NextRequest) {
                 const requestHeaders = new Headers(request.headers);
                 requestHeaders.set("x-user-id", mcpSession.userId);
                 requestHeaders.set("x-user-email", mcpSession.email);
-                return NextResponse.next({
-                    request: { headers: requestHeaders },
-                });
+                return nextWithNonce(requestHeaders);
             }
         }
 
@@ -189,9 +216,7 @@ export async function middleware(request: NextRequest) {
             const requestHeaders = new Headers(request.headers);
             requestHeaders.set("x-user-id", session.userId);
             requestHeaders.set("x-user-email", session.email);
-            return NextResponse.next({
-                request: { headers: requestHeaders },
-            });
+            return nextWithNonce(requestHeaders);
         }
 
         // Fall back to legacy API_TOKEN session cookie
@@ -201,7 +226,7 @@ export async function middleware(request: NextRequest) {
                 // Rate limit legacy sessions by token
                 const rateLimited = await applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;
-                return NextResponse.next();
+                return nextWithNonce();
             }
         }
     }

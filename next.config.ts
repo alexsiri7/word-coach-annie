@@ -51,31 +51,6 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: [
           {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // SEC-011: 'unsafe-eval' removed — not required by Next.js in production.
-              // 'unsafe-inline' is retained for script-src because next-themes injects an
-              // inline FOUC-prevention script at render time that cannot be hashed without
-              // nonce-based middleware. Tracking removal as a follow-up requiring a
-              // custom middleware layer to inject per-request nonces.
-              "script-src 'self' 'unsafe-inline'",
-              // SEC-011: 'unsafe-inline' retained for style-src — 22+ component-level
-              // inline style= attributes and styled-jsx require it. Full removal needs a
-              // separate refactor to eliminate inline styles or add nonces.
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
-              "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://fonts.googleapis.com https://fonts.gstatic.com",
-              "object-src 'none'",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              // SEC-012: Replaced wildcard form-action with explicit self-origin only.
-              // The only form POST in this app is oauth/authorize posting to itself.
-              "form-action 'self'",
-            ].join("; "),
-          },
-          {
             key: "X-Content-Type-Options",
             value: "nosniff",
           },
