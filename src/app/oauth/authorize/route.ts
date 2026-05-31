@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const nonce = request.headers.get("x-nonce") ?? "";
+  if (!nonce) {
+    logger.warn("POST /oauth/authorize: x-nonce header missing — inline scripts will be CSP-blocked");
+  }
   const formData = await request.formData();
 
   const csrfForm = formData.get("csrf_token") as string | null;
@@ -349,7 +352,7 @@ function renderCodePage(code: string, redirectUrl: string, nonce: string): NextR
     <h1>Authorization Approved</h1>
     <p class="description">Copy this code and paste it back into your CLI tool.</p>
     <div class="code-box" id="code" title="Click to select">${escapeHtml(code)}</div>
-    <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+    <button class="copy-btn" id="copy-btn">Copy Code</button>
     <p class="copied" id="copied">Copied to clipboard!</p>
     <p class="redirect-note">Attempting automatic redirect...</p>
   </div>
@@ -360,6 +363,7 @@ function renderCodePage(code: string, redirectUrl: string, nonce: string): NextR
         document.querySelector('.copy-btn').textContent = 'Copied!';
       });
     }
+    document.getElementById('copy-btn').addEventListener('click', copyCode);
     // Try the redirect anyway — works if localhost is reachable
     setTimeout(function() { window.location.href = ${JSON.stringify(redirectUrl)}; }, 500);
   </script>

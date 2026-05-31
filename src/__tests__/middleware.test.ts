@@ -57,6 +57,11 @@ describe("middleware", () => {
         const req = createRequest("/api/projects");
         const res = await middleware(req);
         expect(res.status).toBe(200); // NextResponse.next() returns 200
+        const csp = res.headers.get("Content-Security-Policy");
+        expect(csp).toBeTruthy();
+        expect(csp).toContain("script-src");
+        // Core security guarantee: no unsafe-inline in script-src (style-src retains it intentionally)
+        expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
     });
 
     it("allows public paths when auth is enabled", async () => {
@@ -171,6 +176,51 @@ describe("middleware", () => {
         const req = createRequest("/landing");
         const res = await middleware(req);
         expect(res.status).toBe(200);
+    });
+
+    describe("CSP nonce injection", () => {
+        it("sets Content-Security-Policy header on all passing responses", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy");
+            expect(csp).toBeTruthy();
+            // Core security guarantee: no unsafe-inline in script-src
+            expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+            // Nonce directive is present
+            expect(csp).toMatch(/script-src[^;]*'nonce-[A-Za-z0-9+/=_-]+'/);
+        });
+
+        it("sets Content-Security-Policy on authenticated responses", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const req = createRequest("/api/projects", {
+                cookies: { annie_session: "valid-jwt-token" },
+            });
+            const res = await middleware(req);
+            expect(res.status).toBe(200);
+            const csp = res.headers.get("Content-Security-Policy");
+            expect(csp).toBeTruthy();
+            expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+        });
+
+        it("x-nonce request header matches nonce in Content-Security-Policy", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/projects"));
+
+            // The nonce forwarded to the page (via request header rewrite)
+            const xNonce = res.headers.get("x-middleware-request-x-nonce");
+            // The nonce embedded in the CSP
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            const nonceMatch = csp.match(/'nonce-([A-Za-z0-9+/=_-]+)'/);
+
+            expect(xNonce).toBeTruthy();
+            expect(nonceMatch).not.toBeNull();
+            expect(xNonce).toBe(nonceMatch![1]);
+        });
     });
 
     describe("rate limiting", () => {

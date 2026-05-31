@@ -36,6 +36,23 @@ function makePostRequest(fields: Record<string, string>, cookieHeader = ""): Nex
   });
 }
 
+function makePostRequestWithNonce(
+  fields: Record<string, string>,
+  cookieHeader = "",
+  nonce = "test-nonce-abc",
+): NextRequest {
+  const body = new URLSearchParams(fields).toString();
+  return new NextRequest("http://localhost/oauth/authorize", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: cookieHeader,
+      "x-nonce": nonce,
+    },
+    body,
+  });
+}
+
 describe("POST /oauth/authorize CSRF protection", () => {
   it("returns 403 when csrf_token is missing from form", async () => {
     const req = makePostRequest(
@@ -170,5 +187,45 @@ describe("POST /oauth/authorize approve happy-path", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("code-123"); // from mocked createAuthCode
+  });
+});
+
+describe("POST /oauth/authorize nonce propagation", () => {
+  it("inline script on deny redirect carries nonce attribute", async () => {
+    const req = makePostRequestWithNonce(
+      {
+        action: "deny",
+        csrf_token: "token-abc",
+        redirect_uri: "http://localhost/callback",
+        state: "",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+      "my-test-nonce",
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('nonce="my-test-nonce"');
+  });
+
+  it("inline script on code page carries nonce attribute", async () => {
+    const req = makePostRequestWithNonce(
+      {
+        action: "approve",
+        csrf_token: "token-abc",
+        response_type: "code",
+        client_id: "c1",
+        redirect_uri: "http://localhost/callback",
+        code_challenge: "abc",
+        code_challenge_method: "S256",
+        state: "xyz",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+      "my-test-nonce",
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('nonce="my-test-nonce"');
   });
 });

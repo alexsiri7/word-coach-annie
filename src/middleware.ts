@@ -117,7 +117,7 @@ async function applyRateLimit(
 }
 
 export async function middleware(request: NextRequest) {
-    const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+    const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
     const csp = buildCsp(nonce);
 
     // Helper: NextResponse.next() with nonce injected into request headers + CSP on response
