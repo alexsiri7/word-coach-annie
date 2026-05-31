@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
+import { SESSION_COOKIE_NAME, SESSION_MAX_AGE, verifySessionToken } from "@/lib/auth";
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
@@ -9,9 +9,9 @@ export async function POST(request: NextRequest) {
     if (sessionCookie) {
         const session = await verifySessionToken(sessionCookie);
         if (session?.jti && session.userId) {
-            // Derive expiry from SESSION_MAX_AGE — tokens expire 24h from issuance.
-            // We don't have exact iat here, so use now + SESSION_MAX_AGE as a safe upper bound.
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            // Use SESSION_MAX_AGE as a safe upper bound for blocklist expiry.
+            // Actual token exp = iat + SESSION_MAX_AGE; using now + SESSION_MAX_AGE is always >= actual exp.
+            const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
             try {
                 await revokeToken(session.jti, session.userId, expiresAt);
             } catch (err) {

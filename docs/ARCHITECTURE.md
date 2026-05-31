@@ -186,6 +186,12 @@ The app supports three auth modes (controlled by environment variables):
 | **Token auth** | `API_TOKEN` set | Send `Authorization: Bearer <token>` header, or use session cookie from `/api/auth/login` |
 | **Google OAuth** | `GOOGLE_CLIENT_ID/SECRET` set | Full OAuth flow with invite-list control via `ALLOWED_EMAILS` |
 
+### Session Security
+
+Google OAuth sessions are short-lived JWTs (24 hours) with a `jti` (JWT ID) claim. On logout, the `jti` is written to the `RevokedToken` database table via `src/lib/token-blocklist.ts`, and `verifySessionToken` checks revocation on every authenticated Node.js request.
+
+**Edge Runtime constraint**: Next.js middleware runs in the Edge Runtime and cannot use Prisma. Revocation is skipped there — the 24-hour token lifetime is the compensating control. Do not import `token-blocklist.ts` from middleware or any Edge-compatible module.
+
 ## Content Versioning
 
 Every scene save creates a new `ContentVersion` record. The controller keeps the last 50 versions per scene (configurable) and prunes older ones. Versions store timestamp + full content + word count. Users can view history and restore any version (restore creates a new version from old content).

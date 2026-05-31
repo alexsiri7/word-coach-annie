@@ -412,6 +412,5 @@ model RevokedToken {
   revokedAt DateTime @default(now())
   expiresAt DateTime // mirrors JWT exp — for cleanup
 
-  @@index([jti])
   @@index([expiresAt])
 }

@@ -6,6 +6,7 @@ vi.mock("@/lib/token-blocklist", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
+    SESSION_MAX_AGE: 86400,
     verifySessionToken: vi.fn(async () => ({ userId: "u1", email: "u@test.com", name: "U", jti: "test-jti-123" })),
 }));
 
@@ -36,6 +37,16 @@ describe("POST /api/auth/logout", () => {
             headers: { cookie: "annie_session=fake-token" },
         });
         const response = await POST(req);
+        expect(response.status).toBe(200);
+        const setCookie = response.headers.get("set-cookie");
+        expect(setCookie).toContain("annie_session=;");
+    });
+
+    it("should clear cookie and not attempt revocation when no session cookie present", async () => {
+        const { NextRequest } = await import("next/server");
+        const req = new NextRequest("http://localhost/api/auth/logout", { method: "POST" });
+        const response = await POST(req);
+        expect(revokeToken).not.toHaveBeenCalled();
         expect(response.status).toBe(200);
         const setCookie = response.headers.get("set-cookie");
         expect(setCookie).toContain("annie_session=;");

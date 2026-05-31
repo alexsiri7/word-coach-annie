@@ -2,8 +2,7 @@
  * Token revocation blocklist backed by the Prisma database.
  *
  * Node.js only — do NOT import this in Edge Runtime (middleware).
- * Use the same guard pattern as src/lib/rate-limit.ts:
- *   if (typeof EdgeRuntime !== "undefined") return false;
+ * Use the `isEdgeRuntime()` helper defined below for the guard pattern.
  */
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -21,7 +20,11 @@ export async function revokeToken(jti: string, userId: string, expiresAt: Date):
     try {
         await prisma.revokedToken.create({ data: { jti, userId, expiresAt } });
     } catch (err) {
-        // Unique constraint violation means it's already revoked — that's fine
+        // P2002 = unique constraint: token already revoked — idempotent, ignore.
+        // Any other error is unexpected; log at ERROR for on-call visibility.
+        if ((err as { code?: string }).code === "P2002") {
+            return;
+        }
         logger.error("[token-blocklist] Failed to revoke token:", err);
     }
 }
