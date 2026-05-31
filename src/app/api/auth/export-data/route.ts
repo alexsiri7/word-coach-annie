@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       ? await prisma.user.findUnique({ where: { id: userId } })
       : null;
     if (userId && !user) {
+      logger.warn("GET /api/auth/export-data: rejected — userId not found in DB", { userId });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -93,7 +94,10 @@ export async function GET(request: NextRequest) {
     const timestamp = new Date().toISOString().slice(0, 10);
     const filename = `annie-full-export-${timestamp}.zip`;
 
-    logger.info("GET /api/auth/export-data: user exported data", { userId });
+    logger.info("GET /api/auth/export-data: exported data", {
+      userId: userId ?? "api-token",
+      mode: isGoogleAuthMode() ? "google-auth" : "api-token",
+    });
 
     return new NextResponse(buffer, {
       headers: {

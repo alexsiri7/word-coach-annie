@@ -111,6 +111,7 @@ describe("GET /api/projects/export-all", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/zip");
+    expect(res.headers.get("content-disposition")).toMatch(/attachment.*\.zip/);
   });
 
   it("scopes to user when userId is present", async () => {
