@@ -8,6 +8,9 @@ import JSZip from "jszip";
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => null),
 }));
+vi.mock("@/lib/auth", () => ({
+  isGoogleAuthMode: vi.fn(() => true),
+}));
 vi.mock("@/lib/export-json", () => ({
   exportProjectJson: vi.fn(async (id: string) => ({
     exportVersion: 1,
@@ -22,6 +25,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,9 +39,10 @@ describe("GET /api/auth/export-data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(isGoogleAuthMode).mockReturnValue(true);
   });
 
-  it("returns 401 for unauthenticated request", async () => {
+  it("returns 401 for unauthenticated request in Google auth mode", async () => {
     const { GET } = await import("@/app/api/auth/export-data/route");
     const res = await GET(makeRequest());
     expect(res.status).toBe(401);
