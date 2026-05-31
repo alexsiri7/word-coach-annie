@@ -95,6 +95,24 @@ describe("GET /api/projects/export-all", () => {
     expect(res.headers.get("content-disposition")).toContain(".zip");
   });
 
+  it("returns 200 with ZIP when userId is null in API_TOKEN mode", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(isGoogleAuthMode).mockReturnValue(false);
+
+    const user = await testPrisma.user.create({
+      data: { id: "any-user", email: "any@test.com", googleId: "g-any" },
+    });
+    await testPrisma.project.create({
+      data: { title: "Token Project", author: "Author", userId: user.id },
+    });
+
+    const { GET } = await import("@/app/api/projects/export-all/route");
+    const res = await GET(makeGetRequest());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/zip");
+  });
+
   it("scopes to user when userId is present", async () => {
     vi.mocked(getCurrentUserId).mockReturnValue("user-abc");
 

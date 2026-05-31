@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const userId = getCurrentUserId(request);
     // In Google auth mode (multi-user), a null userId means unauthenticated — reject.
     // In API_TOKEN mode (single-user), userId is always null; allow and export all data.
-    if (!userId && isGoogleAuthMode()) {
+    if (isGoogleAuthMode() && !userId) {
+      logger.warn("GET /api/auth/export-data: rejected — userId is null");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

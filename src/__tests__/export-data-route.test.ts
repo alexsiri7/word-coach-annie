@@ -55,6 +55,30 @@ describe("GET /api/auth/export-data", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns ZIP without profile/ai-settings in API_TOKEN mode", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(isGoogleAuthMode).mockReturnValue(false);
+
+    const user = await testPrisma.user.create({
+      data: { id: "token-user", email: "t@test.com", googleId: "g-t" },
+    });
+    await testPrisma.project.create({
+      data: { title: "Token Project", author: "Author", userId: user.id },
+    });
+
+    const { GET } = await import("@/app/api/auth/export-data/route");
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const zip = await JSZip.loadAsync(buf);
+
+    expect(zip.file("profile.json")).toBeNull();
+    expect(zip.file("ai-settings.json")).toBeNull();
+    const projectFiles = Object.keys(zip.files).filter((n) => n.startsWith("projects/"));
+    expect(projectFiles.length).toBeGreaterThan(0);
+  });
+
   it("returns ZIP with correct headers for authenticated user", async () => {
     const user = await testPrisma.user.create({
       data: { id: "u1", email: "x@test.com", googleId: "g1" },
