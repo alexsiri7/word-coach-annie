@@ -103,6 +103,16 @@ describe("runPeerReview", () => {
     }
   });
 
+  it("passes systemPrompt separately from userMessage for all reviewers", async () => {
+    await runPeerReview("proj-1");
+    const calls = vi.mocked(runSimpleCompletion).mock.calls;
+    for (const [arg] of calls.slice(0, 5)) {
+      expect(arg.systemPrompt).toBeDefined();
+      expect(arg.systemPrompt).not.toBe("");
+      expect(arg.userMessage).toContain("<manuscript>");
+    }
+  });
+
   it("makes exactly 6 AI calls (5 reviewers + 1 synthesis)", async () => {
     await runPeerReview("proj-1");
     expect(vi.mocked(runSimpleCompletion)).toHaveBeenCalledTimes(6);

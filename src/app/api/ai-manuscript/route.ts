@@ -12,46 +12,52 @@ export type ManuscriptAnalysisType =
   | "consistency-check";
 
 const ANALYSIS_PROMPTS: Record<ManuscriptAnalysisType, (ctx: Awaited<ReturnType<typeof getManuscriptContext>>) => string> = {
-  "plot-threads": ({ project, outlineWithContent, plotlines }) => `Analyze the plot threads in "${project.title}". Based on the manuscript structure below, identify:
+  "plot-threads": ({ project, outlineWithContent, plotlines }) => `Analyze the plot threads in <project-title>${project.title}</project-title>. Based on the manuscript structure below, identify:
 1. **Active threads** — which plot lines are introduced and developed
 2. **Dormant threads** — threads introduced but not recently advanced
 3. **Unresolved threads** — threads that need payoff
 4. **Suggested connections** — opportunities to weave threads together
 
-${plotlines ? `Known plotlines:\n${plotlines}\n` : ""}
-Manuscript structure:
+${plotlines ? `<known-plotlines>\n${plotlines}\n</known-plotlines>\n` : ""}
+<manuscript-structure>
 ${outlineWithContent || "(No scenes yet)"}
+</manuscript-structure>
 
 Format your response as a structured report with clear sections. Be specific about which scenes/chapters contain each thread. Keep it concise and actionable.`,
 
-  "character-arcs": ({ project, outlineWithContent, characters, relationships }) => `Analyze character arcs in "${project.title}". For each major character, identify:
+  "character-arcs": ({ project, outlineWithContent, characters, relationships }) => `Analyze character arcs in <project-title>${project.title}</project-title>. For each major character, identify:
 1. **Arc type** — transformation, revelation, flat/steadfast, fallen
 2. **Current position** — where they are in their arc based on the manuscript
 3. **Missing beats** — what arc beats are absent or underdeveloped
 4. **Key relationships** — how relationships drive or reflect the arc
 
-Known characters:
+<known-characters>
 ${characters || "(No characters defined)"}
+</known-characters>
 
-Relationships:
+<relationships>
 ${relationships || "(No relationships defined)"}
+</relationships>
 
-Manuscript structure:
+<manuscript-structure>
 ${outlineWithContent || "(No scenes yet)"}
+</manuscript-structure>
 
 Format your response as a structured report with one section per major character. Be specific about which scenes show arc development.`,
 
-  "consistency-check": ({ project, outlineWithContent, characters }) => `Perform a consistency check on "${project.title}". Look for potential contradictions or inconsistencies in:
+  "consistency-check": ({ project, outlineWithContent, characters }) => `Perform a consistency check on <project-title>${project.title}</project-title>. Look for potential contradictions or inconsistencies in:
 1. **Character details** — appearance, backstory, traits mentioned differently
 2. **Timeline** — events out of chronological order, impossible timing
 3. **World/setting** — location descriptions that contradict each other
 4. **Plot logic** — cause-effect gaps, character motivations that don't hold
 
-Known characters:
+<known-characters>
 ${characters || "(No characters defined)"}
+</known-characters>
 
-Manuscript structure:
+<manuscript-structure>
 ${outlineWithContent || "(No scenes yet)"}
+</manuscript-structure>
 
 Format as a structured report. List specific potential issues with scene references where possible. If no issues are found in a category, say so briefly. Be honest but constructive.`,
 };

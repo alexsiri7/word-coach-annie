@@ -66,3 +66,15 @@ export function escapeHtml(input: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/**
+ * Wraps user-controlled content in XML-like tags to signal to the LLM
+ * that this is user-provided data, not instructions. Mitigates prompt injection.
+ * Use for all user-controlled strings embedded in prompts.
+ *
+ * Example: wrapUserContent("project-title", project.title)
+ * → "<project-title>My Story</project-title>"
+ */
+export function wrapUserContent(tag: string, content: string): string {
+  return `<${tag}>${content}</${tag}>`;
+}
