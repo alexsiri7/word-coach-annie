@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
     // Quick data integrity check — ensure core tables have data.
@@ -12,11 +13,15 @@ export async function GET() {
 
         const dataOk = projects > 0 || users > 0;
 
-        return NextResponse.json({
-            status: dataOk ? "ok" : "degraded",
-            ...(!dataOk && { warning: "Database appears empty — possible data loss" }),
-        });
+        return NextResponse.json(
+            {
+                status: dataOk ? "ok" : "degraded",
+                ...(!dataOk && { warning: "Database appears empty — possible data loss" }),
+            },
+            { status: dataOk ? 200 : 503 }
+        );
     } catch (e) {
+        logger.error("Health check DB error", e);
         return NextResponse.json(
             { status: "error", error: e instanceof Error ? e.message : "DB unreachable" },
             { status: 503 }

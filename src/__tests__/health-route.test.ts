@@ -21,6 +21,7 @@ describe("GET /api/health", () => {
         const res = await GET();
         const body = await res.json();
 
+        expect(res.status).toBe(200);
         expect(body.status).toBe("ok");
         expect(body.db).toBeUndefined();
         expect(body.projects).toBeUndefined();
@@ -34,6 +35,7 @@ describe("GET /api/health", () => {
         const res = await GET();
         const body = await res.json();
 
+        expect(res.status).toBe(503);
         expect(body.status).toBe("degraded");
         expect(body.warning).toBeDefined();
         expect(body.db).toBeUndefined();
