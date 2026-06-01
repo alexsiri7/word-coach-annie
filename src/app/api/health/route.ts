@@ -12,10 +12,13 @@ export async function GET() {
 
         const dataOk = projects > 0 || users > 0;
 
-        return NextResponse.json({
-            status: dataOk ? "ok" : "degraded",
-            ...(!dataOk && { warning: "Database appears empty — possible data loss" }),
-        });
+        return NextResponse.json(
+            {
+                status: dataOk ? "ok" : "degraded",
+                ...(!dataOk && { warning: "Database appears empty — possible data loss" }),
+            },
+            { status: dataOk ? 200 : 503 }
+        );
     } catch (e) {
         return NextResponse.json(
             { status: "error", error: e instanceof Error ? e.message : "DB unreachable" },
