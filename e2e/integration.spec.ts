@@ -62,9 +62,10 @@ test.describe('Integration tests — real server, real data', () => {
   // ── a) Health check ─────────────────────────────────────────────────
   test('health check returns ok', async ({ request }) => {
     const res = await request.get('/api/health', { headers: AUTH_HEADERS })
-    expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body.status).toMatch(/ok|degraded/)
+    // ok → 200, degraded → 503 (empty DB in CI)
+    expect([200, 503]).toContain(res.status())
     // db counts must not be exposed (information disclosure fix)
     expect(body.db).toBeUndefined()
     expect(body.projects).toBeUndefined()
