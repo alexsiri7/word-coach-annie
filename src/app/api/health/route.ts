@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
     // Quick data integrity check — ensure core tables have data.
@@ -20,6 +21,7 @@ export async function GET() {
             { status: dataOk ? 200 : 503 }
         );
     } catch (e) {
+        logger.error("Health check DB error", e);
         return NextResponse.json(
             { status: "error", error: e instanceof Error ? e.message : "DB unreachable" },
             { status: 503 }
