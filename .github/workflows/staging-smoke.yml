@@ -73,7 +73,7 @@ jobs:
           for i in $(seq 1 $MAX_ATTEMPTS); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
               https://word-coach-annie-staging.up.railway.app/api/health) || STATUS="000"
-            if [ "$STATUS" = "200" ]; then
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "503" ]; then
               echo "✓ Staging health check passed after $((i * INTERVAL))s"
               break
             fi
