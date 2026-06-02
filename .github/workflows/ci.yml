@@ -139,9 +139,14 @@ jobs:
       - name: Start server and run E2E tests
         run: |
           npm start &
-          # Wait for server to be ready
+          # Wait for server to be ready (accept 200 or 503 — 503 = empty-DB degraded state in CI)
           for i in $(seq 1 30); do
-            curl -sf http://localhost:3000/api/health && break
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+              http://localhost:3000/api/health) || STATUS="000"
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "503" ]; then
+              echo "✓ Server ready (HTTP $STATUS)"
+              break
+            fi
             sleep 2
           done
           npx playwright test e2e/integration.spec.ts --project=integration
