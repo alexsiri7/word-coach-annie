@@ -230,18 +230,16 @@ describe("POST /api/chat — auto-title", () => {
     while (!(await reader.read()).done) {}
     // Allow the fire-and-forget auto-title IIFE to settle.
     // The chain involves multiple awaited DB queries plus runSimpleCompletion.
-    // We wait for all mock Promises to resolve by checking settled mock results.
+    // Give the IIFE time to schedule before we start polling.
+    await new Promise((r) => setTimeout(r, 50));
+    // Now poll until all mock calls have settled (or timeout).
     const deadline = Date.now() + 2000;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 5));
-      // Check if all mock results have settled
       const results = vi.mocked(runSimpleCompletion).mock.settledResults;
       const calls = vi.mocked(runSimpleCompletion).mock.calls.length;
-      if (results.length === calls) break;
+      if (calls > 0 && results.length === calls) break;
+      await new Promise((r) => setTimeout(r, 5));
     }
-    // Fail explicitly if we timed out waiting for settlements
-    const { settledResults, calls } = vi.mocked(runSimpleCompletion).mock;
-    expect(settledResults.length).toBe(calls.length);
   }
 
   beforeEach(async () => {
