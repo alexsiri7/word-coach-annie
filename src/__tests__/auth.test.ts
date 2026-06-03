@@ -5,8 +5,11 @@ import {
     createSessionToken,
     verifySessionToken,
     isAuthEnabled,
+    isGoogleAuthMode,
     isAllowedRedirect,
     getJwtKey,
+    resolveJwtSecret,
+    safeEqual,
 } from "@/lib/auth";
 
 vi.mock("@/lib/token-blocklist", () => ({
@@ -242,6 +245,82 @@ describe("isAuthEnabled", () => {
         delete process.env.API_TOKEN;
         process.env.GOOGLE_CLIENT_ID = "test-client-id";
         expect(isAuthEnabled()).toBe(true);
+    });
+});
+
+describe("isGoogleAuthMode", () => {
+    let origGoogleClientId: string | undefined;
+
+    beforeEach(() => {
+        origGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+    });
+
+    afterEach(() => {
+        if (origGoogleClientId !== undefined) process.env.GOOGLE_CLIENT_ID = origGoogleClientId;
+        else delete process.env.GOOGLE_CLIENT_ID;
+    });
+
+    it("returns false when GOOGLE_CLIENT_ID is not set", () => {
+        delete process.env.GOOGLE_CLIENT_ID;
+        expect(isGoogleAuthMode()).toBe(false);
+    });
+
+    it("returns true when GOOGLE_CLIENT_ID is set", () => {
+        process.env.GOOGLE_CLIENT_ID = "test-client-id";
+        expect(isGoogleAuthMode()).toBe(true);
+    });
+});
+
+describe("resolveJwtSecret", () => {
+    let origJwt: string | undefined;
+    let origApiToken: string | undefined;
+
+    beforeEach(() => {
+        origJwt = process.env.JWT_SECRET;
+        origApiToken = process.env.API_TOKEN;
+    });
+
+    afterEach(() => {
+        if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
+        else delete process.env.JWT_SECRET;
+        if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
+        else delete process.env.API_TOKEN;
+    });
+
+    it("returns JWT_SECRET when set", () => {
+        process.env.JWT_SECRET = "my-super-secret-key";
+        expect(resolveJwtSecret()).toBe("my-super-secret-key");
+    });
+
+    it("returns 'annie-dev-secret' when auth is disabled", () => {
+        delete process.env.JWT_SECRET;
+        delete process.env.API_TOKEN;
+        delete process.env.GOOGLE_CLIENT_ID;
+        expect(resolveJwtSecret()).toBe("annie-dev-secret");
+    });
+
+    it("throws when auth is enabled but no JWT_SECRET", () => {
+        delete process.env.JWT_SECRET;
+        process.env.API_TOKEN = "some-token";
+        expect(() => resolveJwtSecret()).toThrow("JWT_SECRET is required");
+    });
+});
+
+describe("safeEqual", () => {
+    it("returns true for identical strings", () => {
+        expect(safeEqual("abc", "abc")).toBe(true);
+    });
+
+    it("returns false for different strings of same length", () => {
+        expect(safeEqual("abc", "abd")).toBe(false);
+    });
+
+    it("returns false for strings of different lengths", () => {
+        expect(safeEqual("ab", "abc")).toBe(false);
+    });
+
+    it("returns true for empty strings", () => {
+        expect(safeEqual("", "")).toBe(true);
     });
 });
 

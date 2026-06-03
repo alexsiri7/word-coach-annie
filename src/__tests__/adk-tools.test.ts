@@ -32,7 +32,7 @@ describe("ADK tools", () => {
       const registryTools = getAllTools();
       for (const def of registryTools) {
         const adkTool = getAdkToolByName(def.name);
-        expect(adkTool).toBeDefined();
+        expect(adkTool).toMatchObject({ name: expect.any(String), description: expect.any(String) });
         expect(adkTool!.name).toBe(def.name);
         expect(adkTool!.description).toBe(def.description);
       }
@@ -75,7 +75,7 @@ describe("ADK tools", () => {
       const allTools = getAllAdkTools();
       for (const tool of allTools) {
         const decl = tool._getDeclaration();
-        expect(decl).toBeDefined();
+        expect(decl).toMatchObject({ name: expect.any(String) });
         expect(decl.name).toBe(tool.name);
       }
     });

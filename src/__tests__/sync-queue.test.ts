@@ -130,12 +130,7 @@ describe("sync-queue", () => {
       expect(fetchCalls).toEqual(["/api/projects", "/api/nodes/x"]);
 
       const doneEvent = events.find((e) => e.type === "replay-done");
-      expect(doneEvent).toBeDefined();
-      if (doneEvent && doneEvent.type === "replay-done") {
-        expect(doneEvent.succeeded).toBe(2);
-        expect(doneEvent.failed).toBe(0);
-        expect(doneEvent.conflicts).toBe(0);
-      }
+      expect(doneEvent).toMatchObject({ type: "replay-done", succeeded: 2, failed: 0, conflicts: 0 });
     });
 
     it("handles 409 conflicts by discarding the op", async () => {
@@ -154,13 +149,10 @@ describe("sync-queue", () => {
       unsub();
 
       const conflictEvent = events.find((e) => e.type === "replay-conflict");
-      expect(conflictEvent).toBeDefined();
+      expect(conflictEvent).toMatchObject({ type: "replay-conflict" });
 
       const doneEvent = events.find((e) => e.type === "replay-done");
-      if (doneEvent && doneEvent.type === "replay-done") {
-        expect(doneEvent.conflicts).toBe(1);
-        expect(doneEvent.succeeded).toBe(0);
-      }
+      expect(doneEvent).toMatchObject({ type: "replay-done", conflicts: 1, succeeded: 0 });
     });
 
     it("handles server errors with retry tracking", async () => {
@@ -179,7 +171,7 @@ describe("sync-queue", () => {
       unsub();
 
       const errorEvent = events.find((e) => e.type === "replay-error");
-      expect(errorEvent).toBeDefined();
+      expect(errorEvent).toMatchObject({ type: "replay-error" });
 
       const op = idbMock._ops.find((o) => o.id === 1);
       expect(op?.retries).toBe(1);
