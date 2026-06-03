@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import "./setup";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { testPrisma } from "./setup";
 
 class MockNextRequest {
   private _body: unknown;
@@ -48,8 +48,14 @@ describe("SessionsController", () => {
   let projectId: string;
 
   beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
     const project = await ProjectsController.createProject({ title: "Test Project" });
     projectId = project.id;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("creates a writing session", async () => {
@@ -59,7 +65,7 @@ describe("SessionsController", () => {
       durationSeconds: 1200,
       date: "2026-03-29",
     });
-    expect(session.id).toBeTruthy();
+    expect(typeof session.id).toBe("string");
     expect(session.projectId).toBe(projectId);
     expect(session.wordsWritten).toBe(350);
     expect(session.durationSeconds).toBe(1200);
@@ -70,20 +76,20 @@ describe("SessionsController", () => {
     await SessionsController.createSession({
       projectId,
       wordsWritten: 500,
-      date: new Date().toISOString().slice(0, 10),
+      date: "2024-06-15",
     });
 
     const heatmap = await SessionsController.getGlobalHeatmap(28);
     expect(heatmap).toHaveLength(28);
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = "2024-06-15";
     const todayEntry = heatmap.find((d) => d.date === today);
     expect(todayEntry?.wordsWritten).toBe(500);
     expect(todayEntry?.sessions).toBe(1);
   });
 
   it("aggregates multiple sessions for same day", async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = "2024-06-15";
     await SessionsController.createSession({ projectId, wordsWritten: 200, date: today });
     await SessionsController.createSession({ projectId, wordsWritten: 300, date: today });
 
@@ -166,6 +172,35 @@ describe("ProgressController", () => {
     expect(prog.parts[0].title).toBe("Part 1");
     expect(prog.parts[0].totalScenes).toBe(1);
     expect(prog.parts[0].finalScenes).toBe(1);
+  });
+
+  it("aggregates word count across multiple scenes", async () => {
+    const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+    const s1 = await StructureController.createNode({ projectId, type: "SCENE", title: "S1", parentId: ch.id });
+    const s2 = await StructureController.createNode({ projectId, type: "SCENE", title: "S2", parentId: ch.id });
+
+    await testPrisma.contentVersion.create({
+      data: { nodeId: s1.id, content: "Hello world", wordCount: 200 },
+    });
+    await testPrisma.contentVersion.create({
+      data: { nodeId: s2.id, content: "More words here", wordCount: 300 },
+    });
+
+    const prog = await ProgressController.getProjectProgress(projectId);
+    expect(prog.totalWords).toBe(500);
+  });
+
+  it("returns zero pace when no active writing days", async () => {
+    const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+    await StructureController.createNode({ projectId, type: "SCENE", title: "S1", parentId: ch.id });
+
+    const prog = await ProgressController.getProjectProgress(projectId);
+    // Should not throw on division by zero; pace should be null or have avgDailyWords=0
+    if (prog.pace) {
+      expect(prog.pace.avgDailyWords).toBe(0);
+    } else {
+      expect(prog.pace).toBeNull();
+    }
   });
 });
 

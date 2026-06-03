@@ -299,5 +299,46 @@ describe("AI settings", () => {
             const result = buildPreferenceInstructions(prefs);
             expect(result).not.toContain("Additional user instructions");
         });
+
+        it("returns balanced and moderate text for default preferences", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "",
+                coachingStyle: "balanced",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("encouraging but honest");
+            expect(result).toContain("concise unless asked");
+        });
+
+        it("returns direct and candid text for direct coaching style", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "",
+                coachingStyle: "direct",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("direct and candid");
+        });
+
+        it("includes custom instructions with 'Additional user instructions' prefix", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "Write like Hemingway",
+                coachingStyle: "balanced",
+                responseLength: "moderate",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("Additional user instructions: Write like Hemingway");
+        });
+
+        it("returns concise text for concise response length", () => {
+            const prefs: AiPreferences = {
+                customInstructions: "",
+                coachingStyle: "balanced",
+                responseLength: "concise",
+            };
+            const result = buildPreferenceInstructions(prefs);
+            expect(result).toContain("brief and to the point");
+        });
     });
 });

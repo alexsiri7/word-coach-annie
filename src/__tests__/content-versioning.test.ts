@@ -96,7 +96,7 @@ describe("Content Versioning", () => {
           nodeId: sceneId,
           content: `Version ${i}`,
           wordCount: 2,
-          createdAt: new Date(Date.now() - 10000 + i),
+          createdAt: new Date(Date.now() - 10000 + i * 100),
         },
       });
     }
@@ -123,7 +123,7 @@ describe("Content Versioning", () => {
           nodeId: sceneId,
           content: `Version ${i}`,
           wordCount: 2,
-          createdAt: new Date(Date.now() - 10000 + i),
+          createdAt: new Date(Date.now() - 10000 + i * 100),
         },
       });
     }

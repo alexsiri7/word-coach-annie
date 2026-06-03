@@ -64,11 +64,10 @@ describe("GET /api/conversations", () => {
 
   it("returns conversations ordered by updatedAt desc", async () => {
     await testPrisma.conversation.create({
-      data: { projectId, title: "Older chat" },
+      data: { projectId, title: "Older chat", createdAt: new Date("2024-01-01T00:00:00Z"), updatedAt: new Date("2024-01-01T00:00:00Z") },
     });
-    await new Promise((r) => setTimeout(r, 10));
     await testPrisma.conversation.create({
-      data: { projectId, title: "Newer chat" },
+      data: { projectId, title: "Newer chat", createdAt: new Date("2024-01-01T00:01:00Z"), updatedAt: new Date("2024-01-01T00:01:00Z") },
     });
 
     const { GET } = await import("@/app/api/conversations/route");

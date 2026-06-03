@@ -228,8 +228,18 @@ describe("POST /api/chat — auto-title", () => {
   async function drainStream(res: Response) {
     const reader = res.body!.getReader();
     while (!(await reader.read()).done) {}
-    // Allow the fire-and-forget IIFE microtasks to settle.
+    // Allow the fire-and-forget auto-title IIFE to settle.
+    // The chain involves multiple awaited DB queries plus runSimpleCompletion.
+    // Give the IIFE time to schedule before we start polling.
     await new Promise((r) => setTimeout(r, 50));
+    // Now poll until all mock calls have settled (or timeout).
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      const results = vi.mocked(runSimpleCompletion).mock.settledResults;
+      const calls = vi.mocked(runSimpleCompletion).mock.calls.length;
+      if (calls > 0 && results.length === calls) break;
+      await new Promise((r) => setTimeout(r, 5));
+    }
   }
 
   beforeEach(async () => {

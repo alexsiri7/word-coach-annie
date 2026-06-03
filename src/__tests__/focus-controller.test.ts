@@ -173,6 +173,38 @@ describe("FocusController", () => {
             const grouped = await FocusController.getRelatedElements(scene.id);
             expect(grouped.CHARACTER).toHaveLength(1);
         });
+
+        it("deduplicates objects with 3+ relationships to same scene", async () => {
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch 1" });
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1", parentId: ch.id });
+
+            const char = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Alice" }
+            });
+
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: char.id, toNodeId: scene.id }
+            });
+            await testPrisma.relationship.create({
+                data: { type: "RELATED_TO", toObjectId: char.id, fromNodeId: scene.id }
+            });
+            await testPrisma.relationship.create({
+                data: { type: "INTERACTS_WITH", fromObjectId: char.id, toNodeId: scene.id }
+            });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(1);
+            expect(grouped.CHARACTER[0].name).toBe("Alice");
+        });
+
+        it("returns empty relatedElements for scene with no relationships", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Isolated Scene" });
+
+            const grouped = await FocusController.getRelatedElements(scene.id);
+            expect(grouped.CHARACTER).toHaveLength(0);
+            expect(grouped.LOCATION).toHaveLength(0);
+            expect(grouped.PLOTLINE).toHaveLength(0);
+        });
     });
 
     describe("getAnnotations", () => {
