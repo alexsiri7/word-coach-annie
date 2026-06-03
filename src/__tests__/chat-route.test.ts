@@ -239,6 +239,9 @@ describe("POST /api/chat — auto-title", () => {
       const calls = vi.mocked(runSimpleCompletion).mock.calls.length;
       if (results.length === calls) break;
     }
+    // Fail explicitly if we timed out waiting for settlements
+    const { settledResults, calls } = vi.mocked(runSimpleCompletion).mock;
+    expect(settledResults.length).toBe(calls.length);
   }
 
   beforeEach(async () => {

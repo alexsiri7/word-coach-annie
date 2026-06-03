@@ -1,21 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-
-// DOMPurify requires a DOM; mock it with a realistic implementation
-vi.mock("dompurify", () => {
-  function sanitize(input: string, _opts?: { ALLOWED_TAGS: string[]; ALLOWED_ATTR: string[] }): string {
-    // Simulate DOMPurify's behavior with ALLOWED_TAGS=[] and ALLOWED_ATTR=[]:
-    // strips all tags, decodes entities, preserves text content
-    return input
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<[^>]*>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"');
-  }
-  return { default: { sanitize }, sanitize };
-});
-
+// @vitest-environment jsdom
+import { describe, it, expect } from "vitest";
 import { sanitizeMessageContent } from "@/lib/sanitize";
 
 describe("sanitizeMessageContent", () => {
@@ -50,8 +34,8 @@ describe("sanitizeMessageContent", () => {
     expect(sanitizeMessageContent("")).toBe("");
   });
 
-  it("decodes HTML entities", () => {
-    expect(sanitizeMessageContent("&amp;")).toBe("&");
+  it("preserves HTML entities in text", () => {
+    expect(sanitizeMessageContent("&amp;")).toBe("&amp;");
   });
 
   it("preserves markdown-like content", () => {
