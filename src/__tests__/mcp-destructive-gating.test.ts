@@ -160,7 +160,6 @@ vi.mock("../lib/export/google-docs-exporter", () => ({
 }));
 
 import { deleteNode } from "../mcp/tools/structure";
-import { deleteStoryObject } from "../mcp/tools/story-objects";
 import { listProjects } from "../mcp/tools/projects";
 import { restoreDatabaseSnapshot } from "../mcp/tools/snapshots";
 import { deleteRelationship } from "../mcp/tools/relationships";

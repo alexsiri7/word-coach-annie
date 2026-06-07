@@ -1,105 +1,7 @@
 import { prisma } from "@/lib/db";
 import { mcpCache } from "@/lib/cache";
-
-interface MarkdownOptions {
-    includeBeats?: boolean;
-}
-
-function htmlToMarkdown(html: string, options: MarkdownOptions = {}): string {
-    if (!html || html === "<p></p>") return "";
-
-    let md = html;
-
-    // Valid HTML comments for beats (<!-- beat: ... -->)
-    if (!options.includeBeats) {
-        md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
-    }
-
-    md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
-    md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
-    md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");
-    md = md.replace(/<strong>(.*?)<\/strong>/gi, "**$1**");
-    md = md.replace(/<b>(.*?)<\/b>/gi, "**$1**");
-    md = md.replace(/<em>(.*?)<\/em>/gi, "*$1*");
-    md = md.replace(/<i>(.*?)<\/i>/gi, "*$1*");
-    md = md.replace(/<u>(.*?)<\/u>/gi, "$1");
-    md = md.replace(/<ul[^>]*>/gi, "");
-    md = md.replace(/<\/ul>/gi, "\n");
-    md = md.replace(/<ol[^>]*>/gi, "");
-    md = md.replace(/<\/ol>/gi, "\n");
-    md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
-    md = md.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-    md = md.replace(/<br\s*\/?>/gi, "\n");
-    md = md.replace(/<[^>]+>/g, "");
-    md = md.replace(/\n{3,}/g, "\n\n");
-    md = md.replace(/&amp;/g, "&");
-    md = md.replace(/&lt;/g, "<");
-    md = md.replace(/&gt;/g, ">");
-    md = md.replace(/&quot;/g, '"');
-    md = md.replace(/&#39;/g, "'");
-    md = md.replace(/&nbsp;/g, " ");
-
-    return md.trim();
-}
-
-interface OutlineNode {
-    id: string;
-    type: string;
-    title: string;
-    synopsis: string;
-    status: string;
-    orderIndex: number;
-    parentId: string | null;
-    children: OutlineNode[];
-    content?: string;
-}
-
-async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
-    const nodes = await prisma.structureNode.findMany({
-        where: { projectId },
-        orderBy: { orderIndex: "asc" },
-    });
-
-    const sceneIds = nodes.filter((n) => n.type === "SCENE").map((n) => n.id);
-    const contentMap: Record<string, string> = {};
-
-    if (sceneIds.length > 0) {
-        const allVersions = await prisma.contentVersion.findMany({
-            where: { nodeId: { in: sceneIds } },
-            orderBy: { createdAt: "desc" },
-            select: { nodeId: true, content: true },
-        });
-
-        // First match per nodeId is latest due to orderBy desc
-        for (const v of allVersions) {
-            if (!(v.nodeId in contentMap)) {
-                contentMap[v.nodeId] = v.content;
-            }
-        }
-    }
-
-    const nodeMap = new Map<string, OutlineNode>();
-    const roots: OutlineNode[] = [];
-
-    for (const node of nodes) {
-        nodeMap.set(node.id, {
-            ...node,
-            children: [],
-            content: contentMap[node.id],
-        });
-    }
-
-    for (const node of nodes) {
-        const outlineNode = nodeMap.get(node.id)!;
-        if (node.parentId && nodeMap.has(node.parentId)) {
-            nodeMap.get(node.parentId)!.children.push(outlineNode);
-        } else {
-            roots.push(outlineNode);
-        }
-    }
-
-    return roots;
-}
+import { htmlToMarkdown, type MarkdownOptions } from "@/lib/html-to-markdown";
+import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
 
 export async function exportManuscript(projectId: string, options: MarkdownOptions = {}): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -181,19 +83,27 @@ export async function exportStoryBible(projectId: string): Promise<string> {
         }
     }
 
-    const relationships = await prisma.relationship.findMany({
+    const nodeIds = (await prisma.structureNode.findMany({
+        where: { projectId },
+        select: { id: true },
+    })).map((n) => n.id);
+    const objectIds = storyObjects.map((o) => o.id);
+
+    const projectRelationships = await prisma.relationship.findMany({
+        where: {
+            OR: [
+                { fromNodeId: { in: nodeIds } },
+                { toNodeId: { in: nodeIds } },
+                { fromObjectId: { in: objectIds } },
+                { toObjectId: { in: objectIds } },
+            ],
+        },
         include: {
             fromNode: true,
             fromObject: true,
             toNode: true,
             toObject: true,
         },
-    });
-
-    const projectRelationships = relationships.filter((r) => {
-        const fromProjectId = r.fromNode?.projectId || r.fromObject?.projectId;
-        const toProjectId = r.toNode?.projectId || r.toObject?.projectId;
-        return fromProjectId === projectId || toProjectId === projectId;
     });
 
     if (projectRelationships.length > 0) {

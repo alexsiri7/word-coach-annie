@@ -319,19 +319,24 @@ export async function getConsistencyContext(projectId: string, focusSceneId?: st
     ? [focusSceneId]
     : scenes.slice(0, 20).map((s) => s.id);
 
-  const scenesWithContent: { id: string; title: string; content: string }[] = [];
+  const allVersions = await prisma.contentVersion.findMany({
+    where: { nodeId: { in: targetSceneIds } },
+    orderBy: { createdAt: "desc" },
+    select: { nodeId: true, content: true },
+  });
+  const latestByNode: Record<string, string> = {};
+  for (const v of allVersions) {
+    if (!(v.nodeId in latestByNode)) latestByNode[v.nodeId] = v.content;
+  }
 
-  for (const sceneId of targetSceneIds) {
-    const version = await prisma.contentVersion.findFirst({
-      where: { nodeId: sceneId },
-      orderBy: { createdAt: "desc" },
-      select: { content: true },
-    });
-    const scene = scenes.find((s) => s.id === sceneId);
-    if (scene && version?.content) {
-      const textContent = htmlToText(version.content, 800);
+  const scenesWithContent: { id: string; title: string; content: string }[] = [];
+  for (const sid of targetSceneIds) {
+    const scene = scenes.find((s) => s.id === sid);
+    const content = latestByNode[sid];
+    if (scene && content) {
+      const textContent = htmlToText(content, 800);
       if (textContent.length > 50) {
-        scenesWithContent.push({ id: sceneId, title: scene.title, content: textContent });
+        scenesWithContent.push({ id: sid, title: scene.title, content: textContent });
       }
     }
   }
@@ -422,18 +427,23 @@ export async function getStoryBibleCrossReference(projectId: string, sceneId?: s
     sceneToObjects.get(nodeId)!.add(objId);
   }
 
-  // Fetch scene content with larger windows for cross-referencing
-  const scenesWithContent: CrossReferenceScene[] = [];
+  // Fetch scene content batched
+  const allVersions = await prisma.contentVersion.findMany({
+    where: { nodeId: { in: targetSceneIds } },
+    orderBy: { createdAt: "desc" },
+    select: { nodeId: true, content: true },
+  });
+  const latestByNode: Record<string, string> = {};
+  for (const v of allVersions) {
+    if (!(v.nodeId in latestByNode)) latestByNode[v.nodeId] = v.content;
+  }
 
+  const scenesWithContent: CrossReferenceScene[] = [];
   for (const sid of targetSceneIds) {
-    const version = await prisma.contentVersion.findFirst({
-      where: { nodeId: sid },
-      orderBy: { createdAt: "desc" },
-      select: { content: true },
-    });
     const scene = scenes.find((s) => s.id === sid);
-    if (scene && version?.content) {
-      const textContent = htmlToText(version.content, 2000);
+    const content = latestByNode[sid];
+    if (scene && content) {
+      const textContent = htmlToText(content, 2000);
       if (textContent.length > 50) {
         scenesWithContent.push({
           id: sid,
