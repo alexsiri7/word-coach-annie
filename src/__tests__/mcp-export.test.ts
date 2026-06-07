@@ -126,6 +126,35 @@ describe("MCP Export Tools", () => {
             expect(md).toContain("Opening");
         });
 
+        it("excludes relationships from other projects", async () => {
+            // Project A: character + scene + relationship
+            const charA = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Alice" }
+            });
+            const sceneA = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene A" });
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: charA.id, toNodeId: sceneA.id }
+            });
+
+            // Project B: separate character + scene + relationship
+            const projectB = await ProjectsController.createProject({
+                title: "Other Novel", author: "Other Author", genre: "Sci-Fi", synopsis: "Other"
+            });
+            const charB = await testPrisma.storyObject.create({
+                data: { projectId: projectB.id, type: "CHARACTER", name: "Bob" }
+            });
+            const sceneB = await StructureController.createNode({ projectId: projectB.id, type: "SCENE", title: "Scene B" });
+            await testPrisma.relationship.create({
+                data: { type: "APPEARS_IN", fromObjectId: charB.id, toNodeId: sceneB.id }
+            });
+
+            // Export project A only — should not contain project B data
+            const md = await exportStoryBible(projectId);
+            expect(md).toContain("Alice");
+            expect(md).not.toContain("Bob");
+            expect(md).not.toContain("Scene B");
+        });
+
         it("throws for non-existent project", async () => {
             await expect(exportStoryBible("bad")).rejects.toThrow("Project not found");
         });

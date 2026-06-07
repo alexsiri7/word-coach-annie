@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { testPrisma } from "./setup";
 import { SessionsController } from "@/lib/controllers/sessions";
 import { ProjectsController } from "@/lib/controllers/projects";
 

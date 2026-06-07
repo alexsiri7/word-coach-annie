@@ -3,114 +3,13 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { exportProjectJson } from "@/lib/export-json";
 import { logger } from "@/lib/logger";
-
-interface OutlineNode {
-  id: string;
-  type: string;
-  title: string;
-  synopsis: string;
-  status: string;
-  orderIndex: number;
-  parentId: string | null;
-  children: OutlineNode[];
-  content?: string;
-}
+import { htmlToMarkdown } from "@/lib/html-to-markdown";
+import { buildOutlineTree, OutlineNode } from "@/lib/outline-tree";
 
 interface ExportOptions {
   includeSynopsis: boolean;
   includeSceneBreaks: boolean;
   chapterNumbering: boolean;
-}
-
-function htmlToMarkdown(html: string): string {
-  if (!html || html === "<p></p>") return "";
-
-  let md = html;
-  // Headers
-  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
-  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
-  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");
-  // Bold, italic, underline
-  md = md.replace(/<strong>(.*?)<\/strong>/gi, "**$1**");
-  md = md.replace(/<b>(.*?)<\/b>/gi, "**$1**");
-  md = md.replace(/<em>(.*?)<\/em>/gi, "*$1*");
-  md = md.replace(/<i>(.*?)<\/i>/gi, "*$1*");
-  md = md.replace(/<u>(.*?)<\/u>/gi, "$1");
-  // Lists
-  md = md.replace(/<ul[^>]*>/gi, "");
-  md = md.replace(/<\/ul>/gi, "\n");
-  md = md.replace(/<ol[^>]*>/gi, "");
-  md = md.replace(/<\/ol>/gi, "\n");
-  md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
-  // Paragraphs and breaks
-  md = md.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-  md = md.replace(/<br\s*\/?>/gi, "\n");
-  // Strip remaining tags
-  md = md.replace(/<[^>]+>/g, "");
-  // Clean up whitespace
-  md = md.replace(/\n{3,}/g, "\n\n");
-  // Decode entities
-  md = md.replace(/&amp;/g, "&");
-  md = md.replace(/&lt;/g, "<");
-  md = md.replace(/&gt;/g, ">");
-  md = md.replace(/&quot;/g, '"');
-  md = md.replace(/&#39;/g, "'");
-  md = md.replace(/&ldquo;/g, "\u201C");
-  md = md.replace(/&rdquo;/g, "\u201D");
-  md = md.replace(/&mdash;/g, "\u2014");
-  md = md.replace(/&ndash;/g, "\u2013");
-  md = md.replace(/&nbsp;/g, " ");
-
-  return md.trim();
-}
-
-async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
-  const nodes = await prisma.structureNode.findMany({
-    where: { projectId },
-    orderBy: { orderIndex: "asc" },
-  });
-
-  // Batch: get latest content for all scenes in one query
-  const sceneIds = nodes.filter((n: { type: string }) => n.type === "SCENE").map((n: { id: string }) => n.id);
-  const contentMap: Record<string, string> = {};
-
-  if (sceneIds.length > 0) {
-    const allVersions = await prisma.contentVersion.findMany({
-      where: { nodeId: { in: sceneIds } },
-      orderBy: { createdAt: "desc" },
-      select: { nodeId: true, content: true },
-    });
-
-    // First match per nodeId is latest due to orderBy desc
-    for (const v of allVersions) {
-      if (!(v.nodeId in contentMap)) {
-        contentMap[v.nodeId] = v.content;
-      }
-    }
-  }
-
-  // Build tree
-  const nodeMap = new Map<string, OutlineNode>();
-  const roots: OutlineNode[] = [];
-
-  for (const node of nodes) {
-    nodeMap.set(node.id, {
-      ...node,
-      children: [],
-      content: contentMap[node.id],
-    });
-  }
-
-  for (const node of nodes) {
-    const outlineNode = nodeMap.get(node.id)!;
-    if (node.parentId && nodeMap.has(node.parentId)) {
-      nodeMap.get(node.parentId)!.children.push(outlineNode);
-    } else {
-      roots.push(outlineNode);
-    }
-  }
-
-  return roots;
 }
 
 function exportFullManuscript(
