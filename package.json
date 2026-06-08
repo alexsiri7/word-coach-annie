@@ -59,7 +59,7 @@
     "archiver": "^7.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.8",
     "epub-gen-memory": "^1.1.2",
     "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0",
