@@ -38,6 +38,11 @@ const SIZE_COLORS: Record<string, string> = {
   Large: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
 };
 
+const STATUS_OPTIONS = [
+  { label: "Open", value: false, activeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  { label: "Completed", value: true, activeClass: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+] as const;
+
 interface Filters {
   energy?: string;
   importance?: string;
@@ -226,10 +231,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                 <FilterRow label="Size" options={SIZE_OPTIONS} activeValue={filters.size} colors={SIZE_COLORS} onToggle={(v) => toggleFilter("size", v)} />
                 <div className="flex flex-wrap gap-2 items-center">
                   <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Status</span>
-                  {([
-                    { label: "Open", value: false, activeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-                    { label: "Completed", value: true, activeClass: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-                  ] as const).map(({ label, value, activeClass }) => (
+                  {STATUS_OPTIONS.map(({ label, value, activeClass }) => (
                     <button
                       key={label}
                       onClick={() => toggleFilter("completed", value)}
