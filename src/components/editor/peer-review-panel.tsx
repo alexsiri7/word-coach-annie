@@ -446,7 +446,7 @@ export function PeerReviewPanel({ projectId, onStartChat }: PeerReviewPanelProps
                 {activeTab === "consensus" ? (
                   renderConsensusTab(review.consensus)
                 ) : review[activeTab] ? (
-                  renderReviewTab(review[activeTab]!)
+                  renderReviewTab(review[activeTab] as ReviewFeedback)
                 ) : (
                   <div className="p-4 text-center">
                     <p className="text-sm text-muted-foreground">
