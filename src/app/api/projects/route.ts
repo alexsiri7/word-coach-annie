@@ -10,8 +10,12 @@ import { ProjectCreateSchema } from "@/schemas/projects";
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const MAX_LIMIT = 200;
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "20", 10) || 20, 1),
+      MAX_LIMIT
+    );
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
     const showArchived = searchParams.get("archived") === "true";
     const userId = getCurrentUserId(request);
 

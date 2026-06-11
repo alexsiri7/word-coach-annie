@@ -79,6 +79,7 @@ export async function GET(
             ? await prisma.contentVersion.findMany({
                 where: { nodeId: { in: sceneIds } },
                 orderBy: { createdAt: "desc" },
+                distinct: ["nodeId"],
                 select: { nodeId: true, content: true },
             })
             : [];
