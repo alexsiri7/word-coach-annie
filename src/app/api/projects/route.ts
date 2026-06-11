@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
@@ -115,33 +116,60 @@ export async function POST(request: NextRequest) {
     const { title, author, synopsis, genre, projectType } = parsed.data;
 
     // Only enforce active project limit for authenticated users; skip in API_TOKEN/dev mode
-    if (userId) {
-      const [activeCount, settings] = await Promise.all([
-        prisma.project.count({ where: { userId, archivedAt: null } }),
-        prisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } }),
-      ]);
-      const limit = settings?.maxActiveProjects ?? 3; // matches schema @default(3)
-      if (activeCount >= limit) {
-        return NextResponse.json(
-          { error: `You've reached your ${limit} active project limit. Archive a project to create a new one.` },
-          { status: 403 }
-        );
-      }
-    }
+    let limitError: { error: string; status: number } | null = null;
+    const project = await prisma.$transaction(
+      async (tx) => {
+        if (userId) {
+          const [activeCount, settings] = await Promise.all([
+            tx.project.count({ where: { userId, archivedAt: null } }),
+            tx.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } }),
+          ]);
+          const limit = settings?.maxActiveProjects ?? 3; // matches schema @default(3)
+          if (activeCount >= limit) {
+            limitError = {
+              error: `You've reached your ${limit} active project limit. Archive a project to create a new one.`,
+              status: 403,
+            };
+            // Throw to abort the transaction without creating the project
+            throw new Error("LIMIT_EXCEEDED");
+          }
+        }
 
-    const project = await prisma.project.create({
-      data: {
-        title: sanitizeInput(title.trim()),
-        author: author ? sanitizeInput(author.trim()) : "",
-        synopsis: synopsis ? sanitizeInput(synopsis.trim()) : "",
-        genre: genre ? sanitizeInput(genre.trim()) : "",
-        projectType: projectType || "FICTION",
-        ...(userId && { userId }),
+        return tx.project.create({
+          data: {
+            title: sanitizeInput(title.trim()),
+            author: author ? sanitizeInput(author.trim()) : "",
+            synopsis: synopsis ? sanitizeInput(synopsis.trim()) : "",
+            genre: genre ? sanitizeInput(genre.trim()) : "",
+            projectType: projectType || "FICTION",
+            ...(userId && { userId }),
+          },
+        });
       },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    ).catch((err: unknown) => {
+      if (err instanceof Error && err.message === "LIMIT_EXCEEDED") {
+        return null; // handled via limitError
+      }
+      throw err; // re-throw unexpected errors (including P2034 serialization failure)
     });
+
+    if (limitError) {
+      return NextResponse.json(
+        { error: (limitError as { error: string }).error },
+        { status: (limitError as { status: number }).status }
+      );
+    }
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
+    // P2034 = transaction serialization failure (two concurrent requests raced)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return NextResponse.json(
+        { error: "Request conflict, please try again." },
+        { status: 409 }
+      );
+    }
     logger.error("POST /api/projects error", error);
     return NextResponse.json(
       { error: "Internal server error" },

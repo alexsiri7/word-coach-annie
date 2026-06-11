@@ -100,6 +100,40 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
     expect(res.status).toBe(201);
   });
 
+  it("enforces the limit even under concurrent requests (simulated TOCTOU)", async () => {
+    const user = await testPrisma.user.create({
+      data: { email: "concurrent-limit@test.com", googleId: "g-concurrent" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    // Fill up to limit - 1
+    await testPrisma.project.createMany({
+      data: [
+        { title: "P1", userId: user.id },
+        { title: "P2", userId: user.id },
+      ],
+    });
+
+    const { POST } = await import("@/app/api/projects/route");
+
+    // Fire two simultaneous requests that would both see count=2 without serialization
+    const [res1, res2] = await Promise.all([
+      POST(makePostRequest({ title: "Concurrent A" })),
+      POST(makePostRequest({ title: "Concurrent B" })),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort();
+    // One should succeed (201), the other should fail (403 limit OR 409 serialization conflict)
+    expect(statuses[0]).toBe(201);
+    expect([403, 409]).toContain(statuses[1]);
+
+    // Confirm DB has exactly 3 active projects
+    const finalCount = await testPrisma.project.count({
+      where: { userId: user.id, archivedAt: null },
+    });
+    expect(finalCount).toBe(3);
+  });
+
   it("respects custom maxActiveProjects limit from UserAiSettings", async () => {
     const user = await testPrisma.user.create({
       data: { email: "route-custom-limit@test.com", googleId: "g-route-custom" },
