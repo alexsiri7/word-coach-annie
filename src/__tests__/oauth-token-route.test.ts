@@ -240,6 +240,7 @@ describe("POST /oauth/token", () => {
       userId: "user-1", email: "user@test.com", clientId: "client-1",
       jti: "jti-no-exp", exp: undefined,
     });
+    vi.mocked(claimToken).mockResolvedValue(true);
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
