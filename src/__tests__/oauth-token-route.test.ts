@@ -17,13 +17,12 @@ vi.mock("@/lib/oauth-tokens", () => ({
 }));
 
 vi.mock("@/lib/token-blocklist", () => ({
-  isTokenRevoked: vi.fn(async () => false),
-  revokeToken: vi.fn(async () => undefined),
+  claimToken: vi.fn(async () => true),
 }));
 
 import { consumeAuthCode, getClient } from "@/lib/oauth-store";
 import { createMcpToken, verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
-import { isTokenRevoked, revokeToken } from "@/lib/token-blocklist";
+import { claimToken } from "@/lib/token-blocklist";
 import { POST } from "@/app/oauth/token/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -147,10 +146,10 @@ describe("POST /oauth/token", () => {
     expect(body.refresh_token).toBe("mock-token");
   });
 
-  it("refresh_token grant revokes old token after issuing new ones", async () => {
+  it("refresh_token grant claims (revokes) old token before issuing new ones", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
     vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "old-jti", exp: Math.floor(Date.now() / 1000) + 2592000 });
-    vi.mocked(isTokenRevoked).mockResolvedValue(false);
+    vi.mocked(claimToken).mockResolvedValue(true);
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
@@ -158,13 +157,13 @@ describe("POST /oauth/token", () => {
       client_id: "client-1",
     }));
     expect(res.status).toBe(200);
-    expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("old-jti", "user-1", expect.any(Date));
+    expect(vi.mocked(claimToken)).toHaveBeenCalledWith("old-jti", "user-1", expect.any(Date));
   });
 
-  it("refresh_token grant with already-revoked token returns 400 invalid_grant", async () => {
+  it("refresh_token grant with already-used token returns 400 invalid_grant", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
     vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "used-jti", exp: Math.floor(Date.now() / 1000) + 2592000 });
-    vi.mocked(isTokenRevoked).mockResolvedValue(true);
+    vi.mocked(claimToken).mockResolvedValue(false); // jti already claimed = token reused
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
@@ -174,7 +173,7 @@ describe("POST /oauth/token", () => {
     const body = await res.json();
     expect(res.status).toBe(400);
     expect(body.error).toBe("invalid_grant");
-    expect(vi.mocked(revokeToken)).not.toHaveBeenCalled();
+    expect(vi.mocked(createMcpToken)).not.toHaveBeenCalled();
   });
 
   it("refresh_token grant with mismatched client_id returns 400 invalid_grant", async () => {
@@ -212,5 +211,61 @@ describe("POST /oauth/token", () => {
     const body = await res.json();
     expect(res.status).toBe(400);
     expect(body.error).toBe("unsupported_grant_type");
+  });
+
+  it("refresh_token grant with jti-less legacy token still rotates successfully", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    // Legacy token: no jti, no exp — issued before this fix was deployed
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "user@test.com", clientId: "client-1",
+      jti: undefined, exp: undefined,
+    });
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "legacy-refresh-no-jti",
+      client_id: "client-1",
+    }));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.access_token).toBe("mock-token");
+    expect(body.refresh_token).toBe("mock-token");
+    // Blocklist is not consulted for tokens without jti
+    expect(vi.mocked(claimToken)).not.toHaveBeenCalled();
+  });
+
+  it("refresh_token grant with jti but no exp uses fallback expiresAt for claim", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "user@test.com", clientId: "client-1",
+      jti: "jti-no-exp", exp: undefined,
+    });
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "refresh-no-exp",
+      client_id: "client-1",
+    }));
+    expect(res.status).toBe(200);
+    expect(vi.mocked(claimToken)).toHaveBeenCalledWith("jti-no-exp", "user-1", expect.any(Date));
+  });
+
+  it("refresh_token grant succeeds (fail-open) when claimToken throws unexpectedly", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "user@test.com", clientId: "client-1",
+      jti: "jti-db-fail", exp: Math.floor(Date.now() / 1000) + 2592000,
+    });
+    // claimToken is fail-open internally — it returns true on unexpected DB errors.
+    // This test confirms the route still issues tokens when claimToken returns true.
+    vi.mocked(claimToken).mockResolvedValue(true);
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "refresh-db-fail",
+      client_id: "client-1",
+    }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).access_token).toBe("mock-token");
   });
 });

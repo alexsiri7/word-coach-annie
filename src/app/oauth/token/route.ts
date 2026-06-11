@@ -8,7 +8,7 @@ import {
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
 import { logger } from "@/lib/logger";
-import { revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
+import { claimToken } from "@/lib/token-blocklist";
 
 /**
  * Parse the request body. Supports both application/x-www-form-urlencoded
@@ -164,17 +164,32 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
-  // Reuse detection: if this token has already been rotated, it has been revoked.
-  if (tokenData.jti && await isTokenRevoked(tokenData.jti)) {
-    logger.warn("OAuth refresh token reuse detected — token already rotated", {
-      jti: tokenData.jti,
+  // Legacy token compatibility: tokens issued before this fix have no jti claim.
+  // They skip the blocklist entirely and rotate normally.
+  if (!tokenData.jti) {
+    logger.warn("OAuth refresh token missing jti — legacy pre-rotation token, skipping revocation check", {
       userId: tokenData.userId,
       clientId: tokenData.clientId,
     });
-    return errorResponse("invalid_grant", "Refresh token has already been used");
   }
 
-  // Issue new tokens
+  // Single-use enforcement: atomically claim the jti BEFORE issuing new tokens.
+  // This eliminates the TOCTOU race — only the first request to claim the slot
+  // proceeds; a concurrent replay attempt will receive a P2002 and be rejected.
+  if (tokenData.jti) {
+    const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
+    const claimed = await claimToken(tokenData.jti, tokenData.userId, expiresAt);
+    if (!claimed) {
+      logger.warn("OAuth refresh token reuse detected — concurrent or replayed use", {
+        jti: tokenData.jti,
+        userId: tokenData.userId,
+        clientId: tokenData.clientId,
+      });
+      return errorResponse("invalid_grant", "Refresh token has already been used");
+    }
+  }
+
+  // Issue new tokens (only reached after jti is claimed, or skipped for legacy tokens)
   const accessToken = await createMcpToken(
     { userId: tokenData.userId, email: tokenData.email, type: "mcp_access", clientId: tokenData.clientId },
     ACCESS_TOKEN_TTL
@@ -183,12 +198,6 @@ async function handleRefreshToken(body: Record<string, string>) {
     { userId: tokenData.userId, email: tokenData.email, type: "mcp_refresh", clientId: tokenData.clientId },
     REFRESH_TOKEN_TTL
   );
-
-  // Rotation: revoke the old refresh token now that we've issued a new one.
-  if (tokenData.jti) {
-    const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
-    await revokeToken(tokenData.jti, tokenData.userId, expiresAt);
-  }
 
   return NextResponse.json({
     access_token: accessToken,
