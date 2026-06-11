@@ -164,19 +164,16 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
-  // Legacy token compatibility: tokens issued before this fix have no jti claim.
-  // They skip the blocklist entirely and rotate normally.
+  // Single-use enforcement: atomically claim the jti BEFORE issuing new tokens.
+  // This eliminates the TOCTOU race — only the first request to claim the slot
+  // proceeds; a concurrent replay attempt will receive a P2002 and be rejected.
+  // Legacy tokens (no jti) skip the blocklist and rotate normally.
   if (!tokenData.jti) {
     logger.warn("OAuth refresh token missing jti — legacy pre-rotation token, skipping revocation check", {
       userId: tokenData.userId,
       clientId: tokenData.clientId,
     });
-  }
-
-  // Single-use enforcement: atomically claim the jti BEFORE issuing new tokens.
-  // This eliminates the TOCTOU race — only the first request to claim the slot
-  // proceeds; a concurrent replay attempt will receive a P2002 and be rejected.
-  if (tokenData.jti) {
+  } else {
     const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
     const claimed = await claimToken(tokenData.jti, tokenData.userId, expiresAt);
     if (!claimed) {
@@ -189,7 +186,7 @@ async function handleRefreshToken(body: Record<string, string>) {
     }
   }
 
-  // Issue new tokens (only reached after jti is claimed, or skipped for legacy tokens)
+  // Issue new tokens
   const accessToken = await createMcpToken(
     { userId: tokenData.userId, email: tokenData.email, type: "mcp_access", clientId: tokenData.clientId },
     ACCESS_TOKEN_TTL
