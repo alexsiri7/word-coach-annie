@@ -35,14 +35,14 @@ describe("token-blocklist", () => {
                 "Unique constraint failed on the constraint: `RevokedToken_jti_key`",
                 { code: "P2002", clientVersion: "5.0.0", meta: {} }
             );
-            (prisma.revokedToken.create as ReturnType<typeof vi.fn>).mockRejectedValueOnce(p2002);
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(p2002);
             await expect(revokeToken("jti-1", "user-1", new Date())).resolves.toBeUndefined();
             expect(logger.error).not.toHaveBeenCalled();
         });
 
         it("logs error for non-P2002 DB failures", async () => {
             const dbErr = new Error("Connection refused");
-            (prisma.revokedToken.create as ReturnType<typeof vi.fn>).mockRejectedValueOnce(dbErr);
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(dbErr);
             await revokeToken("jti-1", "user-1", new Date());
             expect(logger.error).toHaveBeenCalledWith(
                 "[token-blocklist] Failed to revoke token:",
