@@ -2,10 +2,19 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as Sentry from "@sentry/nextjs";
 import { createServer } from "@/mcp";
 import { logger } from "@/lib/logger";
+import { isAuthEnabled } from "@/lib/auth";
 
 async function handleMcpRequest(req: Request): Promise<Response> {
     try {
         const userId = req.headers.get("x-user-id");
+
+        if (!userId && isAuthEnabled()) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+
         if (userId) Sentry.setUser({ id: userId });
         const server = createServer({ userId });
         const transport = new WebStandardStreamableHTTPServerTransport({

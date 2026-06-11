@@ -185,6 +185,34 @@ async function mcpRun(
     }
 }
 
+/** Verify userId owns the project. Throws if not. No-op in single-user mode. */
+async function verifyProjectOwnership(projectId: string, uid: string | null): Promise<void> {
+    if (!uid) return;
+    const project = await prisma.project.findFirst({
+        where: { id: projectId, userId: uid },
+        select: { id: true },
+    });
+    if (!project) throw new Error("Project not found or access denied");
+}
+
+/** Look up the projectId that owns a structure node. */
+async function getProjectIdForNode(nodeId: string): Promise<string> {
+    const node = await prisma.structureNode.findUniqueOrThrow({
+        where: { id: nodeId },
+        select: { projectId: true },
+    });
+    return node.projectId;
+}
+
+/** Look up the projectId that owns a story object. */
+async function getProjectIdForStoryObject(objectId: string): Promise<string> {
+    const obj = await prisma.storyObject.findUniqueOrThrow({
+        where: { id: objectId },
+        select: { projectId: true },
+    });
+    return obj.projectId;
+}
+
 // ─── Project Tools ───────────────────────────────────────────────────────────
 
 server.tool(
@@ -195,7 +223,7 @@ server.tool(
         offset: z.number().optional().describe("Offset for pagination"),
     },
     async ({ limit, offset }) => {
-        const result = await listProjects(limit, offset);
+        const result = await listProjects(userId, limit, offset);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -207,7 +235,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
-        const result = await getProject(projectId);
+        const result = await getProject(userId, projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -240,7 +268,7 @@ server.tool(
     },
     async ({ projectId, contentHash, title, author, synopsis, genre }) =>
         mcpRun("update_project", "Error updating project", () =>
-            updateProject(projectId, { title, author, synopsis, genre }, contentHash))
+            updateProject(userId, projectId, { title, author, synopsis, genre }, contentHash))
 );
 
 server.tool(
@@ -277,6 +305,7 @@ server.tool(
         universeId: z.string().describe("The universe ID"),
     },
     async ({ projectId, universeId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await linkProjectToUniverse(projectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -289,6 +318,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await unlinkProjectFromUniverse(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -303,6 +333,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getOutline(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -321,6 +352,7 @@ server.tool(
         insertAfterIndex: z.number().optional().describe("Insert after this order index (appends to end if omitted)"),
     },
     async (params) => {
+        await verifyProjectOwnership(params.projectId, userId);
         const result = await createNode(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -339,7 +371,10 @@ server.tool(
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
     async ({ nodeId, contentHash, ...data }) =>
-        mcpRun("update_node", "Error updating node", () => updateNode(nodeId, data, contentHash))
+        mcpRun("update_node", "Error updating node", async () => {
+            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            return updateNode(nodeId, data, contentHash);
+        })
 );
 
 server.tool(
@@ -350,6 +385,7 @@ server.tool(
     },
     async ({ nodeId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
         const result = await deleteNode(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -364,6 +400,7 @@ server.tool(
         nodeId: z.string().describe("The scene node ID"),
     },
     async ({ nodeId }) => {
+        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
         const result = await readSceneContent(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -383,6 +420,7 @@ server.tool(
     },
     async ({ nodeId, contentHash, content, blocks }) =>
         mcpRun("write_scene_content", "Error writing scene content", async () => {
+            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
             if (blocks) return writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             if (content !== undefined) return writeSceneContent(nodeId, content, contentHash);
             throw new Error("Either 'content' or 'blocks' must be provided");
@@ -401,8 +439,10 @@ server.tool(
         intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) =>
-        mcpRun("update_paragraph", "Error updating paragraph", () =>
-            updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash))
+        mcpRun("update_paragraph", "Error updating paragraph", async () => {
+            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            return updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
+        })
 );
 
 // Note: insert_beat bypasses the prose-writing guard because the payload is beat
@@ -425,8 +465,10 @@ server.tool(
             .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
     },
     async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) =>
-        mcpRun("insert_beat", "Error inserting beat", () =>
-            insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash))
+        mcpRun("insert_beat", "Error inserting beat", async () => {
+            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            return insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
+        })
 );
 
 server.tool(
@@ -437,6 +479,7 @@ server.tool(
         limit: z.number().optional().describe("Max versions to return (default 20)"),
     },
     async ({ nodeId, limit }) => {
+        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
         const result = await getSceneVersions(nodeId, limit);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -450,6 +493,7 @@ server.tool(
         versionId: z.string().describe("The version ID to restore"),
     },
     async ({ nodeId, versionId }) => {
+        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
         const result = await restoreSceneVersion(nodeId, versionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -465,6 +509,7 @@ server.tool(
         selectedText: z.string().optional(),
     },
     async ({ nodeId, content, range, selectedText }: { nodeId: string; content: string; range?: string; selectedText?: string }) => {
+        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
         const result = await addAnnotation(nodeId, content, range, selectedText);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -517,6 +562,7 @@ server.tool(
         projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns all open annotations in the database."),
     },
     async ({ projectId }) => {
+        if (projectId) await verifyProjectOwnership(projectId, userId);
         const result = await getOpenAnnotations(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -535,6 +581,7 @@ server.tool(
         offset: z.number().optional().describe("Offset for pagination"),
     },
     async (params) => {
+        await verifyProjectOwnership(params.projectId, userId);
         const result = await listStoryObjects(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -547,6 +594,7 @@ server.tool(
         objectId: z.string(),
     },
     async ({ objectId }: { objectId: string }) => {
+        await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
         const result = await getStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -565,6 +613,7 @@ server.tool(
         tags: z.string().optional().describe("Comma-separated tags"),
     },
     async (params) => {
+        await verifyProjectOwnership(params.projectId, userId);
         const result = await createStoryObject(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -583,8 +632,10 @@ server.tool(
         tags: z.string().optional().describe("New comma-separated tags"),
     },
     async ({ objectId, contentHash, ...data }) =>
-        mcpRun("update_story_object", "Error updating story object", () =>
-            updateStoryObject(objectId, data, contentHash))
+        mcpRun("update_story_object", "Error updating story object", async () => {
+            await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
+            return updateStoryObject(objectId, data, contentHash);
+        })
 );
 
 server.tool(
@@ -595,6 +646,7 @@ server.tool(
     },
     async ({ objectId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
         const result = await deleteStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -617,6 +669,7 @@ server.tool(
         })).describe("Array of story objects to create"),
     },
     async ({ projectId, objects }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await batchCreateStoryObjects(projectId, objects);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -636,6 +689,8 @@ server.tool(
         })).describe("Array of updates to apply"),
     },
     async ({ updates }) => {
+        const projectIds = await Promise.all(updates.map(u => getProjectIdForStoryObject(u.objectId)));
+        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchUpdateStoryObjects(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -649,6 +704,8 @@ server.tool(
     },
     async ({ objectIds }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        const projectIds = await Promise.all(objectIds.map(id => getProjectIdForStoryObject(id)));
+        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchDeleteStoryObjects(objectIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -667,7 +724,10 @@ server.tool(
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Filter by energy type — key dimension for mood-matched task selection"),
     },
     async (params) =>
-        mcpRun("list_writing_tasks", "Error listing writing tasks", () => listWritingTasks(params))
+        mcpRun("list_writing_tasks", "Error listing writing tasks", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return listWritingTasks(params);
+        })
 );
 
 server.tool(
@@ -683,7 +743,10 @@ server.tool(
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Energy type required (default: Technical)"),
     },
     async (params) =>
-        mcpRun("create_writing_task", "Error creating writing task", () => createWritingTask(params))
+        mcpRun("create_writing_task", "Error creating writing task", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return createWritingTask(params);
+        })
 );
 
 server.tool(
@@ -726,6 +789,7 @@ server.tool(
         })).describe("Array of nodes to create"),
     },
     async ({ projectId, nodes }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await batchCreateNodes(projectId, nodes);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -745,6 +809,8 @@ server.tool(
         })).describe("Array of updates to apply"),
     },
     async ({ updates }) => {
+        const projectIds = await Promise.all(updates.map(u => getProjectIdForNode(u.nodeId)));
+        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchUpdateNodes(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -758,6 +824,8 @@ server.tool(
     },
     async ({ nodeIds }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        const projectIds = await Promise.all(nodeIds.map(id => getProjectIdForNode(id)));
+        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchDeleteNodes(nodeIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -772,6 +840,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await listRelationships(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -790,6 +859,7 @@ server.tool(
         label: z.string().optional().describe("Optional label/description for the relationship"),
     },
     async (params) => {
+        await verifyProjectOwnership(params.projectId, userId);
         const result = await createRelationship(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -817,6 +887,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const markdown = await exportManuscript(projectId);
         return { content: [{ type: "text", text: markdown }] };
     }
@@ -829,6 +900,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const markdown = await exportStoryBible(projectId);
         return { content: [{ type: "text", text: markdown }] };
     }
@@ -842,6 +914,7 @@ server.tool(
         nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
     },
     async ({ projectId, nodeId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const { exportHashnode } = await import("./tools/export");
         const markdown = await exportHashnode(projectId, nodeId);
         return { content: [{ type: "text", text: markdown }] };
@@ -855,6 +928,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getProjectSummary(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1178,6 +1252,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getPlotThreadStatus(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1190,6 +1265,7 @@ server.tool(
         sceneId: z.string().describe("The scene node ID"),
     },
     async ({ sceneId }) => {
+        await verifyProjectOwnership(await getProjectIdForNode(sceneId), userId);
         const result = await getSceneFocus(sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1202,6 +1278,7 @@ server.tool(
         projectId: z.string().describe("The project ID"),
     },
     async ({ projectId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getManuscriptContext(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1215,6 +1292,7 @@ server.tool(
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 20 scenes)"),
     },
     async ({ projectId, sceneId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getConsistencyContext(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1228,6 +1306,7 @@ server.tool(
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),
     },
     async ({ projectId, sceneId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getStoryBibleCrossReference(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1241,6 +1320,7 @@ server.tool(
         sceneId: z.string().describe("The scene to analyze"),
     },
     async ({ projectId, sceneId }) => {
+        await verifyProjectOwnership(projectId, userId);
         const result = await getVoiceContext(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1649,7 +1729,10 @@ server.tool(
     "Trigger a full peer review of the project — runs four agents (editor, fan reader, peer author, comedy writer) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
     { projectId: z.string() },
     async ({ projectId }) =>
-        mcpRun("run_peer_review", "Error running peer review", () => runPeerReview(projectId))
+        mcpRun("run_peer_review", "Error running peer review", async () => {
+            await verifyProjectOwnership(projectId, userId);
+            return runPeerReview(projectId);
+        })
 );
 
 // ─── Get Peer Reviews Tool ────────────────────────────────────────────────────
@@ -1664,6 +1747,7 @@ server.tool(
     async ({ projectId, limit }) => {
         const clampedLimit = Math.min(Math.max(limit, 1), 20);
         try {
+            await verifyProjectOwnership(projectId, userId);
             const rows = await prisma.peerReview.findMany({
                 where: { projectId },
                 orderBy: { createdAt: "desc" },

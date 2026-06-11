@@ -694,8 +694,8 @@ type Args = Record<string, unknown>;
 
 const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   // Core
-  list_projects: async (a) => listProjects(a.limit as number, a.offset as number),
-  get_project: async (a) => getProject(a.projectId as string),
+  list_projects: async (a) => listProjects(null, a.limit as number, a.offset as number),
+  get_project: async (a) => getProject(null, a.projectId as string),
   get_outline: async (a) => getOutline(a.projectId as string),
   read_scene_content: async (a) => readSceneContent(a.nodeId as string),
   list_story_objects: async (a) => listStoryObjects(a as Parameters<typeof listStoryObjects>[0]),
@@ -799,8 +799,8 @@ const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
   // Admin
   create_project: async (a) => createProject(a as Parameters<typeof createProject>[0]),
   update_project: async (a) => {
-    const { projectId, ...data } = a;
-    return updateProject(projectId as string, data as Parameters<typeof updateProject>[1]);
+    const { projectId, contentHash, ...data } = a;
+    return updateProject(null, projectId as string, data as Parameters<typeof updateProject>[2], contentHash as string | undefined);
   },
   snapshot_database: async (a) => snapshotDatabase(a.message as string),
   list_snapshots: async (a) => listDatabaseSnapshots(a.limit as number),

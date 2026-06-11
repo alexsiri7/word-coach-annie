@@ -52,6 +52,29 @@ describe("sanitizeHtml", () => {
         expect(result).toContain("<!-- beat: Action -->");
         expect(result).not.toContain("<script>");
     });
+
+    it("sanitizes XSS payload inside beat comment content", () => {
+        const input = '<p>Text</p><!-- beat: <script>alert(1)</script> --><p>More</p>';
+        const result = sanitizeHtml(input);
+        expect(result).not.toContain("<script>");
+        expect(result).toContain("<!-- beat:");
+        expect(result).toContain("-->");
+        expect(result).toContain("<p>Text</p>");
+    });
+
+    it("sanitizes event handler inside beat comment content", () => {
+        const input = '<!-- beat: <img src=x onerror=alert(1)> -->';
+        const result = sanitizeHtml(input);
+        expect(result).not.toContain("onerror");
+        expect(result).toContain("<!-- beat:");
+    });
+
+    it("sanitizes nested HTML tags inside beat comment content", () => {
+        const input = '<!-- beat: Action <b onmouseover="alert(1)">bold</b> -->';
+        const result = sanitizeHtml(input);
+        expect(result).not.toContain("onmouseover");
+        expect(result).toContain("<!-- beat:");
+    });
 });
 
 describe("escapeMarkdown", () => {
