@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { ProjectCreateSchema } from "@/schemas/projects";
+
+// Sentinel error used to abort a Prisma transaction when the project limit is exceeded.
+// Prisma transactions must be aborted by throwing — there is no early-return path.
+class LimitExceededError extends Error {
+  constructor(readonly limitPayload: { error: string; status: number }) {
+    super("LIMIT_EXCEEDED");
+  }
+}
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
 export async function GET(request: NextRequest) {
@@ -96,8 +105,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/projects - Create a new project (owned by current user)
 export async function POST(request: NextRequest) {
+  // Declared outside the try block so it's accessible in the catch handler for logging
+  const userId = getCurrentUserId(request);
   try {
-    const userId = getCurrentUserId(request);
 
     if (isGoogleAuthMode() && !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -114,34 +124,75 @@ export async function POST(request: NextRequest) {
 
     const { title, author, synopsis, genre, projectType } = parsed.data;
 
-    // Only enforce active project limit for authenticated users; skip in API_TOKEN/dev mode
-    if (userId) {
-      const [activeCount, settings] = await Promise.all([
-        prisma.project.count({ where: { userId, archivedAt: null } }),
-        prisma.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } }),
-      ]);
-      const limit = settings?.maxActiveProjects ?? 3; // matches schema @default(3)
-      if (activeCount >= limit) {
-        return NextResponse.json(
-          { error: `You've reached your ${limit} active project limit. Archive a project to create a new one.` },
-          { status: 403 }
-        );
+    // Only enforce active project limit for authenticated users; skip in API_TOKEN/dev mode.
+    // Side-channel to convey limit-exceeded details across the transaction boundary:
+    // Prisma transactions must be aborted by throwing; we can't early-return a response
+    // from inside the callback, so we capture the payload here and check it after .catch().
+    let limitError: { error: string; status: number } | null = null;
+    const project = await prisma.$transaction(
+      async (tx) => {
+        if (userId) {
+          const [activeCount, settings] = await Promise.all([
+            tx.project.count({ where: { userId, archivedAt: null } }),
+            tx.userAiSettings.findUnique({ where: { userId }, select: { maxActiveProjects: true } }),
+          ]);
+          const limit = settings?.maxActiveProjects ?? 3; // matches schema @default(3)
+          if (activeCount >= limit) {
+            limitError = {
+              error: `You've reached your ${limit} active project limit. Archive a project to create a new one.`,
+              status: 403,
+            };
+            // Throw to abort the transaction without creating the project
+            throw new LimitExceededError(limitError);
+          }
+        }
+
+        return tx.project.create({
+          data: {
+            title: sanitizeInput(title.trim()),
+            author: author ? sanitizeInput(author.trim()) : "",
+            synopsis: synopsis ? sanitizeInput(synopsis.trim()) : "",
+            genre: genre ? sanitizeInput(genre.trim()) : "",
+            projectType: projectType || "FICTION",
+            ...(userId && { userId }),
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    ).catch((err: unknown) => {
+      if (err instanceof LimitExceededError) {
+        return null; // handled via limitError
       }
+      throw err; // re-throw unexpected errors (including P2034 serialization failure)
+    });
+
+    // TypeScript 6 cannot track mutations to `let` bindings made inside async closures,
+    // so it still believes `limitError` is `null` here. The cast restores the declared type
+    // and allows TS to narrow correctly within the if-check.
+    const capturedLimitError = limitError as { error: string; status: number } | null;
+    if (capturedLimitError) {
+      return NextResponse.json(
+        { error: capturedLimitError.error },
+        { status: capturedLimitError.status }
+      );
     }
 
-    const project = await prisma.project.create({
-      data: {
-        title: sanitizeInput(title.trim()),
-        author: author ? sanitizeInput(author.trim()) : "",
-        synopsis: synopsis ? sanitizeInput(synopsis.trim()) : "",
-        genre: genre ? sanitizeInput(genre.trim()) : "",
-        projectType: projectType || "FICTION",
-        ...(userId && { userId }),
-      },
-    });
+    if (!project) {
+      // Should be unreachable: project is only null when limitError is set
+      logger.error("POST /api/projects: project unexpectedly null after transaction");
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
+    // P2034 = transaction serialization failure (two concurrent requests raced)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      logger.warn("POST /api/projects serialization conflict (P2034)", { userId });
+      return NextResponse.json(
+        { error: "Request conflict, please try again." },
+        { status: 409 }
+      );
+    }
     logger.error("POST /api/projects error", error);
     return NextResponse.json(
       { error: "Internal server error" },
