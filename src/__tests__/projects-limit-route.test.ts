@@ -116,7 +116,10 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
 
     const { POST } = await import("@/app/api/projects/route");
 
-    // Fire two simultaneous requests that would both see count=2 without serialization
+    // Simulate interleaved requests — both async chains start before either write commits,
+    // which exercises the serializable-transaction guard.
+    // Note: Node.js is single-threaded so true simultaneity isn't guaranteed; the P2034
+    // serialization-failure (409) path may not be exercised in every run — see test name.
     const [res1, res2] = await Promise.all([
       POST(makePostRequest({ title: "Concurrent A" })),
       POST(makePostRequest({ title: "Concurrent B" })),
@@ -132,6 +135,22 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
       where: { userId: user.id, archivedAt: null },
     });
     expect(finalCount).toBe(3);
+  });
+
+  it("skips the limit check and creates a project for unauthenticated (API_TOKEN/dev) requests", async () => {
+    // Arrange — no userId (API_TOKEN / dev mode); null is the default from the top-level mock
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+
+    const { POST } = await import("@/app/api/projects/route");
+
+    // Act
+    const res = await POST(makePostRequest({ title: "Dev Project" }));
+
+    // Assert
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.title).toBe("Dev Project");
+    expect(body.userId).toBeNull();
   });
 
   it("respects custom maxActiveProjects limit from UserAiSettings", async () => {
