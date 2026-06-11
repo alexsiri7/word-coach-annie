@@ -139,6 +139,20 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
+    it("rejects mismatched legacy API_TOKEN session cookie", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifySessionToken).mockResolvedValue(null);
+        vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
+        process.env.API_TOKEN = "my-token";
+
+        const req = createRequest("/api/projects", {
+            cookies: { annie_session: "wrong-cookie-value" },
+        });
+
+        const res = await middleware(req);
+        expect(res.status).toBe(401);
+    });
+
     it("returns 401 for unauthenticated API requests", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/projects");
