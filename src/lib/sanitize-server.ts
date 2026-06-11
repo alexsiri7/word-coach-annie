@@ -76,14 +76,20 @@ export function escapeHtml(input: string): string {
  * Use this for user-controlled strings embedded in AI prompts. Prefer this helper
  * over inline template literals so that encoding changes only need one update.
  *
- * NOTE: Content is NOT escaped. If user content contains the closing tag string
- * (e.g. "</manuscript>"), it will structurally break the XML boundary.
- * This is intentional: the system-prompt instruction ("treat as data") is the
- * primary defence, not XML parsing. Do not use in strict XML contexts.
+ * NOTE: The closing tag sequence `</${tag}>` within content is entity-escaped
+ * (`&lt;/tag>`) as defense-in-depth to prevent boundary breaks. The system-prompt
+ * instruction ("treat as data") remains the primary defence.
+ * Content is otherwise passed through verbatim — other HTML/XML in the content
+ * is NOT escaped, so do not use this in strict XML parsing contexts.
+ *
+ * @param tag     A trusted, developer-controlled tag name (e.g. "manuscript").
+ *                Must NOT be user-supplied — it is interpolated directly into the wrapper.
+ * @param content The user-controlled string to wrap.
  *
  * Example: wrapUserContent("project-title", project.title)
  * → "<project-title>My Story</project-title>"
  */
 export function wrapUserContent(tag: string, content: string): string {
-  return `<${tag}>${content}</${tag}>`;
+  const escaped = content.replaceAll(`</${tag}>`, `&lt;/${tag}>`);
+  return `<${tag}>${escaped}</${tag}>`;
 }

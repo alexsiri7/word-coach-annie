@@ -166,14 +166,14 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
 
   const truncated = manuscript.slice(0, 50000);
 
-  const JSON_OPTS = { responseMimeType: "application/json", temperature: 0.3 } as const;
+  const sharedOpts = { aiConfig, maxTokens: 2000, responseMimeType: "application/json", temperature: 0.3 } as const;
 
   const [publisherRaw, readerRaw, writerRaw, comedyRaw, actorRaw] = await Promise.all([
-    runSimpleCompletion({ ...buildPublisherPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
-    runSimpleCompletion({ ...buildReaderPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
-    runSimpleCompletion({ ...buildWriterPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
-    runSimpleCompletion({ ...buildComedyPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
-    runSimpleCompletion({ ...buildActorPrompt(truncated), aiConfig, maxTokens: 2000, ...JSON_OPTS }),
+    runSimpleCompletion({ ...buildPublisherPrompt(truncated), ...sharedOpts }),
+    runSimpleCompletion({ ...buildReaderPrompt(truncated), ...sharedOpts }),
+    runSimpleCompletion({ ...buildWriterPrompt(truncated), ...sharedOpts }),
+    runSimpleCompletion({ ...buildComedyPrompt(truncated), ...sharedOpts }),
+    runSimpleCompletion({ ...buildActorPrompt(truncated), ...sharedOpts }),
   ]);
 
   const publisher = parseOrLog(publisherRaw, "publisher", DEFAULT_REVIEW);
@@ -187,9 +187,7 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
   try {
     const synthesisRaw = await runSimpleCompletion({
       userMessage: buildSynthesisPrompt(publisherRaw, readerRaw, writerRaw, comedyRaw, actorRaw),
-      aiConfig,
-      maxTokens: 2000,
-      ...JSON_OPTS,
+      ...sharedOpts,
     });
     consensus = parseOrLog(synthesisRaw, "synthesis", DEFAULT_CONSENSUS);
   } catch (err) {

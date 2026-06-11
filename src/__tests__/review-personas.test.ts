@@ -46,8 +46,9 @@ describe("REVIEW_PERSONAS", () => {
     }
   });
 
-  it("each persona lens does not escape XML characters in the title (known limitation)", () => {
-    // wrapUserContent passes content through verbatim — no escaping.
+  it("passes non-closing-tag XML characters through verbatim in the title", () => {
+    // wrapUserContent only escapes the matching closing tag sequence.
+    // Other HTML/XML in content (e.g. opening tags) is NOT escaped.
     // See sanitize-server.ts JSDoc for rationale.
     for (const id of personaIds) {
       const result = REVIEW_PERSONAS[id].lens("My <Special> Story");
