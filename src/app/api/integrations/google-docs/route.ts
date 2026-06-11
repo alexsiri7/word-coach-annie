@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleDocsCommentSync } from '@/lib/export/google-docs-comment-sync';
 import { GoogleAuthController } from '@/lib/controllers/google-auth';
-import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
+import { getCurrentUserId, verifyProjectWriteAccess, validateCsrfHeader } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 
 /**
@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
  * Disconnects Google Docs by removing the stored credential for the current user.
  */
 export async function DELETE(request: NextRequest) {
+    const csrfError = validateCsrfHeader(request);
+    if (csrfError) return csrfError;
     try {
         const userId = getCurrentUserId(request);
         await GoogleAuthController.disconnect(userId);

@@ -11,6 +11,7 @@ import {
     verifyProjectReadAccess,
     verifyUniverseAccess,
     verifyProjectAccessByNode,
+    validateCsrfHeader,
 } from "@/lib/api-auth";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
@@ -247,6 +248,39 @@ describe("api-auth", () => {
             if (!result.authorized) {
                 expect(result.response.status).toBe(403);
             }
+        });
+    });
+
+    describe("validateCsrfHeader", () => {
+        it("returns null when X-CSRF-Protection header is '1'", () => {
+            const headers = new Headers({ "x-csrf-protection": "1" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).toBeNull();
+        });
+
+        it("returns 403 when X-CSRF-Protection header is absent", () => {
+            const headers = new Headers();
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
+        });
+
+        it("returns 403 when X-CSRF-Protection header has wrong value", () => {
+            const headers = new Headers({ "x-csrf-protection": "true" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
+        });
+
+        it("returns 403 when X-CSRF-Protection header is empty string", () => {
+            const headers = new Headers({ "x-csrf-protection": "" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
         });
     });
 });

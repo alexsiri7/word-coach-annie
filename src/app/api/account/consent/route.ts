@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/api-auth";
+import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 const ConsentUpdateSchema = z.object({
@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const csrfError = validateCsrfHeader(request);
+  if (csrfError) return csrfError;
   try {
     const userId = getCurrentUserId(request);
     if (!userId) {
