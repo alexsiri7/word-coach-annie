@@ -41,7 +41,7 @@ describe("GET /api/health", () => {
         expect(body.db).toBeUndefined();
     });
 
-    it("returns 503 on DB error without leaking error details beyond message", async () => {
+    it("returns 503 on DB error with generic message, not raw error details", async () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockRejectedValue(
             new Error("Connection refused")
         );
@@ -50,18 +50,19 @@ describe("GET /api/health", () => {
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.status).toBe("error");
-        expect(body.error).toBe("Connection refused");
+        expect(body.error).toBe("database unavailable");          // generic — not raw e.message
+        expect(body.error).not.toBe("Connection refused");        // explicitly no leak
         expect(body.db).toBeUndefined();
         expect(body.stack).toBeUndefined();
     });
 
-    it("returns 503 with 'DB unreachable' when a non-Error value is thrown", async () => {
+    it("returns 503 with generic message when a non-Error value is thrown", async () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockRejectedValue("timeout");
 
         const res = await GET();
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.status).toBe("error");
-        expect(body.error).toBe("DB unreachable");
+        expect(body.error).toBe("database unavailable");
     });
 });
