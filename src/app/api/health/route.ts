@@ -23,7 +23,7 @@ export async function GET() {
     } catch (e) {
         logger.error("Health check DB error", e);
         return NextResponse.json(
-            { status: "error", error: e instanceof Error ? e.message : "DB unreachable" },
+            { status: "error", error: "database unavailable" },
             { status: 503 }
         );
     }
