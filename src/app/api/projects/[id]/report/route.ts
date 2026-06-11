@@ -25,9 +25,18 @@ export async function POST(
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
     const rl = await checkRateLimit(`report:${ip}`, RATE_LIMITS.report);
     if (!rl.allowed) {
+      const retryAfterSec = Math.ceil((rl.retryAfterMs ?? RATE_LIMITS.report.windowMs) / 1000);
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
-        { status: 429 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSec),
+            "X-RateLimit-Limit": String(RATE_LIMITS.report.limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(rl.resetMs / 1000)),
+          },
+        }
       );
     }
   }

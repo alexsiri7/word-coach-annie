@@ -21,7 +21,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetMs: 0 }),
+  checkRateLimit: vi.fn(),
   RATE_LIMITS: { report: { limit: 10, windowMs: 3_600_000 } },
 }));
 
@@ -132,7 +132,8 @@ describe("POST /api/projects/[id]/report", () => {
   });
 
   it("does not include project title in GitHub issue body", async () => {
-    mockFindUnique.mockResolvedValue({ id: "proj1" });
+    // Supply title so mock DB "returns" it — tests route output regardless of select clause
+    mockFindUnique.mockResolvedValue({ id: "proj1", title: "My Story" });
     const res = await POST(
       makeRequest({ category: "copyright" }),
       { params: Promise.resolve({ id: "proj1" }) }
@@ -140,6 +141,10 @@ describe("POST /api/projects/[id]/report", () => {
     expect(res.status).toBe(201);
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
+    // Positive: correct ID-only format
+    expect(body.title).toBe("Content Report: Copyright Infringement — ID: proj1");
+    expect(body.body).toContain("**Project ID:** `proj1`");
+    // Negative: title must not be leaked
     expect(body.body).not.toContain("My Story");
     expect(body.title).not.toContain("My Story");
   });
