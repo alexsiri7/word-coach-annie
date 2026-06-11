@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const VALID_CATEGORIES = ["copyright", "illegal", "harassment", "other"] as const;
 
@@ -18,6 +19,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+
+  // IP-based rate limit to prevent enumeration and report spam
+  if (process.env.DISABLE_RATE_LIMIT !== "true") {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+    const rl = await checkRateLimit(`report:${ip}`, RATE_LIMITS.report);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+  }
 
   const body = await request.json().catch(() => null);
   if (!body) {
@@ -36,11 +49,12 @@ export async function POST(
   // Verify the project exists (anyone can report, no auth required for read-accessible content)
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, title: true },
+    select: { id: true },
   });
 
   if (!project) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    // Return 201 silently — do not reveal whether the project exists (prevents ID enumeration)
+    return NextResponse.json({ success: true }, { status: 201 });
   }
 
   const token = env.GITHUB_FEEDBACK_TOKEN;
@@ -55,7 +69,6 @@ export async function POST(
 
   // Build GitHub issue — escape all user-controlled fields to prevent markdown injection
   const categoryLabel = CATEGORY_LABELS[category] || escapeMarkdown(category);
-  const safeTitle = escapeMarkdown(project.title ?? "");
   let safeUrl = "";
   if (url && typeof url === "string") {
     try {
@@ -66,12 +79,12 @@ export async function POST(
   }
   const safeDetails = details?.trim() ? sanitizeInput(details.trim()).slice(0, 4000) : "";
 
-  const title = `Content Report: ${categoryLabel} — "${safeTitle}"`;
+  const title = `Content Report: ${categoryLabel} — ID: ${project.id}`;
 
   const bodyParts = [
     `### Content Report: ${categoryLabel}`,
     "",
-    `**Project:** ${safeTitle} (ID: \`${project.id}\`)`,
+    `**Project ID:** \`${project.id}\``,
   ];
   if (safeUrl) bodyParts.push(`**URL:** ${safeUrl}`);
 

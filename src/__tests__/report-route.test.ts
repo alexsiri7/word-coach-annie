@@ -20,10 +20,16 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetMs: 0 }),
+  RATE_LIMITS: { report: { limit: 10, windowMs: 3_600_000 } },
+}));
+
 const mockEnv: Record<string, string> = {};
 const mockFetch = vi.fn();
 
 import { POST } from "@/app/api/projects/[id]/report/route";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -31,13 +37,14 @@ beforeEach(() => {
   global.fetch = mockFetch as unknown as typeof fetch;
   mockEnv.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
   mockEnv.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
-  mockFindUnique.mockResolvedValue({ id: "proj1", title: "My Story" });
+  mockFindUnique.mockResolvedValue({ id: "proj1" });
   mockFetch.mockResolvedValue({
     ok: true,
     json: async () => ({
       html_url: "https://github.com/testowner/testrepo/issues/1",
     }),
   });
+  vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 9, resetMs: 0 });
 });
 
 afterEach(() => {
@@ -85,7 +92,7 @@ describe("POST /api/projects/[id]/report", () => {
   });
 
   it("does not include project author name in GitHub issue body", async () => {
-    mockFindUnique.mockResolvedValue({ id: "proj1", title: "My Story", author: "Jane Doe" });
+    mockFindUnique.mockResolvedValue({ id: "proj1" });
     const res = await POST(
       makeRequest({ category: "copyright" }),
       { params: Promise.resolve({ id: "proj1" }) }
@@ -94,7 +101,6 @@ describe("POST /api/projects/[id]/report", () => {
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
     expect(body.body).not.toContain("Author:");
-    expect(body.body).not.toContain("Jane Doe");
   });
 
   it("strips query params and hash from URL in GitHub issue body", async () => {
@@ -112,5 +118,39 @@ describe("POST /api/projects/[id]/report", () => {
     expect(body.body).not.toContain("ref=email");
     expect(body.body).not.toContain("section");
     expect(body.body).not.toContain("https://example.com");
+  });
+
+  it("returns 201 (not 404) when project does not exist — prevents enumeration", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const res = await POST(
+      makeRequest({ category: "harassment" }),
+      { params: Promise.resolve({ id: "nonexistent" }) }
+    );
+    expect(res.status).toBe(201);
+    // No GitHub issue should be created
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("does not include project title in GitHub issue body", async () => {
+    mockFindUnique.mockResolvedValue({ id: "proj1" });
+    const res = await POST(
+      makeRequest({ category: "copyright" }),
+      { params: Promise.resolve({ id: "proj1" }) }
+    );
+    expect(res.status).toBe(201);
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.body).not.toContain("My Story");
+    expect(body.title).not.toContain("My Story");
+  });
+
+  it("returns 429 when rate limit exceeded", async () => {
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, resetMs: 3600000 });
+    const res = await POST(
+      makeRequest({ category: "other" }),
+      { params: Promise.resolve({ id: "proj1" }) }
+    );
+    expect(res.status).toBe(429);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
