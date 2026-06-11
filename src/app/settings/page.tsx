@@ -224,7 +224,7 @@ export default function SettingsPage() {
     }
   };
 
-  async function handleDeleteAccount(e: React.MouseEvent) {
+  const handleDeleteAccount = async (e: React.MouseEvent) => {
     e.preventDefault(); // prevent AlertDialogAction from closing the dialog before async resolves
     setDeletingAccount(true);
     setDeleteAccountError(null);

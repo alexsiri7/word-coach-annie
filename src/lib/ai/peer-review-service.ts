@@ -195,16 +195,18 @@ export async function runPeerReview(projectId: string, userId?: string | null) {
     consensusError = err instanceof Error ? err.message : String(err);
   }
 
+  const toJson = (v: unknown) => v as unknown as Prisma.InputJsonValue;
+
   // DB failure intentionally propagates — the review results are not returned without persistence.
   const saved = await prisma.peerReview.create({
     data: {
       projectId,
-      publisher: publisher as unknown as Prisma.InputJsonValue,
-      reader: reader as unknown as Prisma.InputJsonValue,
-      writer: writer as unknown as Prisma.InputJsonValue,
-      comedy: comedy as unknown as Prisma.InputJsonValue,
-      actor: actor as unknown as Prisma.InputJsonValue,
-      consensus: consensus as unknown as Prisma.InputJsonValue,
+      publisher: toJson(publisher),
+      reader: toJson(reader),
+      writer: toJson(writer),
+      comedy: toJson(comedy),
+      actor: toJson(actor),
+      consensus: toJson(consensus),
     },
     select: {
       id: true,
