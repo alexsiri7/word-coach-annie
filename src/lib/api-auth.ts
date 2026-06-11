@@ -280,3 +280,19 @@ export async function verifyProjectWriteAccessByNode(
     if (!access.authorized) return access;
     return { authorized: true, projectId: node.projectId, role: access.role };
 }
+
+/**
+ * Validate that state-changing API requests include the expected custom header.
+ * Browsers cannot add custom headers to cross-origin form submissions or simple
+ * cross-origin fetch requests, so this blocks HTML-form CSRF and
+ * non-credentialed cross-origin fetch attacks.
+ *
+ * The frontend must send `X-CSRF-Protection: 1` on all DELETE/PUT/POST calls.
+ */
+export function validateCsrfHeader(request: NextRequest): NextResponse | null {
+    const header = request.headers.get("x-csrf-protection");
+    if (header !== "1") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return null;
+}

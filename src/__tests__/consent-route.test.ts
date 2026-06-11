@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { testPrisma } from "./setup";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => null),
+  validateCsrfHeader: (request: NextRequest) => {
+    const header = request.headers.get("x-csrf-protection");
+    if (header !== "1") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return null;
+  },
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -21,7 +28,7 @@ function makeGetRequest(): NextRequest {
 function makePutRequest(body: object): NextRequest {
   return new NextRequest("http://localhost/api/account/consent", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1" },
     body: JSON.stringify(body),
   });
 }
@@ -78,6 +85,17 @@ describe("PUT /api/account/consent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUserId).mockReturnValue(null);
+  });
+
+  it("returns 403 when CSRF header is missing", async () => {
+    const req = new NextRequest("http://localhost/api/account/consent", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feature: "sentry_replay", consentGiven: true }),
+    });
+    const { PUT } = await import("@/app/api/account/consent/route");
+    const res = await PUT(req);
+    expect(res.status).toBe(403);
   });
 
   it("returns 401 for unauthenticated request", async () => {

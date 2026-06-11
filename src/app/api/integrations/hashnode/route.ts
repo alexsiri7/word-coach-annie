@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HashnodeAuthController } from '@/lib/controllers/hashnode-auth';
-import { getCurrentUserId } from '@/lib/api-auth';
+import { getCurrentUserId, validateCsrfHeader } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 
 /**
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
  * Removes the stored Hashnode credential.
  */
 export async function DELETE(request: NextRequest) {
+    const csrfError = validateCsrfHeader(request);
+    if (csrfError) return csrfError;
     try {
         const userId = getCurrentUserId(request);
         await HashnodeAuthController.disconnect(userId);
