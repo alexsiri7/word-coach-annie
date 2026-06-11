@@ -83,6 +83,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (user) {
+      const consents = await prisma.userConsent.findMany({
+        where: { userId: user.id },
+        select: { feature: true, consentGiven: true, updatedAt: true },
+        orderBy: { feature: "asc" },
+      });
+      archive.append(
+        JSON.stringify(
+          consents.map((c) => ({
+            feature: c.feature,
+            consentGiven: c.consentGiven,
+            updatedAt: c.updatedAt.toISOString(),
+          })),
+          null,
+          2
+        ),
+        { name: "consents.json" }
+      );
+    }
+
     await archive.finalize();
 
     const chunks: Buffer[] = [];

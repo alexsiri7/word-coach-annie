@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,12 @@ export default function SettingsPage() {
   const [consentLoading, setConsentLoading] = useState(true);
   const [exportingData, setExportingData] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // Account deletion state
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [confirmDeleteEmail, setConfirmDeleteEmail] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/ai-settings")
@@ -217,6 +223,28 @@ export default function SettingsPage() {
       setExportingData(false);
     }
   };
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const res = await offlineFetch("/api/auth/delete-account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1" },
+        body: JSON.stringify({ confirmEmail: confirmDeleteEmail }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setDeleteAccountError(data.error ?? "Deletion failed");
+        return;
+      }
+      router.push("/");
+    } catch {
+      setDeleteAccountError("Network error. Please try again.");
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
 
   const handleGoogleDocsDisconnect = async () => {
     setGoogleDocsDisconnecting(true);
@@ -780,9 +808,60 @@ export default function SettingsPage() {
                   <p className="text-xs text-red-500 mt-2">{exportError}</p>
                 )}
               </div>
+              {scope === "user" && (
+                <div className="border-t border-border pt-4">
+                  <p className="text-sm text-text-primary mb-1">Delete your account</p>
+                  <p className="text-xs text-text-muted mb-3">
+                    Permanently deletes your account and all associated data. This cannot be undone (GDPR Article 17).
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setConfirmDeleteEmail(""); setDeleteAccountError(null); setDeleteAccountOpen(true); }}
+                    className="gap-1.5 text-danger border-danger hover:bg-danger/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete my account
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
+
+        {/* Delete Account Confirmation */}
+        <AlertDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes your account and all your data. Type your email address to confirm.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="px-1 py-2">
+              <Input
+                type="email"
+                placeholder="Your email address"
+                value={confirmDeleteEmail}
+                onChange={(e) => setConfirmDeleteEmail(e.target.value)}
+                autoComplete="off"
+              />
+              {deleteAccountError && (
+                <p className="text-xs text-danger mt-2">{deleteAccountError}</p>
+              )}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteAccountOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount || !confirmDeleteEmail.trim()}
+                className="bg-danger hover:bg-danger/90"
+              >
+                {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete my account"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </main>
   );

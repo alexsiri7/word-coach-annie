@@ -5,7 +5,7 @@ export async function exportProjectJson(projectId: string) {
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
   // Fetch all related data in parallel
-  const [structureNodes, storyObjects, chatMessages, annotations, relationships] =
+  const [structureNodes, storyObjects, chatMessages, annotations, relationships, writingSessions, conversations, googleDocExports, hashnodeExports] =
     await Promise.all([
       prisma.structureNode.findMany({
         where: { projectId },
@@ -30,6 +30,23 @@ export async function exportProjectJson(projectId: string) {
           toNode: { select: { id: true, projectId: true } },
           toObject: { select: { id: true, projectId: true } },
         },
+      }),
+      prisma.writingSession.findMany({
+        where: { projectId },
+        orderBy: { startedAt: "asc" },
+      }),
+      prisma.conversation.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, title: true, type: true, summary: true, summarizedThroughMessageId: true, createdAt: true, updatedAt: true },
+      }),
+      prisma.googleDocExport.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.hashnodeExport.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
       }),
     ]);
 
@@ -121,6 +138,43 @@ export async function exportProjectJson(projectId: string) {
       role: m.role,
       content: m.content,
       createdAt: m.createdAt.toISOString(),
+    })),
+    writingSessions: writingSessions.map((s) => ({
+      id: s.id,
+      nodeId: s.nodeId,
+      startedAt: s.startedAt.toISOString(),
+      endedAt: s.endedAt?.toISOString() ?? null,
+      wordsWritten: s.wordsWritten,
+      durationSeconds: s.durationSeconds,
+      date: s.date,
+    })),
+    conversations: conversations.map((c) => ({
+      id: c.id,
+      title: c.title,
+      type: c.type,
+      summary: c.summary ?? null,
+      summarizedThroughMessageId: c.summarizedThroughMessageId ?? null,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })),
+    googleDocExports: googleDocExports.map((g) => ({
+      id: g.id,
+      exportMode: g.exportMode,
+      googleDocId: g.googleDocId,
+      googleDocUrl: g.googleDocUrl,
+      lastSyncedAt: g.lastSyncedAt.toISOString(),
+      lastCommentSyncAt: g.lastCommentSyncAt?.toISOString() ?? null,
+      createdAt: g.createdAt.toISOString(),
+    })),
+    hashnodeExports: hashnodeExports.map((h) => ({
+      id: h.id,
+      nodeId: h.nodeId ?? null,
+      hashnodePostId: h.hashnodePostId,
+      hashnodePostUrl: h.hashnodePostUrl,
+      publishStatus: h.publishStatus,
+      lastSyncedAt: h.lastSyncedAt.toISOString(),
+      createdAt: h.createdAt.toISOString(),
+      updatedAt: h.updatedAt.toISOString(),
     })),
   };
 }
