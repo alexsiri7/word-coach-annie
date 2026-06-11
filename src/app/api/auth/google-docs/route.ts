@@ -23,6 +23,8 @@ export async function GET(_request: NextRequest) {
 
         const nonce = crypto.randomUUID();
         const jwtSecret = resolveJwtSecret();
+        // State = "nonce.sig" where sig is the first 16 hex chars of HMAC-SHA256(nonce, jwtSecret).
+        // 16 hex chars = 64-bit HMAC — sufficient given UUID nonce + 10-min cookie window.
         const sig = crypto
             .createHmac("sha256", jwtSecret)
             .update(nonce)
