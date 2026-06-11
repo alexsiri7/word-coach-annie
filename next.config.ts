@@ -70,6 +70,13 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains",
           },
+          // SEC-018: Permissions-Policy — disable browser APIs this app never uses.
+          // Defense-in-depth: prevents XSS or third-party scripts from escalating
+          // to sensitive device permission requests.
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
         ],
       },
     ];
