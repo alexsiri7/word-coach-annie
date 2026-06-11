@@ -224,6 +224,8 @@ describe("middleware", () => {
             userId: "mcp-user",
             email: "mcp@example.com",
             clientId: "test-client",
+            jti: "mcp-jti-1",
+            exp: Math.floor(Date.now() / 1000) + 3600,
         });
         const req = createRequest("/api/projects", {
             headers: { authorization: "Bearer mcp-token" },

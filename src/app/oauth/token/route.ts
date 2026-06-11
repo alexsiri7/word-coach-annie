@@ -8,6 +8,7 @@ import {
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
 import { logger } from "@/lib/logger";
+import { claimToken } from "@/lib/token-blocklist";
 
 /**
  * Parse the request body. Supports both application/x-www-form-urlencoded
@@ -161,6 +162,28 @@ async function handleRefreshToken(body: Record<string, string>) {
       userId: tokenData.userId,
     });
     return errorResponse("invalid_grant", "client_id mismatch");
+  }
+
+  // Single-use enforcement: atomically claim the jti BEFORE issuing new tokens.
+  // This eliminates the TOCTOU race — only the first request to claim the slot
+  // proceeds; a concurrent replay attempt will receive a P2002 and be rejected.
+  // Legacy tokens (no jti) skip the blocklist and rotate normally.
+  if (!tokenData.jti) {
+    logger.warn("OAuth refresh token missing jti — legacy pre-rotation token, skipping revocation check", {
+      userId: tokenData.userId,
+      clientId: tokenData.clientId,
+    });
+  } else {
+    const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
+    const claimed = await claimToken(tokenData.jti, tokenData.userId, expiresAt);
+    if (!claimed) {
+      logger.warn("OAuth refresh token reuse detected — concurrent or replayed use", {
+        jti: tokenData.jti,
+        userId: tokenData.userId,
+        clientId: tokenData.clientId,
+      });
+      return errorResponse("invalid_grant", "Refresh token has already been used");
+    }
   }
 
   // Issue new tokens
