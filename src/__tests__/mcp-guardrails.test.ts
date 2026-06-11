@@ -230,7 +230,7 @@ describe("run_peer_review and get_peer_reviews tools", () => {
     );
     const getSection = mcpSource.slice(
         mcpSource.indexOf('"get_peer_reviews"'),
-        mcpSource.indexOf('"get_peer_reviews"') + 1000
+        mcpSource.indexOf('"get_peer_reviews"') + 1500
     );
 
     it("run_peer_review delegates error handling to mcpRun", () => {

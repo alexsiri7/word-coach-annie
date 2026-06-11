@@ -25,10 +25,10 @@ export function sanitizeHtml(input: string): string {
   // Extract beat comments before DOMPurify strips them,
   // but sanitize their inner content to prevent XSS bypass.
   const beats: string[] = [];
-  const withPlaceholders = input.replace(/(<!-- beat:([\s\S]*?)-->)/g, (_match, inner) => {
+  const withPlaceholders = input.replace(/<!-- beat:([\s\S]*?)-->/g, (_match, content) => {
     const idx = beats.length;
-    const safeInner = DOMPurify.sanitize(inner, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-    beats.push(`<!-- beat:${safeInner}-->`);
+    const safeContent = DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+    beats.push(`<!-- beat:${safeContent}-->`);
     return `<span data-beat-placeholder="${idx}"></span>`;
   });
 

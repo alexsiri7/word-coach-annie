@@ -129,6 +129,9 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/db", () => ({
   prisma: {
     peerReview: { findMany: vi.fn(async () => []) },
+    project: { findFirst: vi.fn(async () => ({ id: "p1" })) },
+    structureNode: { findUniqueOrThrow: vi.fn(async () => ({ projectId: "p1" })) },
+    storyObject: { findUniqueOrThrow: vi.fn(async () => ({ projectId: "p1" })) },
   },
 }));
 
