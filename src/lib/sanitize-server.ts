@@ -82,6 +82,10 @@ export function escapeHtml(input: string): string {
  * Content is otherwise passed through verbatim — other HTML/XML in the content
  * is NOT escaped, so do not use this in strict XML parsing contexts.
  *
+ * @param tag     A trusted, developer-controlled tag name (e.g. "manuscript").
+ *                Must NOT be user-supplied — it is interpolated directly into the wrapper.
+ * @param content The user-controlled string to wrap.
+ *
  * Example: wrapUserContent("project-title", project.title)
  * → "<project-title>My Story</project-title>"
  */

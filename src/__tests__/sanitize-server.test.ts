@@ -190,4 +190,11 @@ describe("wrapUserContent", () => {
         const result = wrapUserContent("project-title", content);
         expect(result).toBe("<project-title>&lt;/project-title>evil&lt;/project-title> but </manuscript> is fine</project-title>");
     });
+
+    it("does not double-encode already-escaped closing tag entities", () => {
+        // Content that was previously escaped — should be passed through verbatim
+        const content = "&lt;/manuscript>this is already escaped&lt;/manuscript>";
+        const result = wrapUserContent("manuscript", content);
+        expect(result).toBe("<manuscript>&lt;/manuscript>this is already escaped&lt;/manuscript></manuscript>");
+    });
 });
