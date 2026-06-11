@@ -28,6 +28,12 @@ function makePostRequest(body: unknown): NextRequest {
   });
 }
 
+function makeGetRequest(params: Record<string, string> = {}): NextRequest {
+  const url = new URL("http://localhost/api/projects");
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  return new NextRequest(url.toString());
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("POST /api/projects - active project limit (HTTP level)", () => {
@@ -128,15 +134,9 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
 });
 
 describe("GET /api/projects - pagination limit capping", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
   });
-
-  function makeGetRequest(params: Record<string, string> = {}): NextRequest {
-    const url = new URL("http://localhost/api/projects");
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-    return new NextRequest(url.toString());
-  }
 
   it("caps limit at 200 when caller passes a huge value", async () => {
     const { GET } = await import("@/app/api/projects/route");
