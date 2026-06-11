@@ -151,3 +151,13 @@ GHSA-w5hq-g745-h8pq
 # Upgrade path: auto-fixable. Consider running `npm audit fix`.
 # App risk: LOW — the vulnerable ws copy is deep in the @google/adk transitive tree.
 GHSA-58qx-3vcg-4xpx
+#
+# Source: @grpc/grpc-js (via @google/genai -> @google/adk transitive chain)
+# Justification: @grpc/grpc-js DoS vulnerabilities (malformed request/compressed message)
+# require a gRPC server to be exposed to attackers. This app is a Next.js HTTP server —
+# it does not expose any gRPC endpoints. @grpc/grpc-js is used only as a client
+# internally by the @google/adk and @google/genai SDKs for communicating with Google APIs.
+# Upgrade path: 1.14.4 available but blocked by @google/adk major version pin.
+# App risk: LOW — no exposed gRPC server; only used as gRPC client in transitive SDK code.
+GHSA-5375-pq7m-f5r2
+GHSA-99f4-grh7-6pcq
