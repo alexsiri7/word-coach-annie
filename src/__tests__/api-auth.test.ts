@@ -259,28 +259,31 @@ describe("api-auth", () => {
             expect(result).toBeNull();
         });
 
-        it("returns 403 when X-CSRF-Protection header is absent", () => {
+        it("returns 403 when X-CSRF-Protection header is absent", async () => {
             const headers = new Headers();
             const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
             const result = validateCsrfHeader(request);
             expect(result).not.toBeNull();
             expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
         });
 
-        it("returns 403 when X-CSRF-Protection header has wrong value", () => {
+        it("returns 403 when X-CSRF-Protection header has wrong value", async () => {
             const headers = new Headers({ "x-csrf-protection": "true" });
             const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
             const result = validateCsrfHeader(request);
             expect(result).not.toBeNull();
             expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
         });
 
-        it("returns 403 when X-CSRF-Protection header is empty string", () => {
+        it("returns 403 when X-CSRF-Protection header is empty string", async () => {
             const headers = new Headers({ "x-csrf-protection": "" });
             const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
             const result = validateCsrfHeader(request);
             expect(result).not.toBeNull();
             expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
         });
     });
 });

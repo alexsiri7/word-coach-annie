@@ -284,7 +284,12 @@ export async function verifyProjectWriteAccessByNode(
 
 /**
  * Validate the CSRF custom header to protect state-changing endpoints.
- * Returns a 403 NextResponse if the header is missing or incorrect; null otherwise.
+ *
+ * Expects the `x-csrf-protection` header to be present with the exact value `"1"`.
+ * Returns a 403 NextResponse if the header is absent or has any other value; null otherwise.
+ *
+ * @param request - The incoming Next.js request.
+ * @returns null on success, or a 403 NextResponse on CSRF validation failure.
  */
 export function validateCsrfHeader(request: NextRequest): NextResponse | null {
     const header = request.headers.get("x-csrf-protection");
