@@ -135,4 +135,51 @@ describe("Search Route /api/projects/[id]/search", () => {
         expect(data.totalResults).toBe(0);
         expect(data.query).toBe("nothing");
     });
+
+    it("returns snippet from the newest content version, not an older one", async () => {
+        const node = await testPrisma.structureNode.create({
+            data: { projectId, type: "SCENE", title: "Versioned Scene", orderIndex: 0 },
+        });
+
+        // Older version — should NOT appear in search results
+        await testPrisma.contentVersion.create({
+            data: {
+                nodeId: node.id,
+                content: "<p>old content with keyword OLDWORD</p>",
+                wordCount: 5,
+                createdAt: new Date("2025-01-01T00:00:00Z"),
+            },
+        });
+
+        // Newer version — SHOULD be searched
+        await testPrisma.contentVersion.create({
+            data: {
+                nodeId: node.id,
+                content: "<p>updated content with keyword NEWWORD</p>",
+                wordCount: 5,
+                createdAt: new Date("2025-01-02T00:00:00Z"),
+            },
+        });
+
+        const { GET } = await import("@/app/api/projects/[id]/search/route");
+
+        // New keyword matches
+        const resNew = await GET(
+            mockReq(`http://localhost/api/projects/${projectId}/search?q=NEWWORD`) as any,
+            mockParams({ id: projectId })
+        );
+        expect(resNew.status).toBe(200);
+        const bodyNew = await resNew.json();
+        expect(bodyNew.scenes).toHaveLength(1);
+        expect(bodyNew.scenes[0].snippet).toContain("NEWWORD");
+
+        // Old keyword should NOT match (the old version is not searched)
+        const resOld = await GET(
+            mockReq(`http://localhost/api/projects/${projectId}/search?q=OLDWORD`) as any,
+            mockParams({ id: projectId })
+        );
+        expect(resOld.status).toBe(200);
+        const bodyOld = await resOld.json();
+        expect(bodyOld.scenes).toHaveLength(0);
+    });
 });

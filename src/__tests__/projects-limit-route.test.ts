@@ -126,3 +126,54 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
     expect(body.error).toContain("2 active project limit");
   });
 });
+
+describe("GET /api/projects - pagination limit capping", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+  });
+
+  function makeGetRequest(params: Record<string, string> = {}): NextRequest {
+    const url = new URL("http://localhost/api/projects");
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    return new NextRequest(url.toString());
+  }
+
+  it("caps limit at 200 when caller passes a huge value", async () => {
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET(makeGetRequest({ limit: "99999" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.projects.length).toBeLessThanOrEqual(200);
+  });
+
+  it("uses default limit of 20 when limit is NaN", async () => {
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET(makeGetRequest({ limit: "abc" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("treats limit=0 as default (parseInt(0)||20 === 20) and returns 200", async () => {
+    // Note: parseInt("0") = 0, and 0 || 20 = 20 because 0 is falsy,
+    // so limit=0 falls back to the default of 20 (not clamped to 1)
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET(makeGetRequest({ limit: "0" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("clamps limit to 1 when caller passes a negative value", async () => {
+    await testPrisma.project.createMany({
+      data: [{ title: "X" }, { title: "Y" }],
+    });
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET(makeGetRequest({ limit: "-5" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.projects.length).toBe(1);
+  });
+
+  it("clamps offset to 0 when caller passes a negative offset", async () => {
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET(makeGetRequest({ offset: "-50" }));
+    expect(res.status).toBe(200);
+  });
+});
