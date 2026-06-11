@@ -166,6 +166,7 @@ import { deleteNode } from "../mcp/tools/structure";
 import { listProjects } from "../mcp/tools/projects";
 import { restoreDatabaseSnapshot } from "../mcp/tools/snapshots";
 import { deleteRelationship } from "../mcp/tools/relationships";
+import { prisma } from "@/lib/db";
 
 /** Access internal tool registry from McpServer */
 function getToolHandler(server: unknown, name: string) {
@@ -247,6 +248,50 @@ describe("MCP destructive tool gating", () => {
     const result = await tool.handler({}) as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.content).toBeDefined();
     expect(listProjects).toHaveBeenCalled();
+    expect(result.isError).toBeUndefined();
+  });
+});
+
+describe("MCP project ownership checks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it("rejects access when userId does not own the project", async () => {
+    // Override the default mock to simulate ownership check failure
+    vi.mocked(prisma.project.findFirst).mockResolvedValueOnce(null);
+
+    const { createServer } = await import("../mcp/index");
+    const server = createServer({ userId: "other-user" });
+
+    const tool = getToolHandler(server, "get_outline");
+    expect(tool).toBeDefined();
+
+    // verifyProjectOwnership throws — the OTEL span wrapper re-throws
+    await expect(tool.handler({ projectId: "p1" })).rejects.toThrow("access denied");
+  });
+
+  it("allows access when userId is null (single-user mode)", async () => {
+    const { createServer } = await import("../mcp/index");
+    const server = createServer({ userId: null });
+
+    const tool = getToolHandler(server, "get_outline");
+    expect(tool).toBeDefined();
+
+    const result = await tool.handler({ projectId: "p1" }) as { isError?: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBeUndefined();
+  });
+
+  it("allows access when userId owns the project", async () => {
+    // Default mock returns { id: "p1" } — ownership passes
+    const { createServer } = await import("../mcp/index");
+    const server = createServer({ userId: "owner-user" });
+
+    const tool = getToolHandler(server, "get_outline");
+    expect(tool).toBeDefined();
+
+    const result = await tool.handler({ projectId: "p1" }) as { isError?: boolean; content: Array<{ text: string }> };
     expect(result.isError).toBeUndefined();
   });
 });
