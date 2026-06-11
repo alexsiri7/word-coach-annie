@@ -225,7 +225,7 @@ export async function middleware(request: NextRequest) {
         // Fall back to legacy API_TOKEN session cookie
         if (apiToken) {
             const expected = await deriveSessionToken(apiToken);
-            if (sessionCookie === expected) {
+            if (safeEqual(sessionCookie, expected)) {
                 // Rate limit legacy sessions by token
                 const rateLimited = await applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;
