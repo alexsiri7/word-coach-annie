@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { resolveJwtSecret } from "@/lib/auth";
 import crypto from "crypto";
 
 /**
@@ -20,7 +21,16 @@ export async function GET(_request: NextRequest) {
         const baseUrl = new URL(env.GOOGLE_REDIRECT_URI).origin;
         const redirectUri = `${baseUrl}/api/auth/google-docs/callback`;
 
-        const state = crypto.randomUUID();
+        const nonce = crypto.randomUUID();
+        const jwtSecret = resolveJwtSecret();
+        // State = "nonce.sig" where sig is the first 16 hex chars of HMAC-SHA256(nonce, jwtSecret).
+        // 16 hex chars = 64-bit HMAC — sufficient given UUID nonce + 10-min cookie window.
+        const sig = crypto
+            .createHmac("sha256", jwtSecret)
+            .update(nonce)
+            .digest("hex")
+            .slice(0, 16);
+        const state = `${nonce}.${sig}`;
         const authUrl = GoogleAuthController.getAuthUrl(redirectUri) + `&state=${state}`;
 
         const response = NextResponse.redirect(authUrl);
