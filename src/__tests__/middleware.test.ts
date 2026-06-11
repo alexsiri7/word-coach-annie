@@ -11,6 +11,13 @@ vi.mock("@sentry/nextjs", () => ({
 
 import * as Sentry from "@sentry/nextjs";
 
+// Mock oauth-tokens module
+vi.mock("@/lib/oauth-tokens", () => ({
+    verifyMcpToken: vi.fn(async () => null),
+}));
+
+import { verifyMcpToken } from "@/lib/oauth-tokens";
+
 // Mock auth module
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
@@ -206,6 +213,23 @@ describe("middleware", () => {
         });
         await middleware(req);
         expect(Sentry.setUser).toHaveBeenCalledWith({ id: "sentry-user" });
+        expect(Sentry.setUser).not.toHaveBeenCalledWith(
+            expect.objectContaining({ email: expect.any(String) })
+        );
+    });
+
+    it("sets Sentry user with id only on MCP token path (no email)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifyMcpToken).mockResolvedValue({
+            userId: "mcp-user",
+            email: "mcp@example.com",
+            clientId: "test-client",
+        });
+        const req = createRequest("/api/projects", {
+            headers: { authorization: "Bearer mcp-token" },
+        });
+        await middleware(req);
+        expect(Sentry.setUser).toHaveBeenCalledWith({ id: "mcp-user" });
         expect(Sentry.setUser).not.toHaveBeenCalledWith(
             expect.objectContaining({ email: expect.any(String) })
         );
