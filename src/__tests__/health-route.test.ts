@@ -50,8 +50,8 @@ describe("GET /api/health", () => {
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.status).toBe("error");
-        expect(body.error).toBe("database unavailable");          // generic — not raw e.message
-        expect(body.error).not.toBe("Connection refused");        // explicitly no leak
+        expect(body.error).toBe("database unavailable");
+        expect(JSON.stringify(body)).not.toContain("Connection refused"); // security: no leak anywhere in response
         expect(body.db).toBeUndefined();
         expect(body.stack).toBeUndefined();
     });
