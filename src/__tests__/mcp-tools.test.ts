@@ -267,19 +267,19 @@ describe("MCP Structure Tools", () => {
 describe("MCP Project Tools", () => {
     it("listProjects delegates to ProjectsController", async () => {
         await ProjectsController.createProject({ title: "P1" });
-        const result = await projectTools.listProjects();
+        const result = await projectTools.listProjects(null);
         expect(result.projects.length).toBeGreaterThanOrEqual(1);
     });
 
     it("getProject delegates to ProjectsController", async () => {
         const p = await ProjectsController.createProject({ title: "P1" });
-        const result = await projectTools.getProject(p.id);
+        const result = await projectTools.getProject(null, p.id);
         expect(result.title).toBe("P1");
     });
 
     it("getProject includes contentHash", async () => {
         const p = await ProjectsController.createProject({ title: "P1" });
-        const result = await projectTools.getProject(p.id);
+        const result = await projectTools.getProject(null, p.id);
         expect(result.contentHash).toBeDefined();
         expect(result.contentHash).toHaveLength(64);
     });
@@ -315,15 +315,15 @@ describe("MCP Project Tools", () => {
 
     it("updateProject with valid contentHash succeeds", async () => {
         const p = await projectTools.createProject({ title: "Original" });
-        const { contentHash } = await projectTools.getProject(p.id);
-        const updated = await projectTools.updateProject(p.id, { title: "Updated" }, contentHash);
+        const { contentHash } = await projectTools.getProject(null, p.id);
+        const updated = await projectTools.updateProject(null, p.id, { title: "Updated" }, contentHash);
         expect(updated.title).toBe("Updated");
     });
 
     it("updateProject rejects stale contentHash", async () => {
         const p = await projectTools.createProject({ title: "Original" });
         await expect(
-            projectTools.updateProject(p.id, { title: "Updated" }, "stale-hash")
+            projectTools.updateProject(null, p.id, { title: "Updated" }, "stale-hash")
         ).rejects.toThrow(StaleWriteError);
     });
 });

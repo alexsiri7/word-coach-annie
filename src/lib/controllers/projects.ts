@@ -2,9 +2,11 @@ import { prisma } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class ProjectsController {
-    static async listProjects(limit: number = 20, offset: number = 0) {
+    static async listProjects(limit: number = 20, offset: number = 0, userId?: string | null) {
+        const where = userId ? { userId } : {};
         const [projects, total] = await Promise.all([
             prisma.project.findMany({
+                where,
                 orderBy: { updatedAt: "desc" },
                 skip: offset,
                 take: limit,
@@ -14,7 +16,7 @@ export class ProjectsController {
                     },
                 },
             }),
-            prisma.project.count(),
+            prisma.project.count({ where }),
         ]);
 
         // Batch: get all scenes for all projects in one query
