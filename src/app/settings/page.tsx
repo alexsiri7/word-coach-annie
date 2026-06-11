@@ -163,10 +163,13 @@ export default function SettingsPage() {
   const handleHashnodeDisconnect = async () => {
     setHashnodeDisconnecting(true);
     try {
-      await fetch("/api/integrations/hashnode", { method: "DELETE" });
+      const res = await fetch("/api/integrations/hashnode", { method: "DELETE", headers: { "X-CSRF-Protection": "1" } });
+      if (!res.ok) throw new Error(`Hashnode disconnect failed: ${res.status}`);
       setHashnodeConnected(false);
       setHashnodeUsername(null);
       setHashnodeDisconnectOpen(false);
+    } catch (err) {
+      console.error("Failed to disconnect Hashnode", err);
     } finally {
       setHashnodeDisconnecting(false);
     }
@@ -179,7 +182,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/account/consent", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1" },
         body: JSON.stringify({ feature: "sentry_replay", consentGiven: allowed }),
       });
       if (!res.ok) throw new Error(`consent PUT failed: ${res.status}`);
@@ -218,8 +221,11 @@ export default function SettingsPage() {
   const handleGoogleDocsDisconnect = async () => {
     setGoogleDocsDisconnecting(true);
     try {
-      await fetch("/api/integrations/google-docs", { method: "DELETE" });
+      const res = await fetch("/api/integrations/google-docs", { method: "DELETE", headers: { "X-CSRF-Protection": "1" } });
+      if (!res.ok) throw new Error(`Google Docs disconnect failed: ${res.status}`);
       setGoogleDocsConnected(false);
+    } catch (err) {
+      console.error("Failed to disconnect Google Docs", err);
     } finally {
       setGoogleDocsDisconnecting(false);
     }
