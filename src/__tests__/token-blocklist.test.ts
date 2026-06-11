@@ -11,7 +11,7 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
-import { revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
+import { revokeToken, isTokenRevoked, claimToken } from "@/lib/token-blocklist";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -53,6 +53,46 @@ describe("token-blocklist", () => {
         it("is a no-op in Edge runtime", async () => {
             (globalThis as Record<string, unknown>).EdgeRuntime = "edge";
             await revokeToken("jti-1", "user-1", new Date());
+            expect(prisma.revokedToken.create).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("claimToken", () => {
+        it("returns true and creates DB record on successful claim", async () => {
+            const exp = new Date();
+            const result = await claimToken("jti-1", "user-1", exp);
+            expect(result).toBe(true);
+            expect(prisma.revokedToken.create).toHaveBeenCalledWith({
+                data: { jti: "jti-1", userId: "user-1", expiresAt: exp },
+            });
+        });
+
+        it("returns false on P2002 (token already claimed)", async () => {
+            const p2002 = new Prisma.PrismaClientKnownRequestError(
+                "Unique constraint failed on the constraint: `RevokedToken_jti_key`",
+                { code: "P2002", clientVersion: "5.0.0", meta: {} }
+            );
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(p2002);
+            const result = await claimToken("jti-1", "user-1", new Date());
+            expect(result).toBe(false);
+            expect(logger.error).not.toHaveBeenCalled();
+        });
+
+        it("returns true (fail-open) on unexpected DB error", async () => {
+            const dbErr = new Error("Connection refused");
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(dbErr);
+            const result = await claimToken("jti-1", "user-1", new Date());
+            expect(result).toBe(true);
+            expect(logger.error).toHaveBeenCalledWith(
+                "[token-blocklist] Failed to claim token:",
+                dbErr
+            );
+        });
+
+        it("returns true (no-op) in Edge runtime", async () => {
+            (globalThis as Record<string, unknown>).EdgeRuntime = "edge";
+            const result = await claimToken("jti-1", "user-1", new Date());
+            expect(result).toBe(true);
             expect(prisma.revokedToken.create).not.toHaveBeenCalled();
         });
     });

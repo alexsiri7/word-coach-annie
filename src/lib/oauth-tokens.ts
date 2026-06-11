@@ -25,7 +25,7 @@ export interface McpTokenPayload {
   clientId: string;
 }
 
-/** Create a signed MCP access or refresh token. */
+/** Create a signed MCP access or refresh token. Each token includes a unique jti for single-use enforcement. */
 export async function createMcpToken(
   payload: McpTokenPayload,
   ttlSeconds: number

@@ -251,7 +251,7 @@ describe("POST /oauth/token", () => {
     expect(vi.mocked(claimToken)).toHaveBeenCalledWith("jti-no-exp", "user-1", expect.any(Date));
   });
 
-  it("refresh_token grant succeeds (fail-open) when claimToken throws unexpectedly", async () => {
+  it("refresh_token grant succeeds when claimToken returns true (including fail-open DB errors)", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
     vi.mocked(verifyMcpToken).mockResolvedValue({
       userId: "user-1", email: "user@test.com", clientId: "client-1",
