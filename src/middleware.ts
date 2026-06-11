@@ -81,6 +81,12 @@ function makeRateLimitResponse(
  * - Feedback submission (POST /api/feedback): 5/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
+async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
+    const result = await checkRateLimit(key, config);
+    if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
+    return null;
+}
+
 async function applyRateLimit(
     request: NextRequest,
     userKey: string
@@ -98,12 +104,6 @@ async function applyRateLimit(
     }
 
     const method = request.method;
-
-    async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
-        const result = await checkRateLimit(key, config);
-        if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
-        return null;
-    }
 
     if (pathname === "/api/chat" || pathname.startsWith("/api/chat/"))
         return tryLimit(`chat:${userKey}`, RATE_LIMITS.chat);
