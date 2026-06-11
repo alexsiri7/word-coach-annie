@@ -10,7 +10,7 @@ import { ProjectCreateSchema } from "@/schemas/projects";
 // Sentinel error used to abort a Prisma transaction when the project limit is exceeded.
 // Prisma transactions must be aborted by throwing — there is no early-return path.
 class LimitExceededError extends Error {
-  constructor(readonly limitPayload: { error: string; status: number }) {
+  constructor() {
     super("LIMIT_EXCEEDED");
   }
 }
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
               status: 403,
             };
             // Throw to abort the transaction without creating the project
-            throw new LimitExceededError(limitError);
+            throw new LimitExceededError();
           }
         }
 
