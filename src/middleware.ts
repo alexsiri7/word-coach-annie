@@ -180,7 +180,6 @@ export async function middleware(request: NextRequest) {
 
                 Sentry.setUser({
                     id: mcpSession.userId,
-                    email: mcpSession.email,
                 });
 
                 const requestHeaders = new Headers(request.headers);
@@ -212,7 +211,6 @@ export async function middleware(request: NextRequest) {
             // Set Sentry user context for error attribution
             Sentry.setUser({
                 id: session.userId,
-                email: session.email,
             });
 
             // Forward userId to route handlers via request headers

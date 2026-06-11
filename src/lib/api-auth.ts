@@ -12,9 +12,8 @@ import { logger } from "@/lib/logger";
  */
 export function getCurrentUserId(request: NextRequest): string | null {
     const userId = request.headers.get("x-user-id");
-    const email = request.headers.get("x-user-email");
     if (userId) {
-        Sentry.setUser({ id: userId, email: email ?? undefined });
+        Sentry.setUser({ id: userId });
     }
     return userId;
 }

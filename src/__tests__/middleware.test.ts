@@ -9,6 +9,8 @@ vi.mock("@sentry/nextjs", () => ({
     captureException: vi.fn(),
 }));
 
+import * as Sentry from "@sentry/nextjs";
+
 // Mock auth module
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
@@ -190,6 +192,23 @@ describe("middleware", () => {
         const req = createRequest("/landing");
         const res = await middleware(req);
         expect(res.status).toBe(200);
+    });
+
+    it("sets Sentry user with id only on JWT session path (no email)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifySessionToken).mockResolvedValue({
+            userId: "sentry-user",
+            email: "sentry@example.com",
+            name: "Test",
+        });
+        const req = createRequest("/api/projects", {
+            cookies: { annie_session: "valid-jwt-token" },
+        });
+        await middleware(req);
+        expect(Sentry.setUser).toHaveBeenCalledWith({ id: "sentry-user" });
+        expect(Sentry.setUser).not.toHaveBeenCalledWith(
+            expect.objectContaining({ email: expect.any(String) })
+        );
     });
 
     describe("CSP nonce injection", () => {
