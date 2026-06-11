@@ -48,7 +48,12 @@ export function getEditorExtensions() {
 // Helper to convert HTML comments to beat nodes for Tiptap
 export const commentsToBeats = (html: string) => {
   return html.replace(/<!-- beat: ([\s\S]*?) -->/g, (_match, content) => {
-    return `<div data-type="beat-annotation">${content}</div>`;
+    const safe = content
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    return `<div data-type="beat-annotation">${safe}</div>`;
   });
 };
 

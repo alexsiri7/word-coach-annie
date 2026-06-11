@@ -22,11 +22,13 @@ export function sanitizeInput(input: string): string {
  * comments by default, so we extract them before sanitization and restore after.
  */
 export function sanitizeHtml(input: string): string {
-  // Extract beat comments before DOMPurify strips them
+  // Extract beat comments before DOMPurify strips them,
+  // but sanitize their inner content to prevent XSS bypass.
   const beats: string[] = [];
-  const withPlaceholders = input.replace(/(<!-- beat:[\s\S]*?-->)/g, (match) => {
+  const withPlaceholders = input.replace(/(<!-- beat:([\s\S]*?)-->)/g, (_match, inner) => {
     const idx = beats.length;
-    beats.push(match);
+    const safeInner = DOMPurify.sanitize(inner, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+    beats.push(`<!-- beat:${safeInner}-->`);
     return `<span data-beat-placeholder="${idx}"></span>`;
   });
 
