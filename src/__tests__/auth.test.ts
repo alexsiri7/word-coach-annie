@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
     deriveSessionToken,
     SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE,
     createSessionToken,
     verifySessionToken,
     isAuthEnabled,
@@ -153,7 +154,7 @@ describe("JWT session tokens", () => {
         const key = await getJwtKey();
         const { payload } = await jwtVerify(token, key);
         const lifetime = (payload.exp as number) - (payload.iat as number);
-        expect(lifetime).toBe(60 * 60); // exactly 1 hour
+        expect(lifetime).toBe(SESSION_MAX_AGE); // exactly SESSION_MAX_AGE seconds
     });
 });
 
