@@ -45,9 +45,10 @@ GHSA-685m-2w69-288q
 GHSA-fv7c-fp4j-7gwp
 #
 # Source: @mikro-orm/knex SQL injection via runtime-controlled identifiers
-# Justification: @mikro-orm/knex is a transitive dep via prisma. The SQL injection
-# requires runtime-controlled identifier values (table/column names), which this app
-# does not pass from user input. App uses Prisma's typed query builder exclusively.
+# Justification: @mikro-orm/knex is a transitive dep via @google/adk -> @mikro-orm/postgresql
+# (and other @mikro-orm/* adapters). The SQL injection requires runtime-controlled
+# identifier values (table/column names), which this app does not pass from user input.
+# This app uses Prisma's typed query builder exclusively for its own queries.
 # Upgrade path: auto-fixable within semver. Consider running `npm audit fix`.
 # App risk: LOW — attack vector requires controlling schema identifiers, not data values.
 GHSA-cfw5-68c4-ffqp
@@ -87,9 +88,11 @@ GHSA-f577-qrjj-4474
 GHSA-2gcr-mfcq-wcc3
 #
 # Source: protobufjs / @protobufjs/utf8 (via @google/genai transitive chain)
-# Justification: protobufjs is pulled in by @google/genai. The vulnerabilities
-# (code injection, DoS) require an attacker to supply crafted .proto files or JSON
-# descriptors. This app does not load user-supplied protobuf definitions at runtime.
+# Justification: protobufjs is pulled in by @google/genai. These entries cover
+# @protobufjs/utf8 UTF-8 codec vulnerabilities (distinct from the proto-loader entries
+# above). The vulnerabilities (code injection, DoS) require an attacker to supply
+# crafted .proto files or JSON descriptors. This app does not load user-supplied
+# protobuf definitions at runtime.
 # Upgrade path: blocked by @google/adk@^1.1.0 transitive dependency.
 # App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
 GHSA-q6x5-8v7m-xcrf
