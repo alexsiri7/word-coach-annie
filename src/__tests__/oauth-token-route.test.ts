@@ -16,8 +16,14 @@ vi.mock("@/lib/oauth-tokens", () => ({
   REFRESH_TOKEN_TTL: 2592000,
 }));
 
+vi.mock("@/lib/token-blocklist", () => ({
+  isTokenRevoked: vi.fn(async () => false),
+  revokeToken: vi.fn(async () => undefined),
+}));
+
 import { consumeAuthCode, getClient } from "@/lib/oauth-store";
 import { createMcpToken, verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
+import { isTokenRevoked, revokeToken } from "@/lib/token-blocklist";
 import { POST } from "@/app/oauth/token/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -128,7 +134,7 @@ describe("POST /oauth/token", () => {
 
   it("refresh_token grant with valid token returns new tokens", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1" });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "token-jti-123", exp: Math.floor(Date.now() / 1000) + 2592000 });
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
@@ -141,9 +147,39 @@ describe("POST /oauth/token", () => {
     expect(body.refresh_token).toBe("mock-token");
   });
 
+  it("refresh_token grant revokes old token after issuing new ones", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "old-jti", exp: Math.floor(Date.now() / 1000) + 2592000 });
+    vi.mocked(isTokenRevoked).mockResolvedValue(false);
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "valid-refresh",
+      client_id: "client-1",
+    }));
+    expect(res.status).toBe(200);
+    expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("old-jti", "user-1", expect.any(Date));
+  });
+
+  it("refresh_token grant with already-revoked token returns 400 invalid_grant", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "used-jti", exp: Math.floor(Date.now() / 1000) + 2592000 });
+    vi.mocked(isTokenRevoked).mockResolvedValue(true);
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "already-used-refresh",
+      client_id: "client-1",
+    }));
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("invalid_grant");
+    expect(vi.mocked(revokeToken)).not.toHaveBeenCalled();
+  });
+
   it("refresh_token grant with mismatched client_id returns 400 invalid_grant", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-2", client_name: "Other App", redirect_uris: [], grant_types: [], registered_at: 0 });
-    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1" });
+    vi.mocked(verifyMcpToken).mockResolvedValue({ userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "jti-1", exp: Math.floor(Date.now() / 1000) + 2592000 });
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",

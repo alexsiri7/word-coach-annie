@@ -8,6 +8,7 @@ import {
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
 import { logger } from "@/lib/logger";
+import { revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
 
 /**
  * Parse the request body. Supports both application/x-www-form-urlencoded
@@ -163,6 +164,16 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
+  // Reuse detection: if this token has already been rotated, it has been revoked.
+  if (tokenData.jti && await isTokenRevoked(tokenData.jti)) {
+    logger.warn("OAuth refresh token reuse detected — token already rotated", {
+      jti: tokenData.jti,
+      userId: tokenData.userId,
+      clientId: tokenData.clientId,
+    });
+    return errorResponse("invalid_grant", "Refresh token has already been used");
+  }
+
   // Issue new tokens
   const accessToken = await createMcpToken(
     { userId: tokenData.userId, email: tokenData.email, type: "mcp_access", clientId: tokenData.clientId },
@@ -172,6 +183,12 @@ async function handleRefreshToken(body: Record<string, string>) {
     { userId: tokenData.userId, email: tokenData.email, type: "mcp_refresh", clientId: tokenData.clientId },
     REFRESH_TOKEN_TTL
   );
+
+  // Rotation: revoke the old refresh token now that we've issued a new one.
+  if (tokenData.jti) {
+    const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
+    await revokeToken(tokenData.jti, tokenData.userId, expiresAt);
+  }
 
   return NextResponse.json({
     access_token: accessToken,

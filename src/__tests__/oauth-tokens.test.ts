@@ -65,6 +65,19 @@ describe("MCP OAuth Tokens", () => {
       expect(payload!.clientId).toBe("client-1");
     });
 
+    it("includes jti in verified token payload", async () => {
+      const token = await createMcpToken(
+        { userId: "user-123", email: "test@example.com", type: "mcp_refresh", clientId: "client-1" },
+        REFRESH_TOKEN_TTL
+      );
+      const payload = await verifyMcpToken(token, "mcp_refresh");
+      expect(payload).not.toBeNull();
+      expect(payload!.jti).toBeDefined();
+      expect(typeof payload!.jti).toBe("string");
+      expect(payload!.exp).toBeDefined();
+      expect(payload!.exp).toBeGreaterThan(Date.now() / 1000);
+    });
+
     it("rejects token with wrong expected type", async () => {
       const token = await createMcpToken(
         { userId: "user-123", email: "test@example.com", type: "mcp_access", clientId: "client-1" },
