@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db", () => ({
@@ -30,7 +31,10 @@ describe("token-blocklist", () => {
         });
 
         it("silently ignores P2002 unique constraint (token already revoked)", async () => {
-            const p2002 = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+            const p2002 = new Prisma.PrismaClientKnownRequestError(
+                "Unique constraint failed on the constraint: `RevokedToken_jti_key`",
+                { code: "P2002", clientVersion: "5.0.0", meta: {} }
+            );
             (prisma.revokedToken.create as ReturnType<typeof vi.fn>).mockRejectedValueOnce(p2002);
             await expect(revokeToken("jti-1", "user-1", new Date())).resolves.toBeUndefined();
             expect(logger.error).not.toHaveBeenCalled();
