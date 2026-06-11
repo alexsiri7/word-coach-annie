@@ -147,13 +147,13 @@ describe("JWT session tokens", () => {
         expect(result).toBeNull();
     });
 
-    it("JWT exp is within SESSION_MAX_AGE (24 hours) of issuance", async () => {
+    it("JWT exp is within SESSION_MAX_AGE (1 hour) of issuance", async () => {
         const { jwtVerify } = await import("jose");
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
         const key = await getJwtKey();
         const { payload } = await jwtVerify(token, key);
         const lifetime = (payload.exp as number) - (payload.iat as number);
-        expect(lifetime).toBe(60 * 60 * 24); // exactly 24 hours
+        expect(lifetime).toBe(60 * 60); // exactly 1 hour
     });
 });
 

@@ -12,7 +12,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "annie_session";
-const SESSION_MAX_AGE = 60 * 60 * 24; // 24 hours — reduced from 30 days; revocation handles the rest
+const SESSION_MAX_AGE = 60 * 60; // 1 hour — Edge Runtime cannot check blocklist; short lifetime is the compensating control
 
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE };
 
