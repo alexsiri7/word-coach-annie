@@ -75,6 +75,7 @@ describe("GET /api/auth/export-data", () => {
 
     expect(zip.file("profile.json")).toBeNull();
     expect(zip.file("ai-settings.json")).toBeNull();
+    expect(zip.file("consents.json")).toBeNull();
     const projectFiles = Object.keys(zip.files).filter((n) => n.startsWith("projects/"));
     expect(projectFiles.length).toBeGreaterThan(0);
   });

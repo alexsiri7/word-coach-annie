@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { testPrisma } from "./setup";
 import { NextRequest } from "next/server";
+import { revokeToken } from "@/lib/token-blocklist";
+import { verifySessionToken } from "@/lib/auth";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -128,14 +130,75 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(setCookie).toContain("Max-Age=0");
   });
 
+  it("returns 400 when confirmEmail is not a valid email format", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u8", email: "del8@test.com", googleId: "del-g8" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeDeleteRequest({ confirmEmail: "notanemail" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/valid email/i);
+  });
+
+  it("revokes session token before deletion when cookie is present", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u6", email: "del6@test.com", googleId: "del-g6" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-abc", userId: user.id } as never);
+
+    const req = new NextRequest("http://localhost/api/auth/delete-account", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Protection": "1",
+        Cookie: "annie_session=some-token-value",
+      },
+      body: JSON.stringify({ confirmEmail: "del6@test.com" }),
+    });
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(req);
+    expect(res.status).toBe(200);
+    expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("jti-abc", user.id, expect.any(Date));
+  });
+
+  it("still deletes account when token revocation throws", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u7", email: "del7@test.com", googleId: "del-g7" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-xyz", userId: user.id } as never);
+    vi.mocked(revokeToken).mockRejectedValue(new Error("Redis down"));
+
+    const req = new NextRequest("http://localhost/api/auth/delete-account", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Protection": "1",
+        Cookie: "annie_session=some-token-value",
+      },
+      body: JSON.stringify({ confirmEmail: "del7@test.com" }),
+    });
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(req);
+    expect(res.status).toBe(200); // deletion succeeds despite revoke failure
+    const deletedUser = await testPrisma.user.findUnique({ where: { id: user.id } });
+    expect(deletedUser).toBeNull();
+  });
+
   it("cascades deletion — user consents and projects are removed", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u5", email: "del5@test.com", googleId: "del-g5" },
     });
-    await testPrisma.userConsent.create({
+    const consent = await testPrisma.userConsent.create({
       data: { userId: user.id, feature: "sentry_replay", consentGiven: true },
     });
-    await testPrisma.project.create({
+    const project = await testPrisma.project.create({
       data: { title: "Cascade Test Project", userId: user.id },
     });
     vi.mocked(getCurrentUserId).mockReturnValue(user.id);
@@ -144,10 +207,11 @@ describe("DELETE /api/auth/delete-account", () => {
     const res = await DELETE(makeDeleteRequest({ confirmEmail: "del5@test.com" }));
     expect(res.status).toBe(200);
 
-    const consents = await testPrisma.userConsent.findMany({ where: { userId: user.id } });
-    expect(consents).toHaveLength(0);
+    // Query by id (not userId) to verify actual row deletion, not just nullification
+    const deletedConsent = await testPrisma.userConsent.findUnique({ where: { id: consent.id } });
+    expect(deletedConsent).toBeNull();
 
-    const projects = await testPrisma.project.findMany({ where: { userId: user.id } });
-    expect(projects).toHaveLength(0);
+    const deletedProject = await testPrisma.project.findUnique({ where: { id: project.id } });
+    expect(deletedProject).toBeNull();
   });
 });

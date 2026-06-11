@@ -224,7 +224,8 @@ export default function SettingsPage() {
     }
   };
 
-  async function handleDeleteAccount() {
+  async function handleDeleteAccount(e: React.MouseEvent) {
+    e.preventDefault(); // prevent AlertDialogAction from closing the dialog before async resolves
     setDeletingAccount(true);
     setDeleteAccountError(null);
     try {
@@ -234,10 +235,17 @@ export default function SettingsPage() {
         body: JSON.stringify({ confirmEmail: confirmDeleteEmail }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setDeleteAccountError(data.error ?? "Deletion failed");
+        let errorMsg = "Deletion failed";
+        try {
+          const data = await res.json();
+          errorMsg = data.error ?? errorMsg;
+        } catch {
+          errorMsg = `Deletion failed (HTTP ${res.status})`;
+        }
+        setDeleteAccountError(errorMsg);
         return;
       }
+      setDeleteAccountOpen(false); // close only on success
       router.push("/");
     } catch {
       setDeleteAccountError("Network error. Please try again.");

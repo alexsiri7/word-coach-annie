@@ -72,9 +72,34 @@ Export all personal data for the authenticated user as a ZIP archive (GDPR Artic
 - `200 application/zip` — ZIP archive (`annie-full-export-<date>.zip`) containing:
   - `profile.json` — user profile fields (`id`, `email`, `name`, `picture`, `createdAt`, `updatedAt`)
   - `ai-settings.json` — AI preferences (API key is **omitted** for security)
+  - `consents.json` — consent preferences (`feature`, `consentGiven`, `updatedAt`; internal IDs omitted)
   - `projects/<title>.json` — full project JSON for each project (same format as `/api/projects/:id/export?format=json`)
 - `401 Unauthorized` — not authenticated
 - `500 Internal Server Error` — export generation failed
+
+---
+
+### `DELETE /api/auth/delete-account`
+Permanently delete the authenticated user's account and all associated data (GDPR Article 17 — right to erasure). **This action is irreversible.**
+
+**Authentication**: Required (session cookie). Returns `401` if not authenticated.
+
+**Headers**: `X-CSRF-Protection: 1` required. Returns `403` if missing.
+
+**Body** (`application/json`):
+```json
+{ "confirmEmail": "user@example.com" }
+```
+The `confirmEmail` value must match the account's registered email address (case-insensitive).
+
+**Response**:
+- `200 OK` — `{ "ok": true }`. Session cookie is cleared (`Max-Age=0`). All user data is deleted via cascade.
+- `400 Bad Request` — `confirmEmail` missing, invalid, or does not match account email.
+- `401 Unauthorized` — not authenticated or user not found.
+- `403 Forbidden` — CSRF header missing.
+- `500 Internal Server Error` — deletion failed.
+
+**Note**: Only available in Google OAuth mode (`scope === "user"`). Not applicable in `API_TOKEN` mode.
 
 ---
 

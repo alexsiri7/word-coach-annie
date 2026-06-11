@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE, verifySessionToken } from "@/lib/auth";
 import { revokeToken } from "@/lib/token-blocklist";
-import { AccountDeleteSchema } from "@/schemas/account";
+import { AccountDeleteSchema } from "@/schemas";
 import { logger } from "@/lib/logger";
 
 export async function DELETE(request: NextRequest) {
@@ -27,12 +27,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 4. Email confirmation
-    const rawBody = await request.json().catch(() => ({}));
+    const rawBody = await request.json().catch((err) => {
+      logger.warn("[delete-account] Failed to parse request body:", err);
+      return {};
+    });
     const parsed = AccountDeleteSchema.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
-    if (parsed.data.confirmEmail !== user.email) {
+    if (parsed.data.confirmEmail.toLowerCase() !== user.email.toLowerCase()) {
       return NextResponse.json({ error: "Email does not match your account email" }, { status: 400 });
     }
 
@@ -45,12 +48,13 @@ export async function DELETE(request: NextRequest) {
         try {
           await revokeToken(session.jti, session.userId, expiresAt);
         } catch (err) {
-          logger.error("[delete-account] Failed to revoke token:", err);
+          logger.warn("[delete-account] Failed to revoke token (best-effort):", err);
         }
       }
     }
 
-    // 6. Delete user — cascades all related data
+    // 6. Clean up data without FK cascade, then delete user
+    await prisma.hashnodeCredential.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
 
     logger.info("DELETE /api/auth/delete-account: account deleted", { userId });
