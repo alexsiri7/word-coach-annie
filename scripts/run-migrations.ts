@@ -80,7 +80,8 @@ async function runMigrations() {
     }
 
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "_applied_migrations" ("name") VALUES ('${file}')`
+      `INSERT INTO "_applied_migrations" ("name") VALUES ($1)`,
+      file
     )
     applied_count++
   }
