@@ -38,6 +38,12 @@ export async function POST(
         }
 
         if (canonicalUrl !== undefined) {
+            if (typeof canonicalUrl !== 'string') {
+                return NextResponse.json(
+                    { error: 'canonicalUrl must be a string' },
+                    { status: 400 }
+                );
+            }
             try {
                 const parsed = new URL(canonicalUrl);
                 if (parsed.protocol !== 'https:') {

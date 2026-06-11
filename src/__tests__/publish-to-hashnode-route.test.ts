@@ -47,7 +47,7 @@ describe("POST /api/projects/[id]/publish-to-hashnode", () => {
       const res = await POST(makeRequest({ canonicalUrl: "javascript:alert(1)" }), routeParams);
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toMatch(/canonicalUrl/);
+      expect(body.error).toBe("canonicalUrl must be an absolute HTTPS URL");
     });
 
     it("rejects http:// URL (non-https)", async () => {
@@ -66,19 +66,27 @@ describe("POST /api/projects/[id]/publish-to-hashnode", () => {
       expect(body.error).toBe("canonicalUrl must be a valid URL");
     });
 
+    it("rejects null canonicalUrl", async () => {
+      const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
+      const res = await POST(makeRequest({ canonicalUrl: null }), routeParams);
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/canonicalUrl/);
+    });
+
     it("accepts valid https URL", async () => {
       const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
       const res = await POST(
         makeRequest({ canonicalUrl: "https://mysite.com/article" }),
         routeParams,
       );
-      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(201);
     });
 
     it("accepts undefined canonicalUrl", async () => {
       const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
       const res = await POST(makeRequest({}), routeParams);
-      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(201);
     });
   });
 });
