@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
+import * as Sentry from "@sentry/nextjs";
 
 vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
@@ -29,6 +30,10 @@ async function createTestUser(id: string) {
 
 describe("api-auth", () => {
     describe("getCurrentUserId", () => {
+        beforeEach(() => {
+            vi.clearAllMocks();
+        });
+
         it("returns userId from x-user-id header", () => {
             const headers = new Headers({ "x-user-id": "user-abc", "x-user-email": "abc@test.com" });
             const request = { headers } as unknown as import("next/server").NextRequest;
@@ -39,6 +44,16 @@ describe("api-auth", () => {
             const headers = new Headers();
             const request = { headers } as unknown as import("next/server").NextRequest;
             expect(getCurrentUserId(request)).toBeNull();
+        });
+
+        it("should call Sentry.setUser with id only (no email)", () => {
+            const headers = new Headers({ "x-user-id": "user-abc", "x-user-email": "abc@test.com" });
+            const request = { headers } as unknown as import("next/server").NextRequest;
+            getCurrentUserId(request);
+            expect(Sentry.setUser).toHaveBeenCalledWith({ id: "user-abc" });
+            expect(Sentry.setUser).not.toHaveBeenCalledWith(
+                expect.objectContaining({ email: expect.any(String) })
+            );
         });
     });
 
