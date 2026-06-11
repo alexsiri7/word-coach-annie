@@ -4,6 +4,8 @@ All endpoints are REST JSON APIs under `/api/`. Requests that modify data requir
 
 **Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`.
 
+**CSRF protection**: All state-changing requests (POST, PUT, DELETE) must include the header `X-CSRF-Protection: 1`. Requests missing this header receive `403 Forbidden`.
+
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 
 ---
@@ -109,6 +111,8 @@ Update the authenticated user's consent preference for a specific feature.
 
 **Authentication**: Required. Returns `401` if not authenticated.
 
+**Headers**: `X-CSRF-Protection: 1` (required for all mutation methods)
+
 **Body**:
 ```json
 {
@@ -122,6 +126,7 @@ Update the authenticated user's consent preference for a specific feature.
 **Errors**:
 - `400 Bad Request` — missing/invalid `feature` or `consentGiven`, or unrecognised `feature` value
 - `401 Unauthorized` — not authenticated
+- `403 Forbidden` — missing `X-CSRF-Protection: 1` header
 - `500 Internal Server Error` — database error
 
 ---
@@ -758,6 +763,22 @@ Get Google Docs export status and records for a project.
 
 ---
 
+### `DELETE /api/integrations/google-docs`
+Disconnect the Google Docs integration (removes stored OAuth tokens).
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Headers**: `X-CSRF-Protection: 1` (required for all mutation methods)
+
+**Response**: `{ ok: true }`
+
+**Errors**:
+- `401 Unauthorized` — not authenticated
+- `403 Forbidden` — missing `X-CSRF-Protection: 1` header
+- `500 Internal Server Error` — database error
+
+---
+
 ### `POST /api/integrations/google-docs/export`
 Export or sync a project to Google Docs.
 
@@ -786,7 +807,16 @@ Connect a Hashnode account with an API access token.
 ### `DELETE /api/integrations/hashnode`
 Disconnect the Hashnode account (removes stored credential).
 
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Headers**: `X-CSRF-Protection: 1` (required for all mutation methods)
+
 **Response**: `{ ok: true }`
+
+**Errors**:
+- `401 Unauthorized` — not authenticated
+- `403 Forbidden` — missing `X-CSRF-Protection: 1` header
+- `500 Internal Server Error` — database error
 
 ---
 

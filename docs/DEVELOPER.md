@@ -77,32 +77,35 @@ src/
 
 1. Create `src/app/api/<route>/route.ts`
 2. Import `verifyRequest` (or `verifyProjectAccess`) from `@/lib/api-auth` for auth
-3. Validate input with Zod — share schemas with the controller where possible
-4. Delegate business logic to a **controller** in `src/lib/controllers/`
-5. Write tests in `src/__tests__/` (Vitest)
-6. Update `docs/API.md` with the new endpoint
+3. **For state-changing methods (POST, PUT, DELETE)**: call `validateCsrfHeader(request)` first — return its error response if non-null
+4. Validate input with Zod — share schemas with the controller where possible
+5. Delegate business logic to a **controller** in `src/lib/controllers/`
+6. Write tests in `src/__tests__/` (Vitest)
+7. Update `docs/API.md` with the new endpoint
 
-Pattern:
+Pattern (mutation endpoint):
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { verifyRequest } from "@/lib/api-auth";
+import { validateCsrfHeader, verifyRequest } from "@/lib/api-auth";
 import { MyController } from "@/lib/controllers/my-controller";
 
 const BodySchema = z.object({ name: z.string() });
 
-export async function POST(req: NextRequest) {
+export async function DELETE(req: NextRequest) {
+  const csrfError = validateCsrfHeader(req);
+  if (csrfError) return csrfError;
+
   const auth = await verifyRequest(req);
   if (!auth.ok) return auth.response;
 
-  const body = BodySchema.safeParse(await req.json());
-  if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 });
-
-  const result = await MyController.doSomething(body.data);
-  return NextResponse.json(result, { status: 201 });
+  const result = await MyController.doSomething();
+  return NextResponse.json(result);
 }
 ```
+
+For read-only endpoints (GET), omit the `validateCsrfHeader` call.
 
 ---
 

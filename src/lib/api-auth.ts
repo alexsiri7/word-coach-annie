@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 /**
  * Get the authenticated user's ID from the request.
@@ -287,11 +288,16 @@ export async function verifyProjectWriteAccessByNode(
  * cross-origin fetch requests, so this blocks HTML-form CSRF and
  * non-credentialed cross-origin fetch attacks.
  *
- * The frontend must send `X-CSRF-Protection: 1` on all DELETE/PUT/POST calls.
+ * The frontend must send `X-CSRF-Protection: 1` on all DELETE/PUT/POST calls
+ * to protected endpoints.
  */
 export function validateCsrfHeader(request: NextRequest): NextResponse | null {
     const header = request.headers.get("x-csrf-protection");
     if (header !== "1") {
+        logger.warn("validateCsrfHeader: missing or invalid X-CSRF-Protection header", {
+            method: request.method,
+            url: request.url,
+        });
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return null;

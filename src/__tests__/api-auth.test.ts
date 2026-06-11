@@ -1,12 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
 vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
 }));
 
+vi.mock("@/lib/logger", () => ({
+    logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
 import {
     getCurrentUserId,
+    validateCsrfHeader,
     verifyProjectAccess,
     verifyProjectReadAccess,
     verifyUniverseAccess,
@@ -25,6 +31,41 @@ async function createTestUser(id: string) {
         },
     });
 }
+
+describe("validateCsrfHeader", () => {
+    it("returns null when X-CSRF-Protection header is '1'", () => {
+        const req = new NextRequest("http://localhost/api/test", {
+            method: "PUT",
+            headers: { "X-CSRF-Protection": "1" },
+        });
+        expect(validateCsrfHeader(req)).toBeNull();
+    });
+
+    it("returns 403 response when header is absent", () => {
+        const req = new NextRequest("http://localhost/api/test", { method: "PUT" });
+        const res = validateCsrfHeader(req);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(403);
+    });
+
+    it("returns 403 response when header is wrong value", () => {
+        const req = new NextRequest("http://localhost/api/test", {
+            method: "PUT",
+            headers: { "X-CSRF-Protection": "true" },
+        });
+        const res = validateCsrfHeader(req);
+        expect(res!.status).toBe(403);
+    });
+
+    it("returns 403 response when header is empty string", () => {
+        const req = new NextRequest("http://localhost/api/test", {
+            method: "PUT",
+            headers: { "X-CSRF-Protection": "" },
+        });
+        const res = validateCsrfHeader(req);
+        expect(res!.status).toBe(403);
+    });
+});
 
 describe("api-auth", () => {
     describe("getCurrentUserId", () => {

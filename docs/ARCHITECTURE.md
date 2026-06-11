@@ -190,6 +190,8 @@ The app supports three auth modes (controlled by environment variables):
 
 Google OAuth sessions are short-lived JWTs (24 hours) with a `jti` (JWT ID) claim. On logout, the `jti` is written to the `RevokedToken` database table via `src/lib/token-blocklist.ts`, and `verifySessionToken` checks revocation on every authenticated Node.js request.
 
+State-changing endpoints (DELETE, PUT, POST) additionally require the `X-CSRF-Protection: 1` custom header via `validateCsrfHeader()` in `src/lib/api-auth.ts`, blocking HTML-form CSRF and non-credentialed cross-origin fetch attacks.
+
 **Edge Runtime constraint**: Next.js middleware runs in the Edge Runtime and cannot use Prisma. Revocation is skipped there — the 24-hour token lifetime is the compensating control. Do not import `token-blocklist.ts` from middleware or any Edge-compatible module.
 
 ## Content Versioning

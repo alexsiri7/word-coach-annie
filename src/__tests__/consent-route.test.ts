@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+// validateCsrfHeader is inlined rather than using importOriginal because bun/vitest
+// does not support importOriginal with this module structure. The inline logic
+// mirrors the real implementation exactly — update both if the header name or
+// expected value ever changes.
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => null),
   validateCsrfHeader: (request: NextRequest) => {
@@ -96,6 +100,7 @@ describe("PUT /api/account/consent", () => {
     const { PUT } = await import("@/app/api/account/consent/route");
     const res = await PUT(req);
     expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("Forbidden");
   });
 
   it("returns 401 for unauthenticated request", async () => {
