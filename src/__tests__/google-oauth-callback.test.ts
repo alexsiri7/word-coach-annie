@@ -44,7 +44,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "session",
-    SESSION_MAX_AGE: 86400,
+    SESSION_MAX_AGE: 3600,
     createSessionToken: vi.fn().mockResolvedValue("mock-jwt-token"),
     isAllowedRedirect: vi.fn().mockReturnValue(false),
     resolveJwtSecret: vi.fn().mockReturnValue("annie-dev-secret"),
