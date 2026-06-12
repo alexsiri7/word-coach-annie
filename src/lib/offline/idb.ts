@@ -255,8 +255,7 @@ export async function removePendingOp(id: number): Promise<void> {
 
 /** Get all pending operations with conflict status. */
 export async function getConflictOps(): Promise<PendingOp[]> {
-    const ops = await idbGetAll("pendingOps");
-    return ops.filter((op) => op.status === "conflict");
+    return (await getPendingOps()).filter((op) => op.status === "conflict");
 }
 
 // ─── Cache Write/Read Helpers ──────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   getPendingOps,
   updatePendingOp,
   removePendingOp,
+  idbGet,
   type PendingOp,
 } from "./idb";
 
@@ -130,7 +131,7 @@ export async function replayPendingOps(): Promise<void> {
           body: op.body,
         });
 
-        if (res.ok || res.status === 201) {
+        if (res.ok) {
           await removePendingOp(op.id!);
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });
@@ -194,8 +195,7 @@ export async function replayPendingOps(): Promise<void> {
  * failed (network error or non-2xx response) and stays in the queue.
  */
 export async function forceReplayOp(id: number): Promise<boolean> {
-  const ops = await getPendingOps();
-  const op = ops.find((o) => o.id === id);
+  const op = await idbGet("pendingOps", id);
   if (!op) return false;
   try {
     const res = await fetch(op.url, {
