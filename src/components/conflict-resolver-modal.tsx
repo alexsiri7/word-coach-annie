@@ -59,8 +59,6 @@ export function ConflictResolverModal({ open, onOpenChange, conflicts, onResolve
       if (index >= conflicts.length - 1) {
         onOpenChange(false);
         setIndex(0);
-      } else {
-        setIndex((i) => i);
       }
     } catch {
       setResolveError("An unexpected error occurred. Please try again.");

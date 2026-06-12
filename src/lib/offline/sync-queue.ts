@@ -203,7 +203,7 @@ export async function forceReplayOp(id: number): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: op.body,
     });
-    if (res.ok || res.status === 201) {
+    if (res.ok) {
       await removePendingOp(id);
       return true;
     }
