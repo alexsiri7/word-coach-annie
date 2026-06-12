@@ -128,6 +128,26 @@ describe("cache-reads", () => {
     expect(tree).toEqual([]);
   });
 
+  it("getCachedOutline promotes orphaned nodes to root when parent is missing", async () => {
+    const nodes = [
+      { id: "sc1", projectId: "p1", parentId: "missing-ch", type: "SCENE",
+        title: "Orphan Scene", synopsis: "", status: "DRAFT", orderIndex: 0,
+        createdAt: "", updatedAt: "" },
+    ];
+    vi.mocked(idbGetNodesByProject).mockResolvedValue(nodes as never);
+
+    const tree = await getCachedOutline("p1");
+
+    expect(tree).toHaveLength(1);
+    expect(tree[0].id).toBe("sc1");
+    expect(tree[0].children).toHaveLength(0);
+  });
+
+  it("cacheStructureNodes does nothing when tree is empty", async () => {
+    await cacheStructureNodes([]);
+    expect(idbPut).not.toHaveBeenCalled();
+  });
+
   // ─── cacheContentVersion / getCachedContent ───────────────────
 
   it("cacheContentVersion calls idbPut with the version", async () => {

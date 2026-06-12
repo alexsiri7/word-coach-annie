@@ -19,11 +19,15 @@ export async function cacheProjects(
   }
 }
 
-/** Persist a flat list of structure nodes (from an OutlineNode tree) into IndexedDB. */
+/** Flatten an OutlineNode tree and persist each node into IndexedDB. */
 export async function cacheStructureNodes(tree: OutlineNode[]): Promise<void> {
   const flat = flattenTree(tree);
   for (const n of flat) {
-    await idbPut("structureNodes", n);
+    try {
+      await idbPut("structureNodes", n);
+    } catch (err) {
+      console.warn("[cache] failed to write structure node", n.id, err);
+    }
   }
 }
 

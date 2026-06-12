@@ -144,7 +144,7 @@ export default function Dashboard() {
           setArchivedProjects(newArchivedData.projects);
           setLoading(false);
           // Cache all projects
-          cacheProjects([...newActiveData.projects, ...newArchivedData.projects]);
+          void cacheProjects([...newActiveData.projects, ...newArchivedData.projects]);
           return;
         }
       }
@@ -153,13 +153,14 @@ export default function Dashboard() {
       setArchivedProjects(archivedData.projects);
       setLoading(false);
       // Cache all projects
-      cacheProjects([...activeData.projects, ...archivedData.projects]);
+      void cacheProjects([...activeData.projects, ...archivedData.projects]);
     } catch {
-      // Network error — fall back to cached projects
+      // Fetch or parse error — fall back to cached projects
       const cached = await getCachedProjects();
-      const active = cached.filter((p) => !("archivedAt" in p));
+      const active = cached.filter((p) => p.archivedAt == null);
+      const archived = cached.filter((p) => p.archivedAt != null);
       setProjects(active as Project[]);
-      setArchivedProjects([]);
+      setArchivedProjects(archived as Project[]);
       setLoading(false);
     }
   };

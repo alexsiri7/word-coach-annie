@@ -145,6 +145,13 @@
 **MCP server**: 48 tools + 6 skills as MCP Prompts
 **Database**: 11 Prisma models, SQLite at `./data/word-coach-annie.db` (2.6MB)
 
+### 2026-06-12: Offline Read-Cache Layer (PR #894)
+- Added `src/lib/offline/cache-reads.ts` with 4 cache-write helpers and 4 cache-read helpers
+- Dashboard falls back to cached projects on network error (filters active/archived by `archivedAt`)
+- Project page falls back to cached outline and story objects on network error
+- Scene editor falls back to cached content version on network error
+- "Cached" badge shown in editor toolbar when serving from IndexedDB
+
 ## Open Work (tracked in beads)
 
 | ID | P | Title |

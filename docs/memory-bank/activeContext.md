@@ -34,6 +34,9 @@ Post-M9: All core milestones complete. Focus on AI chat upgrade and infrastructu
 - FR7: Timeline View (relationship-derived matrix)
 - FR8: Google Docs Export (OAuth2, idempotent sync)
 
+## Recent Completions
+- **Offline read-cache**: IndexedDB fallback for projects, outline, story objects, and scene content (`src/lib/offline/cache-reads.ts`). "Cached" badge shown in editor toolbar when serving from IndexedDB.
+
 ## In Progress
 - **an-yoz**: Docker registry deploy with rollback (polecat working)
 

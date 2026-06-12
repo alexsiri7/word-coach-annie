@@ -26,6 +26,7 @@ export interface AnnieDBSchema extends DBSchema {
             projectType: string;
             wordCount?: number;
             nodeCount?: number;
+            archivedAt?: string | null;
             createdAt: string;
             updatedAt: string;
         };

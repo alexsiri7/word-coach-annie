@@ -148,12 +148,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const fetchProject = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProject(data);
-        cacheProjects([data]);
-      }
+      if (!res.ok) throw new TypeError(`HTTP ${res.status}`);
+      const data = await res.json();
+      setProject(data);
+      void cacheProjects([data]);
     } catch {
+      // Fetch or parse error — fall back to cached project
       const cached = await idbGet("projects", projectId);
       if (cached) {
         setProject(cached as unknown as Project);

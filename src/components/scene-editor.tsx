@@ -108,17 +108,19 @@ export function SceneEditor({
     (async () => {
       try {
         const res = await fetch(`/api/nodes/${node.id}/content`);
+        if (!res.ok) throw new TypeError(`HTTP ${res.status}`);
         const data = await res.json();
         setInitialContent(commentsToBeats(data.latest?.content || ""));
         setVersionHistory(data.history || []);
         if (data.latest) {
           setWordCount(data.latest.wordCount);
           setLatestVersionId(data.latest.id);
-          cacheContentVersion(data.latest);
+          void cacheContentVersion(data.latest);
         }
         setContentFromCache(false);
-      } catch {
-        // Network error — fall back to cached content
+      } catch (err) {
+        if (!(err instanceof TypeError)) throw err;
+        // Fetch or parse error — fall back to cached content
         const cached = await getCachedContent(node.id);
         if (cached) {
           setInitialContent(commentsToBeats(cached.content || ""));
@@ -127,7 +129,7 @@ export function SceneEditor({
           setContentFromCache(true);
         } else {
           setInitialContent("");
-          setContentFromCache(true);
+          setContentFromCache(false); // nothing cached — don't show the badge
         }
       }
     })();
