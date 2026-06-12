@@ -85,7 +85,9 @@ let replaying = false;
  * back online. Operations are replayed sequentially to preserve ordering.
  *
  * Conflict handling: if the server responds with 409, the op is marked as
- * a conflict and removed from the queue (the server version wins).
+ * `"conflict"` and the server's content is stored in `serverContent` for
+ * manual resolution via ConflictResolverModal. Conflict ops are skipped on
+ * subsequent replays until the user resolves them.
  */
 export async function replayPendingOps(): Promise<void> {
   if (replaying) return;
@@ -103,6 +105,9 @@ export async function replayPendingOps(): Promise<void> {
 
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];
+
+      // Skip conflict ops — they need manual resolution
+      if (op.status === "conflict") continue;
 
       // Skip already-failed ops that exceeded retries
       if (op.retries >= MAX_RETRIES) {
@@ -130,8 +135,16 @@ export async function replayPendingOps(): Promise<void> {
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });
         } else if (res.status === 409) {
-          // Conflict — server version is newer; discard the queued op
-          await removePendingOp(op.id!);
+          // Conflict — store server version for manual resolution
+          let serverContent: string | null = null;
+          try {
+            const data = await res.json();
+            serverContent = typeof data.content === "string" ? data.content : JSON.stringify(data);
+          } catch (err) {
+            // response body not JSON
+            console.warn("[sync] 409 body not JSON", err);
+          }
+          await updatePendingOp(op.id!, { status: "conflict", serverContent });
           conflicts++;
           emit({ type: "replay-conflict", op, index: i, total: ops.length });
         } else {
@@ -172,5 +185,33 @@ export async function replayPendingOps(): Promise<void> {
     emit({ type: "replay-done", succeeded, failed, conflicts });
   } finally {
     replaying = false;
+  }
+}
+
+/**
+ * Force-replay a single conflict op (used by "Keep my version" resolution).
+ * Returns true if the op was successfully replayed and removed; false if it
+ * failed (network error or non-2xx response) and stays in the queue.
+ */
+export async function forceReplayOp(id: number): Promise<boolean> {
+  const ops = await getPendingOps();
+  const op = ops.find((o) => o.id === id);
+  if (!op) return false;
+  try {
+    const res = await fetch(op.url, {
+      method: op.method,
+      headers: { "Content-Type": "application/json" },
+      body: op.body,
+    });
+    if (res.ok) {
+      await removePendingOp(id);
+      return true;
+    }
+    console.warn(`[sync] forceReplayOp HTTP ${res.status} for op ${id}`);
+    return false;
+  } catch (err) {
+    // network error — leave in queue for retry
+    console.warn("[sync] forceReplayOp network error", err);
+    return false;
   }
 }
