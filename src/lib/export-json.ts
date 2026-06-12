@@ -47,6 +47,10 @@ export async function exportProjectJson(projectId: string) {
       prisma.hashnodeExport.findMany({
         where: { projectId },
         orderBy: { createdAt: "asc" },
+        select: {
+          id: true, nodeId: true, hashnodePostId: true, hashnodePostUrl: true,
+          publishStatus: true, lastSyncedAt: true, createdAt: true, updatedAt: true,
+        },
       }),
     ]);
 
@@ -174,6 +178,7 @@ export async function exportProjectJson(projectId: string) {
       lastSyncedAt: e.lastSyncedAt.toISOString(),
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),
+      // credentialId intentionally excluded — points to raw OAuth token, metadata-only export
     })),
   };
 }

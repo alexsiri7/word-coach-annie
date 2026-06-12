@@ -38,7 +38,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Email does not match" }, { status: 400 });
     }
 
+    // Credentials and GoogleDocExports lack cascade; delete them explicitly before removing the user.
+    // Project and Universe rows are also deleted explicitly (cascade covers them too, belt-and-suspenders).
     await prisma.$transaction([
+      prisma.googleDocExport.deleteMany({ where: { project: { userId } } }),
+      prisma.googleDocExport.deleteMany({ where: { universe: { userId } } }),
       prisma.googleCredential.deleteMany({ where: { userId } }),
       prisma.hashnodeCredential.deleteMany({ where: { userId } }),
       prisma.project.deleteMany({ where: { userId } }),
@@ -49,14 +53,14 @@ export async function DELETE(request: NextRequest) {
     // Revoke session token (best-effort, after transaction)
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     if (sessionCookie) {
-      const session = await verifySessionToken(sessionCookie);
-      if (session?.jti) {
-        const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
-        try {
+      try {
+        const session = await verifySessionToken(sessionCookie);
+        if (session?.jti) {
+          const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
           await revokeToken(session.jti, session.userId, expiresAt);
-        } catch (err) {
-          logger.error("[delete-account] Failed to revoke token in blocklist:", err);
         }
+      } catch (err) {
+        logger.error("[delete-account] Failed to revoke token in blocklist:", err);
       }
     }
 

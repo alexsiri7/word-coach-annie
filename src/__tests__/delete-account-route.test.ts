@@ -22,7 +22,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
-import { isGoogleAuthMode } from "@/lib/auth";
+import { isGoogleAuthMode, verifySessionToken } from "@/lib/auth";
+import { revokeToken } from "@/lib/token-blocklist";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -138,5 +139,74 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(setCookie).toBeTruthy();
     expect(setCookie).toContain("session=");
     expect(setCookie).toContain("Max-Age=0");
+  });
+
+  it("revokes session token on successful deletion", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u5", email: "del5@test.com", googleId: "g-del5" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-abc", userId: user.id, email: "del5@test.com", name: "Test" });
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const req = new NextRequest("http://localhost/api/auth/delete-account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1", Cookie: "session=tok123" },
+      body: JSON.stringify({ email: "del5@test.com" }),
+    });
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("jti-abc", user.id, expect.any(Date));
+  });
+
+  it("still returns 200 when revokeToken throws (best-effort)", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u6", email: "del6@test.com", googleId: "g-del6" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-xyz", userId: user.id, email: "del6@test.com", name: "Test" });
+    vi.mocked(revokeToken).mockRejectedValue(new Error("DB down"));
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const req = new NextRequest("http://localhost/api/auth/delete-account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1", Cookie: "session=tok456" },
+      body: JSON.stringify({ email: "del6@test.com" }),
+    });
+    const res = await DELETE(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("deletes user's projects and credentials along with account", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u7", email: "del7@test.com", googleId: "g-del7" },
+    });
+    const project = await testPrisma.project.create({
+      data: { id: "proj-del7", title: "My Novel", userId: user.id },
+    });
+    await testPrisma.googleCredential.create({
+      data: { userId: user.id, accessToken: "tok", refreshToken: "ref", expiresAt: new Date("2030-01-01") },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "del7@test.com" }));
+    expect(res.status).toBe(200);
+
+    expect(await testPrisma.user.findUnique({ where: { id: user.id } })).toBeNull();
+    expect(await testPrisma.project.findUnique({ where: { id: project.id } })).toBeNull();
+    expect(await testPrisma.googleCredential.findFirst({ where: { userId: user.id } })).toBeNull();
+  });
+
+  it("returns 400 for malformed email format", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u8", email: "del8@test.com", googleId: "g-del8" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "notanemail" }));
+    expect(res.status).toBe(400);
   });
 });

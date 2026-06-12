@@ -237,7 +237,8 @@ export default function SettingsPage() {
         return;
       }
       window.location.href = "/";
-    } catch {
+    } catch (err) {
+      console.error("Failed to delete account:", err);
       setDeleteError("Deletion failed. Please check your connection and try again.");
     } finally {
       setDeletingAccount(false);
@@ -850,7 +851,10 @@ export default function SettingsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteAccount}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteAccount();
+              }}
               disabled={deletingAccount || !deleteConfirmEmail.trim()}
               className="bg-red-600 hover:bg-red-700 text-white"
             >

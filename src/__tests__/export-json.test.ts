@@ -155,6 +155,7 @@ describe("exportProjectJson", () => {
     expect(result.writingSessions[0].wordsWritten).toBe(500);
     expect(result.writingSessions[0].durationSeconds).toBe(1800);
     expect(result.writingSessions[0].date).toBe("2026-06-01");
+    expect(result.writingSessions[0].endedAt).toBeNull();
   });
 
   it("exports conversations with summary", async () => {

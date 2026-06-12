@@ -72,9 +72,39 @@ Export all personal data for the authenticated user as a ZIP archive (GDPR Artic
 - `200 application/zip` — ZIP archive (`annie-full-export-<date>.zip`) containing:
   - `profile.json` — user profile fields (`id`, `email`, `name`, `picture`, `createdAt`, `updatedAt`)
   - `ai-settings.json` — AI preferences (API key is **omitted** for security)
-  - `projects/<title>.json` — full project JSON for each project (same format as `/api/projects/:id/export?format=json`)
+  - `consents.json` — consent preferences (`feature`, `consentGiven`, `updatedAt` per entry)
+  - `projects/<title>.json` — full project JSON for each project, including:
+    - structure nodes, story objects, chat messages, annotations, relationships
+    - `writingSessions` — word count and duration records per scene
+    - `conversations` — AI chat threads (title, type, summary; messages excluded)
+    - `googleDocExports` — Google Docs sync records (credential tokens **omitted**)
+    - `hashnodeExports` — Hashnode publish records (`credentialId` **omitted** for security)
 - `401 Unauthorized` — not authenticated
 - `500 Internal Server Error` — export generation failed
+
+---
+
+### `DELETE /api/auth/delete-account`
+Permanently delete the authenticated user's account and all associated data (GDPR Article 17 — right to erasure).
+
+**Authentication**: Required (session cookie). Returns `401` if not authenticated.
+
+**CSRF**: Requires `X-CSRF-Protection: 1` header. Returns `403` without it.
+
+**Mode restriction**: Only available in Google Auth mode. Returns `403` in API_TOKEN (single-user) mode — owner-operated instances are not subject to GDPR self-service deletion.
+
+**Request body**:
+```json
+{ "email": "user@example.com" }
+```
+The `email` field must exactly match the authenticated user's email as a confirmation step.
+
+**Response**:
+- `200 OK` — `{ "ok": true }`. Session cookie is cleared (`Max-Age=0`).
+- `400 Bad Request` — missing/invalid email, or email does not match (`{ "error": "Email does not match" }`)
+- `401 Unauthorized` — not authenticated or user not found
+- `403 Forbidden` — missing CSRF header, or API_TOKEN mode
+- `500 Internal Server Error` — deletion failed
 
 ---
 
