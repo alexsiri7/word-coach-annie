@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { SceneStatus } from "@/lib/types";
 
 interface EditorToolbarProps {
@@ -61,6 +62,7 @@ interface EditorToolbarProps {
   showAnnotations: boolean;
   annotationCount: number;
   isOnline: boolean;
+  fromCache?: boolean;
   showFocusButton: boolean;
   projectId: string;
   nodeId: string;
@@ -93,6 +95,7 @@ export function EditorToolbar({
   showAnnotations,
   annotationCount,
   isOnline,
+  fromCache = false,
   showFocusButton,
   projectId,
   nodeId,
@@ -381,6 +384,12 @@ export function EditorToolbar({
           >
             <Maximize className="h-4 w-4" />
           </Button>
+        )}
+
+        {fromCache && (
+          <Badge variant="secondary" className="text-xs h-5">
+            Cached
+          </Badge>
         )}
 
         <div
