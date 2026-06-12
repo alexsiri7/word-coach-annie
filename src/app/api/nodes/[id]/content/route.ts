@@ -88,6 +88,7 @@ export async function POST(
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.name === "ConflictError") {
+      logger.warn("Content conflict detected", { nodeId, error: error.message });
       return NextResponse.json({ error: "Conflict: content has changed" }, { status: 409 });
     }
     logger.error("Failed to save content", error);

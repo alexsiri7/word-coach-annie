@@ -107,6 +107,37 @@ describe("Content Route /api/nodes/[id]/content", () => {
             const res = await POST(req as any, mockParams({ id: nodeId }));
             expect(res.status).toBe(400);
         });
+
+        it("returns 409 when contentHash is stale", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Current content</p>", wordCount: 2 },
+            });
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>New content</p>",
+                contentHash: "a".repeat(64), // stale hash — won't match server's hash
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(409);
+            const data = await res.json();
+            expect(data.error).toMatch(/conflict/i);
+        });
+
+        it("succeeds when contentHash matches current server version", async () => {
+            const content = "<p>Current content</p>";
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content, wordCount: 2 },
+            });
+            const { computeContentHash } = await import("@/lib/offline/content-hash");
+            const hash = await computeContentHash(content);
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>Updated content</p>",
+                contentHash: hash,
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(201);
+        });
     });
 
     describe("PATCH", () => {

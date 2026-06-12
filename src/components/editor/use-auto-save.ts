@@ -10,6 +10,7 @@ interface UseAutoSaveOptions {
   onSaveEnd: () => void;
   onVersionCreated: (version: { id: string }) => void;
   onNodeUpdated?: () => void;
+  onSaveError?: (status: number) => void;
 }
 
 export function useAutoSave({
@@ -19,6 +20,7 @@ export function useAutoSave({
   onSaveEnd,
   onVersionCreated,
   onNodeUpdated,
+  onSaveError,
 }: UseAutoSaveOptions) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentRef = useRef<string>("");
@@ -32,9 +34,12 @@ export function useAutoSave({
     baseHashRef.current = await computeContentHash(initialContent);
   }, [initialContent]);
 
-  // Call once: this is a fire-and-forget init, not a render effect
+  // Initiate at most once per mount — fire-and-forget, avoids a useEffect re-render cycle.
+  // The guard inside initBaseHash prevents concurrent invocations.
   if (baseHashRef.current === null && initialContent) {
-    initBaseHash();
+    initBaseHash().catch((err) =>
+      console.warn("[useAutoSave] Failed to seed base hash:", err)
+    );
   }
 
   const saveContent = useCallback(
@@ -61,14 +66,19 @@ export function useAutoSave({
           baseHashRef.current = await computeContentHash(processedContent);
           onVersionCreated(newVersion);
           onNodeUpdated?.();
+        } else if (res.status === 202) {
+          // Queued offline — don't update baseHashRef; the queued op carries
+          // the current baseHashRef value in its body already
+        } else {
+          // Save failed (including online 409 conflict) — log and surface to caller
+          console.error(`[useAutoSave] save failed with status ${res.status} for node ${nodeId}`);
+          onSaveError?.(res.status);
         }
-        // 202 (queued offline) — don't update baseHashRef; the queued op carries
-        // the current baseHashRef value in its body already
       } finally {
         onSaveEnd();
       }
     },
-    [nodeId, onSaveStart, onSaveEnd, onVersionCreated, onNodeUpdated]
+    [nodeId, onSaveStart, onSaveEnd, onVersionCreated, onNodeUpdated, onSaveError]
   );
 
   const scheduleSave = useCallback(

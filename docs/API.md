@@ -329,12 +329,25 @@ Get a scene's content (latest version + version history + annotations).
 
 ---
 
-### `PUT /api/nodes/:id/content`
-Save scene content (creates a new version).
+### `POST /api/nodes/:id/content`
+Save scene content (creates a new version). Used by the auto-save editor path.
 
-**Body**: `{ content: "string" }`
+**Body**: `{ content: string, contentHash?: string }`
 
-**Response**: `{ version: ContentVersion, wordCount: number }`
+- `content` — HTML scene content (required)
+- `contentHash` — SHA-256 of the last server-confirmed content (optional).
+  When supplied, the server verifies it matches the latest stored version's hash
+  before writing. Omit to skip conflict detection (last-write-wins).
+
+**Response (201)**: `{ id, nodeId, content, createdAt, … }` — newly created ContentVersion
+
+**Response (400)**: `{ error: "content is required" }` — missing body field
+
+**Response (409)**: `{ error: "Conflict: content has changed" }` — hash mismatch;
+client should re-read and re-apply changes before retrying.
+
+**Response (202)**: `{ queued: true }` — client is offline; write queued in IndexedDB for
+replay when connectivity returns (returned by the client-side `offlineFetch` wrapper).
 
 ---
 

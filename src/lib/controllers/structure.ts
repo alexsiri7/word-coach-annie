@@ -419,24 +419,6 @@ export class StructureController {
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
 
-        // Optimistic-locking: if caller supplied a contentHash, verify it matches
-        // the hash of the server's latest version before writing.
-        if (contentHash !== undefined) {
-            const latest = await prisma.contentVersion.findFirst({
-                where: { nodeId },
-                orderBy: { createdAt: "desc" },
-                select: { content: true },
-            });
-            if (latest) {
-                const { computeContentHash } = await import("@/lib/offline/content-hash");
-                const serverHash = await computeContentHash(latest.content);
-                if (serverHash !== contentHash) {
-                    throw new ConflictError(`Content conflict for node ${nodeId}`);
-                }
-            }
-            // If no previous version exists, any hash is accepted (first write)
-        }
-
         StructureController.validateSceneContent(content);
 
         // Strip beat annotations in both storage formats:
@@ -450,6 +432,24 @@ export class StructureController {
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
         const version = await prisma.$transaction(async (tx) => {
+            // Optimistic-locking check INSIDE the transaction so the read
+            // and subsequent write share the same DB snapshot (no TOCTOU race).
+            if (contentHash !== undefined) {
+                const latest = await tx.contentVersion.findFirst({
+                    where: { nodeId },
+                    orderBy: { createdAt: "desc" },
+                    select: { content: true },
+                });
+                if (latest) {
+                    const { computeContentHash } = await import("@/lib/offline/content-hash");
+                    const serverHash = await computeContentHash(latest.content);
+                    if (serverHash !== contentHash) {
+                        throw new ConflictError(`Content conflict for node ${nodeId}`);
+                    }
+                }
+                // If no previous version exists, any hash is accepted (first write)
+            }
+
             const [newVersion] = await Promise.all([
                 tx.contentVersion.create({
                     data: { nodeId, content, wordCount },

@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 
 // Stub SubtleCrypto for Node.js test environment
+// Uses a content-sensitive XOR fold so different inputs produce different hashes.
 beforeAll(() => {
   const mockDigest = vi.fn(async (_algo: string, data: BufferSource) => {
-    // Deterministic stub: return bytes based on input length
-    const len = (data as Uint8Array).byteLength;
-    return new Uint8Array(32).fill(len % 256).buffer;
+    const bytes = new Uint8Array((data as ArrayBuffer));
+    const result = new Uint8Array(32);
+    bytes.forEach((b, i) => { result[i % 32] ^= b; });
+    return result.buffer;
   });
   vi.stubGlobal("crypto", { subtle: { digest: mockDigest } });
 });
@@ -28,5 +30,18 @@ describe("computeContentHash", () => {
   it("produces the same hash for empty content", async () => {
     const hash = await computeContentHash("");
     expect(hash).toHaveLength(64);
+  });
+
+  it("produces different hashes for different plain-text content", async () => {
+    const hash1 = await computeContentHash("<p>Hello</p>");
+    const hash2 = await computeContentHash("<p>World</p>");
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it("is deterministic — same input always yields same hash", async () => {
+    const input = "<p>Determinism test</p>";
+    const hash1 = await computeContentHash(input);
+    const hash2 = await computeContentHash(input);
+    expect(hash1).toBe(hash2);
   });
 });

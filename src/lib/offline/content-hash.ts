@@ -6,7 +6,11 @@
  * Works in browser context (SubtleCrypto) and service worker context.
  */
 export async function computeContentHash(html: string): Promise<string> {
-  // Strip HTML tags (same logic as StructureController.writeSceneContent word-count)
+  // Strip HTML tags to extract comparable plain text for hashing.
+  // Uses the same three regexes as StructureController.writeSceneContent's word-count.
+  // Note: beat-annotation <div> stripping is intentionally omitted here because
+  // content always arrives after beatsToComments() (annotations are HTML comments,
+  // which are already handled by <[^>]*>).
   const text = html
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")

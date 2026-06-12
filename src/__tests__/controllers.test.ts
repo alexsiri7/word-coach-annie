@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
-import { StructureController } from "@/lib/controllers/structure";
+import { StructureController, ConflictError } from "@/lib/controllers/structure";
+import { computeContentHash } from "@/lib/offline/content-hash";
 
 // Note: The controllers use the global prisma instance. 
 // In the vitest setup, we set process.env.DATABASE_URL
@@ -91,6 +92,59 @@ describe("Controller Integrity Tests", () => {
             expect(openRels).toHaveLength(1);
             expect(openRels[0].content).toBe("Fix this part");
             expect(openRels[0].nodeTitle).toBe("Scene for Annotation");
+        });
+
+        describe("writeSceneContent optimistic locking", () => {
+            let scene: { id: string };
+
+            beforeEach(async () => {
+                scene = await StructureController.createNode({
+                    projectId,
+                    type: "SCENE",
+                    title: "Lock Test Scene",
+                });
+            });
+
+            it("accepts write with no contentHash (backward compat / first write)", async () => {
+                await expect(
+                    StructureController.writeSceneContent(scene.id, "<p>Initial</p>")
+                ).resolves.not.toThrow();
+            });
+
+            it("accepts any hash when no previous version exists (first write)", async () => {
+                const arbitraryHash = "a".repeat(64);
+                await expect(
+                    StructureController.writeSceneContent(scene.id, "<p>First write</p>", arbitraryHash)
+                ).resolves.not.toThrow();
+            });
+
+            it("accepts write when contentHash matches server latest", async () => {
+                const initialContent = "<p>Initial</p>";
+                await StructureController.writeSceneContent(scene.id, initialContent);
+                const hash = await computeContentHash(initialContent);
+                await expect(
+                    StructureController.writeSceneContent(scene.id, "<p>Updated</p>", hash)
+                ).resolves.not.toThrow();
+            });
+
+            it("throws ConflictError when contentHash is stale", async () => {
+                await StructureController.writeSceneContent(scene.id, "<p>Server version</p>");
+                const staleHash = await computeContentHash("<p>Old client version</p>");
+                await expect(
+                    StructureController.writeSceneContent(scene.id, "<p>Client write</p>", staleHash)
+                ).rejects.toThrow(ConflictError);
+            });
+
+            it("ConflictError has correct name property", async () => {
+                await StructureController.writeSceneContent(scene.id, "<p>Server version</p>");
+                const staleHash = await computeContentHash("<p>Old client version</p>");
+                try {
+                    await StructureController.writeSceneContent(scene.id, "<p>Client write</p>", staleHash);
+                    throw new Error("Expected ConflictError");
+                } catch (err) {
+                    expect(err instanceof Error && err.name).toBe("ConflictError");
+                }
+            });
         });
     });
 });

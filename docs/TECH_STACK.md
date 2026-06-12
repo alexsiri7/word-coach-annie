@@ -74,7 +74,7 @@ Core models for hierarchical story structure:
 | Styling | Tailwind CSS 3.4 | With tailwind-animate, tailwind-merge, CVA |
 | XSS Protection | DOMPurify | HTML sanitization |
 | State | React hooks | No external state library |
-| PWA | next-pwa | Runtime caching for API routes, Google Fonts |
+| PWA | next-pwa | Runtime caching for API routes, Google Fonts; custom service worker (`src/worker`) with Background Sync for offline write-queue replay (IndexedDB `pendingOps`) |
 
 ### Key UI Features
 - Hierarchical outline tree (acts → chapters → scenes)

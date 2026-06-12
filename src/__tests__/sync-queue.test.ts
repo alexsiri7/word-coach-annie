@@ -217,5 +217,66 @@ describe("sync-queue", () => {
 
       expect(fetch).not.toHaveBeenCalled();
     });
+
+    it("skips conflict ops without retrying them", async () => {
+      navigatorStub.onLine = true;
+
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "POST", body: '{}', timestamp: 100, status: "conflict", retries: 0 }
+      );
+
+      vi.stubGlobal("fetch", vi.fn());
+
+      await replayPendingOps();
+
+      // Conflict op must NOT be retried
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("second concurrent call to replayPendingOps is a no-op", async () => {
+      navigatorStub.onLine = true;
+
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "POST", body: '{}', timestamp: 100, status: "pending", retries: 0 }
+      );
+
+      let fetchCount = 0;
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => {
+        fetchCount++;
+        await new Promise((r) => setTimeout(r, 10));
+        return new Response("{}", { status: 200 });
+      }));
+
+      // Fire two concurrent replays — second should be a no-op
+      await Promise.all([replayPendingOps(), replayPendingOps()]);
+
+      expect(fetchCount).toBe(1);
+    });
+  });
+
+  describe("offlineFetch Background Sync registration", () => {
+    it("registers the 'annie-write-queue' sync tag when offline", async () => {
+      navigatorStub.onLine = false;
+      const syncRegister = vi.fn().mockResolvedValue(undefined);
+      (navigatorStub as any).serviceWorker = {
+        ready: Promise.resolve({ sync: { register: syncRegister } }),
+      };
+
+      await offlineFetch("/api/nodes/x", { method: "POST", body: "{}" });
+
+      // Allow microtasks to flush
+      await new Promise((r) => setTimeout(r, 0));
+      expect(syncRegister).toHaveBeenCalledWith("annie-write-queue");
+    });
+
+    it("does not throw when Background Sync is unavailable", async () => {
+      navigatorStub.onLine = false;
+      (navigatorStub as any).serviceWorker = {
+        ready: Promise.resolve({}), // no .sync property
+      };
+      await expect(
+        offlineFetch("/api/nodes/x", { method: "POST", body: "{}" })
+      ).resolves.not.toThrow();
+    });
   });
 });

@@ -122,12 +122,10 @@ export async function replayPendingOps(): Promise<void> {
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];
 
-      // Skip conflict ops — they need manual resolution
-      if (op.status === "conflict") continue;
-
-      // Skip already-failed ops that exceeded retries
-      if (op.retries >= MAX_RETRIES) {
-        failed++;
+      // Skip already-failed ops that exceeded retries, and conflict ops (parked for Issue #888 UI)
+      if (op.retries >= MAX_RETRIES || op.status === "conflict") {
+        if (op.status === "conflict") conflicts++;
+        else failed++;
         continue;
       }
 
@@ -146,7 +144,7 @@ export async function replayPendingOps(): Promise<void> {
           body: op.body,
         });
 
-        if (res.ok || res.status === 201) {
+        if (res.ok) {
           await removePendingOp(op.id!);
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });
