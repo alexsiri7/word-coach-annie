@@ -8,6 +8,8 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+type SyncReg = ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } };
+
 export type SyncEvent =
   | { type: "replay-start"; total: number }
   | { type: "replay-op"; op: PendingOp; index: number; total: number }
@@ -73,7 +75,7 @@ export async function offlineFetch(
       "SyncManager" in window
     ) {
       navigator.serviceWorker.ready
-        .then((reg) => (reg as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register("annie-write-queue"))
+        .then((reg) => (reg as SyncReg).sync.register("annie-write-queue"))
         .catch((err) => console.warn("[sync] Background Sync registration failed", err));
     }
 

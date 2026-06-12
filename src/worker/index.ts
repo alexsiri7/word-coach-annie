@@ -8,8 +8,16 @@ const DB_NAME = "annie-offline";
 const DB_VERSION = 1;
 
 async function getDB() {
-  return openDB(DB_NAME, DB_VERSION);
+  return openDB(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains("pendingOps")) {
+        db.createObjectStore("pendingOps", { keyPath: "id", autoIncrement: true });
+      }
+    },
+  });
 }
+
+const MAX_SW_RETRIES = 3; // mirrors sync-queue.ts MAX_RETRIES
 
 async function replayFromSW(): Promise<void> {
   const db = await getDB();
@@ -18,7 +26,11 @@ async function replayFromSW(): Promise<void> {
   await tx.done;
 
   const pending = allOps
-    .filter((op: Record<string, unknown>) => op.status === "pending" || op.status === "in-flight")
+    .filter(
+      (op: Record<string, unknown>) =>
+        (op.status === "pending" || op.status === "in-flight") &&
+        ((op.retries as number) || 0) < MAX_SW_RETRIES
+    )
     .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.timestamp as number) - (b.timestamp as number));
 
   for (const op of pending) {
@@ -64,8 +76,9 @@ async function replayFromSW(): Promise<void> {
         await txDone.store.put(rec);
       }
       await txDone.done;
-    } catch {
+    } catch (err) {
       // Network error — leave as pending for next attempt
+      console.warn("[sw-sync] network error replaying op", op.id, err);
       const txErr = db.transaction("pendingOps", "readwrite");
       const rec2 = await txErr.store.get(op.id as number);
       if (rec2) {

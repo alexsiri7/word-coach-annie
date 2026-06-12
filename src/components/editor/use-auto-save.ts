@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { beatsToComments } from "./editor-config";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { computeOfflineContentHash } from "@/lib/offline/content-hash";
 
 interface UseAutoSaveOptions {
   nodeId: string;
@@ -39,9 +40,17 @@ export function useAutoSave({
           const newVersion = await res.json();
           onVersionCreated(newVersion);
           onNodeUpdated?.();
+          // Update base hash so the next save doesn't conflict
+          computeOfflineContentHash(beatsToComments(content)).then((h) => {
+            baseHashRef.current = h;
+          });
         } else if (res.status === 409) {
           const data = await res.json().catch(() => null);
           onSaveError?.({ status: 409, data });
+        } else {
+          const data = await res.json().catch(() => null);
+          console.warn("[auto-save] save failed", { status: res.status, data });
+          onSaveError?.({ status: res.status, data });
         }
       } finally {
         onSaveEnd();
