@@ -26,6 +26,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { idbGet } from "@/lib/offline/idb";
+import {
+  cacheProjects,
+  cacheStructureNodes,
+  getCachedOutline,
+  cacheStoryObjects,
+  getCachedStoryObjects,
+} from "@/lib/offline/cache-reads";
 import {
   Dialog,
   DialogContent,
@@ -101,6 +109,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [selectedObjectSource, setSelectedObjectSource] = useState<"project" | "universe">("project");
   const [activeTab, setActiveTab] = useState<SidebarTab>("outline");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
 
   // Dialogs
   const [addNodeDialogOpen, setAddNodeDialogOpen] = useState(false);
@@ -137,33 +146,63 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Data fetching
   const fetchProject = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}`);
-    if (res.ok) setProject(await res.json());
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProject(data);
+        cacheProjects([data]);
+      }
+    } catch {
+      const cached = await idbGet("projects", projectId);
+      if (cached) {
+        setProject(cached as unknown as Project);
+        setFromCache(true);
+      }
+    }
   }, [projectId]);
 
   const fetchOutline = useCallback(async () => {
-    const [nodesRes, plotRes] = await Promise.all([
-      fetch(`/api/projects/${projectId}/nodes`),
-      fetch(`/api/projects/${projectId}/plot-thread-status`),
-    ]);
-    if (!nodesRes.ok) return;
-    const data = await nodesRes.json();
-    let tree: OutlineNode[] = data.tree || [];
+    try {
+      const [nodesRes, plotRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/nodes`),
+        fetch(`/api/projects/${projectId}/plot-thread-status`),
+      ]);
+      if (!nodesRes.ok) return;
+      const data = await nodesRes.json();
+      let tree: OutlineNode[] = data.tree || [];
 
-    if (plotRes.ok) {
-      const plotStatus: { sceneId: string; indicators: PlotlineIndicator[] }[] = await plotRes.json();
-      const plotMap = new Map(plotStatus.map((s) => [s.sceneId, s.indicators]));
-      tree = mergeIndicators(tree, plotMap);
+      if (plotRes.ok) {
+        const plotStatus: { sceneId: string; indicators: PlotlineIndicator[] }[] = await plotRes.json();
+        const plotMap = new Map(plotStatus.map((s) => [s.sceneId, s.indicators]));
+        tree = mergeIndicators(tree, plotMap);
+      }
+
+      setOutline(tree);
+      cacheStructureNodes(tree);
+    } catch {
+      const cachedTree = await getCachedOutline(projectId);
+      if (cachedTree.length > 0) {
+        setOutline(cachedTree);
+        setFromCache(true);
+      }
     }
-
-    setOutline(tree);
   }, [projectId]);
 
   const fetchStoryObjects = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/story-objects`);
-    if (res.ok) {
-      const data = await res.json();
-      setStoryObjects(data.data || []);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story-objects`);
+      if (res.ok) {
+        const data = await res.json();
+        setStoryObjects(data.data || []);
+        cacheStoryObjects(data.data || []);
+      }
+    } catch {
+      const cached = await getCachedStoryObjects(projectId);
+      if (cached.length > 0) {
+        setStoryObjects(cached as unknown as StoryObject[]);
+        setFromCache(true);
+      }
     }
   }, [projectId]);
 
@@ -724,6 +763,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   onNodeUpdated={() => { fetchOutline(); fetchProject(); }}
                   timelineScenes={timelineScenes}
                   linkedCharacters={storyObjects.filter((o) => o.type === "CHARACTER")}
+                  fromCache={fromCache}
                   onReviewScene={() => openAiChat(buildReviewPrompt(selectedNode.status as SceneStatus, selectedNode.title), selectedNode.id)}
                   onPlanBeats={() => openAiChat(buildPlanBeatsPrompt(selectedNode.title))}
                   onCanonCheck={() => openAiChat(buildCanonCheckPrompt(selectedNode.title))}
