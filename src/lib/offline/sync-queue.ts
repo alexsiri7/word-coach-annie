@@ -66,6 +66,17 @@ export async function offlineFetch(
       retries: 0,
     });
 
+    // Register Background Sync so the SW can replay when the tab is closed
+    if (
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "SyncManager" in window
+    ) {
+      navigator.serviceWorker.ready
+        .then((reg) => (reg as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register("annie-write-queue"))
+        .catch((err) => console.warn("[sync] Background Sync registration failed", err));
+    }
+
     // Return a synthetic 202 Accepted so callers can treat it as "queued"
     return new Response(JSON.stringify({ queued: true }), {
       status: 202,
