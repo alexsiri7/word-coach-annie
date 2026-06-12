@@ -104,9 +104,9 @@ export default function PrivacyPage() {
               within the app. Deleted items are removed from the database.
             </p>
             <p>
-              To delete your entire account and all associated data, contact the
-              instance administrator. We will remove all your data promptly upon
-              request.
+              To delete your entire account and all associated data, go to{" "}
+              <Link href="/settings" className="text-accent hover:underline">Settings → Privacy & Data → Delete account</Link>.
+              All data is removed immediately and permanently.
             </p>
           </section>
 
