@@ -332,9 +332,13 @@ Get a scene's content (latest version + version history + annotations).
 ### `PUT /api/nodes/:id/content`
 Save scene content (creates a new version).
 
-**Body**: `{ content: "string" }`
+**Body**: `{ content: "string", contentHash?: "string" }`
 
-**Response**: `{ version: ContentVersion, wordCount: number }`
+When `contentHash` is provided, the server compares it against the hash of the latest stored version. If they differ (another client wrote in between), the request is rejected with a **409 Conflict** response.
+
+**409 Response**: `{ conflict: true, content: "server's current content" }`
+
+**201 Response**: `{ version: ContentVersion, wordCount: number }`
 
 ---
 

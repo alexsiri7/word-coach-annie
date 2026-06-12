@@ -20,7 +20,13 @@ async function getDB() {
 const MAX_SW_RETRIES = 3; // mirrors sync-queue.ts MAX_RETRIES
 
 async function replayFromSW(): Promise<void> {
-  const db = await getDB();
+  let db;
+  try {
+    db = await getDB();
+  } catch (err) {
+    console.error("[sw-sync] Failed to open IndexedDB", err);
+    return;
+  }
   const tx = db.transaction("pendingOps", "readonly");
   const allOps = await tx.store.getAll();
   await tx.done;
@@ -64,14 +70,14 @@ async function replayFromSW(): Promise<void> {
         try {
           const d = await res.json();
           serverContent = typeof d.content === "string" ? d.content : JSON.stringify(d);
-        } catch {
-          /* ignore */
+        } catch (err) {
+          console.warn("[sw-sync] 409 body not JSON", err);
         }
         rec.status = "conflict";
         rec.serverContent = serverContent;
         await txDone.store.put(rec);
       } else {
-        rec.status = "failed";
+        rec.status = "pending";
         rec.retries = ((rec.retries as number) || 0) + 1;
         await txDone.store.put(rec);
       }

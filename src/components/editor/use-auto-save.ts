@@ -30,10 +30,11 @@ export function useAutoSave({
     async (content: string) => {
       onSaveStart();
       try {
+        const transformed = beatsToComments(content);
         const res = await offlineFetch(`/api/nodes/${nodeId}/content`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: beatsToComments(content), contentHash: baseHashRef.current }),
+          body: JSON.stringify({ content: transformed, contentHash: baseHashRef.current }),
         });
 
         if (res.ok) {
@@ -41,9 +42,8 @@ export function useAutoSave({
           onVersionCreated(newVersion);
           onNodeUpdated?.();
           // Update base hash so the next save doesn't conflict
-          computeOfflineContentHash(beatsToComments(content)).then((h) => {
-            baseHashRef.current = h;
-          });
+          const newHash = await computeOfflineContentHash(transformed);
+          baseHashRef.current = newHash;
         } else if (res.status === 409) {
           const data = await res.json().catch(() => null);
           onSaveError?.({ status: 409, data });
