@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController, ConflictError } from "@/lib/controllers/structure";
 import { computeContentHash } from "@/lib/offline/content-hash";
+import { testPrisma } from "./setup";
 
 // Note: The controllers use the global prisma instance. 
 // In the vitest setup, we set process.env.DATABASE_URL
@@ -112,6 +113,9 @@ describe("Controller Integrity Tests", () => {
             });
 
             it("accepts any hash when no previous version exists (first write)", async () => {
+                // createNode creates an initial empty ContentVersion — delete it to simulate
+                // the edge case where a node has no prior versions (e.g. direct DB inserts).
+                await testPrisma.contentVersion.deleteMany({ where: { nodeId: scene.id } });
                 const arbitraryHash = "a".repeat(64);
                 await expect(
                     StructureController.writeSceneContent(scene.id, "<p>First write</p>", arbitraryHash)
