@@ -6,7 +6,7 @@ import { useSyncStatus } from "@/lib/offline/use-sync-status";
 import { ConflictResolverModal } from "./conflict-resolver-modal";
 
 export function SyncStatusChip() {
-  const { isOnline, pendingCount, conflictCount, conflictOps, isSyncing } = useSyncStatus();
+  const { isOnline, pendingCount, conflictCount, conflictOps, isSyncing, refresh } = useSyncStatus();
   const [conflictOpen, setConflictOpen] = useState(false);
 
   // Derive chip state
@@ -41,23 +41,21 @@ export function SyncStatusChip() {
     <>
       <button
         type="button"
-        role="status"
-        aria-live="polite"
         disabled={!clickable}
         onClick={clickable ? () => setConflictOpen(true) : undefined}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${chipClass} disabled:cursor-default`}
       >
-        {icon}
-        <span>{label}</span>
+        <span role="status" aria-live="polite" className="flex items-center gap-1.5">
+          {icon}
+          <span>{label}</span>
+        </span>
       </button>
 
       <ConflictResolverModal
         open={conflictOpen}
         onOpenChange={setConflictOpen}
         conflicts={conflictOps}
-        onResolved={() => {
-          // useSyncStatus will re-poll automatically; nothing extra needed
-        }}
+        onResolved={refresh}
       />
     </>
   );

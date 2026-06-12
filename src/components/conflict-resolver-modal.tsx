@@ -16,7 +16,7 @@ interface Props {
   onResolved: () => void;
 }
 
-function parseContent(raw: string | null | undefined): string {
+export function parseContent(raw: string | null | undefined): string {
   if (!raw) return "(no content)";
   try {
     const parsed = JSON.parse(raw);
@@ -26,13 +26,14 @@ function parseContent(raw: string | null | undefined): string {
   }
 }
 
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 export function ConflictResolverModal({ open, onOpenChange, conflicts, onResolved }: Props) {
   const [index, setIndex] = useState(0);
   const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const op = conflicts[index];
   if (!op) return null;
@@ -43,9 +44,14 @@ export function ConflictResolverModal({ open, onOpenChange, conflicts, onResolve
 
   const resolve = async (action: "keep-mine" | "keep-server") => {
     setResolving(true);
+    setResolveError(null);
     try {
       if (action === "keep-mine") {
-        await forceReplayOp(op.id!);
+        const ok = await forceReplayOp(op.id!);
+        if (!ok) {
+          setResolveError("Could not apply your version. Check your connection and try again.");
+          return;
+        }
       } else {
         await removePendingOp(op.id!);
       }
@@ -56,6 +62,8 @@ export function ConflictResolverModal({ open, onOpenChange, conflicts, onResolve
       } else {
         setIndex((i) => i);
       }
+    } catch {
+      setResolveError("An unexpected error occurred. Please try again.");
     } finally {
       setResolving(false);
     }
@@ -88,6 +96,10 @@ export function ConflictResolverModal({ open, onOpenChange, conflicts, onResolve
             </div>
           </div>
         </div>
+
+        {resolveError && (
+          <p className="text-sm text-red-400">{resolveError}</p>
+        )}
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={resolving}>

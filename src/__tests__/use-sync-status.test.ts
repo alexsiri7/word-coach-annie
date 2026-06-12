@@ -114,5 +114,58 @@ describe("conflict resolution", () => {
 
       expect(fetch).not.toHaveBeenCalled();
     });
+
+    it("returns false and leaves op as conflict on server error", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x/content", method: "PATCH", body: '{"content":"local"}',
+          timestamp: 1, status: "conflict", retries: 0 },
+      );
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 400 })));
+
+      const result = await forceReplayOp(1);
+
+      expect(result).toBe(false);
+      // Op should remain — server rejected the change
+      expect(idbMock._ops).toHaveLength(1);
+      expect(idbMock._ops[0].status).toBe("conflict");
+    });
+
+    it("returns true on successful replay", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x/content", method: "PATCH", body: '{"content":"local"}',
+          timestamp: 1, status: "conflict", retries: 0, serverContent: "server" },
+      );
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+
+      const result = await forceReplayOp(1);
+
+      expect(result).toBe(true);
+      expect(idbMock._ops).toHaveLength(0);
+    });
+
+    it("returns false on network error", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x/content", method: "PATCH", body: '{"content":"local"}',
+          timestamp: 1, status: "conflict", retries: 0 },
+      );
+
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+
+      const result = await forceReplayOp(1);
+
+      expect(result).toBe(false);
+      expect(idbMock._ops).toHaveLength(1);
+    });
+
+    it("returns false for non-existent op", async () => {
+      vi.stubGlobal("fetch", vi.fn());
+
+      const result = await forceReplayOp(999);
+
+      expect(result).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

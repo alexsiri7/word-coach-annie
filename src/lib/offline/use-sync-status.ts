@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getPendingOps, getConflictOps, type PendingOp } from "./idb";
+import { getPendingOps, type PendingOp } from "./idb";
 import { addSyncListener } from "./sync-queue";
 import { useNetworkStatus } from "./use-network-status";
 
@@ -11,6 +11,7 @@ export interface SyncStatus {
   conflictCount: number;
   conflictOps: PendingOp[];
   isSyncing: boolean;
+  refresh: () => void;
 }
 
 export function useSyncStatus(): SyncStatus {
@@ -22,12 +23,15 @@ export function useSyncStatus(): SyncStatus {
   const refresh = useCallback(async () => {
     try {
       const ops = await getPendingOps();
+      const conflicts = ops.filter((o) => o.status === "conflict");
       const nonConflict = ops.filter((o) => o.status !== "conflict");
       setPendingCount(nonConflict.length);
-      const conflicts = await getConflictOps();
       setConflictOps(conflicts);
-    } catch {
+    } catch (err) {
       // IndexedDB not available (SSR or error)
+      if (typeof window !== "undefined") {
+        console.warn("[sync] useSyncStatus: IndexedDB error", err);
+      }
     }
   }, []);
 
@@ -56,5 +60,6 @@ export function useSyncStatus(): SyncStatus {
     conflictCount: conflictOps.length,
     conflictOps,
     isSyncing,
+    refresh,
   };
 }

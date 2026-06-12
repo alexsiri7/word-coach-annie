@@ -232,7 +232,7 @@ export async function getPendingOps(): Promise<PendingOp[]> {
     return ops.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-/** Update a pending operation's status. */
+/** Update fields on a pending operation (status, retries, serverContent). */
 export async function updatePendingOp(
     id: number,
     updates: Partial<Pick<PendingOp, "status" | "retries" | "serverContent">>
