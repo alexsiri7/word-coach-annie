@@ -2,6 +2,14 @@ import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
+import { computeContentHash } from "@/mcp/content-hash";
+
+export class ConflictError extends Error {
+  constructor(public serverContent: string) {
+    super("Content conflict: server version has changed since last read");
+    this.name = "ConflictError";
+  }
+}
 
 export const ANNOTATION_ERRORS = {
     CONTENT_REQUIRED: "Content is required",
@@ -404,13 +412,28 @@ export class StructureController {
         };
     }
 
-    static async writeSceneContent(nodeId: string, content: string) {
+    static async writeSceneContent(nodeId: string, content: string, contentHash?: string | null) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
+
+        if (contentHash) {
+            const latest = await prisma.contentVersion.findFirst({
+                where: { nodeId },
+                orderBy: { createdAt: "desc" },
+                select: { content: true },
+            });
+            if (latest) {
+                const currentHash = computeContentHash(latest.content);
+                if (contentHash !== currentHash) {
+                    throw new ConflictError(latest.content);
+                }
+            }
+            // No latest version → first write → allow unconditionally
+        }
 
         StructureController.validateSceneContent(content);
 

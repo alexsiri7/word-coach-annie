@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { testPrisma } from "./setup";
+import { computeContentHash } from "@/mcp/content-hash";
 
 class MockNextRequest {
     private _body: unknown;
@@ -106,6 +107,37 @@ describe("Content Route /api/nodes/[id]/content", () => {
             const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {});
             const res = await POST(req as any, mockParams({ id: nodeId }));
             expect(res.status).toBe(400);
+        });
+
+        it("returns 409 when contentHash does not match latest version", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Server content</p>", wordCount: 2 },
+            });
+            const staleHash = "0000000000000000000000000000000000000000000000000000000000000000";
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>Client content</p>",
+                contentHash: staleHash,
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(409);
+            const data = await res.json();
+            expect(data.conflict).toBe(true);
+            expect(data.content).toBe("<p>Server content</p>");
+        });
+
+        it("returns 201 when contentHash matches latest version", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Server content</p>", wordCount: 2 },
+            });
+            const correctHash = computeContentHash("<p>Server content</p>");
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>Updated content</p>",
+                contentHash: correctHash,
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(201);
         });
     });
 

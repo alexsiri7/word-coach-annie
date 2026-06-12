@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
-import { StructureController } from "@/lib/controllers/structure";
+import { StructureController, ConflictError } from "@/lib/controllers/structure";
+import { computeContentHash } from "@/mcp/content-hash";
 
 // Note: The controllers use the global prisma instance. 
 // In the vitest setup, we set process.env.DATABASE_URL
@@ -91,6 +92,72 @@ describe("Controller Integrity Tests", () => {
             expect(openRels).toHaveLength(1);
             expect(openRels[0].content).toBe("Fix this part");
             expect(openRels[0].nodeTitle).toBe("Scene for Annotation");
+        });
+    });
+
+    describe("writeSceneContent optimistic locking", () => {
+        it("writes successfully when no contentHash provided (backward-compat)", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Hash Scene"
+            });
+            const result = await StructureController.writeSceneContent(scene.id, "<p>First write</p>");
+            expect(result.wordCount).toBe(2);
+        });
+
+        it("writes successfully when hash matches latest version", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Hash Match Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            const correctHash = computeContentHash("<p>Version 1</p>");
+            const result = await StructureController.writeSceneContent(scene.id, "<p>Version 2</p>", correctHash);
+            expect(result.wordCount).toBe(2);
+        });
+
+        it("throws ConflictError when hash does not match latest version", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Hash Mismatch Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            const staleHash = "0000000000000000000000000000000000000000000000000000000000000000";
+            await expect(
+                StructureController.writeSceneContent(scene.id, "<p>Version 2</p>", staleHash)
+            ).rejects.toThrow(ConflictError);
+        });
+
+        it("ConflictError has correct name and server content", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Conflict Detail Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Server version</p>");
+            const staleHash = "bad_hash";
+            try {
+                await StructureController.writeSceneContent(scene.id, "<p>Client version</p>", staleHash);
+                expect.unreachable("Should have thrown");
+            } catch (err) {
+                expect(err).toBeInstanceOf(ConflictError);
+                expect((err as ConflictError).name).toBe("ConflictError");
+                expect((err as ConflictError).serverContent).toBe("<p>Server version</p>");
+            }
+        });
+
+        it("treats null contentHash as unconditional write", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Null Hash Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            const result = await StructureController.writeSceneContent(scene.id, "<p>Version 2</p>", null);
+            expect(result.wordCount).toBe(2);
         });
     });
 });

@@ -90,6 +90,7 @@ const withAnalyzer = withBundleAnalyzer({
 const pwaConfig = withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
+  customWorkerSrc: "src/worker",
   cacheOnFrontEndNav: true,
   fallbacks: {
     document: "/_offline",

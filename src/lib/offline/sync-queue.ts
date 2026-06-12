@@ -8,6 +8,8 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+type SyncReg = ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } };
+
 export type SyncEvent =
   | { type: "replay-start"; total: number }
   | { type: "replay-op"; op: PendingOp; index: number; total: number }
@@ -65,6 +67,17 @@ export async function offlineFetch(
       status: "pending",
       retries: 0,
     });
+
+    // Register Background Sync so the SW can replay when the tab is closed
+    if (
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "SyncManager" in window
+    ) {
+      navigator.serviceWorker.ready
+        .then((reg) => (reg as SyncReg).sync.register("annie-write-queue"))
+        .catch((err) => console.warn("[sync] Background Sync registration failed", err));
+    }
 
     // Return a synthetic 202 Accepted so callers can treat it as "queued"
     return new Response(JSON.stringify({ queued: true }), {

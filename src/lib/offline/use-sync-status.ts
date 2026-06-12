@@ -24,8 +24,7 @@ export function useSyncStatus(): SyncStatus {
     try {
       const ops = await getPendingOps();
       const conflicts = ops.filter((o) => o.status === "conflict");
-      const nonConflict = ops.filter((o) => o.status !== "conflict");
-      setPendingCount(nonConflict.length);
+      setPendingCount(ops.length - conflicts.length);
       setConflictOps(conflicts);
     } catch (err) {
       // IndexedDB not available (SSR or error)
