@@ -108,7 +108,7 @@ const pwaConfig = withPWA({
       // Cache Google Fonts stylesheets
       {
         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-        handler: "StaleWhileRevalidate",
+        handler: "StaleWhileRevalidate" as const,
         options: {
           cacheName: "google-fonts-stylesheets",
           expiration: {
@@ -123,7 +123,7 @@ const pwaConfig = withPWA({
       // Cache Google Fonts webfont files
       {
         urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-        handler: "CacheFirst",
+        handler: "CacheFirst" as const,
         options: {
           cacheName: "google-fonts-webfonts",
           expiration: {
