@@ -52,7 +52,14 @@ export async function offlineFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
-  const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  let url: string;
+  if (typeof input === "string") {
+    url = input;
+  } else if (input instanceof URL) {
+    url = input.toString();
+  } else {
+    url = input.url;
+  }
   const method = (init?.method ?? "GET").toUpperCase();
 
   // Only intercept mutations to our own API when offline
@@ -143,7 +150,7 @@ export async function replayPendingOps(): Promise<void> {
           body: op.body,
         });
 
-        if (res.ok || res.status === 201) {
+        if (res.ok) {
           await removePendingOp(op.id!);
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });
