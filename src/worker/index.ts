@@ -57,7 +57,7 @@ async function replayFromSW(): Promise<void> {
         continue;
       }
 
-      if (res.ok || res.status === 201) {
+      if (res.ok) {
         await txDone.store.delete(op.id as number);
       } else if (res.status === 409) {
         let serverContent: string | null = null;
