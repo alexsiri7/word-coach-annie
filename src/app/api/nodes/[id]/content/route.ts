@@ -70,7 +70,7 @@ export async function POST(
     if (!access.authorized) return access.response;
 
     const body = await request.json();
-    const { content } = body;
+    const { content, contentHash } = body;
 
     if (content === undefined || content === null) {
       return NextResponse.json(
@@ -80,9 +80,16 @@ export async function POST(
     }
 
     const sanitizedContent = sanitizeHtml(content);
-    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent);
+    const result = await StructureController.writeSceneContent(
+      nodeId,
+      sanitizedContent,
+      typeof contentHash === "string" ? contentHash : undefined
+    );
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.name === "ConflictError") {
+      return NextResponse.json({ error: "Conflict: content has changed" }, { status: 409 });
+    }
     logger.error("Failed to save content", error);
     return NextResponse.json(
       { error: "Internal server error" },

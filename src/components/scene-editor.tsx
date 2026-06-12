@@ -88,6 +88,7 @@ export function SceneEditor({
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
     nodeId: node.id,
+    initialContent: initialContent ?? undefined,
     onSaveStart: () => setSaving(true),
     onSaveEnd: () => setSaving(false),
     onVersionCreated: (v) => {

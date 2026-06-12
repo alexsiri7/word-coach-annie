@@ -154,13 +154,14 @@ describe("sync-queue", () => {
       const conflictEvent = events.find((e) => e.type === "replay-conflict");
       expect(conflictEvent).toMatchObject({ type: "replay-conflict" });
 
-      const doneEvent = events.find((e) => e.type === "replay-done");
-      expect(doneEvent).toMatchObject({ type: "replay-done", conflicts: 1, succeeded: 0 });
-
-      // Op should be marked as conflict, not removed
+      // Op must remain in IDB, marked as conflict (NOT removed)
       const op = idbMock._ops.find((o) => o.id === 1);
+      expect(op).toBeDefined();
       expect(op?.status).toBe("conflict");
       expect(op?.serverContent).toBe("server version");
+
+      const doneEvent = events.find((e) => e.type === "replay-done");
+      expect(doneEvent).toMatchObject({ type: "replay-done", conflicts: 1, succeeded: 0 });
     });
 
     it("skips conflict ops during replay", async () => {

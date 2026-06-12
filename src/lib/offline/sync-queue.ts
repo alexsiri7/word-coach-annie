@@ -66,6 +66,22 @@ export async function offlineFetch(
       retries: 0,
     });
 
+    // Belt-and-suspenders: register a Background Sync tag so the SW can replay
+    // even if this tab is closed before connectivity returns.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          // SyncManager is not available in all browsers (notably Firefox)
+          if ("sync" in reg) {
+            return (reg as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } })
+              .sync.register("annie-write-queue");
+          }
+        })
+        .catch(() => {
+          // Best-effort: ignore if Background Sync unavailable
+        });
+    }
+
     // Return a synthetic 202 Accepted so callers can treat it as "queued"
     return new Response(JSON.stringify({ queued: true }), {
       status: 202,

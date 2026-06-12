@@ -3,6 +3,13 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
+  }
+}
+
 export const ANNOTATION_ERRORS = {
     CONTENT_REQUIRED: "Content is required",
 } as const;
@@ -404,13 +411,31 @@ export class StructureController {
         };
     }
 
-    static async writeSceneContent(nodeId: string, content: string) {
+    static async writeSceneContent(nodeId: string, content: string, contentHash?: string) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
+
+        // Optimistic-locking: if caller supplied a contentHash, verify it matches
+        // the hash of the server's latest version before writing.
+        if (contentHash !== undefined) {
+            const latest = await prisma.contentVersion.findFirst({
+                where: { nodeId },
+                orderBy: { createdAt: "desc" },
+                select: { content: true },
+            });
+            if (latest) {
+                const { computeContentHash } = await import("@/lib/offline/content-hash");
+                const serverHash = await computeContentHash(latest.content);
+                if (serverHash !== contentHash) {
+                    throw new ConflictError(`Content conflict for node ${nodeId}`);
+                }
+            }
+            // If no previous version exists, any hash is accepted (first write)
+        }
 
         StructureController.validateSceneContent(content);
 
