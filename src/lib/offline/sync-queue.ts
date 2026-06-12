@@ -215,10 +215,21 @@ export async function forceReplayOp(id: number): Promise<boolean> {
   const op = ops.find((o) => o.id === id);
   if (!op) return false;
   try {
+    // Strip contentHash so the server uses last-write-wins — the user chose "Keep my version"
+    let body = op.body;
+    if (body) {
+      try {
+        const parsed = JSON.parse(body);
+        delete parsed.contentHash;
+        body = JSON.stringify(parsed);
+      } catch {
+        /* non-JSON body, send as-is */
+      }
+    }
     const res = await fetch(op.url, {
       method: op.method,
       headers: { "Content-Type": "application/json" },
-      body: op.body,
+      body,
     });
     if (res.ok) {
       await removePendingOp(id);

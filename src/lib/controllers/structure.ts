@@ -432,8 +432,11 @@ export class StructureController {
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
         const version = await prisma.$transaction(async (tx) => {
-            // Optimistic-locking check INSIDE the transaction so the read
-            // and subsequent write share the same DB snapshot (no TOCTOU race).
+            // Optimistic-locking check inside the transaction to keep the read and write
+            // atomic. Note: at READ COMMITTED (Prisma default), a concurrent commit between
+            // the findFirst and create could theoretically pass a stale check. The window is
+            // extremely narrow and acceptable for content editing; use Serializable isolation
+            // if stricter guarantees are needed.
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
                     where: { nodeId },

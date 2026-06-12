@@ -33,7 +33,7 @@ vi.mock("@/lib/offline/idb", () => {
   };
 });
 
-import { offlineFetch, replayPendingOps, addSyncListener, type SyncEvent } from "@/lib/offline/sync-queue";
+import { offlineFetch, replayPendingOps, forceReplayOp, addSyncListener, type SyncEvent } from "@/lib/offline/sync-queue";
 import { queuePendingOp } from "@/lib/offline/idb";
 
 // Access internals for test management
@@ -251,6 +251,53 @@ describe("sync-queue", () => {
       await Promise.all([replayPendingOps(), replayPendingOps()]);
 
       expect(fetchCount).toBe(1);
+    });
+  });
+
+  describe("forceReplayOp", () => {
+    it("strips contentHash from body so server uses last-write-wins", async () => {
+      idbMock._ops.push({
+        id: 1,
+        url: "/api/nodes/x/content",
+        method: "POST",
+        body: JSON.stringify({ content: "<p>My version</p>", contentHash: "stale-hash-abc" }),
+        timestamp: 100,
+        status: "conflict",
+        retries: 0,
+      });
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 201 })));
+
+      const result = await forceReplayOp(1);
+
+      expect(result).toBe(true);
+      const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toBe("/api/nodes/x/content");
+      const sentBody = JSON.parse(opts.body);
+      expect(sentBody.content).toBe("<p>My version</p>");
+      expect(sentBody).not.toHaveProperty("contentHash");
+    });
+
+    it("returns false on non-2xx response", async () => {
+      idbMock._ops.push({
+        id: 1,
+        url: "/api/nodes/x/content",
+        method: "POST",
+        body: JSON.stringify({ content: "<p>test</p>" }),
+        timestamp: 100,
+        status: "conflict",
+        retries: 0,
+      });
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+
+      const result = await forceReplayOp(1);
+      expect(result).toBe(false);
+    });
+
+    it("returns false for non-existent op", async () => {
+      const result = await forceReplayOp(999);
+      expect(result).toBe(false);
     });
   });
 
