@@ -24,6 +24,7 @@ vi.mock("@/lib/offline/idb", () => {
       const idx = ops.findIndex((o) => o.id === id);
       if (idx >= 0) ops.splice(idx, 1);
     }),
+    getConflictOps: vi.fn(async () => ops.filter((o) => o.status === "conflict")),
     _ops: ops,
     _reset: () => {
       ops.length = 0;
@@ -133,14 +134,16 @@ describe("sync-queue", () => {
       expect(doneEvent).toMatchObject({ type: "replay-done", succeeded: 2, failed: 0, conflicts: 0 });
     });
 
-    it("handles 409 conflicts by discarding the op", async () => {
+    it("handles 409 conflicts by marking op as conflict with server content", async () => {
       navigatorStub.onLine = true;
 
       idbMock._ops.push(
         { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "pending", retries: 0 }
       );
 
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 409 })));
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ content: "server version" }), { status: 409 })
+      ));
 
       const events: SyncEvent[] = [];
       const unsub = addSyncListener((e) => events.push(e));
@@ -153,6 +156,28 @@ describe("sync-queue", () => {
 
       const doneEvent = events.find((e) => e.type === "replay-done");
       expect(doneEvent).toMatchObject({ type: "replay-done", conflicts: 1, succeeded: 0 });
+
+      // Op should be marked as conflict, not removed
+      const op = idbMock._ops.find((o) => o.id === 1);
+      expect(op?.status).toBe("conflict");
+      expect(op?.serverContent).toBe("server version");
+    });
+
+    it("skips conflict ops during replay", async () => {
+      navigatorStub.onLine = true;
+
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "conflict", retries: 0 },
+        { id: 2, url: "/api/nodes/y", method: "PATCH", body: '{}', timestamp: 200, status: "pending", retries: 0 }
+      );
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+
+      await replayPendingOps();
+
+      // Only the pending op should have been replayed
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith("/api/nodes/y", expect.anything());
     });
 
     it("handles server errors with retry tracking", async () => {

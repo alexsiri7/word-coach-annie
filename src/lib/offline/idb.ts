@@ -8,8 +8,9 @@ export interface PendingOp {
     method: string;
     body: string | null;
     timestamp: number;
-    status: "pending" | "in-flight" | "failed";
+    status: "pending" | "in-flight" | "failed" | "conflict";
     retries: number;
+    serverContent?: string | null;
 }
 
 export interface AnnieDBSchema extends DBSchema {
@@ -234,7 +235,7 @@ export async function getPendingOps(): Promise<PendingOp[]> {
 /** Update a pending operation's status. */
 export async function updatePendingOp(
     id: number,
-    updates: Partial<Pick<PendingOp, "status" | "retries">>
+    updates: Partial<Pick<PendingOp, "status" | "retries" | "serverContent">>
 ): Promise<void> {
     const db = await getDB();
     const op = await db.get("pendingOps", id);
@@ -246,4 +247,10 @@ export async function updatePendingOp(
 /** Remove a completed pending operation. */
 export async function removePendingOp(id: number): Promise<void> {
     return idbDelete("pendingOps", id);
+}
+
+/** Get all pending operations with conflict status. */
+export async function getConflictOps(): Promise<PendingOp[]> {
+    const ops = await idbGetAll("pendingOps");
+    return ops.filter((op) => op.status === "conflict");
 }

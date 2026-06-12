@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus, Plug, Settings } from "lucide-react";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { SyncStatusChip } from "@/components/sync-status-chip";
 
 export function UserMenu() {
     const router = useRouter();
@@ -25,6 +26,7 @@ export function UserMenu() {
 
     return (
         <>
+            <SyncStatusChip />
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">

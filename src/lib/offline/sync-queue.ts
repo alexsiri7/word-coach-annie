@@ -104,6 +104,9 @@ export async function replayPendingOps(): Promise<void> {
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];
 
+      // Skip conflict ops — they need manual resolution
+      if (op.status === "conflict") continue;
+
       // Skip already-failed ops that exceeded retries
       if (op.retries >= MAX_RETRIES) {
         failed++;
@@ -130,8 +133,15 @@ export async function replayPendingOps(): Promise<void> {
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });
         } else if (res.status === 409) {
-          // Conflict — server version is newer; discard the queued op
-          await removePendingOp(op.id!);
+          // Conflict — store server version for manual resolution
+          let serverContent: string | null = null;
+          try {
+            const data = await res.json();
+            serverContent = typeof data.content === "string" ? data.content : JSON.stringify(data);
+          } catch {
+            // response body not JSON
+          }
+          await updatePendingOp(op.id!, { status: "conflict", serverContent });
           conflicts++;
           emit({ type: "replay-conflict", op, index: i, total: ops.length });
         } else {
@@ -172,5 +182,28 @@ export async function replayPendingOps(): Promise<void> {
     emit({ type: "replay-done", succeeded, failed, conflicts });
   } finally {
     replaying = false;
+  }
+}
+
+/**
+ * Force-replay a single conflict op (used by "Keep my version" resolution).
+ * On success the op is removed; on failure it stays in the queue.
+ */
+export async function forceReplayOp(id: number): Promise<void> {
+  const db = await import("./idb");
+  const ops = await db.getPendingOps();
+  const op = ops.find((o) => o.id === id);
+  if (!op) return;
+  try {
+    const res = await fetch(op.url, {
+      method: op.method,
+      headers: { "Content-Type": "application/json" },
+      body: op.body,
+    });
+    if (res.ok || res.status === 201) {
+      await db.removePendingOp(id);
+    }
+  } catch {
+    // network error — leave in queue for retry
   }
 }
