@@ -218,8 +218,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       // Cache write — flatten tree for storage
       const flatNodes = flattenOutlineTree(tree, projectId);
       cacheStructureNodes(flatNodes).catch(() => {});
-    } catch {
-      // Network failure (or unexpected parse error) — fall back to IDB
+    } catch (err) {
+      if (!(err instanceof TypeError)) throw err;
+      // Network failure — fall back to IDB
       try {
         const cached = await idbGetNodesByProject(projectId);
         if (cached.length > 0) {
@@ -239,8 +240,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         setStoryObjects(data.data || []);
         cacheStoryObjects(data.data || []).catch(() => {});
       }
-    } catch {
-      // Network failure (or unexpected parse error) — fall back to IDB
+    } catch (err) {
+      if (!(err instanceof TypeError)) throw err;
+      // Network failure — fall back to IDB
       try {
         const cached = await idbGetStoryObjectsByProject(projectId);
         if (cached.length > 0) setStoryObjects(cached as unknown as StoryObject[]);

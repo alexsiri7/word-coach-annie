@@ -157,13 +157,23 @@ export default function Dashboard() {
       setLoading(false);
       // Cache write — fire-and-forget
       cacheProjects([...activeData.projects, ...archivedData.projects]).catch(() => {});
-    } catch {
-      // Network failure (or unexpected parse error) — fall back to IDB
+    } catch (err) {
+      if (!(err instanceof TypeError)) throw err;
+      // Network failure — fall back to IDB
       try {
         const cached = await idbGetAll("projects");
         if (cached.length > 0) {
-          setProjects(cached.filter((p) => !p.archivedAt) as unknown as Project[]);
-          setArchivedProjects(cached.filter((p) => !!p.archivedAt) as unknown as Project[]);
+          const hydrate = (p: (typeof cached)[number]): Project => ({
+            ...p,
+            projectType: p.projectType as ProjectType,
+            wordCount: p.wordCount ?? 0,
+            nodeCount: p.nodeCount ?? 0,
+            sceneCount: p.sceneCount ?? 0,
+            characterCount: p.characterCount ?? 0,
+            archivedAt: p.archivedAt ?? null,
+          });
+          setProjects(cached.filter((p) => !p.archivedAt).map(hydrate));
+          setArchivedProjects(cached.filter((p) => !!p.archivedAt).map(hydrate));
         }
       } catch {
         // IDB unavailable — nothing to show

@@ -118,8 +118,9 @@ export function SceneEditor({
           // Cache write — fire-and-forget
           cacheContentVersion(data.latest).catch(() => {});
         }
-      } catch {
-        // Network error (TypeError) — fall back to IDB
+      } catch (err) {
+        if (!(err instanceof TypeError)) throw err;
+        // Network error — fall back to IDB
         const cached = await getLatestCachedContent(node.id);
         if (!cached || !mounted) return;
         setInitialContent(commentsToBeats(cached.content || ""));
@@ -138,7 +139,8 @@ export function SceneEditor({
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setAnnotations(data);
-      });
+      })
+      .catch(() => {}); // annotations fetch failure is non-critical
   }, [node.id]);
 
   // Health check polling

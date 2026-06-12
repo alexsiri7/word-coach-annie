@@ -99,6 +99,7 @@
     "autoprefixer": "^10.5.0",
     "esbuild": "^0.28.0",
     "eslint": "^10.4.0",
+    "fake-indexeddb": "^6.2.5",
     "postcss": "^8.5.15",
     "prisma": "^7.8.0",
     "tailwindcss": "^4.2.4",
