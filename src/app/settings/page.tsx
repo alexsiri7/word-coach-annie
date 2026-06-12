@@ -222,6 +222,12 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDeleteDialogChange = (open: boolean) => {
+    setDeleteAccountOpen(open);
+    setDeleteConfirmEmail("");
+    setDeleteError(null);
+  };
+
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     setDeleteError(null);
@@ -827,7 +833,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <AlertDialog open={deleteAccountOpen} onOpenChange={(open) => { setDeleteAccountOpen(open); setDeleteConfirmEmail(""); setDeleteError(null); }}>
+      <AlertDialog open={deleteAccountOpen} onOpenChange={handleDeleteDialogChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>

@@ -5,8 +5,10 @@ export async function exportProjectJson(projectId: string) {
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
   // Fetch all related data in parallel
-  const [structureNodes, storyObjects, chatMessages, annotations, relationships, writingSessions, conversations, googleDocExports, hashnodeExports] =
-    await Promise.all([
+  const [
+    structureNodes, storyObjects, chatMessages, annotations, relationships,
+    writingSessions, conversations, googleDocExports, hashnodeExports,
+  ] = await Promise.all([
       prisma.structureNode.findMany({
         where: { projectId },
         orderBy: { orderIndex: "asc" },
