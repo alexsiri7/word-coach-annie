@@ -30,6 +30,7 @@ import {
   LayoutList,
   ListTodo,
   ShieldCheck,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,7 @@ interface EditorToolbarProps {
   showAnnotations: boolean;
   annotationCount: number;
   isOnline: boolean;
+  fromCache?: boolean;
   showFocusButton: boolean;
   projectId: string;
   nodeId: string;
@@ -93,6 +95,7 @@ export function EditorToolbar({
   showAnnotations,
   annotationCount,
   isOnline,
+  fromCache,
   showFocusButton,
   projectId,
   nodeId,
@@ -400,6 +403,17 @@ export function EditorToolbar({
             </>
           )}
         </div>
+
+        {fromCache && (
+          <div
+            className="flex items-center gap-1.5 ml-1 px-2 py-1 rounded-md bg-warning/10 text-warning text-xs"
+            role="status"
+            aria-label="Showing cached version — content may be stale"
+          >
+            <Database className="h-3 w-3" aria-hidden="true" />
+            <span className="hidden sm:inline-block">Cached</span>
+          </div>
+        )}
 
         <Select value={status} onValueChange={onStatusChange}>
           <SelectTrigger className="w-28 h-8 text-xs">

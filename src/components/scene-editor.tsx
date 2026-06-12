@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheContentVersion, getLatestCachedContent } from "@/lib/offline/idb";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +78,7 @@ export function SceneEditor({
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
   const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [nextScenePrompt, setNextScenePrompt] = useState<{
     id: string;
     title: string;
@@ -100,17 +102,38 @@ export function SceneEditor({
 
   // Load initial content
   useEffect(() => {
-    fetch(`/api/nodes/${node.id}/content`)
-      .then((res) => res.json())
-      .then((data) => {
+    let mounted = true;
+    const loadContent = async () => {
+      try {
+        const res = await fetch(`/api/nodes/${node.id}/content`);
+        if (!res.ok) return; // 4xx/5xx — no cache fallback
+        const data = await res.json();
+        if (!mounted) return;
         setInitialContent(commentsToBeats(data.latest?.content || ""));
         setVersionHistory(data.history || []);
+        setFromCache(false);
         if (data.latest) {
           setWordCount(data.latest.wordCount);
           setLatestVersionId(data.latest.id);
+          // Cache write — fire-and-forget
+          cacheContentVersion(data.latest).catch(() => {});
         }
-      });
+      } catch {
+        // Network error (TypeError) — fall back to IDB
+        const cached = await getLatestCachedContent(node.id);
+        if (!cached || !mounted) return;
+        setInitialContent(commentsToBeats(cached.content || ""));
+        setWordCount(cached.wordCount);
+        setLatestVersionId(cached.id);
+        setFromCache(true);
+      }
+    };
+    loadContent();
+    return () => { mounted = false; };
+  }, [node.id]);
 
+  // Load annotations
+  useEffect(() => {
     fetch(`/api/nodes/${node.id}/annotations`)
       .then((res) => res.json())
       .then((data) => {
@@ -411,6 +434,7 @@ export function SceneEditor({
         showAnnotations={showAnnotations}
         annotationCount={annotations.length}
         isOnline={isOnline}
+        fromCache={fromCache}
         showFocusButton={showFocusButton}
         projectId={projectId}
         nodeId={node.id}

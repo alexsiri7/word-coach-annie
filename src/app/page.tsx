@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheProjects, idbGetAll } from "@/lib/offline/idb";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -120,35 +121,51 @@ export default function Dashboard() {
   const [todayWords, setTodayWords] = useState(0);
 
   const fetchProjects = async () => {
-    const [activeRes, archivedRes] = await Promise.all([
-      fetch("/api/projects"),
-      fetch("/api/projects?archived=true"),
-    ]);
-    const activeData = await activeRes.json();
-    const archivedData = await archivedRes.json();
-
-    // If user has no projects at all, seed the sample project
-    if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
-      const seedRes = await fetch("/api/onboarding/sample", { method: "POST" });
-      if (seedRes.status === 201) {
-        // Re-fetch to include the newly created sample
-        const [newActive, newArchived] = await Promise.all([
-          fetch("/api/projects"),
-          fetch("/api/projects?archived=true"),
-        ]);
-        const newActiveData = await newActive.json();
-        const newArchivedData = await newArchived.json();
-        setProjects(newActiveData.projects);
-        setArchivedProjects(newArchivedData.projects);
+    try {
+      const [activeRes, archivedRes] = await Promise.all([
+        fetch("/api/projects"),
+        fetch("/api/projects?archived=true"),
+      ]);
+      if (!activeRes.ok || !archivedRes.ok) {
         setLoading(false);
         return;
       }
+      const activeData = await activeRes.json();
+      const archivedData = await archivedRes.json();
+
+      // If user has no projects at all, seed the sample project
+      if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
+        const seedRes = await fetch("/api/onboarding/sample", { method: "POST" });
+        if (seedRes.status === 201) {
+          // Re-fetch to include the newly created sample
+          const [newActive, newArchived] = await Promise.all([
+            fetch("/api/projects"),
+            fetch("/api/projects?archived=true"),
+          ]);
+          const newActiveData = await newActive.json();
+          const newArchivedData = await newArchived.json();
+          setProjects(newActiveData.projects);
+          setArchivedProjects(newArchivedData.projects);
+          setLoading(false);
+          cacheProjects([...newActiveData.projects, ...newArchivedData.projects]).catch(() => {});
+          return;
+        }
+      }
+
+      setProjects(activeData.projects);
+      setArchivedProjects(archivedData.projects);
+      setLoading(false);
+      // Cache write — fire-and-forget
+      cacheProjects([...activeData.projects, ...archivedData.projects]).catch(() => {});
+    } catch {
+      // Network error — fall back to IDB
+      const cached = await idbGetAll("projects");
+      if (cached.length > 0) {
+        setProjects(cached.filter((p) => !p.archivedAt) as unknown as Project[]);
+        setArchivedProjects(cached.filter((p) => !!p.archivedAt) as unknown as Project[]);
+      }
+      setLoading(false);
     }
-
-
-    setProjects(activeData.projects);
-    setArchivedProjects(archivedData.projects);
-    setLoading(false);
   };
 
   const fetchTodayWords = async () => {

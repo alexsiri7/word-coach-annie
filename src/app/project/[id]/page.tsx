@@ -27,6 +27,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import {
+  cacheStructureNodes,
+  cacheStoryObjects,
+  idbGetNodesByProject,
+  idbGetStoryObjectsByProject,
+  type AnnieDBSchema,
+} from "@/lib/offline/idb";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -78,6 +85,51 @@ function mergeIndicators(
     plotIndicators: node.type === "SCENE" ? (plotMap.get(node.id) ?? []) : undefined,
     children: mergeIndicators(node.children, plotMap),
   }));
+}
+
+/** Reconstruct OutlineNode[] tree from flat structureNodes (by parentId + orderIndex). */
+function buildOutlineTree(flat: AnnieDBSchema["structureNodes"]["value"][]): OutlineNode[] {
+  const map = new Map(flat.map((n) => [n.id, { ...n, children: [] as OutlineNode[] } as OutlineNode]));
+  const roots: OutlineNode[] = [];
+  for (const node of map.values()) {
+    if (!node.parentId || !map.has(node.parentId)) {
+      roots.push(node);
+    } else {
+      map.get(node.parentId)!.children.push(node);
+    }
+  }
+  const sortTree = (nodes: OutlineNode[]) => {
+    nodes.sort((a, b) => a.orderIndex - b.orderIndex);
+    nodes.forEach((n) => sortTree(n.children));
+    return nodes;
+  };
+  return sortTree(roots);
+}
+
+/** Flatten an OutlineNode tree into flat structureNode records for IDB storage. */
+function flattenOutlineTree(
+  nodes: OutlineNode[],
+  projectId: string
+): AnnieDBSchema["structureNodes"]["value"][] {
+  const result: AnnieDBSchema["structureNodes"]["value"][] = [];
+  const visit = (n: OutlineNode) => {
+    result.push({
+      id: n.id,
+      projectId,
+      parentId: n.parentId,
+      type: n.type,
+      title: n.title,
+      synopsis: n.synopsis,
+      status: n.status,
+      orderIndex: n.orderIndex,
+      wordCount: n.wordCount,
+      createdAt: n.createdAt,
+      updatedAt: n.updatedAt,
+    });
+    n.children.forEach(visit);
+  };
+  nodes.forEach(visit);
+  return result;
 }
 
 const STORY_TABS: { key: SidebarTab; type: StoryObjectType; label: string; icon: typeof Users }[] = [
@@ -142,28 +194,47 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }, [projectId]);
 
   const fetchOutline = useCallback(async () => {
-    const [nodesRes, plotRes] = await Promise.all([
-      fetch(`/api/projects/${projectId}/nodes`),
-      fetch(`/api/projects/${projectId}/plot-thread-status`),
-    ]);
-    if (!nodesRes.ok) return;
-    const data = await nodesRes.json();
-    let tree: OutlineNode[] = data.tree || [];
+    try {
+      const [nodesRes, plotRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/nodes`),
+        fetch(`/api/projects/${projectId}/plot-thread-status`),
+      ]);
+      if (!nodesRes.ok) return;
+      const data = await nodesRes.json();
+      let tree: OutlineNode[] = data.tree || [];
 
-    if (plotRes.ok) {
-      const plotStatus: { sceneId: string; indicators: PlotlineIndicator[] }[] = await plotRes.json();
-      const plotMap = new Map(plotStatus.map((s) => [s.sceneId, s.indicators]));
-      tree = mergeIndicators(tree, plotMap);
+      if (plotRes.ok) {
+        const plotStatus: { sceneId: string; indicators: PlotlineIndicator[] }[] = await plotRes.json();
+        const plotMap = new Map(plotStatus.map((s) => [s.sceneId, s.indicators]));
+        tree = mergeIndicators(tree, plotMap);
+      }
+
+      setOutline(tree);
+
+      // Cache write — flatten tree for storage
+      const flatNodes = flattenOutlineTree(tree, projectId);
+      cacheStructureNodes(flatNodes).catch(() => {});
+    } catch {
+      // Network error — fall back to IDB
+      const cached = await idbGetNodesByProject(projectId);
+      if (cached.length > 0) {
+        setOutline(buildOutlineTree(cached));
+      }
     }
-
-    setOutline(tree);
   }, [projectId]);
 
   const fetchStoryObjects = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/story-objects`);
-    if (res.ok) {
-      const data = await res.json();
-      setStoryObjects(data.data || []);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story-objects`);
+      if (res.ok) {
+        const data = await res.json();
+        setStoryObjects(data.data || []);
+        cacheStoryObjects(data.data || []).catch(() => {});
+      }
+    } catch {
+      // Network error — fall back to IDB
+      const cached = await idbGetStoryObjectsByProject(projectId);
+      if (cached.length > 0) setStoryObjects(cached as unknown as StoryObject[]);
     }
   }, [projectId]);
 

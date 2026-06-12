@@ -26,6 +26,7 @@ export interface AnnieDBSchema extends DBSchema {
             projectType: string;
             wordCount?: number;
             nodeCount?: number;
+            archivedAt?: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -253,4 +254,52 @@ export async function removePendingOp(id: number): Promise<void> {
 export async function getConflictOps(): Promise<PendingOp[]> {
     const ops = await idbGetAll("pendingOps");
     return ops.filter((op) => op.status === "conflict");
+}
+
+// ─── Cache Write/Read Helpers ──────────────────────────────────────────────
+
+/** Upsert an array of projects into the projects store. */
+export async function cacheProjects(
+    projects: AnnieDBSchema["projects"]["value"][]
+): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction("projects", "readwrite");
+    await Promise.all([...projects.map((p) => tx.store.put(p)), tx.done]);
+}
+
+/** Upsert an array of structure nodes (flat) into structureNodes store. */
+export async function cacheStructureNodes(
+    nodes: AnnieDBSchema["structureNodes"]["value"][]
+): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction("structureNodes", "readwrite");
+    await Promise.all([...nodes.map((n) => tx.store.put(n)), tx.done]);
+}
+
+/** Upsert a single content version into contentVersions store. */
+export async function cacheContentVersion(
+    cv: AnnieDBSchema["contentVersions"]["value"]
+): Promise<void> {
+    const db = await getDB();
+    await db.put("contentVersions", cv);
+}
+
+/** Upsert an array of story objects into storyObjects store. */
+export async function cacheStoryObjects(
+    objects: AnnieDBSchema["storyObjects"]["value"][]
+): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction("storyObjects", "readwrite");
+    await Promise.all([...objects.map((o) => tx.store.put(o)), tx.done]);
+}
+
+/** Get the most-recently-created content version for a node, or undefined. */
+export async function getLatestCachedContent(
+    nodeId: string
+): Promise<AnnieDBSchema["contentVersions"]["value"] | undefined> {
+    const versions = await idbGetContentByNode(nodeId);
+    if (!versions.length) return undefined;
+    return versions.reduce((a, b) =>
+        new Date(a.createdAt) > new Date(b.createdAt) ? a : b
+    );
 }
