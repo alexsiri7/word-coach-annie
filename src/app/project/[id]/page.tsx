@@ -87,8 +87,12 @@ function mergeIndicators(
   }));
 }
 
-/** Reconstruct OutlineNode[] tree from flat structureNodes (by parentId + orderIndex). */
-function buildOutlineTree(flat: AnnieDBSchema["structureNodes"]["value"][]): OutlineNode[] {
+/**
+ * Reconstruct an OutlineNode[] tree from flat structureNodes (sorted by orderIndex).
+ * Nodes whose parentId is absent from the set are promoted to root (handles partial caches).
+ * NOTE: intentionally distinct from the server-side buildOutlineTree in src/lib/outline-tree.ts.
+ */
+function buildOutlineTreeFromCache(flat: AnnieDBSchema["structureNodes"]["value"][]): OutlineNode[] {
   const map = new Map(flat.map((n) => [n.id, { ...n, children: [] as OutlineNode[] } as OutlineNode]));
   const roots: OutlineNode[] = [];
   for (const node of map.values()) {
@@ -215,10 +219,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       const flatNodes = flattenOutlineTree(tree, projectId);
       cacheStructureNodes(flatNodes).catch(() => {});
     } catch {
-      // Network error — fall back to IDB
-      const cached = await idbGetNodesByProject(projectId);
-      if (cached.length > 0) {
-        setOutline(buildOutlineTree(cached));
+      // Network failure (or unexpected parse error) — fall back to IDB
+      try {
+        const cached = await idbGetNodesByProject(projectId);
+        if (cached.length > 0) {
+          setOutline(buildOutlineTreeFromCache(cached));
+        }
+      } catch {
+        // IDB unavailable — leave outline empty
       }
     }
   }, [projectId]);
@@ -232,9 +240,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         cacheStoryObjects(data.data || []).catch(() => {});
       }
     } catch {
-      // Network error — fall back to IDB
-      const cached = await idbGetStoryObjectsByProject(projectId);
-      if (cached.length > 0) setStoryObjects(cached as unknown as StoryObject[]);
+      // Network failure (or unexpected parse error) — fall back to IDB
+      try {
+        const cached = await idbGetStoryObjectsByProject(projectId);
+        if (cached.length > 0) setStoryObjects(cached as unknown as StoryObject[]);
+      } catch {
+        // IDB unavailable — leave story objects empty
+      }
     }
   }, [projectId]);
 
