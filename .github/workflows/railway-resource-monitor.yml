@@ -56,6 +56,7 @@ jobs:
           echo "Memory limit: ${MEMORY_LIMIT_MB} MB"
 
           # Query metrics for the last 30 minutes
+          # Note: Railway returns CPU_USAGE as a percentage (0–100), not a fraction or millicores.
           END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           START=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
 
@@ -181,8 +182,8 @@ jobs:
           CPU_PCT: ${{ steps.metrics.outputs.cpu_pct }}
         with:
           script: |
-            const memoryPct = process.env.MEMORY_PCT;
-            const cpuPct = process.env.CPU_PCT;
+            const memoryPct = parseInt(process.env.MEMORY_PCT);
+            const cpuPct = parseInt(process.env.CPU_PCT);
 
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
