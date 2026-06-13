@@ -42,7 +42,7 @@ jobs:
             }")
 
           API_ERRORS=$(echo "$LIMIT_RESPONSE" | jq -r '.errors // empty')
-          if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
+          if [ -n "$API_ERRORS" ]; then
             echo "::error::Railway API returned errors querying service instance: $API_ERRORS"
             exit 1
           fi
@@ -68,7 +68,7 @@ jobs:
             }")
 
           API_ERRORS=$(echo "$METRICS_RESPONSE" | jq -r '.errors // empty')
-          if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
+          if [ -n "$API_ERRORS" ]; then
             echo "::error::Railway API returned errors querying metrics: $API_ERRORS"
             exit 1
           fi
