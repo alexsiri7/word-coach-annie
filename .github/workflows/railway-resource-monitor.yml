@@ -1,0 +1,209 @@
+name: Railway Resource Monitor
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: read
+
+env:
+  MEMORY_THRESHOLD_PCT: 80
+  CPU_THRESHOLD_PCT: 80
+
+jobs:
+  check-resources:
+    name: Production Resource Usage Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Query Railway resource metrics
+        id: metrics
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        run: |
+          if [[ -z "$RAILWAY_TOKEN" ]]; then
+            echo "::warning::RAILWAY_TOKEN secret not configured — skipping resource check"
+            exit 0
+          fi
+
+          # Query the memory limit for this service instance
+          LIMIT_RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"query { serviceInstance(serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\") { memoryLimitMB } }\"
+            }")
+
+          API_ERRORS=$(echo "$LIMIT_RESPONSE" | jq -r '.errors // empty')
+          if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
+            echo "::error::Railway API returned errors querying service instance: $API_ERRORS"
+            exit 1
+          fi
+
+          MEMORY_LIMIT_MB=$(echo "$LIMIT_RESPONSE" | jq -r '.data.serviceInstance.memoryLimitMB // empty')
+          if [ -z "$MEMORY_LIMIT_MB" ] || [ "$MEMORY_LIMIT_MB" = "null" ]; then
+            # Fallback: Railway Hobby default is 512 MB
+            MEMORY_LIMIT_MB=512
+            echo "::warning::Could not query memoryLimitMB, using default ${MEMORY_LIMIT_MB} MB"
+          fi
+          echo "Memory limit: ${MEMORY_LIMIT_MB} MB"
+
+          # Query metrics for the last 30 minutes
+          END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          START=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+
+          METRICS_RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"query { metrics(projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", startDate: \\\"$START\\\", endDate: \\\"$END\\\", measurements: [MEMORY_USAGE_GB, CPU_USAGE]) { measurements { metric values { value } } } }\"
+            }")
+
+          API_ERRORS=$(echo "$METRICS_RESPONSE" | jq -r '.errors // empty')
+          if [ -n "$API_ERRORS" ] && [ "$API_ERRORS" != "null" ]; then
+            echo "::error::Railway API returned errors querying metrics: $API_ERRORS"
+            exit 1
+          fi
+
+          # Extract max memory usage (GB) and max CPU usage (%)
+          MEMORY_GB=$(echo "$METRICS_RESPONSE" | jq -r '
+            [.data.metrics.measurements[]
+              | select(.metric == "MEMORY_USAGE_GB")
+              | .values[].value] | if length == 0 then 0 else max end')
+
+          CPU_PCT=$(echo "$METRICS_RESPONSE" | jq -r '
+            [.data.metrics.measurements[]
+              | select(.metric == "CPU_USAGE")
+              | .values[].value] | if length == 0 then 0 else max end')
+
+          # Handle empty/null values
+          if [ -z "$MEMORY_GB" ] || [ "$MEMORY_GB" = "null" ]; then
+            MEMORY_GB=0
+          fi
+          if [ -z "$CPU_PCT" ] || [ "$CPU_PCT" = "null" ]; then
+            CPU_PCT=0
+          fi
+
+          # Convert memory GB to percentage of limit
+          MEMORY_MB=$(echo "$MEMORY_GB" | awk "{printf \"%.0f\", \$1 * 1024}")
+          MEMORY_PCT=$(echo "$MEMORY_MB $MEMORY_LIMIT_MB" | awk "{printf \"%.0f\", (\$1 / \$2) * 100}")
+          CPU_PCT_INT=$(echo "$CPU_PCT" | awk "{printf \"%.0f\", \$1}")
+
+          echo "Memory: ${MEMORY_MB} MB / ${MEMORY_LIMIT_MB} MB (${MEMORY_PCT}%)"
+          echo "CPU: ${CPU_PCT_INT}%"
+
+          echo "memory_pct=$MEMORY_PCT" >> "$GITHUB_OUTPUT"
+          echo "cpu_pct=$CPU_PCT_INT" >> "$GITHUB_OUTPUT"
+          echo "memory_mb=$MEMORY_MB" >> "$GITHUB_OUTPUT"
+          echo "memory_limit_mb=$MEMORY_LIMIT_MB" >> "$GITHUB_OUTPUT"
+          echo "has_data=true" >> "$GITHUB_OUTPUT"
+
+      - name: Alert if above threshold
+        if: steps.metrics.outputs.has_data == 'true' && (fromJSON(steps.metrics.outputs.memory_pct) >= fromJSON(env.MEMORY_THRESHOLD_PCT) || fromJSON(steps.metrics.outputs.cpu_pct) >= fromJSON(env.CPU_THRESHOLD_PCT))
+        uses: actions/github-script@v7
+        env:
+          MEMORY_PCT: ${{ steps.metrics.outputs.memory_pct }}
+          CPU_PCT: ${{ steps.metrics.outputs.cpu_pct }}
+          MEMORY_MB: ${{ steps.metrics.outputs.memory_mb }}
+          MEMORY_LIMIT_MB: ${{ steps.metrics.outputs.memory_limit_mb }}
+        with:
+          script: |
+            const memoryPct = parseInt(process.env.MEMORY_PCT);
+            const cpuPct = parseInt(process.env.CPU_PCT);
+            const memoryMb = parseInt(process.env.MEMORY_MB);
+            const memoryLimitMb = parseInt(process.env.MEMORY_LIMIT_MB);
+
+            // Ensure required labels exist
+            for (const labelName of ['railway-resources', 'infrastructure']) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: labelName,
+                  color: labelName === 'railway-resources' ? 'e4e669' : '0075ca',
+                });
+              } catch (e) {
+                if (e.status !== 422) throw e; // 422 = already exists
+              }
+            }
+
+            // Check for existing open alert to avoid duplicates
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'railway-resources',
+              per_page: 100,
+            });
+            if (existing.data.length > 0) {
+              console.log(`Open railway-resources issue already exists (#${existing.data[0].number}), skipping creation.`);
+              return;
+            }
+
+            const body = [
+              `## Railway Production Resource Alert`,
+              ``,
+              `Memory: **${memoryMb} MB / ${memoryLimitMb} MB (${memoryPct}%)**`,
+              `CPU: **${cpuPct}%**`,
+              ``,
+              `### Recommended Actions`,
+              `- Check Railway dashboard: Project → Service → Metrics tab`,
+              `- If memory is high: look for memory leaks, increase memory limit in Service → Settings → Resources`,
+              `- If CPU is high: check for runaway processes or infinite loops`,
+              `- Compare production vs staging instance sizes in Railway dashboard`,
+              `- Consider bumping Railway memory limits if production is under-provisioned`,
+              ``,
+              `Triggered by: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Railway production memory/CPU above threshold — ${memoryPct}% memory, ${cpuPct}% CPU`,
+              body: body,
+              labels: ['infrastructure', 'railway-resources'],
+            });
+
+            console.log('Created railway-resources alert issue');
+
+      - name: Resolve if below threshold
+        if: steps.metrics.outputs.has_data == 'true' && fromJSON(steps.metrics.outputs.memory_pct) < fromJSON(env.MEMORY_THRESHOLD_PCT) && fromJSON(steps.metrics.outputs.cpu_pct) < fromJSON(env.CPU_THRESHOLD_PCT)
+        uses: actions/github-script@v7
+        env:
+          MEMORY_PCT: ${{ steps.metrics.outputs.memory_pct }}
+          CPU_PCT: ${{ steps.metrics.outputs.cpu_pct }}
+        with:
+          script: |
+            const memoryPct = process.env.MEMORY_PCT;
+            const cpuPct = process.env.CPU_PCT;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'railway-resources',
+              per_page: 100,
+            });
+
+            for (const issue of existing.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `✅ Resource usage back to normal — memory: ${memoryPct}%, CPU: ${cpuPct}%. Closing.`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+              console.log(`Closed resolved railway-resources issue #${issue.number}`);
+            }
