@@ -7,6 +7,17 @@ declare const self: ServiceWorkerGlobalScope;
 const DB_NAME = "annie-offline";
 const DB_VERSION = 1;
 
+interface WorkerPendingOp {
+  id: number;
+  url: string;
+  method: string;
+  body: string | null;
+  timestamp: number;
+  status: "pending" | "in-flight" | "failed" | "conflict";
+  retries: number;
+  serverContent?: string | null;
+}
+
 async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
@@ -21,20 +32,20 @@ const MAX_SW_RETRIES = 3; // mirrors sync-queue.ts MAX_RETRIES
 
 async function replayFromSW(): Promise<void> {
   const db = await getDB();
-  const allOps = await db.getAll("pendingOps");
+  const allOps: WorkerPendingOp[] = await db.getAll("pendingOps");
 
   const pending = allOps
     .filter(
-      (op: Record<string, unknown>) =>
+      (op) =>
         (op.status === "pending" || op.status === "in-flight") &&
-        ((op.retries as number) || 0) < MAX_SW_RETRIES
+        (op.retries ?? 0) < MAX_SW_RETRIES
     )
-    .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.timestamp as number) - (b.timestamp as number));
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   for (const op of pending) {
     // Mark in-flight
     const txUpdate = db.transaction("pendingOps", "readwrite");
-    const existing = await txUpdate.store.get(op.id as number);
+    const existing: WorkerPendingOp | undefined = await txUpdate.store.get(op.id);
     if (existing) {
       existing.status = "in-flight";
       await txUpdate.store.put(existing);
@@ -42,21 +53,21 @@ async function replayFromSW(): Promise<void> {
     await txUpdate.done;
 
     try {
-      const res = await fetch(op.url as string, {
-        method: op.method as string,
+      const res = await fetch(op.url, {
+        method: op.method,
         headers: { "Content-Type": "application/json" },
-        body: op.body as string | null,
+        body: op.body,
       });
 
       const txDone = db.transaction("pendingOps", "readwrite");
-      const rec = await txDone.store.get(op.id as number);
+      const rec: WorkerPendingOp | undefined = await txDone.store.get(op.id);
       if (!rec) {
         await txDone.done;
         continue;
       }
 
       if (res.ok) {
-        await txDone.store.delete(op.id as number);
+        await txDone.store.delete(op.id);
       } else if (res.status === 409) {
         let serverContent: string | null = null;
         try {
@@ -70,7 +81,7 @@ async function replayFromSW(): Promise<void> {
         await txDone.store.put(rec);
       } else {
         rec.status = "failed";
-        rec.retries = ((rec.retries as number) || 0) + 1;
+        rec.retries = (rec.retries ?? 0) + 1;
         await txDone.store.put(rec);
       }
       await txDone.done;
@@ -78,10 +89,10 @@ async function replayFromSW(): Promise<void> {
       // Network error — leave as pending for next attempt
       console.warn("[sw-sync] network error replaying op", op.id, err);
       const txErr = db.transaction("pendingOps", "readwrite");
-      const rec2 = await txErr.store.get(op.id as number);
+      const rec2: WorkerPendingOp | undefined = await txErr.store.get(op.id);
       if (rec2) {
         rec2.status = "pending";
-        rec2.retries = ((rec2.retries as number) || 0) + 1;
+        rec2.retries = (rec2.retries ?? 0) + 1;
         await txErr.store.put(rec2);
       }
       await txErr.done;
