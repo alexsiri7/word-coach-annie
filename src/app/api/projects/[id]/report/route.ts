@@ -77,7 +77,7 @@ export async function POST(
   }
 
   // Build GitHub issue — escape all user-controlled fields to prevent markdown injection
-  const categoryLabel = CATEGORY_LABELS[category] || escapeMarkdown(category);
+  const categoryLabel = CATEGORY_LABELS[category];
   let safeUrl = "";
   if (url && typeof url === "string") {
     try {

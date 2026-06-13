@@ -37,6 +37,29 @@ export async function POST(
             return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
         }
 
+        if (canonicalUrl !== undefined) {
+            if (typeof canonicalUrl !== 'string') {
+                return NextResponse.json(
+                    { error: 'canonicalUrl must be a string' },
+                    { status: 400 }
+                );
+            }
+            try {
+                const parsed = new URL(canonicalUrl);
+                if (parsed.protocol !== 'https:') {
+                    return NextResponse.json(
+                        { error: 'canonicalUrl must be an absolute HTTPS URL' },
+                        { status: 400 }
+                    );
+                }
+            } catch {
+                return NextResponse.json(
+                    { error: 'canonicalUrl must be a valid URL' },
+                    { status: 400 }
+                );
+            }
+        }
+
         const result = await HashnodePublishController.publish(id, userId, {
             nodeId,
             titleOverride,
