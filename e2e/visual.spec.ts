@@ -509,6 +509,16 @@ test.describe('Visual regression – Annie', () => {
     })
   })
 
+  test('offline fallback page', async ({ page }) => {
+    await page.goto('/offline')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    await expect(page).toHaveScreenshot('offline.png', {
+      animations: 'disabled',
+    })
+  })
+
   test('tasks page populated', async ({ page }) => {
     await page.route('**/api/writing-tasks*', route =>
       route.fulfill({ json: MOCK_WRITING_TASKS, status: 200 })

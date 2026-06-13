@@ -141,12 +141,20 @@ const pwaConfig = withPWA({
       // through to the browser's native error screen.
       // Covers all routes; the NetworkOnly OAuth rule above takes precedence
       // for /oauth/* and /api/auth/* because it is registered first.
+      // NOTE: first-time visitors with no SW installed will still see the
+      // browser error screen if offline — this is unavoidable until the SW
+      // activates on a successful first load (skipWaiting + clientsClaim
+      // handles all subsequent loads).
       {
         urlPattern: ({ request }: { request: Request }) =>
           request.mode === "navigate",
         handler: "NetworkFirst" as const,
         options: {
           cacheName: "app-shell",
+          // 5s balances responsiveness (don't wait forever if offline) vs.
+          // freshness (give the network a chance before serving cached shell).
+          // On very slow connections this may serve stale content — adjust if
+          // users on 2G/3G report unexpected offline-page appearances.
           networkTimeoutSeconds: 5,
           expiration: {
             maxEntries: 32,
