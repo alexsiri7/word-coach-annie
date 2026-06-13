@@ -36,14 +36,15 @@ Triggered a fresh production re-deploy via GitHub Actions `workflow_dispatch` on
 - ✅ Health check (production): `{"status":"ok"}`
 - ✅ Uptime monitor: Auto-closed related issues
 
-**Pipeline run**: https://github.com/alexsiri7/word-coach-annie/actions/runs/27463812461
+**Pipeline run**: Staging → Production re-deploy via `workflow_dispatch`  
+https://github.com/alexsiri7/word-coach-annie/actions/runs/27463812461
 
 ## Prevention
 
 To prevent similar outages:
-1. Monitor production container memory/CPU usage on Railway dashboard
-2. Consider bumping memory limits if production instance is smaller than staging
-3. Uptime monitor already configured to auto-detect and auto-file recovery reports
+1. Monitor production container memory/CPU usage on Railway dashboard — tracked in #900
+2. Consider bumping Railway memory limits if production instance is smaller than staging — tracked in #900
+3. Uptime monitor already configured to auto-detect and auto-file recovery reports ✅
 
 ## References
 
