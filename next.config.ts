@@ -93,7 +93,7 @@ const pwaConfig = withPWA({
   customWorkerSrc: "src/worker",
   cacheOnFrontEndNav: true,
   fallbacks: {
-    document: "/_offline",
+    document: "/offline",
   },
   workboxOptions: {
     skipWaiting: true,
@@ -136,16 +136,26 @@ const pwaConfig = withPWA({
           },
         },
       },
-      // App shell routes — serve from cache first, revalidate in background.
-      // Placed before the default spread so it overrides the default document/pages
-      // handler (which uses NetworkFirst and requires a network attempt offline).
+      // Navigation requests — NetworkFirst with 5s timeout so the SW serves
+      // the cached shell when offline rather than waiting forever or falling
+      // through to the browser's native error screen.
+      // Covers all routes; the NetworkOnly OAuth rule above takes precedence
+      // for /oauth/* and /api/auth/* because it is registered first.
+      // NOTE: first-time visitors with no SW installed will still see the
+      // browser error screen if offline — this is unavoidable until the SW
+      // activates on a successful first load (skipWaiting + clientsClaim
+      // handles all subsequent loads).
       {
-        urlPattern: ({ request, url }: { request: Request; url: URL }) =>
-          request.mode === "navigate" &&
-          (url.pathname === "/" || url.pathname.startsWith("/projects/")),
-        handler: "StaleWhileRevalidate" as const,
+        urlPattern: ({ request }: { request: Request }) =>
+          request.mode === "navigate",
+        handler: "NetworkFirst" as const,
         options: {
           cacheName: "app-shell",
+          // 5s balances responsiveness (don't wait forever if offline) vs.
+          // freshness (give the network a chance before serving cached shell).
+          // On very slow connections this may serve stale content — adjust if
+          // users on 2G/3G report unexpected offline-page appearances.
+          networkTimeoutSeconds: 5,
           expiration: {
             maxEntries: 32,
             maxAgeSeconds: 24 * 60 * 60, // 24 hours
