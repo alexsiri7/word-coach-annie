@@ -50,3 +50,31 @@ To prevent similar outages:
 
 - Investigation: Infrastructure recovery via workflow dispatch re-deploy
 - Previous related incident: #779, #546, #545
+
+## Monitoring
+
+### Automated Resource Monitoring
+
+The `railway-resource-monitor.yml` workflow runs every 6 hours and opens a GitHub issue (labeled `railway-resources`) if production memory or CPU exceeds 80%.
+
+- Issues auto-close when usage drops below the threshold
+- Manual trigger available via `workflow_dispatch` in the GitHub Actions UI
+
+### Checking Current Railway Resource Usage
+
+1. Open Railway dashboard → select the project
+2. Navigate to the production service
+3. Click the **Metrics** tab to see live memory/CPU graphs
+
+### Bumping Railway Memory Limits
+
+1. Railway dashboard → production service → **Settings** → **Resources**
+2. Increase the **Memory** slider to the desired limit
+3. Redeploy the service for the change to take effect
+
+### Comparing Production vs Staging Instance Sizes
+
+1. Railway dashboard → select the **production** environment → Service → **Settings** → **Resources**
+2. Note the memory/CPU allocation
+3. Switch to the **staging** environment and repeat
+4. Ensure production is not under-provisioned relative to staging
