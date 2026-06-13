@@ -143,7 +143,7 @@ export async function replayPendingOps(): Promise<void> {
           body: op.body,
         });
 
-        if (res.ok || res.status === 201) {
+        if (res.ok) {
           await removePendingOp(op.id!);
           succeeded++;
           emit({ type: "replay-success", op, index: i, total: ops.length });

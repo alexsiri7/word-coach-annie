@@ -21,9 +21,7 @@ const MAX_SW_RETRIES = 3; // mirrors sync-queue.ts MAX_RETRIES
 
 async function replayFromSW(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction("pendingOps", "readonly");
-  const allOps = await tx.store.getAll();
-  await tx.done;
+  const allOps = await db.getAll("pendingOps");
 
   const pending = allOps
     .filter(
