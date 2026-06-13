@@ -152,6 +152,13 @@ GHSA-w5hq-g745-h8pq
 # App risk: LOW — the vulnerable ws copy is deep in the @google/adk transitive tree.
 GHSA-58qx-3vcg-4xpx
 #
+# Source: esbuild (Deno-only binary integrity issue — not exploitable in Node.js/Next.js)
+# Justification: esbuild vulnerability is specific to Deno module binary integrity
+# verification. This app runs on Node.js/Next.js and does not use Deno.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: NONE — Deno-only attack vector; not applicable to Node.js runtime.
+GHSA-gv7w-rqvm-qjhr
+#
 # Source: @grpc/grpc-js (via @google/genai -> @google/adk transitive chain)
 # Justification: @grpc/grpc-js DoS vulnerabilities (malformed request/compressed message)
 # require a gRPC server to be exposed to attackers. This app is a Next.js HTTP server —
