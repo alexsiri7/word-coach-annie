@@ -5,8 +5,10 @@ export async function exportProjectJson(projectId: string) {
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
   // Fetch all related data in parallel
-  const [structureNodes, storyObjects, chatMessages, annotations, relationships] =
-    await Promise.all([
+  const [
+    structureNodes, storyObjects, chatMessages, annotations, relationships,
+    writingSessions, conversations, googleDocExports, hashnodeExports,
+  ] = await Promise.all([
       prisma.structureNode.findMany({
         where: { projectId },
         orderBy: { orderIndex: "asc" },
@@ -29,6 +31,27 @@ export async function exportProjectJson(projectId: string) {
           fromObject: { select: { id: true, projectId: true } },
           toNode: { select: { id: true, projectId: true } },
           toObject: { select: { id: true, projectId: true } },
+        },
+      }),
+      prisma.writingSession.findMany({
+        where: { projectId },
+        orderBy: { startedAt: "asc" },
+      }),
+      prisma.conversation.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, title: true, type: true, summary: true, createdAt: true, updatedAt: true },
+      }),
+      prisma.googleDocExport.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.hashnodeExport.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true, nodeId: true, hashnodePostId: true, hashnodePostUrl: true,
+          publishStatus: true, lastSyncedAt: true, createdAt: true, updatedAt: true,
         },
       }),
     ]);
@@ -121,6 +144,43 @@ export async function exportProjectJson(projectId: string) {
       role: m.role,
       content: m.content,
       createdAt: m.createdAt.toISOString(),
+    })),
+    writingSessions: writingSessions.map((s) => ({
+      id: s.id,
+      projectId: s.projectId,
+      nodeId: s.nodeId,
+      startedAt: s.startedAt.toISOString(),
+      endedAt: s.endedAt?.toISOString() ?? null,
+      wordsWritten: s.wordsWritten,
+      durationSeconds: s.durationSeconds,
+      date: s.date,
+    })),
+    conversations: conversations.map((c) => ({
+      id: c.id,
+      title: c.title,
+      type: c.type,
+      summary: c.summary,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })),
+    googleDocExports: googleDocExports.map((e) => ({
+      id: e.id,
+      exportMode: e.exportMode,
+      googleDocId: e.googleDocId,
+      googleDocUrl: e.googleDocUrl,
+      lastSyncedAt: e.lastSyncedAt.toISOString(),
+      createdAt: e.createdAt.toISOString(),
+    })),
+    hashnodeExports: hashnodeExports.map((e) => ({
+      id: e.id,
+      nodeId: e.nodeId,
+      hashnodePostId: e.hashnodePostId,
+      hashnodePostUrl: e.hashnodePostUrl,
+      publishStatus: e.publishStatus,
+      lastSyncedAt: e.lastSyncedAt.toISOString(),
+      createdAt: e.createdAt.toISOString(),
+      updatedAt: e.updatedAt.toISOString(),
+      // credentialId intentionally excluded — points to raw OAuth token, metadata-only export
     })),
   };
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 /**
  * Get the authenticated user's ID from the request.
@@ -11,9 +12,8 @@ import { prisma } from "@/lib/db";
  */
 export function getCurrentUserId(request: NextRequest): string | null {
     const userId = request.headers.get("x-user-id");
-    const email = request.headers.get("x-user-email");
     if (userId) {
-        Sentry.setUser({ id: userId, email: email ?? undefined });
+        Sentry.setUser({ id: userId });
     }
     return userId;
 }
@@ -279,4 +279,22 @@ export async function verifyProjectWriteAccessByNode(
     const access = await verifyProjectWriteAccess(node.projectId, userId, userEmail);
     if (!access.authorized) return access;
     return { authorized: true, projectId: node.projectId, role: access.role };
+}
+
+/**
+ * Validate the CSRF custom header to protect state-changing endpoints.
+ *
+ * Expects the `x-csrf-protection` header to be present with the exact value `"1"`.
+ * Returns a 403 NextResponse if the header is absent or has any other value; null otherwise.
+ *
+ * @param request - The incoming Next.js request.
+ * @returns null on success, or a 403 NextResponse on CSRF validation failure.
+ */
+export function validateCsrfHeader(request: NextRequest): NextResponse | null {
+    const header = request.headers.get("x-csrf-protection");
+    if (header !== "1") {
+        logger.warn("CSRF header missing or invalid", { url: request.url });
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return null;
 }

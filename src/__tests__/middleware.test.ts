@@ -9,6 +9,15 @@ vi.mock("@sentry/nextjs", () => ({
     captureException: vi.fn(),
 }));
 
+import * as Sentry from "@sentry/nextjs";
+
+// Mock oauth-tokens module
+vi.mock("@/lib/oauth-tokens", () => ({
+    verifyMcpToken: vi.fn(async () => null),
+}));
+
+import { verifyMcpToken } from "@/lib/oauth-tokens";
+
 // Mock auth module
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
@@ -139,6 +148,20 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
+    it("rejects mismatched legacy API_TOKEN session cookie", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifySessionToken).mockResolvedValue(null);
+        vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
+        process.env.API_TOKEN = "my-token";
+
+        const req = createRequest("/api/projects", {
+            cookies: { annie_session: "wrong-cookie-value" },
+        });
+
+        const res = await middleware(req);
+        expect(res.status).toBe(401);
+    });
+
     it("returns 401 for unauthenticated API requests", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/projects");
@@ -176,6 +199,42 @@ describe("middleware", () => {
         const req = createRequest("/landing");
         const res = await middleware(req);
         expect(res.status).toBe(200);
+    });
+
+    it("sets Sentry user with id only on JWT session path (no email)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifySessionToken).mockResolvedValue({
+            userId: "sentry-user",
+            email: "sentry@example.com",
+            name: "Test",
+        });
+        const req = createRequest("/api/projects", {
+            cookies: { annie_session: "valid-jwt-token" },
+        });
+        await middleware(req);
+        expect(Sentry.setUser).toHaveBeenCalledWith({ id: "sentry-user" });
+        expect(Sentry.setUser).not.toHaveBeenCalledWith(
+            expect.objectContaining({ email: expect.any(String) })
+        );
+    });
+
+    it("sets Sentry user with id only on MCP token path (no email)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        vi.mocked(verifyMcpToken).mockResolvedValue({
+            userId: "mcp-user",
+            email: "mcp@example.com",
+            clientId: "test-client",
+            jti: "mcp-jti-1",
+            exp: Math.floor(Date.now() / 1000) + 3600,
+        });
+        const req = createRequest("/api/projects", {
+            headers: { authorization: "Bearer mcp-token" },
+        });
+        await middleware(req);
+        expect(Sentry.setUser).toHaveBeenCalledWith({ id: "mcp-user" });
+        expect(Sentry.setUser).not.toHaveBeenCalledWith(
+            expect.objectContaining({ email: expect.any(String) })
+        );
     });
 
     describe("CSP nonce injection", () => {

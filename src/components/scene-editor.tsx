@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheContentVersion, getCachedContent } from "@/lib/offline/cache-reads";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ interface SceneEditorProps {
   showFocusButton?: boolean;
   timelineScenes?: TimelineSceneItem[];
   linkedCharacters?: StoryObject[];
+  fromCache?: boolean;
   onReviewScene?: () => void;
   onPlanBeats?: () => void;
   onCanonCheck?: () => void;
@@ -55,6 +57,7 @@ export function SceneEditor({
   showFocusButton = true,
   timelineScenes,
   linkedCharacters = [],
+  fromCache: fromCacheProp = false,
   onReviewScene,
   onPlanBeats,
   onCanonCheck,
@@ -84,6 +87,8 @@ export function SceneEditor({
     newStatus: string;
   } | null>(null);
 
+  const [contentFromCache, setContentFromCache] = useState(fromCacheProp);
+
   const session = useWritingSession({ projectId, nodeId: node.id });
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
@@ -100,21 +105,40 @@ export function SceneEditor({
 
   // Load initial content
   useEffect(() => {
-    fetch(`/api/nodes/${node.id}/content`)
-      .then((res) => res.json())
-      .then((data) => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/nodes/${node.id}/content`);
+        const data = await res.json();
         setInitialContent(commentsToBeats(data.latest?.content || ""));
         setVersionHistory(data.history || []);
         if (data.latest) {
           setWordCount(data.latest.wordCount);
           setLatestVersionId(data.latest.id);
+          cacheContentVersion(data.latest);
         }
-      });
+        setContentFromCache(false);
+      } catch {
+        // Network error — fall back to cached content
+        const cached = await getCachedContent(node.id);
+        if (cached) {
+          setInitialContent(commentsToBeats(cached.content || ""));
+          setWordCount(cached.wordCount);
+          setLatestVersionId(cached.id);
+          setContentFromCache(true);
+        } else {
+          setInitialContent("");
+          setContentFromCache(true);
+        }
+      }
+    })();
 
     fetch(`/api/nodes/${node.id}/annotations`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setAnnotations(data);
+      })
+      .catch(() => {
+        // Annotations not available offline — ignore
       });
   }, [node.id]);
 
@@ -411,6 +435,7 @@ export function SceneEditor({
         showAnnotations={showAnnotations}
         annotationCount={annotations.length}
         isOnline={isOnline}
+        fromCache={contentFromCache}
         showFocusButton={showFocusButton}
         projectId={projectId}
         nodeId={node.id}

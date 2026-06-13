@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [projects, aiSettings] = await Promise.all([
+    const [projects, aiSettings, consents] = await Promise.all([
       prisma.project.findMany({
         where: userId ? { userId } : {},
         select: { id: true, title: true },
@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
       userId
         ? prisma.userAiSettings.findUnique({ where: { userId } })
         : Promise.resolve(null),
+      userId
+        ? prisma.userConsent.findMany({ where: { userId } })
+        : Promise.resolve([]),
     ]);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
@@ -73,6 +76,19 @@ export async function GET(request: NextRequest) {
       archive.append(JSON.stringify(safeAiSettings, null, 2), {
         name: "ai-settings.json",
       });
+
+      archive.append(
+        JSON.stringify(
+          consents.map((c) => ({
+            feature: c.feature,
+            consentGiven: c.consentGiven,
+            updatedAt: c.updatedAt.toISOString(),
+          })),
+          null,
+          2
+        ),
+        { name: "consents.json" }
+      );
     }
 
     for (const project of projects) {

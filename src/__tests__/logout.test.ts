@@ -6,7 +6,7 @@ vi.mock("@/lib/token-blocklist", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
-    SESSION_MAX_AGE: 86400,
+    SESSION_MAX_AGE: 3600,
     verifySessionToken: vi.fn(async () => ({ userId: "u1", email: "u@test.com", name: "U", jti: "test-jti-123" })),
 }));
 

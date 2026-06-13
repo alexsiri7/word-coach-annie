@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { cacheProjects, getCachedProjects } from "@/lib/offline/cache-reads";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -120,35 +121,47 @@ export default function Dashboard() {
   const [todayWords, setTodayWords] = useState(0);
 
   const fetchProjects = async () => {
-    const [activeRes, archivedRes] = await Promise.all([
-      fetch("/api/projects"),
-      fetch("/api/projects?archived=true"),
-    ]);
-    const activeData = await activeRes.json();
-    const archivedData = await archivedRes.json();
+    try {
+      const [activeRes, archivedRes] = await Promise.all([
+        fetch("/api/projects"),
+        fetch("/api/projects?archived=true"),
+      ]);
+      const activeData = await activeRes.json();
+      const archivedData = await archivedRes.json();
 
-    // If user has no projects at all, seed the sample project
-    if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
-      const seedRes = await fetch("/api/onboarding/sample", { method: "POST" });
-      if (seedRes.status === 201) {
-        // Re-fetch to include the newly created sample
-        const [newActive, newArchived] = await Promise.all([
-          fetch("/api/projects"),
-          fetch("/api/projects?archived=true"),
-        ]);
-        const newActiveData = await newActive.json();
-        const newArchivedData = await newArchived.json();
-        setProjects(newActiveData.projects);
-        setArchivedProjects(newArchivedData.projects);
-        setLoading(false);
-        return;
+      // If user has no projects at all, seed the sample project
+      if (activeData.projects.length === 0 && archivedData.projects.length === 0) {
+        const seedRes = await fetch("/api/onboarding/sample", { method: "POST" });
+        if (seedRes.status === 201) {
+          // Re-fetch to include the newly created sample
+          const [newActive, newArchived] = await Promise.all([
+            fetch("/api/projects"),
+            fetch("/api/projects?archived=true"),
+          ]);
+          const newActiveData = await newActive.json();
+          const newArchivedData = await newArchived.json();
+          setProjects(newActiveData.projects);
+          setArchivedProjects(newArchivedData.projects);
+          setLoading(false);
+          // Cache all projects
+          cacheProjects([...newActiveData.projects, ...newArchivedData.projects]);
+          return;
+        }
       }
+
+      setProjects(activeData.projects);
+      setArchivedProjects(archivedData.projects);
+      setLoading(false);
+      // Cache all projects
+      cacheProjects([...activeData.projects, ...archivedData.projects]);
+    } catch {
+      // Network error — fall back to cached projects
+      const cached = await getCachedProjects();
+      const active = cached.filter((p) => !("archivedAt" in p));
+      setProjects(active as Project[]);
+      setArchivedProjects([]);
+      setLoading(false);
     }
-
-
-    setProjects(activeData.projects);
-    setArchivedProjects(archivedData.projects);
-    setLoading(false);
   };
 
   const fetchTodayWords = async () => {

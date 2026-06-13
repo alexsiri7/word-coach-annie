@@ -135,6 +135,90 @@ describe("exportProjectJson", () => {
     expect(result.chatHistory[1].role).toBe("assistant");
   });
 
+  it("exports writing sessions", async () => {
+    const scene = await testPrisma.structureNode.create({
+      data: { projectId, type: "SCENE", title: "Scene WS", orderIndex: 0 },
+    });
+    await testPrisma.writingSession.create({
+      data: {
+        projectId,
+        nodeId: scene.id,
+        wordsWritten: 500,
+        durationSeconds: 1800,
+        date: "2026-06-01",
+      },
+    });
+
+    const result = await exportProjectJson(projectId);
+
+    expect(result.writingSessions).toHaveLength(1);
+    expect(result.writingSessions[0].wordsWritten).toBe(500);
+    expect(result.writingSessions[0].durationSeconds).toBe(1800);
+    expect(result.writingSessions[0].date).toBe("2026-06-01");
+    expect(result.writingSessions[0].endedAt).toBeNull();
+  });
+
+  it("exports conversations with summary", async () => {
+    await testPrisma.conversation.create({
+      data: {
+        projectId,
+        title: "Brainstorm",
+        type: "chat",
+        summary: "Discussed character arcs",
+      },
+    });
+
+    const result = await exportProjectJson(projectId);
+
+    expect(result.conversations).toHaveLength(1);
+    expect(result.conversations[0].title).toBe("Brainstorm");
+    expect(result.conversations[0].summary).toBe("Discussed character arcs");
+  });
+
+  it("exports google doc exports", async () => {
+    await testPrisma.googleDocExport.create({
+      data: {
+        projectId,
+        exportMode: "STORY_READER",
+        googleDocId: "doc-123",
+        googleDocUrl: "https://docs.google.com/doc-123",
+        lastSyncedAt: new Date("2026-06-01"),
+      },
+    });
+
+    const result = await exportProjectJson(projectId);
+
+    expect(result.googleDocExports).toHaveLength(1);
+    expect(result.googleDocExports[0].exportMode).toBe("STORY_READER");
+    expect(result.googleDocExports[0].googleDocId).toBe("doc-123");
+  });
+
+  it("exports hashnode exports without credentialId", async () => {
+    const credential = await testPrisma.hashnodeCredential.create({
+      data: {
+        userId: "local",
+        accessToken: "test-token",
+      },
+    });
+    await testPrisma.hashnodeExport.create({
+      data: {
+        projectId,
+        hashnodePostId: "post-123",
+        hashnodePostUrl: "https://hashnode.com/post-123",
+        publishStatus: "published",
+        lastSyncedAt: new Date("2026-06-01"),
+        credentialId: credential.id,
+      },
+    });
+
+    const result = await exportProjectJson(projectId);
+
+    expect(result.hashnodeExports).toHaveLength(1);
+    expect(result.hashnodeExports[0].hashnodePostId).toBe("post-123");
+    expect(result.hashnodeExports[0].publishStatus).toBe("published");
+    expect(result.hashnodeExports[0]).not.toHaveProperty("credentialId");
+  });
+
   it("only exports relationships belonging to the project", async () => {
     const scene = await testPrisma.structureNode.create({
       data: { projectId, type: "SCENE", title: "Scene A", orderIndex: 0 },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,10 @@ export default function SettingsPage() {
   const [consentLoading, setConsentLoading] = useState(true);
   const [exportingData, setExportingData] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/ai-settings")
@@ -163,10 +167,13 @@ export default function SettingsPage() {
   const handleHashnodeDisconnect = async () => {
     setHashnodeDisconnecting(true);
     try {
-      await fetch("/api/integrations/hashnode", { method: "DELETE" });
+      const res = await fetch("/api/integrations/hashnode", { method: "DELETE", headers: { "X-CSRF-Protection": "1" } });
+      if (!res.ok) throw new Error(`Hashnode disconnect failed: ${res.status}`);
       setHashnodeConnected(false);
       setHashnodeUsername(null);
       setHashnodeDisconnectOpen(false);
+    } catch (err) {
+      console.error("Failed to disconnect Hashnode", err);
     } finally {
       setHashnodeDisconnecting(false);
     }
@@ -179,7 +186,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/account/consent", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1" },
         body: JSON.stringify({ feature: "sentry_replay", consentGiven: allowed }),
       });
       if (!res.ok) throw new Error(`consent PUT failed: ${res.status}`);
@@ -215,11 +222,43 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDeleteDialogChange = (open: boolean) => {
+    setDeleteAccountOpen(open);
+    setDeleteConfirmEmail("");
+    setDeleteError(null);
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/auth/delete-account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1" },
+        body: JSON.stringify({ email: deleteConfirmEmail }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setDeleteError(data.error || "Deletion failed. Please try again.");
+        return;
+      }
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Failed to delete account:", err);
+      setDeleteError("Deletion failed. Please check your connection and try again.");
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   const handleGoogleDocsDisconnect = async () => {
     setGoogleDocsDisconnecting(true);
     try {
-      await fetch("/api/integrations/google-docs", { method: "DELETE" });
+      const res = await fetch("/api/integrations/google-docs", { method: "DELETE", headers: { "X-CSRF-Protection": "1" } });
+      if (!res.ok) throw new Error(`Google Docs disconnect failed: ${res.status}`);
       setGoogleDocsConnected(false);
+    } catch (err) {
+      console.error("Failed to disconnect Google Docs", err);
     } finally {
       setGoogleDocsDisconnecting(false);
     }
@@ -774,10 +813,63 @@ export default function SettingsPage() {
                   <p className="text-xs text-red-500 mt-2">{exportError}</p>
                 )}
               </div>
+              <div className="border-t border-border pt-4">
+                <p className="text-sm font-medium text-red-600 mb-1">Delete account</p>
+                <p className="text-xs text-text-muted mb-3">
+                  Permanently delete your account and all associated data (GDPR Article 17).
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteAccountOpen(true)}
+                  className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete my account
+                </Button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      <AlertDialog open={deleteAccountOpen} onOpenChange={handleDeleteDialogChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your account and all associated data including projects, universes, writing sessions, and settings. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-1 pb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Type your email address to confirm
+            </label>
+            <Input
+              type="email"
+              value={deleteConfirmEmail}
+              onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+              placeholder="your@email.com"
+              autoComplete="off"
+            />
+            {deleteError && <p className="text-xs text-red-500 mt-2">{deleteError}</p>}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteAccount();
+              }}
+              disabled={deletingAccount || !deleteConfirmEmail.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Delete my account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

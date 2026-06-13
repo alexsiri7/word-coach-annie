@@ -142,6 +142,33 @@ describe("GET /api/auth/export-data", () => {
     expect(profile).not.toHaveProperty("googleId");
   });
 
+  it("includes consents.json in export for authenticated user", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "u-consent", email: "consent@test.com", googleId: "g-consent" },
+    });
+    await testPrisma.userConsent.create({
+      data: {
+        userId: user.id,
+        feature: "sentry_replay",
+        consentGiven: false,
+      },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { GET } = await import("@/app/api/auth/export-data/route");
+    const res = await GET(makeRequest());
+    const buf = Buffer.from(await res.arrayBuffer());
+
+    const zip = await JSZip.loadAsync(buf);
+    const consentsFile = zip.file("consents.json");
+    expect(consentsFile).not.toBeNull();
+    const consents = JSON.parse(await consentsFile!.async("string"));
+    expect(consents).toHaveLength(1);
+    expect(consents[0].feature).toBe("sentry_replay");
+    expect(consents[0].consentGiven).toBe(false);
+    expect(consents[0]).toHaveProperty("updatedAt");
+  });
+
   it("sanitizes project titles in ZIP filenames", async () => {
     const user = await testPrisma.user.create({
       data: { id: "u4", email: "w@test.com", googleId: "g4" },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { StructureController } from "@/lib/controllers/structure";
+import { StructureController, ConflictError } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeHtml } from "@/lib/sanitize-server";
@@ -70,7 +70,7 @@ export async function POST(
     if (!access.authorized) return access.response;
 
     const body = await request.json();
-    const { content } = body;
+    const { content, contentHash } = body;
 
     if (content === undefined || content === null) {
       return NextResponse.json(
@@ -80,9 +80,15 @@ export async function POST(
     }
 
     const sanitizedContent = sanitizeHtml(content);
-    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent);
+    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent, contentHash);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
+    if (error instanceof ConflictError) {
+      return NextResponse.json(
+        { conflict: true, content: error.serverContent },
+        { status: 409 }
+      );
+    }
     logger.error("Failed to save content", error);
     return NextResponse.json(
       { error: "Internal server error" },

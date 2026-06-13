@@ -81,6 +81,12 @@ function makeRateLimitResponse(
  * - Feedback submission (POST /api/feedback): 5/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
+async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
+    const result = await checkRateLimit(key, config);
+    if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
+    return null;
+}
+
 async function applyRateLimit(
     request: NextRequest,
     userKey: string
@@ -98,12 +104,6 @@ async function applyRateLimit(
     }
 
     const method = request.method;
-
-    async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
-        const result = await checkRateLimit(key, config);
-        if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
-        return null;
-    }
 
     if (pathname === "/api/chat" || pathname.startsWith("/api/chat/"))
         return tryLimit(`chat:${userKey}`, RATE_LIMITS.chat);
@@ -180,7 +180,6 @@ export async function middleware(request: NextRequest) {
 
                 Sentry.setUser({
                     id: mcpSession.userId,
-                    email: mcpSession.email,
                 });
 
                 const requestHeaders = new Headers(request.headers);
@@ -212,7 +211,6 @@ export async function middleware(request: NextRequest) {
             // Set Sentry user context for error attribution
             Sentry.setUser({
                 id: session.userId,
-                email: session.email,
             });
 
             // Forward userId to route handlers via request headers
@@ -225,7 +223,7 @@ export async function middleware(request: NextRequest) {
         // Fall back to legacy API_TOKEN session cookie
         if (apiToken) {
             const expected = await deriveSessionToken(apiToken);
-            if (sessionCookie === expected) {
+            if (safeEqual(sessionCookie, expected)) {
                 // Rate limit legacy sessions by token
                 const rateLimited = await applyRateLimit(request, "apitoken");
                 if (rateLimited) return rateLimited;

@@ -184,7 +184,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F18.2: Service worker with offline fallback page
 - F18.3: Network-first caching for API routes (24h); cache-first for fonts (1 year)
 - F18.4: Offline write queue (IndexedDB) — operations queued when disconnected, synced on reconnect
-- F18.5: Offline indicator and sync status toast in UI
+- F18.5: Offline indicator and sync status chip in UI (four states: offline, syncing, conflict, up-to-date); conflict resolver modal for manual resolution of 409 conflicts
 
 ### F19: Dark Mode & Theme Support
 - F19.1: Light/dark theme toggle

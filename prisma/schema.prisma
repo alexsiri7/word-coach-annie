@@ -72,7 +72,7 @@ model Project {
   storyObjects     StoryObject[]
   structureNodes   StructureNode[]
   universe         Universe?         @relation(fields: [universeId], references: [id])
-  user             User?             @relation(fields: [userId], references: [id])
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectType      String            @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
   isSample         Boolean           @default(false)
   conversations    Conversation[]
@@ -177,7 +177,7 @@ model Universe {
   projects         Project[]
   worldObjects     WorldObject[]
   googleDocExports GoogleDocExport[]
-  user             User?             @relation(fields: [userId], references: [id])
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

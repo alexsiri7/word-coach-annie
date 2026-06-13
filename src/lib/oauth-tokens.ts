@@ -37,6 +37,7 @@ export async function createMcpToken(
     .setAudience(JWT_AUDIENCES[payload.type])
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
+    .setJti(crypto.randomUUID())
     .sign(key);
 }
 
@@ -44,7 +45,7 @@ export async function createMcpToken(
 export async function verifyMcpToken(
   token: string,
   expectedType: "mcp_access" | "mcp_refresh"
-): Promise<{ userId: string; email: string; clientId: string } | null> {
+): Promise<{ userId: string; email: string; clientId: string; jti: string | undefined; exp: number | undefined } | null> {
   try {
     const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key, {
@@ -64,6 +65,8 @@ export async function verifyMcpToken(
       userId: payload.userId as string,
       email: payload.email as string,
       clientId: payload.clientId as string,
+      jti: payload.jti as string | undefined,
+      exp: payload.exp as number | undefined,
     };
   } catch (err) {
     // Expected: expired, tampered, wrong algorithm, mismatched issuer/audience — treat as invalid.

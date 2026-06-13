@@ -90,6 +90,7 @@ const withAnalyzer = withBundleAnalyzer({
 const pwaConfig = withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
+  customWorkerSrc: "src/worker",
   cacheOnFrontEndNav: true,
   fallbacks: {
     document: "/_offline",
@@ -108,7 +109,7 @@ const pwaConfig = withPWA({
       // Cache Google Fonts stylesheets
       {
         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-        handler: "StaleWhileRevalidate",
+        handler: "StaleWhileRevalidate" as const,
         options: {
           cacheName: "google-fonts-stylesheets",
           expiration: {
@@ -123,12 +124,31 @@ const pwaConfig = withPWA({
       // Cache Google Fonts webfont files
       {
         urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-        handler: "CacheFirst",
+        handler: "CacheFirst" as const,
         options: {
           cacheName: "google-fonts-webfonts",
           expiration: {
             maxEntries: 16,
             maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      // App shell routes — serve from cache first, revalidate in background.
+      // Placed before the default spread so it overrides the default document/pages
+      // handler (which uses NetworkFirst and requires a network attempt offline).
+      {
+        urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+          request.mode === "navigate" &&
+          (url.pathname === "/" || url.pathname.startsWith("/projects/")),
+        handler: "StaleWhileRevalidate" as const,
+        options: {
+          cacheName: "app-shell",
+          expiration: {
+            maxEntries: 32,
+            maxAgeSeconds: 24 * 60 * 60, // 24 hours
           },
           cacheableResponse: {
             statuses: [0, 200],

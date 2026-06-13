@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
+import * as Sentry from "@sentry/nextjs";
 
 vi.mock("@sentry/nextjs", () => ({
     setUser: vi.fn(),
@@ -11,6 +12,7 @@ import {
     verifyProjectReadAccess,
     verifyUniverseAccess,
     verifyProjectAccessByNode,
+    validateCsrfHeader,
 } from "@/lib/api-auth";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
@@ -28,6 +30,10 @@ async function createTestUser(id: string) {
 
 describe("api-auth", () => {
     describe("getCurrentUserId", () => {
+        beforeEach(() => {
+            vi.clearAllMocks();
+        });
+
         it("returns userId from x-user-id header", () => {
             const headers = new Headers({ "x-user-id": "user-abc", "x-user-email": "abc@test.com" });
             const request = { headers } as unknown as import("next/server").NextRequest;
@@ -38,6 +44,16 @@ describe("api-auth", () => {
             const headers = new Headers();
             const request = { headers } as unknown as import("next/server").NextRequest;
             expect(getCurrentUserId(request)).toBeNull();
+        });
+
+        it("should call Sentry.setUser with id only (no email)", () => {
+            const headers = new Headers({ "x-user-id": "user-abc", "x-user-email": "abc@test.com" });
+            const request = { headers } as unknown as import("next/server").NextRequest;
+            getCurrentUserId(request);
+            expect(Sentry.setUser).toHaveBeenCalledWith({ id: "user-abc" });
+            expect(Sentry.setUser).not.toHaveBeenCalledWith(
+                expect.objectContaining({ email: expect.any(String) })
+            );
         });
     });
 
@@ -247,6 +263,42 @@ describe("api-auth", () => {
             if (!result.authorized) {
                 expect(result.response.status).toBe(403);
             }
+        });
+    });
+
+    describe("validateCsrfHeader", () => {
+        it("returns null when X-CSRF-Protection header is '1'", () => {
+            const headers = new Headers({ "x-csrf-protection": "1" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).toBeNull();
+        });
+
+        it("returns 403 when X-CSRF-Protection header is absent", async () => {
+            const headers = new Headers();
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
+        });
+
+        it("returns 403 when X-CSRF-Protection header has wrong value", async () => {
+            const headers = new Headers({ "x-csrf-protection": "true" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
+        });
+
+        it("returns 403 when X-CSRF-Protection header is empty string", async () => {
+            const headers = new Headers({ "x-csrf-protection": "" });
+            const request = { headers, url: "http://localhost/test" } as unknown as import("next/server").NextRequest;
+            const result = validateCsrfHeader(request);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe(403);
+            expect(await result!.json()).toEqual({ error: "Forbidden" });
         });
     });
 });
