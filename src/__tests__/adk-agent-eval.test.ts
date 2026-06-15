@@ -287,10 +287,12 @@ describe("Agent eval: single tool use", () => {
 
     expect(result.toolLog).toHaveLength(1);
     expect(result.toolLog[0].tool).toBe("list_projects");
-    expect(JSON.parse(result.toolLog[0].result)).toEqual([
-      { id: "proj-1", title: "Test Novel" },
-      { id: "proj-2", title: "Short Stories" },
-    ]);
+    expect(JSON.parse(result.toolLog[0].result)).toEqual({
+      results: [
+        { id: "proj-1", title: "Test Novel" },
+        { id: "proj-2", title: "Short Stories" },
+      ],
+    });
     expect(result.finalContent).toContain("2 projects");
   });
 
