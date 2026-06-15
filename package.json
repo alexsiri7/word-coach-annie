@@ -49,7 +49,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^10.56.0",
     "@tiptap/core": "^3.26.0",
-    "@tiptap/extension-bubble-menu": "^3.26.0",
+    "@tiptap/extension-bubble-menu": "^3.26.1",
     "@tiptap/extension-highlight": "^3.26.0",
     "@tiptap/extension-placeholder": "^3.26.0",
     "@tiptap/extension-underline": "^3.26.0",
