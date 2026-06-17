@@ -169,3 +169,13 @@ GHSA-gv7w-rqvm-qjhr
 # App risk: LOW — no exposed gRPC server; only used as gRPC client in transitive SDK code.
 GHSA-5375-pq7m-f5r2
 GHSA-99f4-grh7-6pcq
+#
+# Source: @opentelemetry/core (via @sentry/nextjs -> @opentelemetry/* transitive chain)
+# Justification: @opentelemetry/core unbounded memory allocation in W3C Baggage propagation
+# requires an attacker to send crafted HTTP headers with very large baggage values.
+# This app is behind standard Next.js HTTP handling; malicious baggage headers would
+# require reaching the OpenTelemetry instrumentation layer (Sentry).
+# Upgrade path: fix requires @opentelemetry/exporter-trace-otlp-proto major version bump.
+# App risk: LOW — moderate severity, requires targeted header manipulation; Sentry is
+# the only consumer of the OpenTelemetry SDK in this app.
+GHSA-8988-4f7v-96qf

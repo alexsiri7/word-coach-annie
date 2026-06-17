@@ -66,9 +66,9 @@ export async function getCachedContent(
 ): Promise<AnnieDBSchema["contentVersions"]["value"] | undefined> {
   const versions = await idbGetContentByNode(nodeId);
   if (versions.length === 0) return undefined;
-  return versions.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )[0];
+  return versions.reduce((latest, v) =>
+    new Date(v.createdAt) > new Date(latest.createdAt) ? v : latest
+  );
 }
 
 /** Return all cached story objects for a project. */

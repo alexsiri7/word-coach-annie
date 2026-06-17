@@ -11,6 +11,7 @@ permissions:
 env:
   MEMORY_THRESHOLD_PCT: 80
   CPU_THRESHOLD_PCT: 80
+  MEMORY_LIMIT_MB: 512 # Railway Hobby plan default; update if plan is upgraded
 
 jobs:
   check-resources:
@@ -33,26 +34,7 @@ jobs:
             exit 0
           fi
 
-          # Query the memory limit for this service instance
-          LIMIT_RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"query\": \"query { serviceInstance(serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\") { memoryLimitMB } }\"
-            }")
-
-          API_ERRORS=$(echo "$LIMIT_RESPONSE" | jq -r '.errors // empty')
-          if [ -n "$API_ERRORS" ]; then
-            echo "::error::Railway API returned errors querying service instance: $API_ERRORS"
-            exit 1
-          fi
-
-          MEMORY_LIMIT_MB=$(echo "$LIMIT_RESPONSE" | jq -r '.data.serviceInstance.memoryLimitMB // empty')
-          if [ -z "$MEMORY_LIMIT_MB" ] || [ "$MEMORY_LIMIT_MB" = "null" ]; then
-            # Fallback: Railway Hobby default is 512 MB
-            MEMORY_LIMIT_MB=512
-            echo "::warning::Could not query memoryLimitMB, using default ${MEMORY_LIMIT_MB} MB"
-          fi
+          # Railway removed memoryLimitMB from the ServiceInstance API — use the configurable limit
           echo "Memory limit: ${MEMORY_LIMIT_MB} MB"
 
           # Query metrics for the last 30 minutes
