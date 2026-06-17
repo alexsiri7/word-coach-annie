@@ -11,6 +11,7 @@ permissions:
 env:
   MEMORY_THRESHOLD_PCT: 80
   CPU_THRESHOLD_PCT: 80
+  MEMORY_LIMIT_MB: 512 # Railway Hobby plan default; update if plan is upgraded
 
 jobs:
   check-resources:
@@ -33,8 +34,7 @@ jobs:
             exit 0
           fi
 
-          # Railway removed memoryLimitMB from the ServiceInstance API — use the Hobby plan default
-          MEMORY_LIMIT_MB=512
+          # Railway removed memoryLimitMB from the ServiceInstance API — use the configurable limit
           echo "Memory limit: ${MEMORY_LIMIT_MB} MB"
 
           # Query metrics for the last 30 minutes
