@@ -46,7 +46,7 @@ jobs:
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"query\": \"query { metrics(projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", startDate: \\\"$START\\\", endDate: \\\"$END\\\", measurements: [MEMORY_USAGE_GB, CPU_USAGE]) { measurements { metric values { value } } } }\"
+              \"query\": \"query { metrics(projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", startDate: \\\"$START\\\", endDate: \\\"$END\\\", measurements: [MEMORY_USAGE_GB, CPU_USAGE]) { measurement { metric values { value } } } }\"
             }")
 
           API_ERRORS=$(echo "$METRICS_RESPONSE" | jq -r '.errors // empty')
@@ -57,12 +57,12 @@ jobs:
 
           # Extract max memory usage (GB) and max CPU usage (%)
           MEMORY_GB=$(echo "$METRICS_RESPONSE" | jq -r '
-            [.data.metrics.measurements[]
+            [.data.metrics.measurement[]
               | select(.metric == "MEMORY_USAGE_GB")
               | .values[].value] | if length == 0 then 0 else max end')
 
           CPU_PCT=$(echo "$METRICS_RESPONSE" | jq -r '
-            [.data.metrics.measurements[]
+            [.data.metrics.measurement[]
               | select(.metric == "CPU_USAGE")
               | .values[].value] | if length == 0 then 0 else max end')
 
