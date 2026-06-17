@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Kick off archive population in the background; archiver writes to passthrough
     // as each project is appended and finalized.
-    (async () => {
+    async function populateArchive() {
       for (const project of projects) {
         const data = await exportProjectJson(project.id);
         const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
         });
       }
       await archive.finalize();
-    })().catch((err) => {
+    }
+
+    populateArchive().catch((err) => {
       logger.error("GET /api/projects/export-all: archive error", err);
       passthrough.destroy(err);
     });
