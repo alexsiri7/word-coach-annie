@@ -36,6 +36,14 @@ export async function GET(request: NextRequest) {
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
 
+    // Forward archiver internal errors (EventEmitter 'error' events) to the
+    // passthrough stream. Without this listener, Node.js would throw an
+    // unhandled 'error' event, crashing the server process.
+    archive.on("error", (err) => {
+      logger.error("GET /api/projects/export-all: archiver internal error", err);
+      passthrough.destroy(err);
+    });
+
     // Kick off archive population in the background; archiver writes to passthrough
     // as each project is appended and finalized.
     (async () => {
@@ -52,12 +60,22 @@ export async function GET(request: NextRequest) {
       passthrough.destroy(err);
     });
 
-    // Wrap the Node.js PassThrough in a Web ReadableStream
+    // Wrap the Node.js PassThrough in a Web ReadableStream.
+    // Note: this uses a push model without backpressure — under a slow client,
+    // chunks may accumulate in the Web Streams internal queue. Acceptable given
+    // the primary goal is avoiding full-buffer OOM; true backpressure is a
+    // follow-up concern.
     const readable = new ReadableStream({
       start(controller) {
         passthrough.on("data", (chunk: Buffer) => controller.enqueue(chunk));
         passthrough.on("end", () => controller.close());
         passthrough.on("error", (err) => controller.error(err));
+      },
+      cancel() {
+        // Called by the Web Streams runtime when the client disconnects.
+        // Destroying the PassThrough signals the archiver pipeline to stop,
+        // releasing Prisma connections and Node.js stream resources.
+        passthrough.destroy();
       },
     });
 
