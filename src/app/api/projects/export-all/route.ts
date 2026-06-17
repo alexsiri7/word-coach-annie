@@ -28,33 +28,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No projects found" }, { status: 404 });
     }
 
-    // Create ZIP archive
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `annie-export-${timestamp}.zip`;
+
+    // Stream the ZIP directly — never buffer the whole archive in memory.
     const archive = archiver("zip", { zlib: { level: 9 } });
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
 
-    // Add each project as a JSON file
-    for (const project of projects) {
-      const data = await exportProjectJson(project.id);
-      const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
-      archive.append(JSON.stringify(data, null, 2), {
-        name: `${safeTitle}.json`,
-      });
+    // Forward archiver internal errors (EventEmitter 'error' events) to the
+    // passthrough stream. Without this listener, Node.js would throw an
+    // unhandled 'error' event, crashing the server process.
+    archive.on("error", (err) => {
+      logger.error("GET /api/projects/export-all: archiver internal error", err);
+      passthrough.destroy(err);
+    });
+
+    // Kick off archive population in the background; archiver writes to passthrough
+    // as each project is appended and finalized.
+    async function populateArchive() {
+      for (const project of projects) {
+        const data = await exportProjectJson(project.id);
+        const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
+        archive.append(JSON.stringify(data, null, 2), {
+          name: `${safeTitle}.json`,
+        });
+      }
+      await archive.finalize();
     }
 
-    await archive.finalize();
+    populateArchive().catch((err) => {
+      logger.error("GET /api/projects/export-all: archive error", err);
+      passthrough.destroy(err);
+    });
 
-    // Collect the stream into a buffer
-    const chunks: Buffer[] = [];
-    for await (const chunk of passthrough) {
-      chunks.push(Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
+    // Wrap the Node.js PassThrough in a Web ReadableStream.
+    // Note: this uses a push model without backpressure — under a slow client,
+    // chunks may accumulate in the Web Streams internal queue. Acceptable given
+    // the primary goal is avoiding full-buffer OOM; true backpressure is a
+    // follow-up concern.
+    const readable = new ReadableStream({
+      start(controller) {
+        passthrough.on("data", (chunk: Buffer) => controller.enqueue(chunk));
+        passthrough.on("end", () => controller.close());
+        passthrough.on("error", (err) => controller.error(err));
+      },
+      cancel() {
+        // Called by the Web Streams runtime when the client disconnects.
+        // Destroying the PassThrough signals the archiver pipeline to stop,
+        // releasing Prisma connections and Node.js stream resources.
+        passthrough.destroy();
+      },
+    });
 
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `annie-export-${timestamp}.zip`;
-
-    return new NextResponse(buffer, {
+    return new Response(readable, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${filename}"`,

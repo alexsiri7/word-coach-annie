@@ -36,6 +36,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
+# Cap V8 old-space at 400 MB so Node.js GCs before hitting the 512 MB container limit.
+# Adjust if Railway plan is upgraded (rule of thumb: ~80% of container RAM).
+ENV NODE_OPTIONS="--max-old-space-size=400"
 
 # Next.js standalone output includes only what's needed
 COPY --from=builder /app/.next/standalone ./
