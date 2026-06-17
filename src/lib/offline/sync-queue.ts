@@ -133,13 +133,9 @@ export async function replayPendingOps(): Promise<void> {
       await updatePendingOp(op.id!, { status: "in-flight" });
 
       try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-
         const res = await fetch(op.url, {
           method: op.method,
-          headers,
+          headers: { "Content-Type": "application/json" },
           body: op.body,
         });
 
