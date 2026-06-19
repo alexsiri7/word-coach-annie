@@ -96,14 +96,14 @@ describe("GET /api/projects/export-all", () => {
     const res = await GET(makeGetRequest());
 
     // Headers are already flushed as 200 (streaming response); consume the body
-    // to allow the background IIFE to run and error to propagate.
+    // to allow the background populateArchive() to run and error to propagate.
     try {
       await res.arrayBuffer();
     } catch {
       // Stream error during body consumption is expected when the archive fails mid-stream.
     }
 
-    // Give the async IIFE's .catch() handler a chance to execute
+    // Give populateArchive()'s .catch() handler a chance to execute
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
