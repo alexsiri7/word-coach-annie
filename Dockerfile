@@ -37,9 +37,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 # Cap V8 old-space at 380 MB. Node.js total RSS also includes young-gen, native bindings
-# (Prisma, OpenSSL, libuv), and OS overhead (~20–50 MB on top of old-space). Setting
-# old-space to ~74% of container RAM keeps total RSS under the 80% alert threshold.
-# Adjust if Railway plan is upgraded (keep old-space ≤ 74% of container RAM).
+# (Prisma, OpenSSL, libuv), and OS overhead (~19–30 MB observed in production). Setting
+# old-space to ~74% of container RAM keeps total RSS at ~78%, safely below the 80%
+# alert threshold. Adjust if Railway plan is upgraded (keep old-space ≤ 74% of container RAM).
 ENV NODE_OPTIONS="--max-old-space-size=380"
 
 # Next.js standalone output includes only what's needed
