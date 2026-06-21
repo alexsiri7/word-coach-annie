@@ -39,83 +39,107 @@ export async function GET(request: NextRequest) {
         : Promise.resolve([]),
     ]);
 
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `annie-full-export-${timestamp}.zip`;
+
+    // Stream the ZIP directly — never buffer the whole archive in memory.
     const archive = archiver("zip", { zlib: { level: 9 } });
     const passthrough = new PassThrough();
     archive.pipe(passthrough);
 
-    if (user) {
-      // Add profile (safe fields only)
-      archive.append(
-        JSON.stringify(
-          {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            picture: user.picture,
-            createdAt: user.createdAt.toISOString(),
-            updatedAt: user.updatedAt.toISOString(),
-          },
-          null,
-          2
-        ),
-        { name: "profile.json" }
-      );
+    // Forward archiver internal errors to the passthrough stream.
+    // Without this listener, Node.js would throw an unhandled 'error' event,
+    // crashing the server process.
+    archive.on("error", (err) => {
+      logger.error("GET /api/auth/export-data: archiver internal error", err);
+      passthrough.destroy(err);
+    });
 
-      // Add AI settings (omit apiKey for security)
-      const safeAiSettings = aiSettings
-        ? {
-            model: aiSettings.model,
-            customInstructions: aiSettings.customInstructions,
-            coachingStyle: aiSettings.coachingStyle,
-            responseLength: aiSettings.responseLength,
-            chatWindowSize: aiSettings.chatWindowSize,
-            messagesUntilCompression: aiSettings.messagesUntilCompression,
-            compressionModel: aiSettings.compressionModel,
-          }
-        : null;
-      archive.append(JSON.stringify(safeAiSettings, null, 2), {
-        name: "ai-settings.json",
-      });
+    // Kick off archive population in the background; archiver writes to passthrough
+    // as each entry is appended and finalized.
+    async function populateArchive() {
+      if (user) {
+        // Add profile (safe fields only)
+        archive.append(
+          JSON.stringify(
+            {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              picture: user.picture,
+              createdAt: user.createdAt.toISOString(),
+              updatedAt: user.updatedAt.toISOString(),
+            },
+            null,
+            2
+          ),
+          { name: "profile.json" }
+        );
 
-      archive.append(
-        JSON.stringify(
-          consents.map((c) => ({
-            feature: c.feature,
-            consentGiven: c.consentGiven,
-            updatedAt: c.updatedAt.toISOString(),
-          })),
-          null,
-          2
-        ),
-        { name: "consents.json" }
-      );
+        // Add AI settings (omit apiKey for security)
+        const safeAiSettings = aiSettings
+          ? {
+              model: aiSettings.model,
+              customInstructions: aiSettings.customInstructions,
+              coachingStyle: aiSettings.coachingStyle,
+              responseLength: aiSettings.responseLength,
+              chatWindowSize: aiSettings.chatWindowSize,
+              messagesUntilCompression: aiSettings.messagesUntilCompression,
+              compressionModel: aiSettings.compressionModel,
+            }
+          : null;
+        archive.append(JSON.stringify(safeAiSettings, null, 2), {
+          name: "ai-settings.json",
+        });
+
+        archive.append(
+          JSON.stringify(
+            consents.map((c) => ({
+              feature: c.feature,
+              consentGiven: c.consentGiven,
+              updatedAt: c.updatedAt.toISOString(),
+            })),
+            null,
+            2
+          ),
+          { name: "consents.json" }
+        );
+      }
+
+      for (const project of projects) {
+        const data = await exportProjectJson(project.id);
+        const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
+        archive.append(JSON.stringify(data, null, 2), {
+          name: `projects/${safeTitle}.json`,
+        });
+      }
+      await archive.finalize();
     }
-
-    for (const project of projects) {
-      const data = await exportProjectJson(project.id);
-      const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
-      archive.append(JSON.stringify(data, null, 2), {
-        name: `projects/${safeTitle}.json`,
-      });
-    }
-
-    await archive.finalize();
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of passthrough) {
-      chunks.push(Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
-
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `annie-full-export-${timestamp}.zip`;
 
     logger.info("GET /api/auth/export-data: exported data", {
       userId: userId ?? "api-token",
       mode: isGoogleAuthMode() ? "google-auth" : "api-token",
     });
 
-    return new NextResponse(buffer, {
+    populateArchive().catch((err) => {
+      logger.error("GET /api/auth/export-data: archive error", err);
+      passthrough.destroy(err);
+    });
+
+    // Wrap the Node.js PassThrough in a Web ReadableStream.
+    const readable = new ReadableStream({
+      start(controller) {
+        passthrough.on("data", (chunk: Buffer) => controller.enqueue(chunk));
+        passthrough.on("end", () => controller.close());
+        passthrough.on("error", (err) => controller.error(err));
+      },
+      cancel() {
+        // Called by the Web Streams runtime when the client disconnects.
+        passthrough.destroy();
+      },
+    });
+
+    return new Response(readable, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${filename}"`,
