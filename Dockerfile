@@ -36,11 +36,11 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Cap V8 old-space at 380 MB. Node.js total RSS also includes young-gen, native bindings
-# (Prisma, OpenSSL, libuv), and OS overhead (~19–30 MB observed in production). Setting
-# old-space to ~74% of container RAM keeps total RSS at ~78%, safely below the 80%
-# alert threshold. Adjust if Railway plan is upgraded (keep old-space ≤ 74% of container RAM).
-ENV NODE_OPTIONS="--max-old-space-size=380"
+# Cap V8 old-space at 420 MB. At 380 MB baseline RSS was ~399 MB, leaving only ~113 MB
+# before the 512 MB container OOM limit — insufficient under transient load. 420 MB keeps
+# estimated RSS at ~439 MB (~86% of container RAM) with ~73 MB headroom.
+# If still OOM-killing, upgrade Railway plan to 1 GB RAM.
+ENV NODE_OPTIONS="--max-old-space-size=420"
 
 # Next.js standalone output includes only what's needed
 COPY --from=builder /app/.next/standalone ./
@@ -59,4 +59,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD node scripts/migrate.mjs && node server.js
+CMD ["sh", "-c", "node scripts/migrate.mjs && exec node server.js"]
