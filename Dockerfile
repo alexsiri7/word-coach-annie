@@ -36,10 +36,12 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Cap V8 old-space at 420 MB. At 380 MB baseline RSS was ~399 MB, leaving only ~113 MB
-# before the 512 MB container OOM limit — insufficient under transient load. 420 MB keeps
-# estimated RSS at ~439 MB (~86% of container RAM) with ~73 MB headroom.
-# If still OOM-killing, upgrade Railway plan to 1 GB RAM.
+# Cap V8 old-space at 420 MB. At 380 MB, baseline RSS was ~399 MB (~78% of container RAM)
+# but OOM kills occurred under transient load — the application's working set exceeds 380 MB.
+# 420 MB pushes estimated RSS to ~439 MB (~86% of container RAM), deliberately exceeding the
+# prior 80% alert threshold — this is accepted given the alternative is a crashed server.
+# Headroom: ~73 MB before the 512 MB container OOM limit.
+# If still OOM-killing, upgrade Railway plan to 1 GB RAM (then set old-space ≤ 74% of new RAM).
 ENV NODE_OPTIONS="--max-old-space-size=420"
 
 # Next.js standalone output includes only what's needed
