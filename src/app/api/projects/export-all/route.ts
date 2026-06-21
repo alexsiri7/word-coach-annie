@@ -16,10 +16,8 @@ export async function GET(request: NextRequest) {
       logger.warn("GET /api/projects/export-all: rejected — userId is null");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const where = userId ? { userId } : {};
-
     const projects = await prisma.project.findMany({
-      where,
+      where: userId ? { userId } : {},
       select: { id: true, title: true },
       orderBy: { title: "asc" },
     });
