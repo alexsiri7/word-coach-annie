@@ -114,12 +114,11 @@ export async function GET(request: NextRequest) {
         });
       }
       await archive.finalize();
+      logger.info("GET /api/auth/export-data: exported data", {
+        userId: userId ?? "api-token",
+        mode: isGoogleAuthMode() ? "google-auth" : "api-token",
+      });
     }
-
-    logger.info("GET /api/auth/export-data: exported data", {
-      userId: userId ?? "api-token",
-      mode: isGoogleAuthMode() ? "google-auth" : "api-token",
-    });
 
     populateArchive().catch((err) => {
       logger.error("GET /api/auth/export-data: archive error", err);
@@ -127,6 +126,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Wrap the Node.js PassThrough in a Web ReadableStream.
+    // Note: this uses a push model without backpressure — under a slow client,
+    // chunks may accumulate in the Web Streams internal queue. Acceptable given
+    // the primary goal is avoiding full-buffer OOM; true backpressure is a
+    // follow-up concern.
     const readable = new ReadableStream({
       start(controller) {
         passthrough.on("data", (chunk: Buffer) => controller.enqueue(chunk));
@@ -135,6 +138,8 @@ export async function GET(request: NextRequest) {
       },
       cancel() {
         // Called by the Web Streams runtime when the client disconnects.
+        // Destroying the PassThrough signals the archiver pipeline to stop,
+        // releasing Prisma connections and Node.js stream resources.
         passthrough.destroy();
       },
     });

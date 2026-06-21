@@ -26,6 +26,8 @@ vi.mock("@/lib/logger", () => ({
 
 import { getCurrentUserId } from "@/lib/api-auth";
 import { isGoogleAuthMode } from "@/lib/auth";
+import { exportProjectJson } from "@/lib/export-json";
+import { logger } from "@/lib/logger";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -167,6 +169,35 @@ describe("GET /api/auth/export-data", () => {
     expect(consents[0].feature).toBe("sentry_replay");
     expect(consents[0].consentGiven).toBe(false);
     expect(consents[0]).toHaveProperty("updatedAt");
+  });
+
+  it("logs error when exportProjectJson throws mid-archive", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "u-err", email: "err@test.com", googleId: "g-err" },
+    });
+    await testPrisma.project.create({
+      data: { title: "Fail Project", author: "Author", userId: user.id },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(exportProjectJson).mockRejectedValueOnce(new Error("DB timeout"));
+
+    const { GET } = await import("@/app/api/auth/export-data/route");
+    const res = await GET(makeRequest());
+
+    // Headers are already flushed as 200 (streaming); consume body to let background work run.
+    try {
+      await res.arrayBuffer();
+    } catch {
+      // Stream error on consumption is expected when archive fails mid-stream.
+    }
+
+    // Allow populateArchive()'s .catch() handler to execute.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+      expect.stringContaining("archive error"),
+      expect.any(Error)
+    );
   });
 
   it("sanitizes project titles in ZIP filenames", async () => {
