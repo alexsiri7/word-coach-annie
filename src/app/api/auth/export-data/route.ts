@@ -132,9 +132,26 @@ export async function GET(request: NextRequest) {
     // follow-up concern.
     const readable = new ReadableStream({
       start(controller) {
-        passthrough.on("data", (chunk: Buffer) => controller.enqueue(chunk));
-        passthrough.on("end", () => controller.close());
-        passthrough.on("error", (err) => controller.error(err));
+        passthrough.on("data", (chunk: Buffer) => {
+          try {
+            controller.enqueue(chunk);
+          } catch (err) {
+            // Stream already cancelled/errored (client disconnected) — stop feeding it.
+            passthrough.destroy();
+            // Log if this is not the expected already-closed TypeError, for debuggability.
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes("Controller is already closed") && !msg.includes("Invalid state")) {
+              logger.error("GET /api/auth/export-data: unexpected error in stream enqueue", err);
+            }
+          }
+        });
+        passthrough.on("end", () => {
+          try { controller.close(); } catch { /* already closed */ }
+        });
+        passthrough.on("error", (err) => {
+          logger.error("GET /api/auth/export-data: export stream passthrough error", err);
+          try { controller.error(err); } catch { /* controller already in errored state */ }
+        });
       },
       cancel() {
         // Called by the Web Streams runtime when the client disconnects.
