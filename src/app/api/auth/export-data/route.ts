@@ -145,7 +145,9 @@ export async function GET(request: NextRequest) {
             }
           }
         });
-        passthrough.on("end", () => { try { controller.close(); } catch { /* already closed */ } });
+        passthrough.on("end", () => {
+          try { controller.close(); } catch { /* already closed */ }
+        });
         passthrough.on("error", (err) => {
           logger.error("GET /api/auth/export-data: export stream passthrough error", err);
           try { controller.error(err); } catch { /* controller already in errored state */ }
