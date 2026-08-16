@@ -72,6 +72,8 @@ describe("POST /api/auth/refresh", () => {
             expect(setCookie).toContain("annie_session=fresh-session-jwt");
             expect(setCookie).toContain("HttpOnly");
             expect(setCookie).toContain("Max-Age=3600");
+            expect(setCookie).toContain("SameSite=Lax");
+            expect(setCookie).toContain("Path=/");
             // Does NOT try the refresh token path
             expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
         });

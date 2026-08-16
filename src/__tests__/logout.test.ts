@@ -94,6 +94,31 @@ describe("POST /api/auth/logout", () => {
         expect(setCookie).toContain("annie_refresh=;");
     });
 
+    it("should revoke both session and refresh token jtis when both cookies are present", async () => {
+        mockVerifySessionToken.mockResolvedValueOnce({
+            userId: "u1",
+            email: "u@test.com",
+            name: "U",
+            jti: "session-jti-789",
+        });
+        mockVerifyRefreshToken.mockResolvedValueOnce({
+            userId: "u1",
+            email: "u@test.com",
+            name: "U",
+            jti: "refresh-jti-101",
+        });
+        const { NextRequest } = await import("next/server");
+        const req = new NextRequest("http://localhost/api/auth/logout", {
+            method: "POST",
+            headers: { cookie: "annie_session=valid-session; annie_refresh=valid-refresh" },
+        });
+        const response = await POST(req);
+        expect(response.status).toBe(200);
+        expect(revokeToken).toHaveBeenCalledTimes(2);
+        expect(revokeToken).toHaveBeenCalledWith("session-jti-789", "u1", expect.any(Date));
+        expect(revokeToken).toHaveBeenCalledWith("refresh-jti-101", "u1", expect.any(Date));
+    });
+
     it("should clear cookies and not attempt revocation when no cookies are present", async () => {
         mockVerifySessionToken.mockResolvedValueOnce(null);
         const { NextRequest } = await import("next/server");

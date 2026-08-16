@@ -68,7 +68,8 @@ export async function getJwtKey(): Promise<CryptoKey> {
 
 /**
  * Payload shape for long-lived refresh tokens.
- * Intentionally minimal — refresh tokens only identify the user and carry a jti.
+ * Carries user identity so the refresh endpoint can mint new session tokens
+ * without a database round-trip.
  */
 export interface RefreshPayload {
     userId: string;

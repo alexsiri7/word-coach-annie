@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isAllowedRedirect } from "@/lib/auth";
 
 function sanitizeRedirect(from: string | null): string {
     if (!from) return "/";
@@ -29,8 +30,8 @@ function LoginForm() {
         fetch("/api/auth/refresh", { method: "POST" })
             .then((res) => {
                 if (res.ok) {
-                    const from = sanitizeRedirect(searchParams.get("from"));
-                    router.replace(from);
+                    const from = searchParams.get("from");
+                    router.replace(from && isAllowedRedirect(from) ? from : "/");
                 } else {
                     // 401 → refresh token missing/expired/revoked; show login form.
                     setCheckingRefresh(false);

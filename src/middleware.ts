@@ -35,11 +35,11 @@ const PUBLIC_PATHS = [
     "/api/auth/logout",
     "/api/auth/google",
     "/api/auth/me",
-    // /api/auth/refresh authenticates via its session cookie directly in the
-    // Node.js route handler (blocklist check runs there). Marking it public
-    // prevents a chicken-and-egg redirect: a near-expired token that would
-    // fail the Edge middleware's verifySessionToken clock must still be able
-    // to reach the refresh endpoint.
+    // /api/auth/refresh authenticates via its session/refresh cookies directly
+    // in the Node.js route handler (blocklist check runs there). Marking it
+    // public prevents a chicken-and-egg redirect: a near-expired token that
+    // would fail the Edge middleware's verifySessionToken clock must still be
+    // able to reach the refresh endpoint.
     "/api/auth/refresh",
     "/login",
     "/landing",
@@ -148,7 +148,7 @@ export async function middleware(request: NextRequest) {
     // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
     // This prevents brute-force attacks on /api/auth/login even though that path is public.
     const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-    if (pathname === "/api/auth/login" && !rateLimitBypassed) {
+    if ((pathname === "/api/auth/login" || pathname === "/api/auth/refresh") && !rateLimitBypassed) {
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
         const result = await checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {
