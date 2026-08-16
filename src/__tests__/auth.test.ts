@@ -6,8 +6,6 @@ import {
     REFRESH_MAX_AGE,
     createSessionToken,
     verifySessionToken,
-    createRefreshToken,
-    verifyRefreshToken,
     isAuthEnabled,
     isGoogleAuthMode,
     isAllowedRedirect,
@@ -15,6 +13,11 @@ import {
     resolveJwtSecret,
     safeEqual,
 } from "@/lib/auth";
+import {
+    createRefreshToken,
+    verifyRefreshToken,
+    verifySessionTokenNode,
+} from "@/lib/auth-server";
 
 vi.mock("@/lib/token-blocklist", () => ({
     isTokenRevoked: vi.fn(async () => false),
@@ -161,7 +164,7 @@ describe("JWT session tokens", () => {
     });
 });
 
-describe("verifySessionToken — blocklist integration", () => {
+describe("verifySessionTokenNode — blocklist integration", () => {
     let origJwt: string | undefined;
 
     beforeEach(async () => {
@@ -175,7 +178,6 @@ describe("verifySessionToken — blocklist integration", () => {
     afterEach(() => {
         if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
         else delete process.env.JWT_SECRET;
-        delete (globalThis as Record<string, unknown>).EdgeRuntime;
     });
 
     it("returns null for a revoked token (blocklist returns true)", async () => {
@@ -183,36 +185,40 @@ describe("verifySessionToken — blocklist integration", () => {
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
+        const result = await verifySessionTokenNode(token);
         expect(result).toBeNull();
         expect(isTokenRevoked).toHaveBeenCalled();
     });
 
     it("returns session when blocklist returns false", async () => {
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
+        const result = await verifySessionTokenNode(token);
         expect(result).not.toBeNull();
         expect(result?.userId).toBe("u1");
     });
 
-    it("returns null if isTokenRevoked throws unexpectedly (propagates to outer catch)", async () => {
+    it("returns null if isTokenRevoked throws unexpectedly", async () => {
         // Note: the real isTokenRevoked catches DB errors and returns false (fail-open behavior).
         // That fail-open is tested in token-blocklist.test.ts.
-        // This test documents verifySessionToken's outer catch behavior if isTokenRevoked ever throws.
+        // This test documents verifySessionTokenNode's behavior if isTokenRevoked ever throws.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Unexpected"));
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
-        expect(result).toBeNull(); // outer catch handles it; logs "unexpected error"
+        // isTokenRevoked throws → bubbles up from verifySessionTokenNode
+        await expect(verifySessionTokenNode(token)).rejects.toThrow("Unexpected");
     });
 
-    it("skips blocklist check when EdgeRuntime is set", async () => {
-        (globalThis as Record<string, unknown>).EdgeRuntime = "edge";
+    it("verifySessionToken (Edge-safe) does NOT check blocklist", async () => {
+        // verifySessionToken no longer consults the blocklist — it is Edge-safe.
+        // Use verifySessionTokenNode for blocklist enforcement in Node.js routes.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        await verifySessionToken(token);
+        const result = await verifySessionToken(token);
+        // verifySessionToken returns a valid session (does not check blocklist)
+        expect(result).not.toBeNull();
         expect(isTokenRevoked).not.toHaveBeenCalled();
     });
 });

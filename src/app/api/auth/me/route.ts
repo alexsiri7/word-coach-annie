@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
     SESSION_COOKIE_NAME,
-    verifySessionToken,
     deriveSessionToken,
 } from "@/lib/auth";
+import { verifySessionTokenNode as verifySessionToken } from "@/lib/auth-server";
 import { env } from "@/lib/env";
 
 /**

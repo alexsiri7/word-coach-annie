@@ -8,11 +8,11 @@ import {
     REFRESH_COOKIE_NAME,
     REFRESH_MAX_AGE,
     createSessionToken,
-    createRefreshToken,
     isAllowedRedirect,
     resolveJwtSecret,
     safeEqual,
 } from "@/lib/auth";
+import { createRefreshToken } from "@/lib/auth-server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 

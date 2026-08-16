@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockVerifySessionToken, mockVerifyRefreshToken, mockCreateSessionToken } = vi.hoisted(() => ({
-    mockVerifySessionToken: vi.fn(),
+const { mockVerifySessionTokenNodeNode, mockVerifyRefreshToken, mockCreateSessionToken } = vi.hoisted(() => ({
+    mockVerifySessionTokenNodeNode: vi.fn(),
     mockVerifyRefreshToken: vi.fn(),
     mockCreateSessionToken: vi.fn(),
 }));
@@ -11,7 +11,10 @@ vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
     REFRESH_COOKIE_NAME: "annie_refresh",
     SESSION_MAX_AGE: 3600,
-    verifySessionToken: mockVerifySessionToken,
+}));
+
+vi.mock("@/lib/auth-server", () => ({
+    verifySessionTokenNode: mockVerifySessionTokenNodeNode,
     verifyRefreshToken: mockVerifyRefreshToken,
     createSessionToken: mockCreateSessionToken,
 }));
@@ -46,7 +49,7 @@ describe("POST /api/auth/refresh", () => {
             expect(res.status).toBe(401);
             const body = await res.json();
             expect(body.error).toBe("Session expired or revoked");
-            expect(mockVerifySessionToken).not.toHaveBeenCalled();
+            expect(mockVerifySessionTokenNode).not.toHaveBeenCalled();
             expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
         });
     });
@@ -54,7 +57,7 @@ describe("POST /api/auth/refresh", () => {
     describe("path 1: active session renewal", () => {
         it("re-issues session cookie when the session cookie is still valid", async () => {
             const session = { userId: "u1", email: "u@test.com", name: "U", picture: undefined };
-            mockVerifySessionToken.mockResolvedValueOnce(session);
+            mockVerifySessionTokenNode.mockResolvedValueOnce(session);
             mockCreateSessionToken.mockResolvedValueOnce("fresh-session-jwt");
 
             const req = makeRequest({ sessionCookie: "valid-session-token" });
@@ -79,7 +82,7 @@ describe("POST /api/auth/refresh", () => {
         });
 
         it("returns 500 if session is valid but createSessionToken throws", async () => {
-            mockVerifySessionToken.mockResolvedValueOnce({ userId: "u1", email: "u@test.com", name: "U" });
+            mockVerifySessionTokenNode.mockResolvedValueOnce({ userId: "u1", email: "u@test.com", name: "U" });
             mockCreateSessionToken.mockRejectedValueOnce(new Error("crypto fail"));
 
             const req = makeRequest({ sessionCookie: "valid-session-token" });
@@ -98,7 +101,7 @@ describe("POST /api/auth/refresh", () => {
             const res = await POST(req);
 
             expect(res.status).toBe(200);
-            expect(mockVerifySessionToken).not.toHaveBeenCalled();
+            expect(mockVerifySessionTokenNode).not.toHaveBeenCalled();
             expect(mockCreateSessionToken).toHaveBeenCalledWith({
                 userId: "u2",
                 email: "u2@test.com",
@@ -110,7 +113,7 @@ describe("POST /api/auth/refresh", () => {
         });
 
         it("issues a new session cookie from a valid refresh cookie when session is expired", async () => {
-            mockVerifySessionToken.mockResolvedValueOnce(null); // expired
+            mockVerifySessionTokenNode.mockResolvedValueOnce(null); // expired
             const refresh = { userId: "u3", email: "u3@test.com", name: "U3", picture: undefined };
             mockVerifyRefreshToken.mockResolvedValueOnce(refresh);
             mockCreateSessionToken.mockResolvedValueOnce("fresh-session-from-refresh-v2");
@@ -124,7 +127,7 @@ describe("POST /api/auth/refresh", () => {
         });
 
         it("returns 401 when both session and refresh are invalid/revoked", async () => {
-            mockVerifySessionToken.mockResolvedValueOnce(null);
+            mockVerifySessionTokenNode.mockResolvedValueOnce(null);
             mockVerifyRefreshToken.mockResolvedValueOnce(null);
 
             const req = makeRequest({ sessionCookie: "bad-session", refreshCookie: "bad-refresh" });

@@ -67,74 +67,6 @@ export async function getJwtKey(): Promise<CryptoKey> {
 }
 
 /**
- * Payload shape for long-lived refresh tokens.
- * Carries user identity so the refresh endpoint can mint new session tokens
- * without a database round-trip.
- */
-export interface RefreshPayload {
-    userId: string;
-    email: string;
-    name: string;
-    picture?: string;
-    jti?: string;
-}
-
-/**
- * Create a signed JWT for a long-lived refresh token (30 days).
- * Sets iss=JWT_ISSUER and aud=JWT_AUDIENCE_REFRESH.
- * Must only be verified in Node.js (blocklist check runs there).
- */
-export async function createRefreshToken(payload: RefreshPayload): Promise<string> {
-    const key = await getJwtKey();
-    return new SignJWT({ ...payload })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuer(JWT_ISSUER)
-        .setAudience(JWT_AUDIENCE_REFRESH)
-        .setIssuedAt()
-        .setExpirationTime(`${REFRESH_MAX_AGE}s`)
-        .setJti(crypto.randomUUID())
-        .sign(key);
-}
-
-/**
- * Verify a refresh token. Returns the payload if valid, null otherwise.
- * Always checks the revocation blocklist (Node.js only — never call from Edge).
- */
-export async function verifyRefreshToken(token: string): Promise<RefreshPayload | null> {
-    try {
-        const key = await getJwtKey();
-        const { payload } = await jwtVerify(token, key, {
-            algorithms: ["HS256"],
-            issuer: JWT_ISSUER,
-            audience: JWT_AUDIENCE_REFRESH,
-        });
-        if (!payload.userId || !payload.email) return null;
-
-        const result: RefreshPayload = {
-            userId: payload.userId as string,
-            email: payload.email as string,
-            name: (payload.name as string) || "",
-            picture: payload.picture as string | undefined,
-            jti: payload.jti as string | undefined,
-        };
-
-        // Blocklist check — refresh tokens are only verified in Node.js routes.
-        if (result.jti) {
-            const { isTokenRevoked } = await import("@/lib/token-blocklist");
-            if (await isTokenRevoked(result.jti)) {
-                return null;
-            }
-        }
-
-        return result;
-    } catch (err) {
-        if (err instanceof JoseErrors.JOSEError) return null;
-        logger.error("verifyRefreshToken: unexpected error", err);
-        return null;
-    }
-}
-
-/**
  * Create a signed JWT for a user session.
  * Sets iss=JWT_ISSUER and aud=JWT_AUDIENCE_SESSION; verifySessionToken enforces both.
  */
@@ -171,14 +103,10 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
                 jti: payload.jti as string | undefined,
             };
 
-            // Check revocation blocklist in Node.js contexts.
-            // Edge runtime (middleware) skips this — short token lifetime is the compensating control.
-            if (session.jti && typeof (globalThis as Record<string, unknown>).EdgeRuntime === "undefined") {
-                const { isTokenRevoked } = await import("@/lib/token-blocklist");
-                if (await isTokenRevoked(session.jti)) {
-                    return null;
-                }
-            }
+            // Revocation blocklist check is intentionally absent here so that
+            // this function is Edge-safe (no Node.js DB imports).
+            // Node.js API routes that need blocklist enforcement must use
+            // verifySessionTokenNode from auth-server.ts instead.
 
             return session;
         }

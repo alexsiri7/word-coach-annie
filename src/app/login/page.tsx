@@ -4,7 +4,25 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isAllowedRedirect } from "@/lib/auth";
+
+const ALLOWED_REDIRECT_PATTERNS = [
+    /^\/$/,
+    /^\/settings(\/.*)?$/,
+    /^\/setup(\/.*)?$/,
+    /^\/project\/[a-zA-Z0-9_-]+(\/.*)?$/,
+    /^\/read\/[a-zA-Z0-9_-]+(\/.*)?$/,
+    /^\/universe(\/[a-zA-Z0-9_-]+(\/.*)?)?$/,
+    /^\/oauth\/authorize$/,
+];
+
+function isAllowedRedirect(path: string): boolean {
+    if (!path) return false;
+    if (!path.startsWith("/") || path.startsWith("//")) return false;
+    if (path.includes("\\")) return false;
+    const [pathname] = path.split("?");
+    if (pathname.includes(":")) return false;
+    return ALLOWED_REDIRECT_PATTERNS.some((re) => re.test(pathname));
+}
 
 function sanitizeRedirect(from: string | null): string {
     if (!from) return "/";

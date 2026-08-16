@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, verifySessionToken, safeEqual } from "@/lib/auth";
+import { SESSION_COOKIE_NAME, safeEqual } from "@/lib/auth";
+import { verifySessionTokenNode as verifySessionToken } from "@/lib/auth-server";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
 import { escapeHtml } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";

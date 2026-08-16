@@ -48,11 +48,14 @@ vi.mock("@/lib/auth", () => ({
     REFRESH_COOKIE_NAME: "refresh",
     REFRESH_MAX_AGE: 2592000,
     createSessionToken: vi.fn().mockResolvedValue("mock-jwt-token"),
-    createRefreshToken: vi.fn().mockResolvedValue("mock-refresh-token"),
     isAllowedRedirect: vi.fn().mockReturnValue(false),
     resolveJwtSecret: vi.fn().mockReturnValue("annie-dev-secret"),
     // timing-safe comparison is irrelevant in unit tests; using vi.fn() enables spy assertions
     safeEqual: vi.fn().mockImplementation((a: string, b: string) => a === b),
+}));
+
+vi.mock("@/lib/auth-server", () => ({
+    createRefreshToken: vi.fn().mockResolvedValue("mock-refresh-token"),
 }));
 
 vi.mock("@/lib/logger", () => ({

@@ -3,10 +3,12 @@ import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     REFRESH_COOKIE_NAME,
-    verifySessionToken,
+} from "@/lib/auth";
+import {
+    verifySessionTokenNode,
     verifyRefreshToken,
     createSessionToken,
-} from "@/lib/auth";
+} from "@/lib/auth-server";
 import { logger } from "@/lib/logger";
 
 /**
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Path 1: existing session still valid — re-issue it to reset the 1h clock.
     if (sessionCookie) {
-        const session = await verifySessionToken(sessionCookie);
+        const session = await verifySessionTokenNode(sessionCookie);
         if (session) {
             try {
                 const freshJwt = await createSessionToken({

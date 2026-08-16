@@ -5,8 +5,8 @@ import {
     REFRESH_COOKIE_NAME,
     REFRESH_MAX_AGE,
     verifySessionToken,
-    verifyRefreshToken,
 } from "@/lib/auth";
+import { verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 

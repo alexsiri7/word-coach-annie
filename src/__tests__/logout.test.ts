@@ -21,6 +21,9 @@ vi.mock("@/lib/auth", () => ({
     SESSION_MAX_AGE: 3600,
     REFRESH_MAX_AGE: 2592000,
     verifySessionToken: mockVerifySessionToken,
+}));
+
+vi.mock("@/lib/auth-server", () => ({
     verifyRefreshToken: mockVerifyRefreshToken,
 }));
 
