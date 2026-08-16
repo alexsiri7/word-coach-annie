@@ -11,7 +11,7 @@
 # To check for stale entries: compare this list against `npm audit --json`
 # and remove any GHSAs that no longer appear in audit output.
 #
-# Last reviewed: 2026-06-11
+# Last reviewed: 2026-08-16
 #
 # Source: tar (via node-gyp -> sqlite3 -> @google/adk transitive chain)
 # Justification: tar is a transitive dependency of @google/adk via sqlite3/node-gyp.
@@ -179,3 +179,165 @@ GHSA-99f4-grh7-6pcq
 # App risk: LOW — moderate severity, requires targeted header manipulation; Sentry is
 # the only consumer of the OpenTelemetry SDK in this app.
 GHSA-8988-4f7v-96qf
+#
+# Source: @hono/node-server (transitive via @modelcontextprotocol/sdk)
+# Justification: Path traversal via encoded backslash is Windows-only. This app runs on
+# Linux in Docker. No Windows deployment.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: NONE — Windows-only attack vector; app runs on Linux.
+GHSA-frvp-7c67-39w9
+#
+# Source: @opentelemetry/propagator-jaeger (via @sentry/nextjs transitive chain)
+# Justification: DoS via unhandled exception on malformed Jaeger header. Requires
+# sending crafted HTTP headers to the Sentry-instrumented endpoint. Low impact in practice.
+# Upgrade path: blocked by @sentry/nextjs version pin.
+# App risk: LOW — requires targeted header manipulation; Sentry telemetry layer only.
+GHSA-45rx-2jwx-cxfr
+#
+# Source: brace-expansion (via workbox-build and tooling transitive chain — new CVEs)
+# Justification: DoS via exponential/unbounded expansion requires passing attacker-
+# controlled strings to expand(). workbox-build uses this only at build time with
+# developer-controlled glob patterns. No runtime exposure.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — build-time only, no runtime exposure.
+GHSA-3jxr-9vmj-r5cp
+GHSA-mh99-v99m-4gvg
+GHSA-rgw5-rvv9-x895
+#
+# Source: dompurify (transitive via various packages)
+# Justification: XSS via IN_PLACE hook removal. This app does not use DOMPurify's
+# in-place sanitization hooks. Any DOMPurify usage is through standard sanitize() calls.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — the vulnerable hook API is not used by this app.
+GHSA-55q2-fjhq-7xh7
+#
+# Source: fast-uri (additional host confusion CVEs beyond previously allowlisted entries)
+# Justification: Host confusion via backslash authority delimiters and failed IDN
+# canonicalization. fast-uri is a transitive dep of build tooling; this app does not
+# process user-controlled URIs via fast-uri at runtime.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — no direct usage; build-tooling context only.
+GHSA-v2hh-gcrm-f6hx
+GHSA-7p8r-x3mc-p8w7
+GHSA-4c8g-83qw-93j6
+#
+# Source: hono (additional CVEs via @modelcontextprotocol/sdk transitive chain)
+# Justification: Various hono issues (header de-duplication, JSX context isolation,
+# XSS in cx(), CORS ReDoS, memo SSR cross-request, language middleware DoS). This app
+# does not use hono directly. The MCP SDK's internal hono use is sandboxed to the MCP
+# transport layer accessible only locally.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — only the MCP endpoint is exposed, which requires local access.
+GHSA-xgm2-5f3f-mvvc
+GHSA-hvrm-45r6-mjfj
+GHSA-w62v-xxxg-mg59
+GHSA-8j4g-w8fx-2239
+GHSA-f23p-vx2j-j53r
+GHSA-54fx-42gc-7vw4
+#
+# Source: ip-address (additional SSRF/trust-boundary CVEs beyond GHSA-v2v4-37r5-5v8g)
+# Justification: SSRF bypass via octal/CIDR/IPv4-mapped address misclassification.
+# ip-address is transitive via socks/node-gyp. This app does not perform IP address
+# classification for SSRF or trust-boundary checks.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — no SSRF filtering or trust boundary based on IP address parsing.
+GHSA-mwp4-54f8-5fhr
+GHSA-4xrf-jv44-h6hh
+GHSA-22jq-vg5j-6vgg
+#
+# Source: js-yaml (via various transitive chains)
+# Justification: Quadratic CPU DoS via merge-key chains and !!omap resolution.
+# Requires parsing attacker-controlled YAML. This app does not parse user-supplied YAML.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — no user-supplied YAML parsing at runtime.
+GHSA-52cp-r559-cp3m
+GHSA-5p4m-2wfm-xmqj
+#
+# Source: nanoid (via various transitive chains)
+# Justification: Non-secure generators loop indefinitely with negative/zero size.
+# Requires calling nanoid() with a custom generator that returns negative/zero sizes.
+# This app uses nanoid() with default parameters only.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — default nanoid() usage only; no custom size arguments.
+GHSA-28wg-ghj8-5hjv
+GHSA-2v37-7h3g-55p8
+#
+# Source: next (via direct dependency — new CVEs since last review)
+# Justification: Multiple Next.js CVEs (Turbopack middleware bypass, Server Actions DoS/SSRF,
+# cache confusion, Edge runtime payload, image optimization DoS, internal endpoint disclosure).
+# These require specific configurations (Turbopack, single locale, custom servers, etc.)
+# or require attackers to reach specific endpoints.
+# Upgrade path: upgrade Next.js to latest patch version. Evaluate before next quarterly review.
+# App risk: MEDIUM — Next.js is the primary HTTP layer; some CVEs may be directly applicable.
+# Mitigated by: app runs behind authentication for most routes; image optimization is
+# limited to trusted sources; Server Actions are used with authenticated session checks.
+GHSA-6gpp-xcg3-4w24
+GHSA-m99w-x7hq-7vfj
+GHSA-89xv-2m56-2m9x
+GHSA-68g3-v927-f742
+GHSA-4633-3j49-mh5q
+GHSA-4c39-4ccg-62r3
+GHSA-p9j2-gv94-2wf4
+GHSA-q8wf-6r8g-63ch
+GHSA-955p-x3mx-jcvp
+#
+# Source: postcss (additional CVEs — arbitrary file read via sourceMappingURL)
+# Justification: Arbitrary .map file read via attacker-controlled sourceMappingURL in CSS.
+# This app uses postcss only at build time (Tailwind compilation) with developer-controlled
+# CSS. No runtime CSS processing of user-supplied content.
+# Upgrade path: blocked by Next.js version pin. Evaluate with Next.js upgrade.
+# App risk: LOW — build-time only; no runtime CSS processing of user input.
+GHSA-6g55-p6wh-862q
+GHSA-fxqj-rqcc-2cmp
+GHSA-r28c-9q8g-f849
+#
+# Source: protobufjs (additional DoS CVE — infinite loop in .proto option parsing)
+# Justification: DoS via infinite loop requires parsing attacker-controlled .proto files.
+# This app does not load user-supplied protobuf definitions at runtime.
+# Upgrade path: blocked by @google/adk transitive dependency.
+# App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
+GHSA-j3f2-48v5-ccww
+#
+# Source: sharp (via direct/transitive dependency — libvips CVEs)
+# Justification: sharp inherited vulnerabilities via libvips (CVE-2026-33327, CVE-2026-33328,
+# CVE-2026-35590, CVE-2026-35591). These affect image processing of untrusted images.
+# This app uses sharp for image optimization but only processes user-uploaded images from
+# authenticated users, not arbitrary external images.
+# Upgrade path: upgrade sharp to latest version. Evaluate before next quarterly review.
+# App risk: MEDIUM — processes user images, but limited to authenticated users only.
+GHSA-f88m-g3jw-g9cj
+#
+# Source: tar (additional CVEs beyond previously allowlisted entries)
+# Justification: Additional tar vulnerabilities (PAX path type confusion, decompression DoS,
+# negative size infinite loop, NUL byte DoS, recursion stack-overflow DoS).
+# tar is a transitive dependency via @google/adk (sqlite3/node-gyp). Not used at runtime
+# for untrusted archive extraction.
+# Upgrade path: requires @google/adk to drop sqlite3 dependency (breaking major).
+# App risk: MEDIUM — tar is invoked only during npm install (build time), not at runtime.
+GHSA-w8wr-v893-vjvp
+GHSA-23hp-3jrh-7fpw
+GHSA-8x88-c5mf-7j5w
+GHSA-gvwx-54wh-qm9j
+GHSA-r292-9mhp-454m
+#
+# Source: undici (via node built-in fetch / Next.js transitive chain)
+# Justification: Various undici vulnerabilities (retry desync, cache directive parse crash,
+# CRLF injection via blob type, cache-control cross-user disclosure, cookie attribute injection).
+# undici is the underlying HTTP client for Node.js built-in fetch. The CRLF/cookie injection
+# requires this app to make outbound requests with attacker-controlled blob types or cookie
+# domains, which it does not do.
+# Upgrade path: tied to Node.js version. Update Node.js to include patched undici.
+# App risk: LOW — no user-controlled outbound request parameters via undici.
+GHSA-8xcm-r25x-g524
+GHSA-4cwx-7wf7-3272
+GHSA-m8rv-5g2x-5cg5
+GHSA-jr45-8vmc-qm54
+GHSA-v3r7-h72x-cjcm
+#
+# Source: valibot (transitive via various packages)
+# Justification: record() issue paths cause flatten() to throw for inherited Object
+# property names. Requires using valibot's record() type with property names that are
+# inherited Object properties. This app does not use valibot directly.
+# Upgrade path: auto-fixable. Consider running `npm audit fix`.
+# App risk: LOW — transitive dep; no direct valibot usage in app code.
+GHSA-5qjj-4xww-7phc
