@@ -35,6 +35,12 @@ const PUBLIC_PATHS = [
     "/api/auth/logout",
     "/api/auth/google",
     "/api/auth/me",
+    // /api/auth/refresh authenticates via its session cookie directly in the
+    // Node.js route handler (blocklist check runs there). Marking it public
+    // prevents a chicken-and-egg redirect: a near-expired token that would
+    // fail the Edge middleware's verifySessionToken clock must still be able
+    // to reach the refresh endpoint.
+    "/api/auth/refresh",
     "/login",
     "/landing",
     "/privacy",

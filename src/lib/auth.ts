@@ -12,12 +12,15 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "annie_session";
+const REFRESH_COOKIE_NAME = "annie_refresh";
 const SESSION_MAX_AGE = 60 * 60; // 1 hour — Edge Runtime cannot check blocklist; short lifetime is the compensating control
+const REFRESH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days — long-lived refresh token, verified only in Node.js (blocklist checked)
 
-export { SESSION_COOKIE_NAME, SESSION_MAX_AGE };
+export { SESSION_COOKIE_NAME, REFRESH_COOKIE_NAME, SESSION_MAX_AGE, REFRESH_MAX_AGE };
 
 export const JWT_ISSUER = "word-coach-annie";
 export const JWT_AUDIENCE_SESSION = "word-coach-annie:session";
+export const JWT_AUDIENCE_REFRESH = "word-coach-annie:refresh";
 
 /** JWT payload shape for Google OAuth sessions. */
 export interface SessionPayload {
@@ -61,6 +64,73 @@ export async function getJwtKey(): Promise<CryptoKey> {
         false,
         ["sign", "verify"]
     );
+}
+
+/**
+ * Payload shape for long-lived refresh tokens.
+ * Intentionally minimal — refresh tokens only identify the user and carry a jti.
+ */
+export interface RefreshPayload {
+    userId: string;
+    email: string;
+    name: string;
+    picture?: string;
+    jti?: string;
+}
+
+/**
+ * Create a signed JWT for a long-lived refresh token (30 days).
+ * Sets iss=JWT_ISSUER and aud=JWT_AUDIENCE_REFRESH.
+ * Must only be verified in Node.js (blocklist check runs there).
+ */
+export async function createRefreshToken(payload: RefreshPayload): Promise<string> {
+    const key = await getJwtKey();
+    return new SignJWT({ ...payload })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(JWT_ISSUER)
+        .setAudience(JWT_AUDIENCE_REFRESH)
+        .setIssuedAt()
+        .setExpirationTime(`${REFRESH_MAX_AGE}s`)
+        .setJti(crypto.randomUUID())
+        .sign(key);
+}
+
+/**
+ * Verify a refresh token. Returns the payload if valid, null otherwise.
+ * Always checks the revocation blocklist (Node.js only — never call from Edge).
+ */
+export async function verifyRefreshToken(token: string): Promise<RefreshPayload | null> {
+    try {
+        const key = await getJwtKey();
+        const { payload } = await jwtVerify(token, key, {
+            algorithms: ["HS256"],
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE_REFRESH,
+        });
+        if (!payload.userId || !payload.email) return null;
+
+        const result: RefreshPayload = {
+            userId: payload.userId as string,
+            email: payload.email as string,
+            name: (payload.name as string) || "",
+            picture: payload.picture as string | undefined,
+            jti: payload.jti as string | undefined,
+        };
+
+        // Blocklist check — refresh tokens are only verified in Node.js routes.
+        if (result.jti) {
+            const { isTokenRevoked } = await import("@/lib/token-blocklist");
+            if (await isTokenRevoked(result.jti)) {
+                return null;
+            }
+        }
+
+        return result;
+    } catch (err) {
+        if (err instanceof JoseErrors.JOSEError) return null;
+        logger.error("verifyRefreshToken: unexpected error", err);
+        return null;
+    }
 }
 
 /**

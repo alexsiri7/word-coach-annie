@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,31 @@ function LoginForm() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showTokenForm, setShowTokenForm] = useState(false);
+    // true while we attempt a silent token refresh on first load
+    const [checkingRefresh, setCheckingRefresh] = useState(true);
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // On first render, silently attempt to renew the session via the refresh cookie.
+    // If the server returns 200, a new session cookie is set and we redirect immediately
+    // without showing the login form — the user stays logged in transparently.
+    useEffect(() => {
+        fetch("/api/auth/refresh", { method: "POST" })
+            .then((res) => {
+                if (res.ok) {
+                    const from = sanitizeRedirect(searchParams.get("from"));
+                    router.replace(from);
+                } else {
+                    // 401 → refresh token missing/expired/revoked; show login form.
+                    setCheckingRefresh(false);
+                }
+            })
+            .catch(() => {
+                // Network error — show login form so the user can log in manually.
+                setCheckingRefresh(false);
+            });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,6 +70,16 @@ function LoginForm() {
     };
 
     const authError = searchParams.get("error");
+
+    // Show a minimal loading indicator while checking the refresh cookie.
+    // This prevents a flash of the login form before an automatic redirect.
+    if (checkingRefresh) {
+        return (
+            <div className="flex items-center justify-center py-8">
+                <span className="text-sm text-muted-foreground">Checking session…</span>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">

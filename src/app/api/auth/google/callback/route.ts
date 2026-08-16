@@ -5,7 +5,10 @@ import { prisma } from "@/lib/db";
 import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
+    REFRESH_COOKIE_NAME,
+    REFRESH_MAX_AGE,
     createSessionToken,
+    createRefreshToken,
     isAllowedRedirect,
     resolveJwtSecret,
     safeEqual,
@@ -131,8 +134,17 @@ export async function GET(request: NextRequest) {
             },
         });
 
-        // Create JWT session
-        const jwt = await createSessionToken({
+        // Create short-lived JWT session cookie (1 hour) and long-lived refresh cookie (30 days).
+        // The session cookie is verified in Edge middleware (blocklist skipped — short lifetime
+        // is the compensating control). The refresh cookie is only verified in Node.js routes
+        // where the blocklist IS checked, ensuring revocation stays effective.
+        const sessionJwt = await createSessionToken({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            picture: user.picture || undefined,
+        });
+        const refreshJwt = await createRefreshToken({
             userId: user.id,
             email: user.email,
             name: user.name,
@@ -159,7 +171,7 @@ export async function GET(request: NextRequest) {
             maxAge: 0,
             path: "/",
         });
-        response.cookies.set(SESSION_COOKIE_NAME, jwt, {
+        response.cookies.set(SESSION_COOKIE_NAME, sessionJwt, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             // SameSite=Lax (not Strict) is required for OAuth flows: the redirect chain
@@ -170,6 +182,16 @@ export async function GET(request: NextRequest) {
             sameSite: "lax",
             maxAge: SESSION_MAX_AGE,
             path: "/",
+        });
+        // Long-lived refresh token — httpOnly, Lax, scoped to the refresh endpoint only.
+        // Scoping to /api/auth/refresh prevents the cookie being sent on every request,
+        // reducing exposure surface.
+        response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: REFRESH_MAX_AGE,
+            path: "/api/auth/refresh",
         });
 
         return response;
