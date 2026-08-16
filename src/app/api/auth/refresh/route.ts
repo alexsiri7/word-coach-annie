@@ -25,8 +25,8 @@ import { logger } from "@/lib/logger";
  * control for the Edge's inability to consult the blocklist; renewing through this
  * Node.js route preserves the revocation guarantee.
  *
- * The refresh cookie (annie_refresh) is scoped to /api/auth/refresh, so it is
- * only sent on calls to this endpoint — reducing its exposure surface.
+ * The refresh cookie (annie_refresh) is scoped to /api/auth/, so it is
+ * only sent on calls to auth endpoints — reducing its exposure surface.
  *
  * Returns:
  *   200 { ok: true }  — new session cookie set; refresh cookie preserved

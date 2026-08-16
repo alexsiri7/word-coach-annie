@@ -3,8 +3,11 @@ import {
     deriveSessionToken,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
+    REFRESH_MAX_AGE,
     createSessionToken,
     verifySessionToken,
+    createRefreshToken,
+    verifyRefreshToken,
     isAuthEnabled,
     isGoogleAuthMode,
     isAllowedRedirect,
@@ -211,6 +214,74 @@ describe("verifySessionToken — blocklist integration", () => {
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
         await verifySessionToken(token);
         expect(isTokenRevoked).not.toHaveBeenCalled();
+    });
+});
+
+describe("refresh token functions", () => {
+    let origJwt: string | undefined;
+
+    beforeEach(async () => {
+        origJwt = process.env.JWT_SECRET;
+        process.env.JWT_SECRET = "test-jwt-secret";
+        const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    });
+
+    afterEach(() => {
+        if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
+        else delete process.env.JWT_SECRET;
+    });
+
+    it("round-trips: createRefreshToken → verifyRefreshToken returns payload", async () => {
+        const payload = { userId: "u1", email: "u@test.com", name: "Test", picture: "https://example.com/pic.jpg" };
+        const token = await createRefreshToken(payload);
+        expect(token).toBeTruthy();
+        expect(token.split(".")).toHaveLength(3);
+
+        const result = await verifyRefreshToken(token);
+        expect(result).not.toBeNull();
+        expect(result!.userId).toBe("u1");
+        expect(result!.email).toBe("u@test.com");
+        expect(result!.name).toBe("Test");
+        expect(result!.picture).toBe("https://example.com/pic.jpg");
+        expect(result!.jti).toBeDefined();
+    });
+
+    it("rejects a session token used as a refresh token (audience mismatch)", async () => {
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifyRefreshToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("rejects a refresh token used as a session token (audience mismatch)", async () => {
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("returns null for a revoked refresh token", async () => {
+        const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifyRefreshToken(token);
+        expect(result).toBeNull();
+        expect(isTokenRevoked).toHaveBeenCalled();
+    });
+
+    it("returns null for a tampered token", async () => {
+        const result = await verifyRefreshToken("not-a-valid-jwt");
+        expect(result).toBeNull();
+    });
+
+    it("refresh token exp matches REFRESH_MAX_AGE (30 days)", async () => {
+        const { jwtVerify } = await import("jose");
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "U" });
+        const key = await getJwtKey();
+        const { payload } = await jwtVerify(token, key, { audience: "word-coach-annie:refresh" });
+        const lifetime = (payload.exp as number) - (payload.iat as number);
+        expect(lifetime).toBe(REFRESH_MAX_AGE);
     });
 });
 

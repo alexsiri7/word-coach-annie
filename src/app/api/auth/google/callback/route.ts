@@ -183,15 +183,15 @@ export async function GET(request: NextRequest) {
             maxAge: SESSION_MAX_AGE,
             path: "/",
         });
-        // Long-lived refresh token — httpOnly, Lax, scoped to the refresh endpoint only.
-        // Scoping to /api/auth/refresh prevents the cookie being sent on every request,
-        // reducing exposure surface.
+        // Long-lived refresh token — httpOnly, Lax, scoped to auth endpoints only.
+        // Scoping to /api/auth/ prevents the cookie being sent on every request,
+        // reducing exposure surface while still allowing /api/auth/logout to revoke it.
         response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             maxAge: REFRESH_MAX_AGE,
-            path: "/api/auth/refresh",
+            path: "/api/auth/",
         });
 
         return response;

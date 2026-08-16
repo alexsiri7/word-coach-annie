@@ -188,9 +188,20 @@ The app supports three auth modes (controlled by environment variables):
 
 ### Session Security
 
-Google OAuth sessions are short-lived JWTs (24 hours) with a `jti` (JWT ID) claim. On logout, the `jti` is written to the `RevokedToken` database table via `src/lib/token-blocklist.ts`, and `verifySessionToken` checks revocation on every authenticated Node.js request.
+Google OAuth uses a **two-token architecture**:
 
-**Edge Runtime constraint**: Next.js middleware runs in the Edge Runtime and cannot use Prisma. Revocation is skipped there — the 24-hour token lifetime is the compensating control. Do not import `token-blocklist.ts` from middleware or any Edge-compatible module.
+| Token | Cookie | Lifetime | Verified in | Blocklist checked |
+|-------|--------|----------|-------------|-------------------|
+| Session JWT | `annie_session` | 1 hour | Edge middleware + Node.js | No (Edge) / Yes (Node.js) |
+| Refresh JWT | `annie_refresh` | 30 days | Node.js only (`/api/auth/refresh`) | Always |
+
+On login, both tokens are issued. The session cookie is short-lived (1 hour) so the Edge Runtime's inability to check the blocklist is mitigated by the short window. The refresh cookie is scoped to `/api/auth/` (reducing exposure) and is always verified against the `RevokedToken` blocklist in Node.js.
+
+**Silent renewal**: The client calls `POST /api/auth/refresh` every 45 minutes to re-issue the session cookie before it expires. On cold return (tab reopen after >1 hour), the login page attempts renewal via the refresh cookie before showing the login form.
+
+**Logout**: Both tokens' `jti` values are written to the `RevokedToken` table, and both cookies are cleared.
+
+**Edge Runtime constraint**: Next.js middleware runs in the Edge Runtime and cannot use Prisma. Do not import `token-blocklist.ts` from middleware or any Edge-compatible module. The 1-hour session lifetime is the compensating control.
 
 ## Content Versioning
 
