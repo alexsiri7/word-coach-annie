@@ -45,7 +45,10 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "session",
     SESSION_MAX_AGE: 3600,
+    REFRESH_COOKIE_NAME: "refresh",
+    REFRESH_MAX_AGE: 2592000,
     createSessionToken: vi.fn().mockResolvedValue("mock-jwt-token"),
+    createRefreshToken: vi.fn().mockResolvedValue("mock-refresh-token"),
     isAllowedRedirect: vi.fn().mockReturnValue(false),
     resolveJwtSecret: vi.fn().mockReturnValue("annie-dev-secret"),
     // timing-safe comparison is irrelevant in unit tests; using vi.fn() enables spy assertions
@@ -166,6 +169,14 @@ describe("Google OAuth callback - verified_email check", () => {
         const sessionCookie = setCookie.find((c: string) => c.startsWith("session="));
         expect(sessionCookie).toBeDefined();
         expect(sessionCookie).toContain("mock-jwt-token");
+
+        // Should have refresh cookie set with correct attributes
+        const refreshCookie = setCookie.find((c: string) => c.startsWith("refresh="));
+        expect(refreshCookie).toBeDefined();
+        expect(refreshCookie).toContain("mock-refresh-token");
+        expect(refreshCookie).toContain("HttpOnly");
+        expect(refreshCookie).toContain("Path=/api/auth/");
+        expect(refreshCookie).toContain("Max-Age=2592000");
     });
 
     it("should redirect to /login?error=invalid_state when state HMAC is tampered", async () => {

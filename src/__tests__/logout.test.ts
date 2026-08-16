@@ -5,13 +5,15 @@ vi.mock("@/lib/token-blocklist", () => ({
     isTokenRevoked: vi.fn(async () => false),
 }));
 
-const mockVerifySessionToken = vi.fn(async () => ({
-    userId: "u1",
-    email: "u@test.com",
-    name: "U",
-    jti: "test-jti-123",
+const { mockVerifySessionToken, mockVerifyRefreshToken } = vi.hoisted(() => ({
+    mockVerifySessionToken: vi.fn(async () => ({
+        userId: "u1",
+        email: "u@test.com",
+        name: "U",
+        jti: "test-jti-123",
+    })) as any,
+    mockVerifyRefreshToken: vi.fn(async () => null) as any,
 }));
-const mockVerifyRefreshToken = vi.fn(async () => null);
 
 vi.mock("@/lib/auth", () => ({
     SESSION_COOKIE_NAME: "annie_session",
