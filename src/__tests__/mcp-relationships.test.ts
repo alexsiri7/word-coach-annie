@@ -161,6 +161,26 @@ describe("MCP Relationships Tools", () => {
             ).rejects.toThrow("fromObjectId not found");
         });
 
+        it("throws for world object ID in toObjectId when project has no linked universe", async () => {
+            const char = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "A" }
+            });
+            await expect(
+                createRelationship({ projectId, type: "APPEARS_IN", fromObjectId: char.id, toObjectId: "non-existent-world-obj" })
+            ).rejects.toThrow("toObjectId not found");
+        });
+
+        it("throws for world object ID in toObjectId when not found in linked universe", async () => {
+            const universe = await UniversesController.createUniverse({ title: "Test Universe" });
+            await UniversesController.linkProjectToUniverse(projectId, universe.id);
+            const char = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "A" }
+            });
+            await expect(
+                createRelationship({ projectId, type: "RELATED_TO", fromObjectId: char.id, toObjectId: "non-existent-world-obj" })
+            ).rejects.toThrow("toObjectId not found in this project or linked universe");
+        });
+
         it("throws for non-existent fromObjectId", async () => {
             const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
 
