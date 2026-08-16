@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { listRelationships, createRelationship, deleteRelationship } from "@/mcp/tools/relationships";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
+import { UniversesController } from "@/lib/controllers/universes";
 import { testPrisma } from "./setup";
 
 describe("MCP Relationships Tools", () => {
@@ -111,6 +112,53 @@ describe("MCP Relationships Tools", () => {
             await expect(
                 createRelationship({ projectId, type: "APPEARS_IN", fromObjectId: char.id })
             ).rejects.toThrow("Exactly one to-field must be provided");
+        });
+
+        it("creates relationship from local story object to universe world object", async () => {
+            const universe = await UniversesController.createUniverse({ title: "Test Universe" });
+            await UniversesController.linkProjectToUniverse(projectId, universe.id);
+            const worldObj = await testPrisma.worldObject.create({
+                data: { universeId: universe.id, type: "CHARACTER", name: "Universe Alice" }
+            });
+            const localChar = await testPrisma.storyObject.create({
+                data: { projectId, type: "CHARACTER", name: "Local Bob" }
+            });
+
+            const rel = await createRelationship({
+                projectId,
+                type: "RELATED_TO",
+                fromObjectId: localChar.id,
+                toObjectId: worldObj.id,
+            });
+
+            expect(rel.from?.name).toBe("Local Bob");
+            expect(rel.to?.name).toBe("Universe Alice");
+        });
+
+        it("creates relationship from universe world object to local story object", async () => {
+            const universe = await UniversesController.createUniverse({ title: "Test Universe" });
+            await UniversesController.linkProjectToUniverse(projectId, universe.id);
+            const worldObj = await testPrisma.worldObject.create({
+                data: { universeId: universe.id, type: "CHARACTER", name: "Universe Alice" }
+            });
+            const localScene = await StructureController.createNode({ projectId, type: "SCENE", title: "Scene 1" });
+
+            const rel = await createRelationship({
+                projectId,
+                type: "APPEARS_IN",
+                fromObjectId: worldObj.id,
+                toNodeId: localScene.id,
+            });
+
+            expect(rel.from?.name).toBe("Universe Alice");
+            expect(rel.to?.name).toBe("Scene 1");
+        });
+
+        it("throws for world object ID when project has no linked universe", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+            await expect(
+                createRelationship({ projectId, type: "APPEARS_IN", fromObjectId: "non-existent-world-obj", toNodeId: scene.id })
+            ).rejects.toThrow("fromObjectId not found");
         });
 
         it("throws for non-existent fromObjectId", async () => {
