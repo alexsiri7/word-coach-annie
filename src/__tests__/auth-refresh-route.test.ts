@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockVerifySessionTokenNodeNode, mockVerifyRefreshToken, mockCreateSessionToken } = vi.hoisted(() => ({
-    mockVerifySessionTokenNodeNode: vi.fn(),
+const { mockVerifySessionTokenNode, mockVerifyRefreshToken, mockCreateSessionToken } = vi.hoisted(() => ({
+    mockVerifySessionTokenNode: vi.fn(),
     mockVerifyRefreshToken: vi.fn(),
     mockCreateSessionToken: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/auth-server", () => ({
-    verifySessionTokenNode: mockVerifySessionTokenNodeNode,
+    verifySessionTokenNode: mockVerifySessionTokenNode,
     verifyRefreshToken: mockVerifyRefreshToken,
     createSessionToken: mockCreateSessionToken,
 }));
