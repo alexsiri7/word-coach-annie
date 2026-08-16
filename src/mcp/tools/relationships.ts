@@ -2,6 +2,19 @@ import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../snapshot";
 import { mcpCache } from "@/lib/cache";
 
+type RelationshipEntity = { id: string; name: string; entityType: string } | null;
+
+function resolveEntity(
+    node: { id: string; title: string; type: string } | null | undefined,
+    obj: { id: string; name: string; type: string } | null | undefined,
+    worldObj: { id: string; name: string; type: string } | null | undefined,
+): RelationshipEntity {
+    if (node) return { id: node.id, name: node.title, entityType: node.type };
+    if (obj) return { id: obj.id, name: obj.name, entityType: obj.type };
+    if (worldObj) return { id: worldObj.id, name: worldObj.name, entityType: worldObj.type };
+    return null;
+}
+
 const VALID_RELATIONSHIP_TYPES = [
     "APPEARS_IN",
     "LOCATED_AT",
@@ -60,24 +73,12 @@ export async function listRelationships(projectId: string) {
             });
 
             return {
-                relationships: relationships.map((r: Record<string, unknown> & { id: string; type: string; label: string | null; fromNode?: { id: string; title: string; type: string } | null; fromObject?: { id: string; name: string; type: string } | null; fromWorldObject?: { id: string; name: string; type: string } | null; toNode?: { id: string; title: string; type: string } | null; toObject?: { id: string; name: string; type: string } | null; toWorldObject?: { id: string; name: string; type: string } | null }) => ({
+                relationships: relationships.map((r) => ({
                     id: r.id,
                     type: r.type,
                     label: r.label,
-                    from: r.fromNode
-                        ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
-                        : r.fromObject
-                            ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                            : r.fromWorldObject
-                                ? { id: r.fromWorldObject.id, name: r.fromWorldObject.name, entityType: r.fromWorldObject.type }
-                                : null,
-                    to: r.toNode
-                        ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
-                        : r.toObject
-                            ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                            : r.toWorldObject
-                                ? { id: r.toWorldObject.id, name: r.toWorldObject.name, entityType: r.toWorldObject.type }
-                                : null,
+                    from: resolveEntity(r.fromNode, r.fromObject, r.fromWorldObject),
+                    to: resolveEntity(r.toNode, r.toObject, r.toWorldObject),
                 })),
                 total: relationships.length,
             };
@@ -187,20 +188,8 @@ export async function createRelationship(params: {
         id: relationship.id,
         type: relationship.type,
         label: relationship.label,
-        from: relationship.fromNode
-            ? { id: relationship.fromNode.id, name: relationship.fromNode.title, entityType: relationship.fromNode.type }
-            : relationship.fromObject
-                ? { id: relationship.fromObject.id, name: relationship.fromObject.name, entityType: relationship.fromObject.type }
-                : relationship.fromWorldObject
-                    ? { id: relationship.fromWorldObject.id, name: relationship.fromWorldObject.name, entityType: relationship.fromWorldObject.type }
-                    : null,
-        to: relationship.toNode
-            ? { id: relationship.toNode.id, name: relationship.toNode.title, entityType: relationship.toNode.type }
-            : relationship.toObject
-                ? { id: relationship.toObject.id, name: relationship.toObject.name, entityType: relationship.toObject.type }
-                : relationship.toWorldObject
-                    ? { id: relationship.toWorldObject.id, name: relationship.toWorldObject.name, entityType: relationship.toWorldObject.type }
-                    : null,
+        from: resolveEntity(relationship.fromNode, relationship.fromObject, relationship.fromWorldObject),
+        to: resolveEntity(relationship.toNode, relationship.toObject, relationship.toWorldObject),
     };
 }
 
