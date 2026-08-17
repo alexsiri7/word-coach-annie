@@ -123,42 +123,31 @@ export async function createRelationship(params: {
         throw new Error("Exactly one to-field must be provided (toNodeId or toObjectId)");
     }
 
+    const universeId = project.universeId;
+
     if (fromNodeId) {
         const node = await prisma.structureNode.findFirst({ where: { id: fromNodeId, projectId } });
         if (!node) throw new Error("fromNodeId not found in this project");
     }
-    let resolvedFromObjectId: string | undefined = undefined;
-    let resolvedFromWorldObjectId: string | undefined = undefined;
-    if (fromObjectId) {
-        const storyObj = await prisma.storyObject.findFirst({ where: { id: fromObjectId, projectId } });
-        if (storyObj) {
-            resolvedFromObjectId = fromObjectId;
-        } else if (project.universeId) {
-            const worldObj = await prisma.worldObject.findFirst({ where: { id: fromObjectId, universeId: project.universeId } });
-            if (!worldObj) throw new Error("fromObjectId not found in this project or linked universe");
-            resolvedFromWorldObjectId = fromObjectId;
-        } else {
-            throw new Error("fromObjectId not found in this project");
+    async function resolveObjectId(objectId: string, fieldName: string): Promise<{ objectId?: string; worldObjectId?: string }> {
+        const storyObj = await prisma.storyObject.findFirst({ where: { id: objectId, projectId } });
+        if (storyObj) return { objectId };
+        if (universeId) {
+            const worldObj = await prisma.worldObject.findFirst({ where: { id: objectId, universeId } });
+            if (!worldObj) throw new Error(`${fieldName} not found in this project or linked universe`);
+            return { worldObjectId: objectId };
         }
+        throw new Error(`${fieldName} not found in this project`);
     }
+
+    const { objectId: resolvedFromObjectId, worldObjectId: resolvedFromWorldObjectId } =
+        fromObjectId ? await resolveObjectId(fromObjectId, "fromObjectId") : {};
     if (toNodeId) {
         const node = await prisma.structureNode.findFirst({ where: { id: toNodeId, projectId } });
         if (!node) throw new Error("toNodeId not found in this project");
     }
-    let resolvedToObjectId: string | undefined = undefined;
-    let resolvedToWorldObjectId: string | undefined = undefined;
-    if (toObjectId) {
-        const storyObj = await prisma.storyObject.findFirst({ where: { id: toObjectId, projectId } });
-        if (storyObj) {
-            resolvedToObjectId = toObjectId;
-        } else if (project.universeId) {
-            const worldObj = await prisma.worldObject.findFirst({ where: { id: toObjectId, universeId: project.universeId } });
-            if (!worldObj) throw new Error("toObjectId not found in this project or linked universe");
-            resolvedToWorldObjectId = toObjectId;
-        } else {
-            throw new Error("toObjectId not found in this project");
-        }
-    }
+    const { objectId: resolvedToObjectId, worldObjectId: resolvedToWorldObjectId } =
+        toObjectId ? await resolveObjectId(toObjectId, "toObjectId") : {};
 
     const relationship = await prisma.relationship.create({
         data: {
