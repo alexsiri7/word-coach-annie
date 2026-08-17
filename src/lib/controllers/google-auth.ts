@@ -65,7 +65,11 @@ export class GoogleAuthController {
             expiry_date: cred.expiresAt.getTime()
         });
 
-        // Setup token refresh handler
+        // Defensive: remove any previously attached 'tokens' listeners before adding a
+        // new one. Currently a no-op — getClient() creates a fresh OAuth2Client instance
+        // on every call so there are no prior listeners to remove. Kept as a guard
+        // against listener accumulation if client caching is introduced in a future refactor.
+        client.removeAllListeners('tokens');
         client.on('tokens', async (tokens) => {
             if (tokens.access_token) {
                 try {

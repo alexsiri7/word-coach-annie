@@ -1,4 +1,4 @@
-import { Registry, Counter, Histogram, Gauge } from "prom-client";
+import { Registry, Counter, Histogram, Gauge, collectDefaultMetrics } from "prom-client";
 
 interface MetricsState {
   registry: Registry;
@@ -50,6 +50,9 @@ function createMetrics(): MetricsState {
     help: "Total users in the database",
     registers: [registry],
   });
+
+  // Enable Node.js default metrics (heap, RSS, GC stats, event loop lag, etc.)
+  collectDefaultMetrics({ register: registry });
 
   return { registry, httpRequestCounter, httpRequestDuration, projectsGauge, usersGauge };
 }

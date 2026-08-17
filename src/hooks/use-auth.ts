@@ -72,14 +72,16 @@ export function useAuth(): AuthState {
         refresh();
     }, [refresh]);
 
-    // Start interval when authenticated, clear when not
+    // Start interval when authenticated; cleanup clears it on unmount or when auth changes.
     useEffect(() => {
-        if (renewTimerRef.current) clearInterval(renewTimerRef.current);
-        renewTimerRef.current = null;
-        if (authenticated) {
-            renewTimerRef.current = setInterval(silentRenew, SILENT_RENEW_INTERVAL_MS);
-        }
-        return () => { if (renewTimerRef.current) clearInterval(renewTimerRef.current); };
+        if (!authenticated) return;
+        renewTimerRef.current = setInterval(silentRenew, SILENT_RENEW_INTERVAL_MS);
+        return () => {
+            if (renewTimerRef.current) {
+                clearInterval(renewTimerRef.current);
+                renewTimerRef.current = null;
+            }
+        };
     }, [authenticated, silentRenew]);
 
     return { authenticated, user, loading, logout, refresh };

@@ -5,6 +5,7 @@
  * The cache lives in the Node.js process — it resets when the MCP server restarts.
  */
 import { trace } from "@opentelemetry/api";
+import { logger } from "@/lib/logger";
 
 interface CacheEntry<T> {
     value: T;
@@ -22,12 +23,35 @@ function addCacheEvent(eventName: string, attrs: Record<string, string | number>
 export class TTLCache {
     private store = new Map<string, CacheEntry<unknown>>();
     private defaultTTL: number;
+    private sweepTimer: ReturnType<typeof setInterval>;
 
     /**
      * @param defaultTTLMs Default time-to-live in milliseconds (default: 30 seconds)
      */
     constructor(defaultTTLMs: number = 30_000) {
         this.defaultTTL = defaultTTLMs;
+        // Proactively sweep expired entries every 60s so they don't linger
+        // if never re-accessed. .unref() prevents this timer from blocking exit.
+        this.sweepTimer = setInterval(() => {
+            try {
+                const now = Date.now();
+                for (const [key, entry] of this.store) {
+                    if (now > entry.expiresAt) {
+                        this.store.delete(key);
+                    }
+                }
+            } catch (err) {
+                // Defensive: sweep must never crash the process
+                logger.error("TTLCache sweep error", err);
+            }
+        }, 60_000);
+        this.sweepTimer.unref();
+    }
+
+    /** Stop the sweep timer and clear all entries. */
+    dispose(): void {
+        clearInterval(this.sweepTimer);
+        this.store.clear();
     }
 
     get<T>(key: string): T | undefined {
