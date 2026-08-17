@@ -65,7 +65,9 @@ export class GoogleAuthController {
             expiry_date: cred.expiresAt.getTime()
         });
 
-        // Setup token refresh handler
+        // Setup token refresh handler — remove any previously attached listeners
+        // before adding a new one to prevent accumulation on reused client objects.
+        client.removeAllListeners('tokens');
         client.on('tokens', async (tokens) => {
             if (tokens.access_token) {
                 try {

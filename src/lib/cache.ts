@@ -28,6 +28,16 @@ export class TTLCache {
      */
     constructor(defaultTTLMs: number = 30_000) {
         this.defaultTTL = defaultTTLMs;
+        // Proactively sweep expired entries every 60s so they don't linger
+        // if never re-accessed. .unref() prevents this timer from blocking exit.
+        setInterval(() => {
+            const now = Date.now();
+            for (const [key, entry] of this.store) {
+                if (now > entry.expiresAt) {
+                    this.store.delete(key);
+                }
+            }
+        }, 60_000).unref();
     }
 
     get<T>(key: string): T | undefined {
