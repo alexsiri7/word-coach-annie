@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, REFRESH_COOKIE_NAME, SESSION_MAX_AGE, REFRESH_MAX_AGE, verifySessionToken } from "@/lib/auth";
-import { verifyRefreshToken } from "@/lib/auth-server";
+import { SESSION_COOKIE_NAME, REFRESH_COOKIE_NAME, SESSION_MAX_AGE, REFRESH_MAX_AGE } from "@/lib/auth";
+import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
     if (sessionCookie) {
-        const session = await verifySessionToken(sessionCookie);
+        const session = await verifySessionTokenNode(sessionCookie);
         if (session?.jti) {
             // Use SESSION_MAX_AGE as a safe upper bound for blocklist expiry.
             // Actual token exp = iat + SESSION_MAX_AGE; using now + SESSION_MAX_AGE is always >= actual exp.

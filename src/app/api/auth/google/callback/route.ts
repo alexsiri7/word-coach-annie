@@ -141,14 +141,20 @@ export async function GET(request: NextRequest) {
             picture: user.picture || undefined,
         });
 
-        // Issue long-lived refresh token alongside session cookie
-        const { createRefreshToken } = await import("@/lib/auth-server");
-        const refreshJwt = await createRefreshToken({
-            userId: user.id,
-            email: user.email,
-            name: user.name,
-            picture: user.picture || undefined,
-        });
+        // Issue long-lived refresh token alongside session cookie (non-fatal: login proceeds even if this fails)
+        let refreshJwt: string | null = null;
+        try {
+            const { createRefreshToken } = await import("@/lib/auth-server");
+            refreshJwt = await createRefreshToken({
+                userId: user.id,
+                email: user.email,
+                name: user.name,
+                picture: user.picture || undefined,
+            });
+        } catch (refreshErr) {
+            // Non-fatal: session cookie is still issued. Log so ops can fix the key config.
+            logger.error("GET /api/auth/google/callback: failed to mint refresh token (login proceeds without it)", refreshErr);
+        }
 
         // Redirect to the original page (if set) or home
         // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
@@ -174,21 +180,23 @@ export async function GET(request: NextRequest) {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             // SameSite=Lax (not Strict) is required for OAuth flows: the redirect chain
-            // from Google back to /oauth/authorize inherits a cross-site context, so
-            // Strict cookies are silently dropped by the browser before reaching the
+            // from Google back to /api/auth/google/callback inherits a cross-site context,
+            // so Strict cookies are silently dropped by the browser before reaching the
             // middleware. Lax still blocks cross-site POST (CSRF vector); the session
             // cookie is httpOnly so JS cannot read it regardless.
             sameSite: "lax",
             maxAge: SESSION_MAX_AGE,
             path: "/",
         });
-        response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: REFRESH_MAX_AGE,
-            path: "/api/auth/",
-        });
+        if (refreshJwt) {
+            response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: REFRESH_MAX_AGE,
+                path: "/api/auth/",
+            });
+        }
 
         return response;
     } catch (error) {

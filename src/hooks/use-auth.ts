@@ -34,7 +34,7 @@ export function useAuth(): AuthState {
                 window.location.href = "/login";
             }
         } catch {
-            // transient — leave cookie in place
+            // Network error — do not update auth state; will retry on next interval
         }
     }, []);
 

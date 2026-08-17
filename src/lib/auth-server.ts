@@ -59,8 +59,14 @@ export async function verifyRefreshToken(token: string): Promise<RefreshPayload 
             jti: payload.jti as string | undefined,
         };
 
-        if (result.jti && (await isTokenRevoked(result.jti))) {
-            return null;
+        if (result.jti) {
+            try {
+                if (await isTokenRevoked(result.jti)) return null;
+            } catch (blocklistErr) {
+                // DB unavailable — fail-closed: reject the token rather than accept it with unknown revocation status
+                logger.error("verifyRefreshToken: blocklist check failed, rejecting token as precaution", blocklistErr);
+                return null;
+            }
         }
 
         return result;
@@ -74,6 +80,11 @@ export async function verifyRefreshToken(token: string): Promise<RefreshPayload 
 export async function verifySessionTokenNode(token: string) {
     const session = await verifySessionToken(token);
     if (!session) return null;
-    if (session.jti && (await isTokenRevoked(session.jti))) return null;
+    try {
+        if (session.jti && (await isTokenRevoked(session.jti))) return null;
+    } catch (err) {
+        logger.error("verifySessionTokenNode: unexpected error checking blocklist", err);
+        return null; // fail-safe: treat as unverifiable
+    }
     return session;
 }

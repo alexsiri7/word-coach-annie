@@ -200,13 +200,14 @@ describe("verifySessionTokenNode — blocklist integration", () => {
     it("returns null if isTokenRevoked throws unexpectedly", async () => {
         // Note: the real isTokenRevoked catches DB errors and returns false (fail-open behavior).
         // That fail-open is tested in token-blocklist.test.ts.
-        // This test documents verifySessionTokenNode's behavior if isTokenRevoked ever throws.
+        // verifySessionTokenNode wraps the blocklist check in a try-catch: unexpected errors
+        // are logged and treated as null (fail-safe) rather than propagated to callers.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Unexpected"));
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        // isTokenRevoked throws → bubbles up from verifySessionTokenNode
-        await expect(verifySessionTokenNode(token)).rejects.toThrow("Unexpected");
+        // isTokenRevoked throws → caught inside verifySessionTokenNode → returns null
+        await expect(verifySessionTokenNode(token)).resolves.toBeNull();
     });
 
     it("verifySessionToken (Edge-safe) does NOT check blocklist", async () => {

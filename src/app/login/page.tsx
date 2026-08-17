@@ -33,7 +33,7 @@ function LoginForm() {
                 }
             })
             .catch(() => setCheckingRefresh(false));
-    }, []);
+    }, [searchParams, router]);
 
     if (checkingRefresh) {
         return <div className="text-center text-sm text-muted-foreground">Checking session…</div>;
