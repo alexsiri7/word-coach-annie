@@ -4,7 +4,9 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import {
     SESSION_COOKIE_NAME,
+    REFRESH_COOKIE_NAME,
     SESSION_MAX_AGE,
+    REFRESH_MAX_AGE,
     createSessionToken,
     isAllowedRedirect,
     resolveJwtSecret,
@@ -139,6 +141,15 @@ export async function GET(request: NextRequest) {
             picture: user.picture || undefined,
         });
 
+        // Issue long-lived refresh token alongside session cookie
+        const { createRefreshToken } = await import("@/lib/auth-server");
+        const refreshJwt = await createRefreshToken({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            picture: user.picture || undefined,
+        });
+
         // Redirect to the original page (if set) or home
         // Use GOOGLE_REDIRECT_URI origin to avoid Docker container hostname in redirect
         const redirectTo = request.cookies.get("oauth_redirect")?.value;
@@ -170,6 +181,13 @@ export async function GET(request: NextRequest) {
             sameSite: "lax",
             maxAge: SESSION_MAX_AGE,
             path: "/",
+        });
+        response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: REFRESH_MAX_AGE,
+            path: "/api/auth/",
         });
 
         return response;

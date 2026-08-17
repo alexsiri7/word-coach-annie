@@ -12,12 +12,15 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "annie_session";
+const REFRESH_COOKIE_NAME = "annie_refresh";
 const SESSION_MAX_AGE = 60 * 60; // 1 hour — Edge Runtime cannot check blocklist; short lifetime is the compensating control
+const REFRESH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days — long-lived refresh token, verified only in Node.js (blocklist checked)
 
-export { SESSION_COOKIE_NAME, SESSION_MAX_AGE };
+export { SESSION_COOKIE_NAME, REFRESH_COOKIE_NAME, SESSION_MAX_AGE, REFRESH_MAX_AGE };
 
 export const JWT_ISSUER = "word-coach-annie";
 export const JWT_AUDIENCE_SESSION = "word-coach-annie:session";
+export const JWT_AUDIENCE_REFRESH = "word-coach-annie:refresh";
 
 /** JWT payload shape for Google OAuth sessions. */
 export interface SessionPayload {
@@ -100,14 +103,10 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
                 jti: payload.jti as string | undefined,
             };
 
-            // Check revocation blocklist in Node.js contexts.
-            // Edge runtime (middleware) skips this — short token lifetime is the compensating control.
-            if (session.jti && typeof (globalThis as Record<string, unknown>).EdgeRuntime === "undefined") {
-                const { isTokenRevoked } = await import("@/lib/token-blocklist");
-                if (await isTokenRevoked(session.jti)) {
-                    return null;
-                }
-            }
+            // Revocation blocklist check is intentionally absent here so that
+            // this function is Edge-safe (no Node.js DB imports).
+            // Node.js API routes that need blocklist enforcement must use
+            // verifySessionTokenNode from auth-server.ts instead.
 
             return session;
         }

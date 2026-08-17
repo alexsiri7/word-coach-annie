@@ -94,6 +94,15 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
+    it("allows /api/auth/refresh without a session cookie (endpoint handles auth itself)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/api/auth/refresh");
+        const res = await middleware(req);
+        // Public path — middleware passes through; the route handler returns 401 for
+        // missing/revoked cookies (tested in auth-refresh-route.test.ts).
+        expect(res.status).toBe(200);
+    });
+
     it("allows /login path", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/login");
