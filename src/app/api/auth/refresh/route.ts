@@ -14,6 +14,28 @@ import {
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
+const IS_PROD = process.env.NODE_ENV === "production";
+
+function setSessionCookie(response: NextResponse, jwt: string): void {
+    response.cookies.set(SESSION_COOKIE_NAME, jwt, {
+        httpOnly: true,
+        secure: IS_PROD,
+        sameSite: "lax",
+        maxAge: SESSION_MAX_AGE,
+        path: "/",
+    });
+}
+
+function setRefreshCookie(response: NextResponse, jwt: string): void {
+    response.cookies.set(REFRESH_COOKIE_NAME, jwt, {
+        httpOnly: true,
+        secure: IS_PROD,
+        sameSite: "lax",
+        maxAge: REFRESH_MAX_AGE,
+        path: "/api/auth/",
+    });
+}
+
 export async function POST(request: NextRequest) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
@@ -30,13 +52,7 @@ export async function POST(request: NextRequest) {
                     picture: session.picture,
                 });
                 const response = NextResponse.json({ ok: true });
-                response.cookies.set(SESSION_COOKIE_NAME, freshJwt, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === "production",
-                    sameSite: "lax",
-                    maxAge: SESSION_MAX_AGE,
-                    path: "/",
-                });
+                setSessionCookie(response, freshJwt);
                 return response;
             } catch (err) {
                 logger.error("POST /api/auth/refresh: failed to mint new session from active session", err);
@@ -56,33 +72,17 @@ export async function POST(request: NextRequest) {
                     const expiresAt = new Date(Date.now() + REFRESH_MAX_AGE * 1000);
                     await revokeToken(refresh.jti, refresh.userId, expiresAt);
                 }
-                const freshJwt = await createSessionToken({
+                const userInfo = {
                     userId: refresh.userId,
                     email: refresh.email,
                     name: refresh.name,
                     picture: refresh.picture,
-                });
-                const freshRefreshJwt = await createRefreshToken({
-                    userId: refresh.userId,
-                    email: refresh.email,
-                    name: refresh.name,
-                    picture: refresh.picture,
-                });
+                };
+                const freshJwt = await createSessionToken(userInfo);
+                const freshRefreshJwt = await createRefreshToken(userInfo);
                 const response = NextResponse.json({ ok: true });
-                response.cookies.set(SESSION_COOKIE_NAME, freshJwt, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === "production",
-                    sameSite: "lax",
-                    maxAge: SESSION_MAX_AGE,
-                    path: "/",
-                });
-                response.cookies.set(REFRESH_COOKIE_NAME, freshRefreshJwt, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === "production",
-                    sameSite: "lax",
-                    maxAge: REFRESH_MAX_AGE,
-                    path: "/api/auth/",
-                });
+                setSessionCookie(response, freshJwt);
+                setRefreshCookie(response, freshRefreshJwt);
                 return response;
             } catch (err) {
                 logger.error("POST /api/auth/refresh: failed to mint new session from refresh token", err);
