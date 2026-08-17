@@ -58,7 +58,10 @@ export function useAuth(): AuthState {
     }, []);
 
     const logout = useCallback(async () => {
-        if (renewTimerRef.current) { clearInterval(renewTimerRef.current); renewTimerRef.current = null; }
+        if (renewTimerRef.current) {
+            clearInterval(renewTimerRef.current);
+            renewTimerRef.current = null;
+        }
         await fetch("/api/auth/logout", { method: "POST" });
         setAuthenticated(false);
         setUser(null);
