@@ -316,7 +316,9 @@ Delete a node and all its children recursively.
 ### `POST /api/projects/:id/nodes`
 Create a new structure node under a project.
 
-**Body**: `{ type: "PART|CHAPTER|SCENE", title: "string", parentId?: "string", orderIndex?: number }`
+**Body**: `{ type: "PART|CHAPTER|SCENE", title: "string", parentId?: "string", orderIndex?: number, insertAfterIndex?: number }`
+
+`insertAfterIndex` — when provided, inserts the new node immediately after the sibling node with that `orderIndex`, shifting subsequent siblings up. Takes precedence over `orderIndex`.
 
 ---
 

@@ -267,10 +267,13 @@ function NodeContent({
               </>
             )}
             {isScene && (
-              <DropdownMenuItem onClick={() => onAddNode(node.parentId, "SCENE", node.orderIndex)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Next Scene
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={() => onAddNode(node.parentId, "SCENE", node.orderIndex)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Next Scene
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
             )}
             <DropdownMenuItem onClick={() => onRenameNode(node.id, node.title)}>
               <Pencil className="h-4 w-4 mr-2" />

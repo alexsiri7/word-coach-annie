@@ -808,7 +808,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Add Node Dialog */}
-      <Dialog open={addNodeDialogOpen} onOpenChange={setAddNodeDialogOpen}>
+      <Dialog open={addNodeDialogOpen} onOpenChange={(open) => { setAddNodeDialogOpen(open); if (!open) setAddNodeInsertAfterIndex(undefined); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -830,7 +830,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddNodeDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setAddNodeDialogOpen(false); setAddNodeInsertAfterIndex(undefined); }}>
               Cancel
             </Button>
             <Button onClick={handleAddNode} disabled={!addNodeTitle.trim()}>

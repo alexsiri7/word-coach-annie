@@ -35,6 +35,37 @@ function mockParams(projectId: string) {
   return { params: Promise.resolve({ id: projectId }) };
 }
 
+describe("POST /api/projects/[id]/nodes - insertAfterIndex wiring", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("passes insertAfterIndex to StructureController.createNode when provided", async () => {
+    vi.mocked(StructureController.createNode).mockResolvedValue({ id: "new-scene-id" } as never);
+    const { POST } = await import("@/app/api/projects/[id]/nodes/route");
+    const res = await POST(
+      makePostRequest({ type: "SCENE", title: "Scene 3", parentId: "ch-1", insertAfterIndex: 2 }),
+      mockParams("proj-1")
+    );
+    expect(res.status).toBe(201);
+    expect(vi.mocked(StructureController.createNode)).toHaveBeenCalledWith(
+      expect.objectContaining({ insertAfterIndex: 2, type: "SCENE", title: "Scene 3", parentId: "ch-1" })
+    );
+  });
+
+  it("does not pass insertAfterIndex to StructureController.createNode when omitted", async () => {
+    vi.mocked(StructureController.createNode).mockResolvedValue({ id: "new-chapter-id" } as never);
+    const { POST } = await import("@/app/api/projects/[id]/nodes/route");
+    const res = await POST(
+      makePostRequest({ type: "CHAPTER", title: "Chapter 1" }),
+      mockParams("proj-1")
+    );
+    expect(res.status).toBe(201);
+    const call = vi.mocked(StructureController.createNode).mock.calls[0][0];
+    expect(call.insertAfterIndex).toBeUndefined();
+  });
+});
+
 describe("POST /api/projects/[id]/nodes - error handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
