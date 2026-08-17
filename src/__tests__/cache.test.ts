@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TTLCache } from "@/lib/cache";
 
 describe("TTLCache", () => {
@@ -6,6 +6,10 @@ describe("TTLCache", () => {
 
     beforeEach(() => {
         cache = new TTLCache(1000); // 1s default TTL
+    });
+
+    afterEach(() => {
+        cache.dispose();
     });
 
     it("returns undefined for missing keys", () => {
@@ -32,8 +36,8 @@ describe("TTLCache", () => {
 
     it("sweeps expired entries on 60-second interval", () => {
         vi.useFakeTimers();
+        const sweepCache = new TTLCache(1000);
         try {
-            const sweepCache = new TTLCache(1000);
             sweepCache.set("soon", "x", 500);
             sweepCache.set("later", "y", 120_000);
 
@@ -43,6 +47,7 @@ describe("TTLCache", () => {
             expect(sweepCache.size).toBe(1);
             expect(sweepCache.get("later")).toBe("y");
         } finally {
+            sweepCache.dispose();
             vi.useRealTimers();
         }
     });
@@ -94,5 +99,20 @@ describe("TTLCache", () => {
         cache.set("b", 2);
         cache.clear();
         expect(cache.size).toBe(0);
+    });
+
+    it("dispose stops the sweep timer and clears entries", () => {
+        vi.useFakeTimers();
+        const disposable = new TTLCache(1000);
+        try {
+            disposable.set("a", 1, 500);
+            disposable.dispose();
+
+            // After dispose, sweep should not run
+            vi.advanceTimersByTime(60_001);
+            expect(disposable.size).toBe(0); // cleared by dispose
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
