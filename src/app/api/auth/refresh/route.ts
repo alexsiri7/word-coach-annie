@@ -3,12 +3,15 @@ import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     REFRESH_COOKIE_NAME,
+    REFRESH_MAX_AGE,
 } from "@/lib/auth";
 import {
     verifySessionTokenNode,
     verifyRefreshToken,
     createSessionToken,
+    createRefreshToken,
 } from "@/lib/auth-server";
+import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
@@ -47,7 +50,19 @@ export async function POST(request: NextRequest) {
         const refresh = await verifyRefreshToken(refreshCookie);
         if (refresh) {
             try {
+                // Rotate the refresh token: revoke old jti before issuing new one.
+                // This limits leaked refresh token exposure to ~45 min (next legitimate use invalidates it).
+                if (refresh.jti) {
+                    const expiresAt = new Date(Date.now() + REFRESH_MAX_AGE * 1000);
+                    await revokeToken(refresh.jti, refresh.userId, expiresAt);
+                }
                 const freshJwt = await createSessionToken({
+                    userId: refresh.userId,
+                    email: refresh.email,
+                    name: refresh.name,
+                    picture: refresh.picture,
+                });
+                const freshRefreshJwt = await createRefreshToken({
                     userId: refresh.userId,
                     email: refresh.email,
                     name: refresh.name,
@@ -60,6 +75,13 @@ export async function POST(request: NextRequest) {
                     sameSite: "lax",
                     maxAge: SESSION_MAX_AGE,
                     path: "/",
+                });
+                response.cookies.set(REFRESH_COOKIE_NAME, freshRefreshJwt, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                    maxAge: REFRESH_MAX_AGE,
+                    path: "/api/auth/",
                 });
                 return response;
             } catch (err) {

@@ -5,8 +5,8 @@ vi.mock("@/lib/token-blocklist", () => ({
     isTokenRevoked: vi.fn(async () => false),
 }));
 
-const { mockVerifySessionToken, mockVerifyRefreshToken } = vi.hoisted(() => ({
-    mockVerifySessionToken: vi.fn(async () => ({
+const { mockVerifySessionTokenNode, mockVerifyRefreshToken } = vi.hoisted(() => ({
+    mockVerifySessionTokenNode: vi.fn(async () => ({
         userId: "u1",
         email: "u@test.com",
         name: "U",
@@ -20,10 +20,10 @@ vi.mock("@/lib/auth", () => ({
     REFRESH_COOKIE_NAME: "annie_refresh",
     SESSION_MAX_AGE: 3600,
     REFRESH_MAX_AGE: 2592000,
-    verifySessionToken: mockVerifySessionToken,
 }));
 
 vi.mock("@/lib/auth-server", () => ({
+    verifySessionTokenNode: mockVerifySessionTokenNode,
     verifyRefreshToken: mockVerifyRefreshToken,
 }));
 
@@ -33,7 +33,7 @@ import { revokeToken } from "@/lib/token-blocklist";
 describe("POST /api/auth/logout", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockVerifySessionToken.mockResolvedValue({
+        mockVerifySessionTokenNode.mockResolvedValue({
             userId: "u1",
             email: "u@test.com",
             name: "U",
@@ -54,7 +54,7 @@ describe("POST /api/auth/logout", () => {
     });
 
     it("should revoke the refresh token jti when a valid refresh cookie is present", async () => {
-        mockVerifySessionToken.mockResolvedValueOnce(null);
+        mockVerifySessionTokenNode.mockResolvedValueOnce(null);
         mockVerifyRefreshToken.mockResolvedValueOnce({
             userId: "u1",
             email: "u@test.com",
@@ -98,7 +98,7 @@ describe("POST /api/auth/logout", () => {
     });
 
     it("should revoke both session and refresh token jtis when both cookies are present", async () => {
-        mockVerifySessionToken.mockResolvedValueOnce({
+        mockVerifySessionTokenNode.mockResolvedValueOnce({
             userId: "u1",
             email: "u@test.com",
             name: "U",
@@ -123,7 +123,7 @@ describe("POST /api/auth/logout", () => {
     });
 
     it("should clear cookies and not attempt revocation when no cookies are present", async () => {
-        mockVerifySessionToken.mockResolvedValueOnce(null);
+        mockVerifySessionTokenNode.mockResolvedValueOnce(null);
         const { NextRequest } = await import("next/server");
         const req = new NextRequest("http://localhost/api/auth/logout", { method: "POST" });
         const response = await POST(req);
