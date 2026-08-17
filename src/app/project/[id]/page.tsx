@@ -236,9 +236,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         ...(addNodeInsertAfterIndex !== undefined ? { insertAfterIndex: addNodeInsertAfterIndex } : {}),
       }),
     });
-    setAddNodeDialogOpen(false);
+    closeAddNodeDialog();
     setAddNodeTitle("");
-    setAddNodeInsertAfterIndex(undefined);
     fetchOutline();
     try {
       const created = await res.json();
@@ -276,6 +275,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setAddObjectDialogOpen(false);
     setAddObjectName("");
     fetchStoryObjects();
+  };
+
+  const closeAddNodeDialog = () => {
+    setAddNodeDialogOpen(false);
+    setAddNodeInsertAfterIndex(undefined);
   };
 
   const openAddNode = (parentId: string | null, type: "CHAPTER" | "SCENE", insertAfterIndex?: number) => {
@@ -808,7 +812,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Add Node Dialog */}
-      <Dialog open={addNodeDialogOpen} onOpenChange={(open) => { setAddNodeDialogOpen(open); if (!open) setAddNodeInsertAfterIndex(undefined); }}>
+      <Dialog open={addNodeDialogOpen} onOpenChange={(open) => { if (!open) closeAddNodeDialog(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -830,7 +834,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setAddNodeDialogOpen(false); setAddNodeInsertAfterIndex(undefined); }}>
+            <Button variant="outline" onClick={closeAddNodeDialog}>
               Cancel
             </Button>
             <Button onClick={handleAddNode} disabled={!addNodeTitle.trim()}>
