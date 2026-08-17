@@ -30,6 +30,23 @@ describe("TTLCache", () => {
         }
     });
 
+    it("sweeps expired entries on 60-second interval", () => {
+        vi.useFakeTimers();
+        try {
+            const sweepCache = new TTLCache(1000);
+            sweepCache.set("soon", "x", 500);
+            sweepCache.set("later", "y", 120_000);
+
+            vi.advanceTimersByTime(60_001);
+
+            // "soon" expired before the sweep fired; "later" has not
+            expect(sweepCache.size).toBe(1);
+            expect(sweepCache.get("later")).toBe("y");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("getOrSet returns cached value on hit", async () => {
         const factory = vi.fn().mockResolvedValue("computed");
         cache.set("key", "cached");

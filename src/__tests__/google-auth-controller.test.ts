@@ -2,11 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { testPrisma } from "./setup";
 
+// Track the most recently constructed OAuth2 mock instance so tests can inspect it.
+let lastOAuth2Instance: { removeAllListeners: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> } | null = null;
+
 // Mock googleapis to avoid needing real credentials
 vi.mock("googleapis", () => ({
     google: {
         auth: {
             OAuth2: class {
+                removeAllListeners = vi.fn();
                 generateAuthUrl = vi.fn().mockReturnValue("https://accounts.google.com/auth?test=1");
                 getToken = vi.fn().mockResolvedValue({
                     tokens: {
@@ -18,6 +22,9 @@ vi.mock("googleapis", () => ({
                 });
                 setCredentials = vi.fn();
                 on = vi.fn();
+                constructor() {
+                    lastOAuth2Instance = this as unknown as typeof lastOAuth2Instance;
+                }
             },
         },
     },
@@ -175,6 +182,51 @@ describe("GoogleAuthController", () => {
 
             const client = await GoogleAuthController.getValidClient("user-B");
             expect(client).toBeNull();
+        });
+
+        it("removes previous 'tokens' listener before adding a new one", async () => {
+            await testPrisma.googleCredential.create({
+                data: {
+                    userId: "local",
+                    accessToken: "test-token",
+                    refreshToken: "test-refresh",
+                    expiresAt: new Date(Date.now() + 3600000),
+                    scope: "test-scope"
+                }
+            });
+
+            await GoogleAuthController.getValidClient(null);
+
+            const instance = lastOAuth2Instance!;
+            expect(instance.removeAllListeners).toHaveBeenCalledWith("tokens");
+            expect(instance.on).toHaveBeenCalledWith("tokens", expect.any(Function));
+            // removeAllListeners must be called before on
+            expect(instance.removeAllListeners.mock.invocationCallOrder[0])
+                .toBeLessThan(instance.on.mock.invocationCallOrder[0]);
+        });
+
+        it("does not accumulate listeners across multiple getValidClient calls", async () => {
+            await testPrisma.googleCredential.create({
+                data: {
+                    userId: "local",
+                    accessToken: "test-token",
+                    refreshToken: "test-refresh",
+                    expiresAt: new Date(Date.now() + 3600000),
+                    scope: "test-scope"
+                }
+            });
+
+            await GoogleAuthController.getValidClient(null);
+            const firstInstance = lastOAuth2Instance!;
+
+            await GoogleAuthController.getValidClient(null);
+            const secondInstance = lastOAuth2Instance!;
+
+            // Each call creates a fresh client — each must clear then attach exactly once
+            expect(firstInstance.removeAllListeners).toHaveBeenCalledTimes(1);
+            expect(firstInstance.on).toHaveBeenCalledTimes(1);
+            expect(secondInstance.removeAllListeners).toHaveBeenCalledTimes(1);
+            expect(secondInstance.on).toHaveBeenCalledTimes(1);
         });
     });
 
