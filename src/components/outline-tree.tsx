@@ -54,7 +54,7 @@ interface OutlineTreeProps {
   projectType: ProjectType;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
-  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE") => void;
+  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE", insertAfterIndex?: number) => void;
   onRenameNode: (nodeId: string, currentTitle: string) => void;
   onDeleteNode: (nodeId: string, title: string) => void;
   onMoveNode?: (nodeId: string, newParentId: string | null, newIndex: number) => void;
@@ -152,7 +152,7 @@ function NodeContent({
   isDragging?: boolean;
   onToggleExpand?: () => void;
   onSelectNode: (nodeId: string) => void;
-  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE") => void;
+  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE", insertAfterIndex?: number) => void;
   onRenameNode: (nodeId: string, currentTitle: string) => void;
   onDeleteNode: (nodeId: string, title: string) => void;
   dragHandleProps?: Record<string, unknown>;
@@ -266,6 +266,12 @@ function NodeContent({
                 <DropdownMenuSeparator />
               </>
             )}
+            {isScene && (
+              <DropdownMenuItem onClick={() => onAddNode(node.parentId, "SCENE", node.orderIndex)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Next Scene
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onRenameNode(node.id, node.title)}>
               <Pencil className="h-4 w-4 mr-2" />
               Rename
@@ -311,7 +317,7 @@ function SortableTreeNode({
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onSelectNode: (nodeId: string) => void;
-  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE") => void;
+  onAddNode: (parentId: string | null, type: "CHAPTER" | "SCENE", insertAfterIndex?: number) => void;
   onRenameNode: (nodeId: string, currentTitle: string) => void;
   onDeleteNode: (nodeId: string, title: string) => void;
   overNodeId: string | null;

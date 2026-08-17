@@ -116,6 +116,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [addNodeParentId, setAddNodeParentId] = useState<string | null>(null);
   const [addNodeType, setAddNodeType] = useState<"CHAPTER" | "SCENE">("CHAPTER");
   const [addNodeTitle, setAddNodeTitle] = useState("");
+  const [addNodeInsertAfterIndex, setAddNodeInsertAfterIndex] = useState<number | undefined>(undefined);
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameNodeId, setRenameNodeId] = useState<string | null>(null);
@@ -225,18 +226,24 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Handlers
   const handleAddNode = async () => {
     if (!addNodeTitle.trim()) return;
-    await offlineFetch(`/api/projects/${projectId}/nodes`, {
+    const res = await offlineFetch(`/api/projects/${projectId}/nodes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: addNodeTitle,
         type: addNodeType,
         parentId: addNodeParentId,
+        ...(addNodeInsertAfterIndex !== undefined ? { insertAfterIndex: addNodeInsertAfterIndex } : {}),
       }),
     });
     setAddNodeDialogOpen(false);
     setAddNodeTitle("");
+    setAddNodeInsertAfterIndex(undefined);
     fetchOutline();
+    try {
+      const created = await res.json();
+      if (created?.id) setSelectedNodeId(created.id);
+    } catch {}
   };
 
   const handleRenameNode = async () => {
@@ -271,10 +278,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     fetchStoryObjects();
   };
 
-  const openAddNode = (parentId: string | null, type: "CHAPTER" | "SCENE") => {
+  const openAddNode = (parentId: string | null, type: "CHAPTER" | "SCENE", insertAfterIndex?: number) => {
     setAddNodeParentId(parentId);
     setAddNodeType(type);
     setAddNodeTitle("");
+    setAddNodeInsertAfterIndex(insertAfterIndex);
     setAddNodeDialogOpen(true);
   };
 
