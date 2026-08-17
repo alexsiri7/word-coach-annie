@@ -47,7 +47,18 @@ Returns the current authenticated user (Google OAuth only).
 ---
 
 ### `POST /api/auth/logout`
-Clears the session cookie.
+Revokes the session and refresh token JTIs (via blocklist) and clears both `annie_session` and `annie_refresh` cookies.
+
+---
+
+### `POST /api/auth/refresh`
+Silently renew the session cookie. Called automatically by the client every 45 minutes.
+
+**Path 1** (session still valid): Verifies the `annie_session` cookie and re-issues it with a fresh 1-hour `Max-Age`.
+
+**Path 2** (session expired): Falls back to the `annie_refresh` cookie (30-day lifetime, blocklist-checked). If valid, issues a new `annie_session` cookie.
+
+**Response**: `200 { "ok": true }` with updated `Set-Cookie` header, or `401 { "error": "Session expired or revoked" }`.
 
 ---
 
@@ -57,7 +68,7 @@ Initiates Google OAuth flow. Redirects to Google's consent screen.
 ---
 
 ### `GET /api/auth/google/callback`
-OAuth callback. Validates the code, creates/updates `GoogleCredential`, sets session cookie, and redirects to app.
+OAuth callback. Validates the code, creates/updates `GoogleCredential`, sets session and refresh cookies, and redirects to app.
 
 ---
 

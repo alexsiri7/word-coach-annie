@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isAllowedRedirect } from "@/lib/auth";
 
 function sanitizeRedirect(from: string | null): string {
     if (!from) return "/";
@@ -17,8 +18,26 @@ function LoginForm() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showTokenForm, setShowTokenForm] = useState(false);
+    const [checkingRefresh, setCheckingRefresh] = useState(true);
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    useEffect(() => {
+        fetch("/api/auth/refresh", { method: "POST" })
+            .then((res) => {
+                if (res.ok) {
+                    const from = searchParams.get("from");
+                    router.replace(from && isAllowedRedirect(from) ? from : "/");
+                } else {
+                    setCheckingRefresh(false);
+                }
+            })
+            .catch(() => setCheckingRefresh(false));
+    }, [searchParams, router]);
+
+    if (checkingRefresh) {
+        return <div className="text-center text-sm text-muted-foreground">Checking session…</div>;
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

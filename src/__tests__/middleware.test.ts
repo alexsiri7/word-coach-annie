@@ -94,6 +94,15 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
+    it("allows /api/auth/refresh without a session cookie (endpoint handles auth itself)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/api/auth/refresh");
+        const res = await middleware(req);
+        // Public path — middleware passes through; the route handler returns 401 for
+        // missing/revoked cookies (tested in auth-refresh-route.test.ts).
+        expect(res.status).toBe(200);
+    });
+
     it("allows /login path", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/login");
@@ -508,6 +517,19 @@ describe("middleware", () => {
             });
             const res = await middleware(req);
             expect(res.status).toBe(200);
+        });
+
+        it("returns 429 when /api/auth/refresh is called more than 5 times per minute from the same IP", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-forwarded-for": "1.2.3.4" };
+
+            for (let i = 0; i < 5; i++) {
+                await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
+            }
+
+            const res = await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
+            expect(res.status).toBe(429);
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
 
         it("does not rate limit when auth is disabled", async () => {

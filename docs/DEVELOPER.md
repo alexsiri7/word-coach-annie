@@ -59,7 +59,8 @@ src/
 │   ├── controllers/    # Business logic (called by API routes and AI tools)
 │   ├── export/         # Google Docs exporter
 │   ├── api-auth.ts     # Request authentication helpers
-│   ├── auth.ts         # Session/token management
+│   ├── auth.ts         # Session/token management (Edge-safe)
+│   ├── auth-server.ts  # Node.js-only auth (refresh tokens, blocklist)
 │   ├── db.ts           # Prisma client singleton
 │   ├── env.ts          # Validated env vars (Zod)
 │   ├── logger.ts       # Structured logger (pino-compatible)

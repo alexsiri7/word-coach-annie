@@ -3,6 +3,7 @@ import {
     deriveSessionToken,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
+    REFRESH_MAX_AGE,
     createSessionToken,
     verifySessionToken,
     isAuthEnabled,
@@ -12,6 +13,11 @@ import {
     resolveJwtSecret,
     safeEqual,
 } from "@/lib/auth";
+import {
+    createRefreshToken,
+    verifyRefreshToken,
+    verifySessionTokenNode,
+} from "@/lib/auth-server";
 
 vi.mock("@/lib/token-blocklist", () => ({
     isTokenRevoked: vi.fn(async () => false),
@@ -158,7 +164,7 @@ describe("JWT session tokens", () => {
     });
 });
 
-describe("verifySessionToken — blocklist integration", () => {
+describe("verifySessionTokenNode — blocklist integration", () => {
     let origJwt: string | undefined;
 
     beforeEach(async () => {
@@ -172,7 +178,6 @@ describe("verifySessionToken — blocklist integration", () => {
     afterEach(() => {
         if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
         else delete process.env.JWT_SECRET;
-        delete (globalThis as Record<string, unknown>).EdgeRuntime;
     });
 
     it("returns null for a revoked token (blocklist returns true)", async () => {
@@ -180,37 +185,110 @@ describe("verifySessionToken — blocklist integration", () => {
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
+        const result = await verifySessionTokenNode(token);
         expect(result).toBeNull();
         expect(isTokenRevoked).toHaveBeenCalled();
     });
 
     it("returns session when blocklist returns false", async () => {
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
+        const result = await verifySessionTokenNode(token);
         expect(result).not.toBeNull();
         expect(result?.userId).toBe("u1");
     });
 
-    it("returns null if isTokenRevoked throws unexpectedly (propagates to outer catch)", async () => {
+    it("returns null if isTokenRevoked throws unexpectedly", async () => {
         // Note: the real isTokenRevoked catches DB errors and returns false (fail-open behavior).
         // That fail-open is tested in token-blocklist.test.ts.
-        // This test documents verifySessionToken's outer catch behavior if isTokenRevoked ever throws.
+        // verifySessionTokenNode wraps the blocklist check in a try-catch: unexpected errors
+        // are logged and treated as null (fail-safe) rather than propagated to callers.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Unexpected"));
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        const result = await verifySessionToken(token);
-        expect(result).toBeNull(); // outer catch handles it; logs "unexpected error"
+        // isTokenRevoked throws → caught inside verifySessionTokenNode → returns null
+        await expect(verifySessionTokenNode(token)).resolves.toBeNull();
     });
 
-    it("skips blocklist check when EdgeRuntime is set", async () => {
-        (globalThis as Record<string, unknown>).EdgeRuntime = "edge";
+    it("verifySessionToken (Edge-safe) does NOT check blocklist", async () => {
+        // verifySessionToken no longer consults the blocklist — it is Edge-safe.
+        // Use verifySessionTokenNode for blocklist enforcement in Node.js routes.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
         const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U" });
-        await verifySessionToken(token);
+        const result = await verifySessionToken(token);
+        // verifySessionToken returns a valid session (does not check blocklist)
+        expect(result).not.toBeNull();
         expect(isTokenRevoked).not.toHaveBeenCalled();
+    });
+});
+
+describe("refresh token functions", () => {
+    let origJwt: string | undefined;
+
+    beforeEach(async () => {
+        origJwt = process.env.JWT_SECRET;
+        process.env.JWT_SECRET = "test-jwt-secret";
+        const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    });
+
+    afterEach(() => {
+        if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
+        else delete process.env.JWT_SECRET;
+    });
+
+    it("round-trips: createRefreshToken → verifyRefreshToken returns payload", async () => {
+        const payload = { userId: "u1", email: "u@test.com", name: "Test", picture: "https://example.com/pic.jpg" };
+        const token = await createRefreshToken(payload);
+        expect(token).toBeTruthy();
+        expect(token.split(".")).toHaveLength(3);
+
+        const result = await verifyRefreshToken(token);
+        expect(result).not.toBeNull();
+        expect(result!.userId).toBe("u1");
+        expect(result!.email).toBe("u@test.com");
+        expect(result!.name).toBe("Test");
+        expect(result!.picture).toBe("https://example.com/pic.jpg");
+        expect(result!.jti).toBeDefined();
+    });
+
+    it("rejects a session token used as a refresh token (audience mismatch)", async () => {
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifyRefreshToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("rejects a refresh token used as a session token (audience mismatch)", async () => {
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifySessionToken(token);
+        expect(result).toBeNull();
+    });
+
+    it("returns null for a revoked refresh token", async () => {
+        const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        const result = await verifyRefreshToken(token);
+        expect(result).toBeNull();
+        expect(isTokenRevoked).toHaveBeenCalled();
+    });
+
+    it("returns null for a tampered token", async () => {
+        const result = await verifyRefreshToken("not-a-valid-jwt");
+        expect(result).toBeNull();
+    });
+
+    it("refresh token exp matches REFRESH_MAX_AGE (30 days)", async () => {
+        const { jwtVerify } = await import("jose");
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "U" });
+        const key = await getJwtKey();
+        const { payload } = await jwtVerify(token, key, { audience: "word-coach-annie:refresh" });
+        const lifetime = (payload.exp as number) - (payload.iat as number);
+        expect(lifetime).toBe(REFRESH_MAX_AGE);
     });
 });
 

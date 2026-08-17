@@ -125,10 +125,6 @@ export async function createRelationship(params: {
 
     const universeId = project.universeId;
 
-    if (fromNodeId) {
-        const node = await prisma.structureNode.findFirst({ where: { id: fromNodeId, projectId } });
-        if (!node) throw new Error("fromNodeId not found in this project");
-    }
     async function resolveObjectId(objectId: string, fieldName: string): Promise<{ objectId?: string; worldObjectId?: string }> {
         const storyObj = await prisma.storyObject.findFirst({ where: { id: objectId, projectId } });
         if (storyObj) return { objectId };
@@ -140,6 +136,10 @@ export async function createRelationship(params: {
         throw new Error(`${fieldName} not found in this project`);
     }
 
+    if (fromNodeId) {
+        const node = await prisma.structureNode.findFirst({ where: { id: fromNodeId, projectId } });
+        if (!node) throw new Error("fromNodeId not found in this project");
+    }
     const { objectId: resolvedFromObjectId, worldObjectId: resolvedFromWorldObjectId } =
         fromObjectId ? await resolveObjectId(fromObjectId, "fromObjectId") : {};
     if (toNodeId) {

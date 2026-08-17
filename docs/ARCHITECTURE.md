@@ -63,7 +63,8 @@ src/
 │   ├── controllers/            # Business logic (structure, projects, etc.)
 │   ├── export/                 # Google Docs exporter
 │   ├── api-auth.ts             # Request authentication helpers
-│   ├── auth.ts                 # Session/token management
+│   ├── auth.ts                 # Session/token management (Edge-safe)
+│   ├── auth-server.ts          # Node.js-only auth (refresh tokens, blocklist)
 │   ├── db.ts                   # Prisma client singleton
 │   ├── env.ts                  # Validated environment variables
 │   ├── types.ts                # Shared TypeScript types
@@ -188,9 +189,18 @@ The app supports three auth modes (controlled by environment variables):
 
 ### Session Security
 
-Google OAuth sessions are short-lived JWTs (24 hours) with a `jti` (JWT ID) claim. On logout, the `jti` is written to the `RevokedToken` database table via `src/lib/token-blocklist.ts`, and `verifySessionToken` checks revocation on every authenticated Node.js request.
+Google OAuth uses a two-token model:
 
-**Edge Runtime constraint**: Next.js middleware runs in the Edge Runtime and cannot use Prisma. Revocation is skipped there — the 24-hour token lifetime is the compensating control. Do not import `token-blocklist.ts` from middleware or any Edge-compatible module.
+| Token | Cookie | Lifetime | Verified in | Blocklist checked |
+|-------|--------|----------|-------------|-------------------|
+| **Session JWT** | `annie_session` | 1 hour | Edge + Node.js (`verifySessionToken`) | No — short lifetime is the compensating control |
+| **Refresh JWT** | `annie_refresh` | 30 days | Node.js only (`verifyRefreshToken`) | Yes |
+
+On logout, both tokens' `jti` claims are written to the `RevokedToken` table via `src/lib/token-blocklist.ts`. The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
+
+**Module split**: Edge-safe functions (JWT create/verify without DB) live in `src/lib/auth.ts`. Node.js-only functions (blocklist-aware verification, refresh token operations) live in `src/lib/auth-server.ts`. Do not import `auth-server.ts` or `token-blocklist.ts` from middleware or any Edge-compatible module.
+
+- In Node.js API routes, use `verifySessionTokenNode` (from `auth-server.ts`) instead of `verifySessionToken` to ensure revoked sessions are rejected.
 
 ## Content Versioning
 

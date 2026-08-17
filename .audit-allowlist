@@ -341,3 +341,11 @@ GHSA-v3r7-h72x-cjcm
 # Upgrade path: auto-fixable. Consider running `npm audit fix`.
 # App risk: LOW — transitive dep; no direct valibot usage in app code.
 GHSA-5qjj-4xww-7phc
+#
+# Source: deepmerge-ts (via @prisma/config transitive chain)
+# Justification: deepmerge-ts stack exhaustion requires merging recursive object graphs
+# with attacker-controlled input. This app does not pass user-controlled objects to
+# deepmerge-ts; it is used internally by @prisma/config for merging Prisma configuration.
+# Upgrade path: fix available (deepmerge-ts >=8.0.0). Consider running `npm audit fix`.
+# App risk: LOW — no user-controlled input reaches deepmerge-ts; config merging only.
+GHSA-ggr8-5vv4-36mx
