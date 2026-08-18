@@ -66,8 +66,8 @@ export async function listRelationships(projectId: string) {
                 }),
             ]);
 
-            const nodeIds = nodes.map((n: { id: string }) => n.id);
-            const objectIds = objects.map((o: { id: string }) => o.id);
+            const nodeIds = nodes.map((n) => n.id);
+            const objectIds = objects.map((o) => o.id);
 
             const relationships = await prisma.relationship.findMany({
                 where: {

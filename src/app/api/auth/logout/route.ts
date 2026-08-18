@@ -4,6 +4,8 @@ import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
+const IS_PROD = process.env.NODE_ENV === "production";
+
 async function revokeIfPresent(
     jti: string | undefined,
     userId: string | undefined,
@@ -39,14 +41,14 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ ok: true });
     response.cookies.set(SESSION_COOKIE_NAME, "", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: IS_PROD,
         sameSite: "strict",
         maxAge: 0,
         path: "/",
     });
     response.cookies.set(REFRESH_COOKIE_NAME, "", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: IS_PROD,
         sameSite: "lax",
         maxAge: 0,
         path: "/api/auth/",

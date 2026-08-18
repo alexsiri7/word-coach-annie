@@ -163,7 +163,7 @@ function NodeContent({
     <div
       role="treeitem"
       aria-selected={isSelected}
-      aria-expanded={isScene ? undefined : node.children.length > 0 ? true : false}
+      aria-expanded={isScene ? undefined : node.children.length > 0}
       aria-label={node.title}
       tabIndex={isSelected ? 0 : -1}
       className={cn(

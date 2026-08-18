@@ -32,10 +32,14 @@ export class GoogleAuthController {
         });
     }
 
+    private static resolveUserId(userId?: string | null): string {
+        return userId ?? DEFAULT_USER_ID;
+    }
+
     static async handleCallback(code: string, redirectUri?: string, userId?: string | null) {
         const client = this.getClient(redirectUri ?? env.GOOGLE_REDIRECT_URI);
         const { tokens } = await client.getToken(code);
-        const resolvedUserId = userId ?? DEFAULT_USER_ID;
+        const resolvedUserId = this.resolveUserId(userId);
 
         // Replace existing credentials for this user only
         await prisma.googleCredential.deleteMany({ where: { userId: resolvedUserId } });
@@ -54,7 +58,7 @@ export class GoogleAuthController {
     }
 
     static async getValidClient(userId?: string | null): Promise<OAuth2Client | null> {
-        const resolvedUserId = userId ?? DEFAULT_USER_ID;
+        const resolvedUserId = this.resolveUserId(userId);
         const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return null;
 
@@ -93,7 +97,7 @@ export class GoogleAuthController {
     }
 
     static async getStatus(userId?: string | null) {
-        const resolvedUserId = userId ?? DEFAULT_USER_ID;
+        const resolvedUserId = this.resolveUserId(userId);
         const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
 
@@ -107,7 +111,7 @@ export class GoogleAuthController {
     }
 
     static async disconnect(userId?: string | null) {
-        const resolvedUserId = userId ?? DEFAULT_USER_ID;
+        const resolvedUserId = this.resolveUserId(userId);
         await prisma.googleCredential.deleteMany({ where: { userId: resolvedUserId } });
     }
 }

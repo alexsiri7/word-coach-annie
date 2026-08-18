@@ -15,6 +15,8 @@ import {
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
+const IS_PROD = process.env.NODE_ENV === "production";
+
 /**
  * GET /api/auth/google/callback — Handle Google OAuth callback.
  * Verifies CSRF state (cookie match + HMAC-SHA256 binding), exchanges auth
@@ -164,21 +166,21 @@ export async function GET(request: NextRequest) {
         // Clear the OAuth state and redirect cookies
         response.cookies.set("oauth_redirect", "", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: IS_PROD,
             sameSite: "lax",
             maxAge: 0,
             path: "/",
         });
         response.cookies.set("oauth_state", "", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: IS_PROD,
             sameSite: "lax",
             maxAge: 0,
             path: "/",
         });
         response.cookies.set(SESSION_COOKIE_NAME, jwt, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: IS_PROD,
             // SameSite=Lax (not Strict) is required for OAuth flows: the redirect chain
             // from Google back to /api/auth/google/callback inherits a cross-site context,
             // so Strict cookies are silently dropped by the browser before reaching the
@@ -191,7 +193,7 @@ export async function GET(request: NextRequest) {
         if (refreshJwt) {
             response.cookies.set(REFRESH_COOKIE_NAME, refreshJwt, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
+                secure: IS_PROD,
                 sameSite: "lax",
                 maxAge: REFRESH_MAX_AGE,
                 path: "/api/auth/",
