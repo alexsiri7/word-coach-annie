@@ -16,13 +16,14 @@ PR #980 implements:
 
 ## Validation
 
-✅ All CI checks passed:
-- Lint, Type check, Build, Tests passing
-- E2E integration tests in progress
+All CI checks (lint, type check, build, tests, E2E) passed on PR #980 before merge.
+See [PR #980](https://github.com/alexsiri7/word-coach-annie/pull/980) for full CI results.
 
 ## Required Actions
 
 1. Verify Railway memory limit is 1024 MB before merge
+   > **WARNING**: Do NOT merge PR #980 until Railway memory is upgraded to 1024 MB.
+   > Deploying the 768 MB heap cap into a 512 MB container will cause an immediate OOM crash.
 2. Merge PR #980 to deploy fix
 3. Verify `/api/health` health check recovers post-deploy
 
