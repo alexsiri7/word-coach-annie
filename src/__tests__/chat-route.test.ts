@@ -536,8 +536,10 @@ describe("POST /api/chat — compression trigger boundary", () => {
     expect(vi.mocked(compressConversation)).not.toHaveBeenCalled();
   });
 
-  it("triggers compression when message count reaches the threshold (>= check)", async () => {
-    // Insert exactly MAX_MESSAGES_TO_LOAD messages so allMessages.length === MAX_LOAD
+  it("triggers compression when new message pushes allMessages count above MAX_MESSAGES_TO_LOAD", async () => {
+    // Insert exactly MAX_MESSAGES_TO_LOAD messages into the DB.
+    // The POST adds one more → total = MAX_LOAD + 1, which satisfies the
+    // `allMessages.length > MAX_MESSAGES_TO_LOAD` check (take: MAX+1 detects overflow).
     for (let i = 0; i < MAX_LOAD; i++) {
       await testPrisma.chatMessage.create({
         data: { conversationId, role: i % 2 === 0 ? "user" : "assistant", content: `msg ${i}` },
