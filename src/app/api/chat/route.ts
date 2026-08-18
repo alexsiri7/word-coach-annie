@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
       take: MAX_MESSAGES_TO_LOAD,
     });
 
-    if (allMessages.length > messagesUntilCompression + chatWindowSize) {
+    if (allMessages.length >= messagesUntilCompression + chatWindowSize) {
       compressConversation(conversation, allMessages, compressionSettings, aiConfig).catch(
         (err) => logger.error("compressConversation failed", err)
       );
