@@ -25,6 +25,13 @@ export function useAuth(): AuthState {
     const [loading, setLoading] = useState(true);
     const renewTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    const clearRenewTimer = useCallback(() => {
+        if (renewTimerRef.current) {
+            clearInterval(renewTimerRef.current);
+            renewTimerRef.current = null;
+        }
+    }, []);
+
     const silentRenew = useCallback(async () => {
         try {
             const res = await fetch("/api/auth/refresh", { method: "POST" });
@@ -58,15 +65,12 @@ export function useAuth(): AuthState {
     }, []);
 
     const logout = useCallback(async () => {
-        if (renewTimerRef.current) {
-            clearInterval(renewTimerRef.current);
-            renewTimerRef.current = null;
-        }
+        clearRenewTimer();
         await fetch("/api/auth/logout", { method: "POST" });
         setAuthenticated(false);
         setUser(null);
         window.location.href = "/login";
-    }, []);
+    }, [clearRenewTimer]);
 
     useEffect(() => {
         refresh();
@@ -76,13 +80,8 @@ export function useAuth(): AuthState {
     useEffect(() => {
         if (!authenticated) return;
         renewTimerRef.current = setInterval(silentRenew, SILENT_RENEW_INTERVAL_MS);
-        return () => {
-            if (renewTimerRef.current) {
-                clearInterval(renewTimerRef.current);
-                renewTimerRef.current = null;
-            }
-        };
-    }, [authenticated, silentRenew]);
+        return clearRenewTimer;
+    }, [authenticated, silentRenew, clearRenewTimer]);
 
     return { authenticated, user, loading, logout, refresh };
 }
