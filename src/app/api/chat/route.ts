@@ -316,6 +316,7 @@ export async function POST(request: NextRequest) {
 
     // Cap at messagesUntilCompression + chatWindowSize to avoid loading unbounded
     // history. compressConversation fires-and-forgets with this same slice.
+    // Fetch one extra to detect overflow without loading all messages.
     const MAX_MESSAGES_TO_LOAD = messagesUntilCompression + chatWindowSize;
     const allMessages = await prisma.chatMessage.findMany({
       where: {
@@ -323,11 +324,11 @@ export async function POST(request: NextRequest) {
         ...(afterDate ? { createdAt: { gt: afterDate } } : {}),
       },
       orderBy: { createdAt: "asc" },
-      take: MAX_MESSAGES_TO_LOAD,
+      take: MAX_MESSAGES_TO_LOAD + 1,
     });
 
-    if (allMessages.length >= messagesUntilCompression + chatWindowSize) {
-      compressConversation(conversation, allMessages, compressionSettings, aiConfig).catch(
+    if (allMessages.length > MAX_MESSAGES_TO_LOAD) {
+      compressConversation(conversation, allMessages.slice(0, MAX_MESSAGES_TO_LOAD), compressionSettings, aiConfig).catch(
         (err) => logger.error("compressConversation failed", err)
       );
     }
