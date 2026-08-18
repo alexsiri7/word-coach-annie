@@ -4,35 +4,36 @@ import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
+async function revokeIfPresent(
+    jti: string | undefined,
+    userId: string | undefined,
+    maxAge: number,
+    label: string,
+): Promise<void> {
+    if (!jti || !userId) return;
+    // Use maxAge as a safe upper bound for blocklist expiry.
+    // Actual token exp = iat + maxAge; using now + maxAge is always >= actual exp.
+    const expiresAt = new Date(Date.now() + maxAge * 1000);
+    try {
+        await revokeToken(jti, userId, expiresAt);
+    } catch (err) {
+        // Non-fatal: cookie is still cleared; revocation is best-effort
+        logger.error(`[logout] Failed to revoke ${label} in blocklist:`, err);
+    }
+}
+
 export async function POST(request: NextRequest) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
     if (sessionCookie) {
         const session = await verifySessionTokenNode(sessionCookie);
-        if (session?.jti) {
-            // Use SESSION_MAX_AGE as a safe upper bound for blocklist expiry.
-            // Actual token exp = iat + SESSION_MAX_AGE; using now + SESSION_MAX_AGE is always >= actual exp.
-            const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
-            try {
-                await revokeToken(session.jti, session.userId, expiresAt);
-            } catch (err) {
-                // Non-fatal: cookie is still cleared; revocation is best-effort
-                logger.error("[logout] Failed to revoke token in blocklist:", err);
-            }
-        }
+        await revokeIfPresent(session?.jti, session?.userId, SESSION_MAX_AGE, "session token");
     }
 
     if (refreshCookie) {
         const refresh = await verifyRefreshToken(refreshCookie);
-        if (refresh?.jti) {
-            const expiresAt = new Date(Date.now() + REFRESH_MAX_AGE * 1000);
-            try {
-                await revokeToken(refresh.jti, refresh.userId, expiresAt);
-            } catch (err) {
-                logger.error("[logout] Failed to revoke refresh token:", err);
-            }
-        }
+        await revokeIfPresent(refresh?.jti, refresh?.userId, REFRESH_MAX_AGE, "refresh token");
     }
 
     const response = NextResponse.json({ ok: true });

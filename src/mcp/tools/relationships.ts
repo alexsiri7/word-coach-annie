@@ -4,6 +4,9 @@ import { mcpCache } from "@/lib/cache";
 
 type RelationshipEntity = { id: string; name: string; entityType: string } | null;
 
+const nodeSelect = { id: true, title: true, type: true } as const;
+const objectSelect = { id: true, name: true, type: true } as const;
+
 function resolveEntity(
     node: { id: string; title: string; type: string } | null | undefined,
     obj: { id: string; name: string; type: string } | null | undefined,
@@ -78,12 +81,12 @@ export async function listRelationships(projectId: string) {
                     ],
                 },
                 include: {
-                    fromNode: { select: { id: true, title: true, type: true } },
-                    fromObject: { select: { id: true, name: true, type: true } },
-                    fromWorldObject: { select: { id: true, name: true, type: true } },
-                    toNode: { select: { id: true, title: true, type: true } },
-                    toObject: { select: { id: true, name: true, type: true } },
-                    toWorldObject: { select: { id: true, name: true, type: true } },
+                    fromNode: { select: nodeSelect },
+                    fromObject: { select: objectSelect },
+                    fromWorldObject: { select: objectSelect },
+                    toNode: { select: nodeSelect },
+                    toObject: { select: objectSelect },
+                    toWorldObject: { select: objectSelect },
                 },
                 orderBy: { createdAt: "desc" },
             });
@@ -166,12 +169,12 @@ export async function createRelationship(params: {
             ...(resolvedToWorldObjectId && { toWorldObjectId: resolvedToWorldObjectId }),
         },
         include: {
-            fromNode: { select: { id: true, title: true, type: true } },
-            fromObject: { select: { id: true, name: true, type: true } },
-            fromWorldObject: { select: { id: true, name: true, type: true } },
-            toNode: { select: { id: true, title: true, type: true } },
-            toObject: { select: { id: true, name: true, type: true } },
-            toWorldObject: { select: { id: true, name: true, type: true } },
+            fromNode: { select: nodeSelect },
+            fromObject: { select: objectSelect },
+            fromWorldObject: { select: objectSelect },
+            toNode: { select: nodeSelect },
+            toObject: { select: objectSelect },
+            toWorldObject: { select: objectSelect },
         },
     });
 
