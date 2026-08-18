@@ -46,6 +46,7 @@ vi.mock("@/mcp/skills", () => ({
 
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { runChatAgent, runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { compressConversation } from "@/lib/ai/chat-compression";
 import { logger } from "@/lib/logger";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { loadSkill } from "@/mcp/skills";
@@ -496,5 +497,71 @@ describe("POST /api/chat — reviewSceneId skill routing", () => {
     );
     const call = vi.mocked(runChatAgent).mock.lastCall![0];
     expect(call.systemPrompt).not.toContain("## Active Skill:");
+  });
+});
+
+describe("POST /api/chat — compression trigger boundary", () => {
+  // chatWindowSize=5, messagesUntilCompression=15 → MAX_MESSAGES_TO_LOAD=20
+  const CHAT_WINDOW = 5;
+  const UNTIL_COMPRESSION = 15;
+  const MAX_LOAD = UNTIL_COMPRESSION + CHAT_WINDOW; // 20
+
+  let conversationId: string;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(getCurrentUserId).mockReturnValue(null);
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true } as never);
+
+    const project = await testPrisma.project.create({
+      data: { title: "Compression Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Compression chat" },
+    });
+    conversationId = conversation.id;
+  });
+
+  it("does NOT trigger compression when message count is below the threshold", async () => {
+    // Insert fewer messages than messagesUntilCompression + chatWindowSize
+    for (let i = 0; i < MAX_LOAD - 1; i++) {
+      await testPrisma.chatMessage.create({
+        data: { conversationId, role: i % 2 === 0 ? "user" : "assistant", content: `msg ${i}` },
+      });
+    }
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "hello" }));
+
+    expect(vi.mocked(compressConversation)).not.toHaveBeenCalled();
+  });
+
+  it("triggers compression when message count reaches the threshold (>= check)", async () => {
+    // Insert exactly MAX_MESSAGES_TO_LOAD messages so allMessages.length === MAX_LOAD
+    for (let i = 0; i < MAX_LOAD; i++) {
+      await testPrisma.chatMessage.create({
+        data: { conversationId, role: i % 2 === 0 ? "user" : "assistant", content: `msg ${i}` },
+      });
+    }
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "hello" }));
+
+    expect(vi.mocked(compressConversation)).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps chatHistory passed to agent at chatWindowSize even with many messages", async () => {
+    // Insert more than MAX_MESSAGES_TO_LOAD to confirm the query cap and window slice work
+    for (let i = 0; i < MAX_LOAD + 10; i++) {
+      await testPrisma.chatMessage.create({
+        data: { conversationId, role: i % 2 === 0 ? "user" : "assistant", content: `msg ${i}` },
+      });
+    }
+
+    const { POST } = await import("@/app/api/chat/route");
+    await POST(makePostRequest({ conversationId, message: "hello" }));
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.chatHistory.length).toBeLessThanOrEqual(CHAT_WINDOW);
   });
 });
