@@ -310,17 +310,21 @@ export async function POST(request: NextRequest) {
       afterDate = pivot?.createdAt ?? new Date(0);
     }
 
+    // Load compression settings FIRST so we can cap the query
+    const compressionSettings = await getCompressionSettings(userId);
+    const { chatWindowSize, messagesUntilCompression } = compressionSettings;
+
+    // Cap at messagesUntilCompression + chatWindowSize to avoid loading unbounded
+    // history. compressConversation fires-and-forgets with this same slice.
+    const MAX_MESSAGES_TO_LOAD = messagesUntilCompression + chatWindowSize;
     const allMessages = await prisma.chatMessage.findMany({
       where: {
         conversationId,
         ...(afterDate ? { createdAt: { gt: afterDate } } : {}),
       },
       orderBy: { createdAt: "asc" },
+      take: MAX_MESSAGES_TO_LOAD,
     });
-
-    // Load compression settings and trigger if needed (fire and forget)
-    const compressionSettings = await getCompressionSettings(userId);
-    const { chatWindowSize, messagesUntilCompression } = compressionSettings;
 
     if (allMessages.length > messagesUntilCompression + chatWindowSize) {
       compressConversation(conversation, allMessages, compressionSettings, aiConfig).catch(
