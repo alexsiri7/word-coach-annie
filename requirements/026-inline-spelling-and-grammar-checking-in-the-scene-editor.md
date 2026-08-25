@@ -1,8 +1,8 @@
 ---
 created: '2026-08-25'
-github_issue: null
+github_issue: 1000
 id: '026'
-status: draft
+status: idea
 title: Inline spelling and grammar checking in the scene editor
 updated: '2026-08-25'
 ---
@@ -17,4 +17,6 @@ While writing prose in the scene editor, misspelled words and grammatical issues
 
 ## Issues
 
-_None yet._
+- #1000 — Add harper.js and validate WASM linting performance in the editor context
+- #1001 — Build Tiptap extension for inline flagging and suggestion UI
+- #1002 — Add per-session on/off toggle for spelling and grammar checking
