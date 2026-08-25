@@ -54,6 +54,9 @@ These are NOT included in first-load JS — they load only when their component 
 | TipTap + ProseMirror | `9212`, `70e0d97a`, `54a60aa6`, `5492` | 444 kB | Scene editor opens |
 | react-force-graph-2d | `3735` | 184 kB | Graph view opens |
 | react-markdown + remark | `7898` | 144 kB | AI chat panel opens |
+| harper.js | _(WASM chunk)_ | ~1–2 MB | Spell/grammar linting first use |
+
+> **Note**: harper.js loads a ~1–2 MB WASM binary on first use of the linting feature. It is dynamically imported in `src/lib/linting/harper-linter.ts` and does not affect page load unless the linter is invoked.
 
 Dynamic imports in `src/app/project/[id]/page.tsx`:
 - `SceneEditor` — `dynamic(() => import("@/components/scene-editor"))`
