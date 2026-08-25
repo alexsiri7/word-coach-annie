@@ -28,7 +28,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 
 | Component | Technology | Details |
 |-----------|-----------|---------|
-| Framework | Next.js 16.2.6 | App Router, API routes; webpack opt-in via `--webpack` flag (Next.js 16 defaults to Turbopack); `asyncWebAssembly: true, layers: true` enabled in webpack config for harper-wasm WASM support |
+| Framework | Next.js 16.2.6 | App Router, API routes; webpack opt-in via `--webpack` flag (Next.js 16 defaults to Turbopack); `asyncWebAssembly: true, layers: true` enabled in webpack config for harper.js WASM support |
 | Runtime | Node.js 20 | Docker base: `node:20-slim` |
 | Language | TypeScript 5.7.3 | Strict mode |
 | ORM | Prisma 7.6.0 | Type-safe DB access with `@prisma/adapter-pg` |
@@ -70,10 +70,9 @@ Core models for hierarchical story structure:
 | Framework | React 19.0 | Latest React with App Router |
 | UI Library | Shadcn/ui | Built on Radix UI primitives |
 | Rich Text Editor | Tiptap 3.23 | Extensible editor (bubble menu, highlight, placeholder) |
-| Spell/Grammar Check | harper.js 2.7.0 | Client-side WASM linter (Automattic); Tiptap extension with ProseMirror decorations and suggestion popover |
+| Spell/Grammar Check | harper.js 2.7.0 | Client-side WASM linter; Tiptap extension with ProseMirror decorations and standalone lazy-loaded wrapper (`src/lib/linting/harper-linter.ts`) |
 | Icons | Lucide React | Icon library |
 | Styling | Tailwind CSS 3.4 | With tailwind-animate, tailwind-merge, CVA |
-| Spell/Grammar Linting | harper-wasm 0.1.1 | Client-side WASM linter (lazy-loaded ~1–2 MB on first use); requires `asyncWebAssembly: true` in Next.js webpack config |
 | XSS Protection | DOMPurify | HTML sanitization |
 | State | React hooks | No external state library |
 | PWA | next-pwa | App-shell navigation caching (NetworkFirst, 5s timeout), runtime caching for API routes and Google Fonts; offline fallback page at `/offline` |

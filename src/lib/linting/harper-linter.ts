@@ -1,23 +1,26 @@
 /**
  * Harper.js linter wrapper — only call from client components (WASM runs in the browser).
- * Lazily loads harper-wasm on first use so the ~1-2 MB WASM bundle doesn't block initial page load.
+ * Lazily loads harper.js on first use so the ~1-2 MB WASM bundle doesn't block initial page load.
  */
 
-import type { Lint } from "harper-wasm";
+import type { Lint, Linter, LintConfig } from "harper.js";
 
-let initialized = false;
+let linter: Linter | null = null;
 let initPromise: Promise<void> | null = null;
-let harperModule: typeof import("harper-wasm") | null = null;
 
 async function ensureInitialized(): Promise<void> {
-  if (initialized) return;
+  if (linter) return;
   if (!initPromise) {
     initPromise = (async () => {
-      harperModule = await import("harper-wasm");
-      await harperModule.setup();
-      initialized = true;
+      const [{ LocalLinter }, { binary }] = await Promise.all([
+        import("harper.js"),
+        import("harper.js/binary"),
+      ]);
+      linter = new LocalLinter({ binary });
+      await linter.setup();
     })().catch((err) => {
       initPromise = null; // allow retry on next call
+      linter = null;
       console.error("[harper-linter] WASM initialization failed:", err);
       throw err;
     });
@@ -25,23 +28,23 @@ async function ensureInitialized(): Promise<void> {
   return initPromise;
 }
 
-/** Get the current lint configuration as an object. */
-export async function getLintConfig(): Promise<unknown> {
+/** Get the current lint configuration. */
+export async function getLintConfig(): Promise<LintConfig> {
   await ensureInitialized();
-  return harperModule!.get_lint_config_as_object();
+  return linter!.getLintConfig();
 }
 
-/** Set the lint configuration from an object. */
-export async function setLintConfig(config: unknown): Promise<void> {
+/** Set the lint configuration. */
+export async function setLintConfig(config: LintConfig): Promise<void> {
   await ensureInitialized();
-  harperModule!.set_lint_config_from_object(config);
+  await linter!.setLintConfig(config);
 }
 
 /** Lint the given text and return an array of lint issues. */
 export async function lintText(text: string): Promise<Lint[]> {
   await ensureInitialized();
   try {
-    return harperModule!.lint(text);
+    return await linter!.lint(text);
   } catch (err) {
     console.error("[harper-linter] lint() failed:", err);
     return [];

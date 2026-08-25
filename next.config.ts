@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
   },
   webpack(config: Record<string, unknown>, { isServer }: { isServer: boolean }) {
     if (!isServer) {
-      config.experiments = { ...(config.experiments as Record<string, unknown>), asyncWebAssembly: true };
+      config.experiments = { ...(config.experiments as Record<string, unknown>), asyncWebAssembly: true, layers: true };
     }
     return config;
   },
