@@ -3,6 +3,7 @@ import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
+import { HarperSpellcheck, type SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
@@ -28,7 +29,10 @@ export const AnnotationMark = Highlight.extend({
   },
 });
 
-export function getEditorExtensions() {
+export function getEditorExtensions(options?: {
+  onSuggestionOpen?: (payload: SuggestionOpenPayload) => void;
+  onSuggestionClose?: () => void;
+}) {
   return [
     StarterKit,
     Underline,
@@ -42,6 +46,10 @@ export function getEditorExtensions() {
       placeholder: "Start writing your scene...",
     }),
     BeatAnnotation,
+    HarperSpellcheck.configure({
+      onSuggestionOpen: options?.onSuggestionOpen ?? (() => {}),
+      onSuggestionClose: options?.onSuggestionClose ?? (() => {}),
+    }),
   ];
 }
 

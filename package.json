@@ -63,6 +63,7 @@
     "epub-gen-memory": "^1.1.2",
     "google-auth-library": "^10.6.2",
     "googleapis": "^176.0.0",
+    "harper.js": "^2.7.0",
     "html-to-image": "^1.11.13",
     "idb": "^8.0.3",
     "ioredis": "^5.11.1",

@@ -7,6 +7,7 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 ### Writing
 - **Hierarchical structure**: Parts → Chapters → Scenes with status tracking (Outline/Draft/Revised/Final)
 - **Rich text editor**: Tiptap-based WYSIWYG with auto-save, word counts, and content versioning
+- **Inline spell/grammar check**: Wavy-underline highlighting with one-click corrections powered by harper.js (client-side WASM, togglable per session)
 - **Scene beats**: Inline narrative waypoints (`<!-- beat: ... -->`) rendered as styled cards, stripped on export
 - **Focus mode**: Distraction-free three-panel layout (scene info | editor | related elements)
 - **Full-text search**: Search across all scenes and story objects with highlighted snippets

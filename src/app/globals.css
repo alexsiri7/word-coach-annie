@@ -364,6 +364,13 @@
   }
 }
 
+/* Harper spellcheck — wavy underline on flagged words */
+.harper-error {
+  text-decoration: underline wavy #ef4444;
+  text-decoration-thickness: 2px;
+  cursor: pointer;
+}
+
 /* Tiptap editor styling */
 .tiptap-editor .ProseMirror {
   outline: none;

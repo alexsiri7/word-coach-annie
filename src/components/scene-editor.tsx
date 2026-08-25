@@ -28,6 +28,8 @@ import { EditorStatusBar } from "@/components/editor/editor-status-bar";
 import { AnnieCritiquePanel } from "@/components/editor/annie-critique-panel";
 import { SceneContextSidebar } from "@/components/editor/scene-context-sidebar";
 import { useWritingSession } from "@/hooks/use-writing-session";
+import type { LintResult, SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
+import { HarperSuggestionPopover } from "@/components/editor/harper-suggestion-popover";
 
 export interface TimelineSceneItem {
   id: string;
@@ -81,6 +83,8 @@ export function SceneEditor({
   const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
   const [spellCheckEnabled, setSpellCheckEnabled] = useState(true);
+  const [activeLint, setActiveLint] = useState<LintResult | null>(null);
+  const [activeLintRect, setActiveLintRect] = useState<DOMRect | null>(null);
   const [nextScenePrompt, setNextScenePrompt] = useState<{
     id: string;
     title: string;
@@ -179,9 +183,22 @@ export function SceneEditor({
   // Cleanup save timeout on unmount
   useEffect(() => cleanup, [cleanup]);
 
+  const handleSuggestionOpen = useCallback(({ lint, rect }: SuggestionOpenPayload) => {
+    setActiveLint(lint);
+    setActiveLintRect(rect);
+  }, []);
+
+  const handleSuggestionClose = useCallback(() => {
+    setActiveLint(null);
+    setActiveLintRect(null);
+  }, []);
+
   const editor = useEditor(
     {
-      extensions: getEditorExtensions(),
+      extensions: getEditorExtensions({
+        onSuggestionOpen: handleSuggestionOpen,
+        onSuggestionClose: handleSuggestionClose,
+      }),
       content: initialContent || "",
       editorProps: {
         attributes: {
@@ -209,11 +226,13 @@ export function SceneEditor({
     [initialContent]
   );
 
-  // Sync spell-check toggle with the harper extension (from #1001)
+  // Sync spell-check toggle with the harper extension (#1001)
+  // Extension defaults to enabled=true; only dispatch when toggling off to avoid no-op transaction on mount
   useEffect(() => {
     if (!editor) return;
-    // TODO(#1001): Call harper extension enable/disable API once extension is merged
-    // editor.commands.setSpellCheckEnabled?.(spellCheckEnabled);
+    if (!spellCheckEnabled) {
+      editor.commands.setSpellCheckEnabled(false);
+    }
   }, [editor, spellCheckEnabled]);
 
   const addAnnotation = useCallback(async (text: string) => {
@@ -505,6 +524,14 @@ export function SceneEditor({
               </div>
             </div>
             <EditorContent editor={editor} className="h-full" />
+            <HarperSuggestionPopover
+              activeLint={activeLint}
+              activeLintRect={activeLintRect}
+              onApply={(from, to, replacement) => {
+                editor?.commands.applySpellSuggestion(from, to, replacement);
+              }}
+              onDismiss={handleSuggestionClose}
+            />
             {editor && (
               <BubbleMenu editor={editor}>
                 <div className="flex flex-col gap-1">
