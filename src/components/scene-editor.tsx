@@ -209,13 +209,6 @@ export function SceneEditor({
     [initialContent]
   );
 
-  // Sync spell-check toggle with the harper extension (from #1001)
-  useEffect(() => {
-    if (!editor) return;
-    // TODO(#1001): Call harper extension enable/disable API once extension is merged
-    // editor.commands.setSpellCheckEnabled?.(spellCheckEnabled);
-  }, [editor, spellCheckEnabled]);
-
   const addAnnotation = useCallback(async (text: string) => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
