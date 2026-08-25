@@ -23,7 +23,6 @@ beforeEach(() => {
   mockSetup.mockResolvedValue(undefined);
   mockLint.mockReturnValue([]);
   mockGetConfig.mockReturnValue({});
-  mockSetConfig.mockReturnValue(undefined);
 });
 
 describe("harper-linter", () => {
