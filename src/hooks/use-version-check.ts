@@ -57,6 +57,30 @@ export function useVersionCheck() {
         };
     }, [checkVersion, dismissed]);
 
+    // Listen for service worker controller changes (new SW activated via skipWaiting)
+    useEffect(() => {
+        if (dismissed) return;
+        if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+            return;
+        }
+
+        const handleControllerChange = () => {
+            setUpdateAvailable(true);
+        };
+
+        navigator.serviceWorker.addEventListener(
+            "controllerchange",
+            handleControllerChange,
+        );
+
+        return () => {
+            navigator.serviceWorker.removeEventListener(
+                "controllerchange",
+                handleControllerChange,
+            );
+        };
+    }, [dismissed]);
+
     const dismiss = useCallback(() => {
         setDismissed(true);
     }, []);

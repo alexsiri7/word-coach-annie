@@ -4,7 +4,6 @@ import "./globals.css";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
-import { SwLifecycle } from "@/components/sw-lifecycle";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -69,7 +68,6 @@ export default async function RootLayout({
             <SyncToast />
           </ToastProvider>
           <OfflineIndicator />
-          <SwLifecycle />
         </ThemeProvider>
       </body>
     </html>
