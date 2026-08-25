@@ -28,7 +28,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 
 | Component | Technology | Details |
 |-----------|-----------|---------|
-| Framework | Next.js 16.2.6 | App Router, API routes; webpack opt-in via `--webpack` flag (Next.js 16 defaults to Turbopack) |
+| Framework | Next.js 16.2.6 | App Router, API routes; webpack opt-in via `--webpack` flag (Next.js 16 defaults to Turbopack); `asyncWebAssembly: true` enabled for browser builds to support harper.js WASM |
 | Runtime | Node.js 20 | Docker base: `node:20-slim` |
 | Language | TypeScript 5.7.3 | Strict mode |
 | ORM | Prisma 7.6.0 | Type-safe DB access with `@prisma/adapter-pg` |
@@ -70,6 +70,7 @@ Core models for hierarchical story structure:
 | Framework | React 19.0 | Latest React with App Router |
 | UI Library | Shadcn/ui | Built on Radix UI primitives |
 | Rich Text Editor | Tiptap 3.23 | Extensible editor (bubble menu, highlight, placeholder) |
+| Spell/Grammar Check | harper.js 2.7.0 | Client-side WASM linter (Automattic); Tiptap extension with ProseMirror decorations and suggestion popover |
 | Icons | Lucide React | Icon library |
 | Styling | Tailwind CSS 3.4 | With tailwind-animate, tailwind-merge, CVA |
 | XSS Protection | DOMPurify | HTML sanitization |
@@ -79,6 +80,7 @@ Core models for hierarchical story structure:
 ### Key UI Features
 - Hierarchical outline tree (acts → chapters → scenes)
 - Rich text scene editor with beat annotations
+- Inline spell/grammar checking with one-click suggestions (harper.js, togglable per session)
 - Focus mode for distraction-free writing
 - World-building panels (characters, locations, timelines)
 - AI chat panel per project

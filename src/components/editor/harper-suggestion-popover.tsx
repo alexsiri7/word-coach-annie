@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useLayoutEffect } from "react";
+import React, { useRef, useLayoutEffect, useEffect } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,15 @@ export function HarperSuggestionPopover({
       anchorRef.current.style.pointerEvents = "none";
     }
   }, [activeLintRect]);
+
+  // Dismiss popover when the editor scrolls (so it doesn't drift from the underlined word)
+  useEffect(() => {
+    const editorEl = document.querySelector(".tiptap");
+    if (!editorEl || !activeLint) return;
+    const dismiss = () => onDismiss();
+    editorEl.addEventListener("scroll", dismiss, { once: true, passive: true });
+    return () => editorEl.removeEventListener("scroll", dismiss);
+  }, [activeLint, onDismiss]);
 
   if (!activeLint || !activeLintRect) return null;
 

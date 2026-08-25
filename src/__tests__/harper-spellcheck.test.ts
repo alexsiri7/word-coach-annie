@@ -40,17 +40,49 @@ describe("charOffsetToPos", () => {
 
   it("maps across paragraph boundary (second paragraph)", () => {
     const doc = createDoc("Hi", "World");
-    // textBetween with " " separator: "Hi World"
-    // offset 0='H', 1='i', 2=' '(separator), 3='W', 4='o', ...
+    // doc.textBetween with " " separator → "Hi World"
+    // flat offsets: H=0, i=1, ' '=2 (block separator), W=3, o=4, …
     const pos = charOffsetToPos(doc, 3);
-    // Second paragraph: doc(0) > p1(1) > "Hi"(1-2) > /p1(3) > p2(4) > "World"(4-8) > /p2(9)
-    // 'W' is at pos 4
-    expect(pos).toBe(4);
+    // ProseMirror token layout:
+    //   pos 0: p1 open | pos 1: 'H' | pos 2: 'i' | pos 3: p1 close
+    //   pos 4: p2 open | pos 5: 'W' | pos 6: 'o' | …
+    // 'W' is at pos 5
+    expect(pos).toBe(5);
   });
 });
 
-describe("HarperSpellcheck extension", () => {
-  it("exports charOffsetToPos as a function", () => {
-    expect(typeof charOffsetToPos).toBe("function");
+describe("charOffsetToPos — edge cases", () => {
+  it("returns pos 1 (fallback) for offset beyond document length", () => {
+    const doc = createDoc("Hi");
+    // Document has only 2 chars; offset 99 is out of range
+    const pos = charOffsetToPos(doc, 99);
+    expect(pos).toBe(1);
+  });
+
+  it("maps offset exactly at separator boundary", () => {
+    // "Hi" + separator + "World" => "Hi World"
+    // Separator is at index 2, so offset 2 is the separator itself
+    const doc = createDoc("Hi", "World");
+    const pos = charOffsetToPos(doc, 2);
+    // The separator is virtual; acceptable result is at start of second paragraph text (>= 4)
+    expect(pos).toBeGreaterThanOrEqual(4);
+  });
+
+  it("handles document with an empty paragraph between text blocks", () => {
+    const doc = createDoc("Hello", "", "World");
+    // "Hello  World" — textBetween produces separators for each block boundary
+    // Verify we can look up a position inside "World" without crashing
+    const helloLen = 5;
+    // Two separators: one after "Hello", one for the empty paragraph
+    const wPos = charOffsetToPos(doc, helloLen + 2);
+    const resolved = doc.resolve(wPos);
+    expect(resolved.pos).toBeGreaterThan(0);
+  });
+
+  it("maps offset 0 when first paragraph is empty", () => {
+    const doc = createDoc("", "World");
+    // First paragraph is empty; offset 0 should not crash
+    const pos = charOffsetToPos(doc, 0);
+    expect(pos).toBeGreaterThanOrEqual(1);
   });
 });

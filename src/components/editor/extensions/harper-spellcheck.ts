@@ -237,12 +237,15 @@ export const HarperSpellcheck = Extension.create<{
                   }),
                 );
               }
-            } catch {
-              // Linting failed — silently ignore
+            } catch (err) {
+              console.error("[harper] runLint failed:", err);
+              // Linting failed — silently ignore to keep editor stable
             }
           };
 
-          initLinter();
+          initLinter().catch((err) => {
+            console.error("[harper] Failed to initialize spell-check linter:", err);
+          });
 
           return {
             update(currentView, prevState) {
@@ -253,7 +256,9 @@ export const HarperSpellcheck = Extension.create<{
             destroy() {
               if (debounceTimer) clearTimeout(debounceTimer);
               if (linter) {
-                linter.dispose().catch(() => {});
+                linter.dispose().catch((err) => {
+                  console.warn("[harper] linter.dispose() failed:", err);
+                });
               }
             },
           };
