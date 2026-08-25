@@ -36,9 +36,8 @@ export function HarperSuggestionPopover({
   useEffect(() => {
     const editorEl = document.querySelector(".tiptap");
     if (!editorEl || !activeLint) return;
-    const dismiss = () => onDismiss();
-    editorEl.addEventListener("scroll", dismiss, { once: true, passive: true });
-    return () => editorEl.removeEventListener("scroll", dismiss);
+    editorEl.addEventListener("scroll", onDismiss, { once: true, passive: true });
+    return () => editorEl.removeEventListener("scroll", onDismiss);
   }, [activeLint, onDismiss]);
 
   if (!activeLint || !activeLintRect) return null;

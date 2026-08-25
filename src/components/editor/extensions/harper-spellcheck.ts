@@ -102,7 +102,6 @@ export const HarperSpellcheck = Extension.create<{
           this.storage.enabled = enabled;
           if (dispatch) {
             if (!enabled) {
-              // Clear decorations when disabled
               tr.setMeta(harperPluginKey, {
                 decorations: DecorationSet.empty,
                 lints: [],
@@ -181,7 +180,6 @@ export const HarperSpellcheck = Extension.create<{
             const doc = currentView.state.doc;
             const text = doc.textBetween(0, doc.content.size, " ", "");
             if (!text.trim()) {
-              // Empty doc — clear any stale decorations
               currentView.dispatch(
                 currentView.state.tr.setMeta(harperPluginKey, {
                   decorations: DecorationSet.empty,
@@ -239,7 +237,6 @@ export const HarperSpellcheck = Extension.create<{
               }
             } catch (err) {
               console.error("[harper] runLint failed:", err);
-              // Linting failed — silently ignore to keep editor stable
             }
           };
 
