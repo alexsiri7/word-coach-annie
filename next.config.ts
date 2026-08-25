@@ -45,6 +45,12 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion,
   },
+  webpack(config: Record<string, unknown>, { isServer }: { isServer: boolean }) {
+    if (!isServer) {
+      config.experiments = { ...(config.experiments as Record<string, unknown>), asyncWebAssembly: true };
+    }
+    return config;
+  },
   async headers() {
     return [
       {
