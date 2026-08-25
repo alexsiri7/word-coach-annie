@@ -80,6 +80,7 @@ export function SceneEditor({
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
   const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
+  const [spellCheckEnabled, setSpellCheckEnabled] = useState(true);
   const [nextScenePrompt, setNextScenePrompt] = useState<{
     id: string;
     title: string;
@@ -207,6 +208,13 @@ export function SceneEditor({
     },
     [initialContent]
   );
+
+  // Sync spell-check toggle with the harper extension (from #1001)
+  useEffect(() => {
+    if (!editor) return;
+    // TODO(#1001): Call harper extension enable/disable API once extension is merged
+    // editor.commands.setSpellCheckEnabled?.(spellCheckEnabled);
+  }, [editor, spellCheckEnabled]);
 
   const addAnnotation = useCallback(async (text: string) => {
     if (!editor) return;
@@ -449,6 +457,8 @@ export function SceneEditor({
         showCritiquePanel={showCritiquePanel}
         onToggleSceneContext={() => setShowSceneContext((v) => !v)}
         showSceneContext={showSceneContext}
+        onToggleSpellCheck={() => setSpellCheckEnabled((v) => !v)}
+        spellCheckEnabled={spellCheckEnabled}
         onReviewScene={onReviewScene}
         onPlanBeats={onPlanBeats}
         onCanonCheck={onCanonCheck}
