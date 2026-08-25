@@ -30,6 +30,7 @@ import {
   LayoutList,
   ListTodo,
   ShieldCheck,
+  SpellCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,6 +77,8 @@ interface EditorToolbarProps {
   showCritiquePanel?: boolean;
   onToggleSceneContext?: () => void;
   showSceneContext?: boolean;
+  onToggleSpellCheck?: () => void;
+  spellCheckEnabled?: boolean;
   onReviewScene?: () => void;
   onPlanBeats?: () => void;
   onCanonCheck?: () => void;
@@ -109,6 +112,8 @@ export function EditorToolbar({
   showCritiquePanel,
   onToggleSceneContext,
   showSceneContext,
+  onToggleSpellCheck,
+  spellCheckEnabled = true,
   onReviewScene,
   onPlanBeats,
   onCanonCheck,
@@ -335,6 +340,19 @@ export function EditorToolbar({
             aria-pressed={showSceneContext}
           >
             <PanelRight className="h-4 w-4" />
+          </Button>
+        )}
+
+        {onToggleSpellCheck && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", spellCheckEnabled && "bg-accent/15 text-accent")}
+            onClick={onToggleSpellCheck}
+            aria-label={`${spellCheckEnabled ? "Disable" : "Enable"} spelling and grammar checking`}
+            aria-pressed={spellCheckEnabled}
+          >
+            <SpellCheck className="h-4 w-4" />
           </Button>
         )}
 
