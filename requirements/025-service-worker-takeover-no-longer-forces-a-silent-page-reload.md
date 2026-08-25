@@ -1,8 +1,8 @@
 ---
 created: '2026-08-25'
-github_issue: null
+github_issue: 997
 id: '025'
-status: draft
+status: idea
 title: Service worker takeover no longer forces a silent page reload
 updated: '2026-08-25'
 ---
@@ -17,4 +17,5 @@ Regaining network connectivity after being offline never triggers an unprompted 
 
 ## Issues
 
-_None yet._
+- #997 — Remove unconditional reload on service worker controllerchange
+- #998 — Route service worker updates through the existing update-available banner
