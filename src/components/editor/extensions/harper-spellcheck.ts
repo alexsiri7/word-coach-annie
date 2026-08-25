@@ -194,16 +194,13 @@ export const HarperSpellcheck = Extension.create<{
                 language: "plaintext",
               });
 
-              const results: LintResult[] = rawLints
-                .filter(
-                  (l) =>
-                    l.span().start < text.length && l.span().end <= text.length,
-                )
-                .map((l, i) => {
+              const results: LintResult[] = rawLints.flatMap((l, i) => {
                   const span = l.span();
+                  if (span.start >= text.length || span.end > text.length) return [];
                   const from = charOffsetToPos(doc, span.start);
                   const to = charOffsetToPos(doc, span.end);
-                  return {
+                  if (from >= to) return [];
+                  return [{
                     id: `harper-${i}-${span.start}-${span.end}`,
                     from,
                     to,
@@ -212,9 +209,8 @@ export const HarperSpellcheck = Extension.create<{
                       .suggestions()
                       .map((s) => s.get_replacement_text())
                       .filter(Boolean),
-                  };
-                })
-                .filter((r) => r.from < r.to);
+                  }];
+                });
 
               const decorations = DecorationSet.create(
                 doc,
