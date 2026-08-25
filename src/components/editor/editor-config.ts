@@ -47,8 +47,8 @@ export function getEditorExtensions(options?: {
     }),
     BeatAnnotation,
     HarperSpellcheck.configure({
-      onSuggestionOpen: options?.onSuggestionOpen ?? (() => {}),
-      onSuggestionClose: options?.onSuggestionClose ?? (() => {}),
+      onSuggestionOpen: options?.onSuggestionOpen,
+      onSuggestionClose: options?.onSuggestionClose,
     }),
   ];
 }
