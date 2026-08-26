@@ -1,8 +1,8 @@
 ---
 created: '2026-08-26'
-github_issue: null
+github_issue: 1011
 id: '027'
-status: draft
+status: idea
 title: Fix Harper spell/grammar checker not loading under the Turbopack dev server
 updated: '2026-08-26'
 ---
@@ -17,4 +17,5 @@ Inline spelling/grammar checking (Req 026) works identically whether the app is 
 
 ## Issues
 
-_None yet._
+- #1011 — Add Turbopack config for harper.js WASM resolution
+- #1012 — Align dev and build scripts on the same Next.js bundler
