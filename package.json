@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 --webpack",
-    "dev:secure": "next dev --experimental-https -H 0.0.0.0 --webpack",
-    "build": "next build --webpack",
+    "dev": "next dev -H 0.0.0.0",
+    "dev:secure": "next dev --experimental-https -H 0.0.0.0",
+    "build": "next build",
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",
@@ -18,7 +18,7 @@
     "e2e:update-snapshots": "playwright test --update-snapshots",
     "test:screenshots": "playwright test e2e/visual.spec.ts",
     "test:screenshots:update": "playwright test e2e/visual.spec.ts --update-snapshots",
-    "analyze": "ANALYZE=true next build --webpack",
+    "analyze": "ANALYZE=true next build",
     "postinstall": "prisma generate"
   },
   "dependencies": {

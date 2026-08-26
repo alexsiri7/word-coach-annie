@@ -229,8 +229,7 @@ export function SceneEditor({
   // Sync spell-check toggle with the harper extension (#1001)
   // Extension defaults to enabled=true; only dispatch when toggling off to avoid no-op transaction on mount
   useEffect(() => {
-    if (!editor) return;
-    if (!spellCheckEnabled) {
+    if (editor && !spellCheckEnabled) {
       editor.commands.setSpellCheckEnabled(false);
     }
   }, [editor, spellCheckEnabled]);

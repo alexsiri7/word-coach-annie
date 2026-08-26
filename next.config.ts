@@ -42,6 +42,15 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-slot",
     ],
   },
+  turbopack: {
+    // Enable WASM support for harper.js: the binary.js entry point references
+    // harper_wasm_bg.wasm via new URL("harper_wasm_bg.wasm", import.meta.url).
+    // Turbopack ignores the webpack() asyncWebAssembly/layers experiments config,
+    // so we configure native WASM resolution here.
+    resolveAlias: {
+      "harper_wasm_bg.wasm": "./node_modules/harper.js/dist/harper_wasm_bg.wasm",
+    },
+  },
   env: {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion,
   },
