@@ -181,15 +181,6 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   }
 }
 
-function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
-  if (!range) return null;
-  try {
-    return JSON.parse(range);
-  } catch {
-    return null;
-  }
-}
-
 function removeHighlights(container: HTMLElement): void {
   for (const mark of container.querySelectorAll("mark[data-annotation-id]")) {
     const parent = mark.parentNode;
