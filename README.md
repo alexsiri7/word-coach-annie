@@ -11,6 +11,7 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 - **Scene beats**: Inline narrative waypoints (`<!-- beat: ... -->`) rendered as styled cards, stripped on export
 - **Focus mode**: Distraction-free three-panel layout (scene info | editor | related elements)
 - **Full-text search**: Search across all scenes and story objects with highlighted snippets
+- **Reader Mode** (`/read/[id]`): Clean reading view with annotation highlights; click a highlighted passage to read the associated annotation
 
 ### Story Management
 - **Story objects**: Characters, Locations, Plotlines, World Elements, Notes — all with CRUD and tags

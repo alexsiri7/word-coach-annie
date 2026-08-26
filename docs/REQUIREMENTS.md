@@ -220,6 +220,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F23.2: Hierarchical display: chapters → scenes with scene break indicators
 - F23.3: Shows only DRAFT and above status scenes
 - F23.4: Accessible to owners, editors, and readers via RBAC
+- F23.5: Unresolved annotations are highlighted in the reader view; clicking a highlight shows a popover with the annotation content (read-only, no mutation actions)
 
 ### F24: Writing Sessions & Progress Tracking
 - F24.1: Auto-tracked writing sessions (start/end time, words written, duration)

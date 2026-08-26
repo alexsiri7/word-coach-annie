@@ -52,6 +52,7 @@ src/
 │   │   └── world-objects/      # World object CRUD
 │   ├── login/                  # Login page
 │   ├── project/[id]/           # Project editor, focus mode, timeline
+│   ├── read/[id]/              # Reader Mode (clean reading view with annotation highlights)
 │   └── universe/               # Universe management pages
 ├── components/                 # React components
 │   ├── editor/                 # Tiptap extensions (beats, links, highlight)

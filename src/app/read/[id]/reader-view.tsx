@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Annotation } from "@/lib/types";
+import DOMPurify from "isomorphic-dompurify";
 
 interface OutlineNode {
   id: string;
@@ -86,7 +87,7 @@ function collectTocEntries(nodes: OutlineNode[], depth: number = 0): TocEntry[] 
   return entries;
 }
 
-function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
+export function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
   const scenes: OutlineNode[] = [];
   for (const node of nodes) {
     if (node.type === "SCENE" && node.content && node.content !== "<p></p>") {
@@ -97,7 +98,19 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
   return scenes;
 }
 
-function applyHighlight(container: HTMLElement, searchText: string, annotationId: string): void {
+/**
+ * Wrap the first occurrence of `searchText` in the container with a
+ * `<mark data-annotation-id>` element for highlighting.
+ *
+ * Uses `Range.surroundContents()`, which throws if the range crosses element
+ * boundaries — those cases are silently skipped.
+ *
+ * NOTE: Only the first occurrence of `searchText` is highlighted. If the same
+ * phrase appears multiple times, subsequent annotations on later occurrences will
+ * highlight the first occurrence. Track as a follow-up: use the annotation's
+ * stored range field for precise position mapping.
+ */
+export function applyHighlight(container: HTMLElement, searchText: string, annotationId: string): void {
   if (!searchText) return;
 
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -143,12 +156,17 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
     mark.className = "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer";
 
     range.surroundContents(mark);
-  } catch {
-    // Cannot wrap this selection — skip silently
+  } catch (err) {
+    // HierarchyRequestError / InvalidStateError: range crosses element boundaries — skip silently.
+    // Anything else is unexpected; log for debugging.
+    if (!(err instanceof DOMException)) {
+      console.warn("[applyHighlight] unexpected error wrapping range:", err);
+    }
   }
 }
 
-function removeHighlights(container: HTMLElement): void {
+/** Remove all annotation highlight marks inserted by `applyHighlight`. */
+export function removeHighlights(container: HTMLElement): void {
   const marks = container.querySelectorAll("mark[data-annotation-id]");
   marks.forEach((mark) => {
     const parent = mark.parentNode;
@@ -206,17 +224,18 @@ function SceneContent({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleaned = stripBeats(content);
-  if (!cleaned || cleaned === "<p></p>") return null;
 
   // Sanitize HTML to prevent XSS — content may come from another user via sharing.
   // isomorphic-dompurify works on both SSR and client, so no window guard needed.
-  // ADD_TAGS: ["mark"] allows the <mark> elements we inject post-sanitize.
+  // ADD_TAGS: ["mark"] preserves any <mark> elements already present in the original content.
+  // Highlights we inject post-render (via applyHighlight) use DOM APIs directly and are not
+  // affected by this config.
   const sanitized = useMemo(() => {
-    const DOMPurify = require("isomorphic-dompurify");
+    if (!cleaned || cleaned === "<p></p>") return "";
     return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
   }, [cleaned]);
 
-  // Apply DOM highlights after render
+  // Apply DOM highlights after render — no-ops when container is null
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -244,6 +263,9 @@ function SceneContent({
     container.addEventListener("click", handleClick);
     return () => container.removeEventListener("click", handleClick);
   }, [annotations, onAnnotationClick]);
+
+  // Early return AFTER all hooks — safe to return null when content is empty
+  if (!sanitized) return null;
 
   return (
     // NOTE: class name "reader-prose" is referenced in sentry.client.config.ts
@@ -377,9 +399,11 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
         try {
           const res = await fetch(`/api/nodes/${scene.id}/annotations`);
           if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
-          const data: Annotation[] = await res.json();
-          return { sceneId: scene.id, annotations: data };
-        } catch {
+          const data = await res.json();
+          const annotations = Array.isArray(data) ? (data as Annotation[]) : [];
+          return { sceneId: scene.id, annotations };
+        } catch (err) {
+          console.warn("[ReaderView] annotation fetch failed for scene", scene.id, err);
           return { sceneId: scene.id, annotations: [] as Annotation[] };
         }
       })
