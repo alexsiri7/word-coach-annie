@@ -23,6 +23,7 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 - **Markdown**: Full manuscript, per-chapter, or story bible with configurable options
 - **PDF**: Server-rendered PDF download via `@react-pdf/renderer`
 - **EPUB**: EPUB 3 download via `epub-gen-memory`, beat annotations stripped automatically
+- **DOCX**: Word document download via `docx` npm package, Arial 12pt left-justified
 - **Medium**: Medium-ready Markdown with front matter
 - **Google Docs**: OAuth-based export with idempotent sync (3 modes: Universe, Internal, Reader)
 

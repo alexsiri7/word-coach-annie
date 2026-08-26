@@ -24,12 +24,12 @@ vi.mock("epub-gen-memory", () => ({
 }));
 
 vi.mock("docx", () => ({
-  Document: vi.fn().mockImplementation((config: unknown) => config),
+  Document: vi.fn().mockImplementation(function (config: unknown) { return config; }),
   Packer: {
     toBuffer: vi.fn().mockResolvedValue(Buffer.from("fake-docx")),
   },
-  Paragraph: vi.fn().mockImplementation((config: unknown) => config),
-  TextRun: vi.fn().mockImplementation((config: unknown) => config),
+  Paragraph: vi.fn().mockImplementation(function (config: unknown) { return config; }),
+  TextRun: vi.fn().mockImplementation(function (config: unknown) { return config; }),
   AlignmentType: { LEFT: "left" },
 }));
 
