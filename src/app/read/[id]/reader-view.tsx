@@ -172,6 +172,15 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   }
 }
 
+function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
+  if (!range) return null;
+  try {
+    return JSON.parse(range);
+  } catch {
+    return null;
+  }
+}
+
 function removeHighlights(container: HTMLElement): void {
   const marks = container.querySelectorAll("mark[data-annotation-id]");
   marks.forEach((mark) => {
@@ -206,10 +215,8 @@ function AnnotationTooltip({
           {annotation.content}
         </div>
         {annotation.selectedText && (
-          <div className="mt-2">
-            <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
-              &quot;{annotation.selectedText}&quot;
-            </div>
+          <div className="mt-2 bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
+            &quot;{annotation.selectedText}&quot;
           </div>
         )}
       </div>
@@ -455,9 +462,7 @@ function SceneContent({
     if (!annotations || annotations.length === 0) return;
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
-      const parsedRange = (() => {
-        try { return annotation.range ? JSON.parse(annotation.range) : null; } catch { return null; }
-      })();
+      const parsedRange = parseAnnotationRange(annotation.range);
       const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
       applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
