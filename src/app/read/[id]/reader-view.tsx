@@ -390,7 +390,10 @@ function SceneContent({
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
       const parsedRange = parseAnnotationRange(annotation.range, annotation.id);
-      const prefix = parsedRange && "type" in parsedRange && parsedRange.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
+      let prefix = "";
+      if (parsedRange && "type" in parsedRange && parsedRange.type === "textQuote") {
+        prefix = parsedRange.prefix ?? "";
+      }
       applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
   }, [annotations, sanitized]);

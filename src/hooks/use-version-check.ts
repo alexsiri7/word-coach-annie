@@ -43,11 +43,7 @@ export function useVersionCheck() {
         const interval = setInterval(checkVersion, CHECK_INTERVAL);
 
         // Check on visibility change (tab refocus)
-        const handleVisibility = () => {
-            if (document.visibilityState === "visible") {
-                checkVersion();
-            }
-        };
+        const handleVisibility = () => { if (document.visibilityState === "visible") checkVersion(); };
         document.addEventListener("visibilitychange", handleVisibility);
 
         return () => {
