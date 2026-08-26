@@ -223,6 +223,31 @@ describe("review persona prompts", () => {
     }
 });
 
+describe("mcpRun StaleWriteError logging", () => {
+    it("imports StaleWriteError from @/mcp/content-hash", () => {
+        expect(mcpSource).toContain('import { StaleWriteError } from "@/mcp/content-hash"');
+    });
+
+    it("uses logger.warn (not logger.error) for StaleWriteError", () => {
+        const mcpRunIdx = mcpSource.indexOf("async function mcpRun(");
+        const mcpRunSection = mcpSource.slice(mcpRunIdx, mcpRunIdx + 800);
+        const catchIdx = mcpRunSection.indexOf("} catch (e) {");
+        const catchBlock = mcpRunSection.slice(catchIdx, catchIdx + 400);
+        expect(catchBlock).toContain("e instanceof StaleWriteError");
+        expect(catchBlock).toContain("logger.warn(");
+        // Ensure the else branch still calls logger.error for non-stale errors
+        expect(catchBlock).toContain("logger.error(");
+    });
+
+    it("returns isError: true for both StaleWriteError and generic errors", () => {
+        const mcpRunIdx = mcpSource.indexOf("async function mcpRun(");
+        const mcpRunSection = mcpSource.slice(mcpRunIdx, mcpRunIdx + 800);
+        const catchIdx = mcpRunSection.indexOf("} catch (e) {");
+        const catchBlock = mcpRunSection.slice(catchIdx, catchIdx + 400);
+        expect(catchBlock).toContain("isError: true");
+    });
+});
+
 describe("run_peer_review and get_peer_reviews tools", () => {
     const runSection = mcpSource.slice(
         mcpSource.indexOf('"run_peer_review"'),
