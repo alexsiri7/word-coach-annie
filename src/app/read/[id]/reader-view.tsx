@@ -404,7 +404,7 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  async function downloadAs(format: "pdf" | "epub") {
+  async function downloadAs(format: "pdf" | "epub" | "docx") {
     const res = await fetch(`/api/projects/${project.id}/export/${format}`);
     if (!res.ok) return;
     const blob = await res.blob();
@@ -457,6 +457,9 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => downloadAs("epub")}>
                   Download EPUB
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadAs("docx")}>
+                  Download DOCX
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

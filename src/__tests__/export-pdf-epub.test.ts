@@ -23,6 +23,16 @@ vi.mock("epub-gen-memory", () => ({
   default: vi.fn().mockResolvedValue(Buffer.from("fake-epub")),
 }));
 
+vi.mock("docx", () => ({
+  Document: vi.fn().mockImplementation((config: unknown) => config),
+  Packer: {
+    toBuffer: vi.fn().mockResolvedValue(Buffer.from("fake-docx")),
+  },
+  Paragraph: vi.fn().mockImplementation((config: unknown) => config),
+  TextRun: vi.fn().mockImplementation((config: unknown) => config),
+  AlignmentType: { LEFT: "left" },
+}));
+
 class MockNextRequest {
   private _url: string;
   nextUrl: { searchParams: URLSearchParams };
@@ -603,5 +613,108 @@ describe("GET /api/projects/[id]/export/epub — auth and 404", () => {
     });
     const res = await GET(req as never, mockParams({ id: projectId }));
     expect((res as any).status).toBe(200);
+  });
+});
+
+describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
+  let ownerId: string;
+  let projectId: string;
+
+  beforeEach(async () => {
+    const { owner, project } = await createOwnerAndProject();
+    ownerId = owner.id;
+    projectId = project.id;
+  });
+
+  it("returns 200 for unauthenticated request (dev/API_TOKEN mode)", async () => {
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`);
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect((res as any).status).toBe(200);
+  });
+
+  it("returns 403 for non-owner user", async () => {
+    const ts = Date.now();
+    const other = await testPrisma.user.create({
+      data: { email: `other-docx-${ts}@example.com`, googleId: `google-other-docx-${ts}`, name: "Other3" },
+    });
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`, {
+      userId: other.id,
+    });
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect((res as any).status).toBe(403);
+  });
+
+  it("returns 404 for non-existent project", async () => {
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(
+      `http://localhost/api/projects/nonexistent/export/docx`,
+      { userId: ownerId }
+    );
+    const res = await GET(req as never, mockParams({ id: "nonexistent" }));
+    expect((res as any).status).toBeGreaterThanOrEqual(404);
+  });
+
+  it("returns 200 with DOCX for project owner", async () => {
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`, {
+      userId: ownerId,
+    });
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect((res as any).status).toBe(200);
+  });
+
+  it("shared reader can download DOCX", async () => {
+    const ts = Date.now();
+    const readerEmail = `reader-docx-${ts}@example.com`;
+    const reader = await testPrisma.user.create({
+      data: {
+        email: readerEmail,
+        googleId: `google-reader-docx-${ts}`,
+        name: "Reader3",
+      },
+    });
+    await testPrisma.projectShare.create({
+      data: { projectId, email: readerEmail, role: "READER" },
+    });
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`, {
+      userId: reader.id,
+      userEmail: readerEmail,
+    });
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect((res as any).status).toBe(200);
+  });
+
+  it("generated buffer is non-empty (valid DOCX)", async () => {
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`, {
+      userId: ownerId,
+    });
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect((res as any).status).toBe(200);
+    // Packer.toBuffer mock returns Buffer.from("fake-docx") which is non-empty
+    const { Packer } = await import("docx");
+    expect(Packer.toBuffer).toHaveBeenCalled();
+  });
+
+  it("Paragraph children use Arial font and LEFT alignment", async () => {
+    const { Paragraph, TextRun, AlignmentType } = await import("docx");
+    const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`, {
+      userId: ownerId,
+    });
+    await GET(req as never, mockParams({ id: projectId }));
+    // All Paragraph calls must use AlignmentType.LEFT
+    const paragraphCalls = (Paragraph as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    for (const [config] of paragraphCalls) {
+      expect(config.alignment).toBe(AlignmentType.LEFT);
+    }
+    // All TextRun calls must set font: "Arial"
+    const textRunCalls = (TextRun as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    for (const [config] of textRunCalls) {
+      expect(config.font).toBe("Arial");
+    }
   });
 });
