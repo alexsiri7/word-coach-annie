@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { Annotation } from "@/lib/types";
+import type { Annotation, TextQuoteRange } from "@/lib/types";
 
 interface OutlineNode {
   id: string;
@@ -103,7 +103,20 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
   return scenes;
 }
 
-function applyHighlight(container: HTMLElement, searchText: string, annotationId: string): void {
+const PREFIX_SUFFIX_LEN = 32;
+
+function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: number): number {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let total = 0;
+  let textNode: Text | null;
+  while ((textNode = walker.nextNode() as Text | null)) {
+    if (textNode === targetNode) return total + targetOffset;
+    total += textNode.textContent?.length ?? 0;
+  }
+  return total;
+}
+
+function applyHighlight(container: HTMLElement, searchText: string, annotationId: string, prefix = ""): void {
   if (!searchText) return;
 
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -117,7 +130,12 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
     fullText += textNode.textContent ?? "";
   }
 
-  const idx = fullText.indexOf(searchText);
+  let idx = -1;
+  if (prefix) {
+    const contextIdx = fullText.indexOf(prefix + searchText);
+    if (contextIdx !== -1) idx = contextIdx + prefix.length;
+  }
+  if (idx === -1) idx = fullText.indexOf(searchText);
   if (idx === -1) return;
 
   const endIdx = idx + searchText.length;
@@ -203,6 +221,8 @@ interface SelectionState {
   position: { x: number; y: number };
   sceneId: string;
   selectedText: string;
+  prefix: string;
+  suffix: string;
   mode: "buttons" | "comment" | "task";
 }
 
@@ -239,8 +259,12 @@ function SelectionPopover({
       if (!sceneId) return;
       const selectedText = selection.toString().trim();
       if (!selectedText) return;
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      const domRange = selection.getRangeAt(0);
+      const rect = domRange.getBoundingClientRect();
+      const startOff = getTextOffset(proseEl, domRange.startContainer, domRange.startOffset);
+      const fullText = proseEl.textContent ?? "";
+      const prefix = fullText.slice(Math.max(0, startOff - PREFIX_SUFFIX_LEN), startOff);
+      const suffix = fullText.slice(startOff + selectedText.length, startOff + selectedText.length + PREFIX_SUFFIX_LEN);
       setSel({
         position: {
           x: rect.left + rect.width / 2,
@@ -248,6 +272,8 @@ function SelectionPopover({
         },
         sceneId,
         selectedText,
+        prefix,
+        suffix,
         mode: "buttons",
       });
     };
@@ -280,7 +306,16 @@ function SelectionPopover({
       const res = await fetch(`/api/nodes/${sel.sceneId}/annotations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, range: "", selectedText: sel.selectedText }),
+        body: JSON.stringify({
+          content: text,
+          range: JSON.stringify({
+            type: "textQuote",
+            selectedText: sel.selectedText,
+            prefix: sel.prefix,
+            suffix: sel.suffix,
+          } satisfies TextQuoteRange),
+          selectedText: sel.selectedText,
+        }),
       });
       if (res.ok) {
         const annotation: Annotation = await res.json();
@@ -420,7 +455,11 @@ function SceneContent({
     if (!annotations || annotations.length === 0) return;
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
-      applyHighlight(container, annotation.selectedText!, annotation.id);
+      const parsedRange = (() => {
+        try { return annotation.range ? JSON.parse(annotation.range) : null; } catch { return null; }
+      })();
+      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
+      applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
   }, [annotations, sanitized]);
 
