@@ -1,0 +1,60 @@
+name: Pipeline Deploy Watchdog
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write  # needed for workflow dispatch
+
+jobs:
+  check-and-redispatch:
+    name: Re-dispatch pipeline if workflow_run was dropped
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if pipeline needs re-dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+
+          # Get current main HEAD SHA
+          MAIN_SHA=$(gh api repos/$REPO/git/ref/heads/main --jq '.object.sha')
+          echo "Main HEAD: $MAIN_SHA"
+
+          # Check if CI succeeded for this SHA
+          CI_RUN=$(gh run list \
+            --repo "$REPO" \
+            --workflow=ci.yml \
+            --branch main \
+            --commit "$MAIN_SHA" \
+            --status success \
+            --limit 1 \
+            --json databaseId,conclusion \
+            --jq '.[0].databaseId // empty')
+
+          if [ -z "$CI_RUN" ]; then
+            echo "No successful CI run for $MAIN_SHA yet — nothing to dispatch"
+            exit 0
+          fi
+          echo "CI succeeded for $MAIN_SHA (run $CI_RUN)"
+
+          # Check if a pipeline run exists for this SHA
+          PIPELINE_RUN=$(gh run list \
+            --repo "$REPO" \
+            --workflow=staging-smoke.yml \
+            --commit "$MAIN_SHA" \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+
+          if [ -n "$PIPELINE_RUN" ]; then
+            echo "Pipeline run $PIPELINE_RUN already exists for $MAIN_SHA — nothing to do"
+            exit 0
+          fi
+
+          echo "No pipeline run for $MAIN_SHA despite CI success — re-dispatching"
+          gh workflow run staging-smoke.yml --repo "$REPO" --ref main
+          echo "Re-dispatch triggered"
