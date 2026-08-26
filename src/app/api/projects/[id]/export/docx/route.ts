@@ -189,9 +189,8 @@ export async function GET(
     });
   } catch (error) {
     logger.error("GET /api/projects/[id]/export/docx error", error);
-    const debugMsg = error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
     return NextResponse.json(
-      { error: "Internal server error", _debug: debugMsg },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

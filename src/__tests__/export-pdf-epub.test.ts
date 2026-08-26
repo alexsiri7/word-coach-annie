@@ -630,10 +630,6 @@ describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
     const { GET } = await import("@/app/api/projects/[id]/export/docx/route");
     const req = makeRequest(`http://localhost/api/projects/${projectId}/export/docx`);
     const res = await GET(req as never, mockParams({ id: projectId }));
-    if ((res as any).status !== 200) {
-      const body = await (res as any).json();
-      console.error("DOCX_DEBUG_STATUS:", (res as any).status, "DOCX_DEBUG_BODY:", JSON.stringify(body));
-    }
     expect((res as any).status).toBe(200);
   });
 
