@@ -187,6 +187,7 @@ export default async function ReaderPage({
     );
   }
 
+  // In dev/API_TOKEN mode (no userId), grant owner access — matches checkReaderAccess logic
   const isOwner = !userId || data.ownerId === userId;
 
   return <ReaderView project={data.project} outline={data.outline} isOwner={isOwner} />;
