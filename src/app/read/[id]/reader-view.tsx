@@ -226,10 +226,7 @@ function SceneContent({
   const cleaned = stripBeats(content);
 
   // Sanitize HTML to prevent XSS — content may come from another user via sharing.
-  // isomorphic-dompurify works on both SSR and client, so no window guard needed.
-  // ADD_TAGS: ["mark"] preserves any <mark> elements already present in the original content.
-  // Highlights we inject post-render (via applyHighlight) use DOM APIs directly and are not
-  // affected by this config.
+  // ADD_TAGS: ["mark"] preserves <mark> elements in the original content.
   const sanitized = useMemo(() => {
     if (!cleaned || cleaned === "<p></p>") return "";
     return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
@@ -394,27 +391,31 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
     const scenes = collectSceneNodes(outline);
     if (scenes.length === 0) return;
     let cancelled = false;
-    Promise.all(
-      scenes.map(async (scene) => {
-        try {
-          const res = await fetch(`/api/nodes/${scene.id}/annotations`);
-          if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
-          const data = await res.json();
-          const annotations = Array.isArray(data) ? (data as Annotation[]) : [];
-          return { sceneId: scene.id, annotations };
-        } catch (err) {
-          console.warn("[ReaderView] annotation fetch failed for scene", scene.id, err);
-          return { sceneId: scene.id, annotations: [] as Annotation[] };
-        }
-      })
-    ).then((results) => {
+
+    async function fetchAnnotations() {
+      const results = await Promise.all(
+        scenes.map(async (scene) => {
+          try {
+            const res = await fetch(`/api/nodes/${scene.id}/annotations`);
+            if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
+            const data = await res.json();
+            const annotations = Array.isArray(data) ? (data as Annotation[]) : [];
+            return { sceneId: scene.id, annotations };
+          } catch (err) {
+            console.warn("[ReaderView] annotation fetch failed for scene", scene.id, err);
+            return { sceneId: scene.id, annotations: [] as Annotation[] };
+          }
+        })
+      );
       if (cancelled) return;
       const map = new Map<string, Annotation[]>();
       for (const { sceneId, annotations } of results) {
         map.set(sceneId, annotations);
       }
       setAnnotationsByScene(map);
-    });
+    }
+
+    fetchAnnotations();
     return () => { cancelled = true; };
   }, [outline]);
 
