@@ -370,6 +370,21 @@ Restore a previous content version.
 ### `GET /api/nodes/:id/annotations`
 List annotations for a node.
 
+**Auth**: Project owner or shared reader access required.
+
+**Response**: Array of `Annotation` objects.
+
+---
+
+### `POST /api/nodes/:id/annotations`
+Create an annotation on a specific scene node.
+
+**Auth**: Project owner or shared reader access required.
+
+**Body**: `{ content: string, range: string, selectedText: string }`
+
+**Response**: Created `Annotation` object (status 201).
+
 ---
 
 ### `POST /api/nodes/move`

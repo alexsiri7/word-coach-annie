@@ -180,7 +180,7 @@ function AnnotationTooltip({
       <div
         className="fixed z-50 w-72 bg-surface-raised border border-border rounded-lg shadow-xl p-3 text-sm"
         style={{
-          left: Math.min(position.x, window.innerWidth - 300),
+          left: Math.max(8, Math.min(position.x, window.innerWidth - 300)),
           top: position.y + 8,
         }}
       >
@@ -216,11 +216,21 @@ function SelectionPopover({
   onAnnotationCreated: (sceneId: string, annotation: Annotation) => void;
 }) {
   const [sel, setSel] = useState<SelectionState | null>(null);
+  const selRef = useRef<SelectionState | null>(null);
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const taskRef = useRef<HTMLInputElement>(null);
 
+  // Keep ref in sync with state so stale-closure handlers can read current value
+  useEffect(() => { selRef.current = sel; }, [sel]);
+
   useEffect(() => {
     const handleMouseUp = () => {
+      // If the user is in a form mode (comment/task), don't reset the form on mouseup.
+      // This prevents losing typed content when clicking the Save button, since mouseup
+      // fires before click and the text selection is still active at that point.
+      const current = selRef.current;
+      if (current && current.mode !== "buttons") return;
+
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed) {
         setSel(null);
@@ -286,6 +296,8 @@ function SelectionPopover({
         const annotation: Annotation = await res.json();
         onAnnotationCreated(sel.sceneId, annotation);
         setSel(null);
+      } else {
+        console.error("Failed to add annotation", res.status, res.statusText);
       }
     } catch (e) {
       console.error("Failed to add annotation", e);
@@ -306,7 +318,11 @@ function SelectionPopover({
           whatIsNeeded: sel.selectedText,
         }),
       });
-      if (res.ok) setSel(null);
+      if (res.ok) {
+        setSel(null);
+      } else {
+        console.error("Failed to create writing task", res.status, res.statusText);
+      }
     } catch (e) {
       console.error("Failed to create writing task", e);
     }
@@ -320,7 +336,7 @@ function SelectionPopover({
       <div
         className="fixed z-50 bg-surface-raised border border-border rounded-lg shadow-xl p-2 text-sm"
         style={{
-          left: Math.min(sel.position.x - 60, window.innerWidth - 240),
+          left: Math.max(8, Math.min(sel.position.x - 60, window.innerWidth - 240)),
           top: sel.position.y + 8,
         }}
       >

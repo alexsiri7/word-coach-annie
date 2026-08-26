@@ -187,6 +187,7 @@ export default async function ReaderPage({
     );
   }
 
+  // !userId = unauthenticated dev/API_TOKEN mode → treat as owner
   const isOwner = !userId || data.ownerId === userId;
 
   return <ReaderView project={data.project} outline={data.outline} isOwner={isOwner} />;
