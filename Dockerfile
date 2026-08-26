@@ -37,7 +37,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 # Cap V8 old-space at 400 MB for the 512 MB Railway plan.
-# Estimated RSS at 400 MB heap ≈ ~419–430 MB (~82–84% of 512 MB container RAM).
+# Estimated RSS at 400 MB heap ≈ ~419–430 MB (~82–84% of 512 MB container RAM),
+# plus non-heap (Prisma engine, code cache, OS) — total headroom is thin.
 # NOTE: 512 MB proved insufficient at production load (see #976/#1032).
 # Upgrade to 1 GB Railway plan and use --max-old-space-size=768 instead.
 ENV NODE_OPTIONS="--max-old-space-size=400"
