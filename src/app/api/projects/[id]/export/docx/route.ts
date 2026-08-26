@@ -45,9 +45,9 @@ function stripHtml(html: string): string {
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// NOTE: buildOutlineTree is duplicated in pdf/route.tsx and epub/route.ts — intentionally
-// kept self-contained per-route. If logic changes, update all three copies.
-// TODO: Extract to src/lib/outline-tree.ts (see follow-up issue).
+// NOTE: buildOutlineTree is duplicated from src/lib/outline-tree.ts (also in pdf/route.tsx,
+// epub/route.ts, and export/route.ts). The shared module exists but these routes haven't
+// been migrated to use it yet. If logic changes, update all copies.
 async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   const nodes = await prisma.structureNode.findMany({
     where: { projectId },
@@ -96,25 +96,20 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   return roots;
 }
 
+function headingParagraph(title: string, size: number): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text: title, font: "Arial", size, bold: true })],
+    alignment: AlignmentType.LEFT,
+  });
+}
+
 function buildDocxParagraphs(nodes: OutlineNode[]): Paragraph[] {
   const paragraphs: Paragraph[] = [];
 
   function walk(node: OutlineNode) {
-    if (node.type === "PART") {
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: node.title, font: "Arial", size: 32, bold: true })],
-          alignment: AlignmentType.LEFT,
-        })
-      );
-      for (const child of node.children) walk(child);
-    } else if (node.type === "CHAPTER") {
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: node.title, font: "Arial", size: 28, bold: true })],
-          alignment: AlignmentType.LEFT,
-        })
-      );
+    if (node.type === "PART" || node.type === "CHAPTER") {
+      const size = node.type === "PART" ? 32 : 28;
+      paragraphs.push(headingParagraph(node.title, size));
       for (const child of node.children) walk(child);
     } else if (node.type === "SCENE" && node.content) {
       const text = stripHtml(node.content);

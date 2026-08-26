@@ -195,12 +195,10 @@ function AnnotationTooltip({
 
 function SceneContent({
   content,
-  sceneId: _sceneId,
   annotations,
   onAnnotationClick,
 }: {
   content: string;
-  sceneId?: string;
   annotations?: Annotation[];
   onAnnotationClick?: (annotation: Annotation, pos: { x: number; y: number }) => void;
 }) {
@@ -325,7 +323,6 @@ function ManuscriptNode({
               )}
               <SceneContent
                 content={scene.content || ""}
-                sceneId={scene.id}
                 annotations={annotationsByScene.get(scene.id)}
                 onAnnotationClick={onAnnotationClick}
               />
@@ -346,7 +343,6 @@ function ManuscriptNode({
       <section id={node.id} className="my-8">
         <SceneContent
           content={node.content}
-          sceneId={node.id}
           annotations={annotationsByScene.get(node.id)}
           onAnnotationClick={onAnnotationClick}
         />
@@ -398,6 +394,14 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
     setActiveAnnotation(null);
     setTooltipPos(null);
   }, []);
+
+  const handleAnnotationClick = useCallback(
+    (annotation: Annotation, pos: { x: number; y: number }) => {
+      setActiveAnnotation(annotation);
+      setTooltipPos(pos);
+    },
+    []
+  );
 
   const handleTocClick = (id: string) => {
     setTocOpen(false);
@@ -559,10 +563,7 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
                 chapterCounter={chapterCounter}
                 isFirst={i === 0}
                 annotationsByScene={annotationsByScene}
-                onAnnotationClick={(annotation, pos) => {
-                  setActiveAnnotation(annotation);
-                  setTooltipPos(pos);
-                }}
+                onAnnotationClick={handleAnnotationClick}
               />
             ))
           )}
