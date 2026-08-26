@@ -36,10 +36,11 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Cap V8 old-space at 768 MB for the 1 GB Railway plan.
-# Estimated RSS at 768 MB heap ≈ ~807 MB (~79% of 1024 MB container RAM),
-# leaving ~217 MB headroom before OOM.
-ENV NODE_OPTIONS="--max-old-space-size=768"
+# Cap V8 old-space at 400 MB for the 512 MB Railway plan.
+# Estimated RSS at 400 MB heap ≈ ~419–430 MB (~82–84% of 512 MB container RAM).
+# NOTE: 512 MB proved insufficient at production load (see #976/#1032).
+# Upgrade to 1 GB Railway plan and use --max-old-space-size=768 instead.
+ENV NODE_OPTIONS="--max-old-space-size=400"
 
 # Next.js standalone output includes only what's needed
 COPY --from=builder /app/.next/standalone ./
