@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useLayoutEffect, useEffect } from "react";
+import { useRef, useLayoutEffect, useEffect } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,14 @@ export function HarperSuggestionPopover({
 
   useLayoutEffect(() => {
     if (anchorRef.current && activeLintRect) {
-      anchorRef.current.style.position = "fixed";
-      anchorRef.current.style.top = `${activeLintRect.bottom}px`;
-      anchorRef.current.style.left = `${activeLintRect.left}px`;
-      anchorRef.current.style.width = `${activeLintRect.width}px`;
-      anchorRef.current.style.height = "0";
-      anchorRef.current.style.pointerEvents = "none";
+      Object.assign(anchorRef.current.style, {
+        position: "fixed",
+        top: `${activeLintRect.bottom}px`,
+        left: `${activeLintRect.left}px`,
+        width: `${activeLintRect.width}px`,
+        height: "0",
+        pointerEvents: "none",
+      });
     }
   }, [activeLintRect]);
 
