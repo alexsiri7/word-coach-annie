@@ -105,7 +105,7 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
 
 const PREFIX_SUFFIX_LEN = 32;
 
-function parseAnnotationRange(range: string | null | undefined): Record<string, unknown> | null {
+function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
   if (!range) return null;
   try {
     return JSON.parse(range);
@@ -462,7 +462,7 @@ function SceneContent({
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
       const parsedRange = parseAnnotationRange(annotation.range);
-      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix as string ?? "") : "";
+      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
       applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
   }, [annotations, sanitized]);
