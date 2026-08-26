@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ANNOTATION_ERRORS, StructureController } from "@/lib/controllers/structure";
-import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
@@ -39,7 +39,7 @@ export async function POST(
 
     try {
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
+        const access = await verifyProjectReadAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
         const body = await request.json();

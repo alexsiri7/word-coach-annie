@@ -181,6 +181,15 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   }
 }
 
+function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
+  if (!range) return null;
+  try {
+    return JSON.parse(range);
+  } catch {
+    return null;
+  }
+}
+
 function removeHighlights(container: HTMLElement): void {
   for (const mark of container.querySelectorAll("mark[data-annotation-id]")) {
     const parent = mark.parentNode;
@@ -214,10 +223,8 @@ function AnnotationTooltip({
           {annotation.content}
         </div>
         {annotation.selectedText && (
-          <div className="mt-2">
-            <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
-              &quot;{annotation.selectedText}&quot;
-            </div>
+          <div className="mt-2 bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
+            &quot;{annotation.selectedText}&quot;
           </div>
         )}
       </div>
