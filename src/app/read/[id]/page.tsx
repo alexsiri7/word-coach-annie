@@ -87,9 +87,7 @@ async function getManuscriptData(projectId: string) {
 
   // Sort children
   for (const node of nodeMap.values()) {
-    if (node.children.length > 1) {
-      node.children.sort((a, b) => a.orderIndex - b.orderIndex);
-    }
+    node.children.sort((a, b) => a.orderIndex - b.orderIndex);
   }
   roots.sort((a, b) => a.orderIndex - b.orderIndex);
 

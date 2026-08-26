@@ -105,6 +105,15 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
 
 const PREFIX_SUFFIX_LEN = 32;
 
+function parseAnnotationRange(range: string | null | undefined): Record<string, unknown> | null {
+  if (!range) return null;
+  try {
+    return JSON.parse(range);
+  } catch {
+    return null;
+  }
+}
+
 function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: number): number {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let total = 0;
@@ -173,14 +182,13 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
 }
 
 function removeHighlights(container: HTMLElement): void {
-  const marks = container.querySelectorAll("mark[data-annotation-id]");
-  marks.forEach((mark) => {
+  for (const mark of container.querySelectorAll("mark[data-annotation-id]")) {
     const parent = mark.parentNode;
-    if (!parent) return;
+    if (!parent) continue;
     while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
     parent.removeChild(mark);
     parent.normalize();
-  });
+  }
 }
 
 function AnnotationTooltip({
@@ -455,10 +463,8 @@ function SceneContent({
     if (!annotations || annotations.length === 0) return;
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
-      const parsedRange = (() => {
-        try { return annotation.range ? JSON.parse(annotation.range) : null; } catch { return null; }
-      })();
-      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
+      const parsedRange = parseAnnotationRange(annotation.range);
+      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix as string ?? "") : "";
       applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
   }, [annotations, sanitized]);
