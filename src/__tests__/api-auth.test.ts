@@ -10,6 +10,7 @@ import {
     getCurrentUserId,
     verifyProjectAccess,
     verifyProjectReadAccess,
+    verifyProjectReadAccessByNode,
     verifyUniverseAccess,
     verifyProjectAccessByNode,
     validateCsrfHeader,
@@ -259,6 +260,52 @@ describe("api-auth", () => {
                 title: "Scene 1",
             });
             const result = await verifyProjectAccessByNode(node.id, "user-456");
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(403);
+            }
+        });
+    });
+
+    describe("verifyProjectReadAccessByNode", () => {
+        it("returns 404 for a non-existent node", async () => {
+            const result = await verifyProjectReadAccessByNode("nonexistent-node", "user-1");
+            expect(result.authorized).toBe(false);
+            if (!result.authorized) {
+                expect(result.response.status).toBe(404);
+            }
+        });
+
+        it("allows OWNER access and propagates OWNER role", async () => {
+            const user = await createTestUser("rbn-owner");
+            const project = await prisma.project.create({ data: { title: "Owned", userId: user.id } });
+            const node = await StructureController.createNode({ projectId: project.id, type: "SCENE", title: "S" });
+            const result = await verifyProjectReadAccessByNode(node.id, user.id, user.email);
+            expect(result.authorized).toBe(true);
+            if (result.authorized) {
+                expect(result.role).toBe("OWNER");
+                expect(result.projectId).toBe(project.id);
+            }
+        });
+
+        it("allows READER-role share to create annotations (regression guard for fix #1014)", async () => {
+            const owner = await createTestUser("rbn-proj-owner");
+            const reader = await createTestUser("rbn-proj-reader");
+            const project = await prisma.project.create({ data: { title: "Shared", userId: owner.id } });
+            await prisma.projectShare.create({ data: { projectId: project.id, email: reader.email } });
+            const node = await StructureController.createNode({ projectId: project.id, type: "SCENE", title: "S" });
+            const result = await verifyProjectReadAccessByNode(node.id, reader.id, reader.email);
+            expect(result.authorized).toBe(true);
+            if (result.authorized) {
+                expect(result.role).toBe("READER");
+            }
+        });
+
+        it("denies access to a non-shared user", async () => {
+            const owner = await createTestUser("rbn-deny-owner");
+            const project = await prisma.project.create({ data: { title: "Private", userId: owner.id } });
+            const node = await StructureController.createNode({ projectId: project.id, type: "SCENE", title: "S" });
+            const result = await verifyProjectReadAccessByNode(node.id, "stranger", "stranger@example.com");
             expect(result.authorized).toBe(false);
             if (!result.authorized) {
                 expect(result.response.status).toBe(403);

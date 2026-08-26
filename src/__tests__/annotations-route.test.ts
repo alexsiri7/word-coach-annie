@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => "user-1"),
-  verifyProjectReadAccessByNode: vi.fn(async () => ({ authorized: true })),
-  verifyProjectWriteAccessByNode: vi.fn(async () => ({ authorized: true })),
+  verifyProjectReadAccessByNode: vi.fn(async () => ({ authorized: true, projectId: "proj-1", role: "READER" })),
 }));
 
 vi.mock("@/lib/controllers/structure", () => ({
@@ -31,6 +30,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { StructureController, ANNOTATION_ERRORS } from "@/lib/controllers/structure";
+import { verifyProjectReadAccessByNode } from "@/lib/api-auth";
 
 function makePostRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/nodes/node-1/annotations", {
@@ -83,5 +83,25 @@ describe("POST /api/nodes/[id]/annotations", () => {
 
     expect(res.status).toBe(500);
     expect(body.error).toBe("Internal server error");
+  });
+
+  it("allows a READER-role user to POST an annotation successfully (regression guard)", async () => {
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({ authorized: true, projectId: "proj-1", role: "READER" });
+    vi.mocked(StructureController.addAnnotation).mockResolvedValue({ id: "ann-1", content: "Good point" } as never);
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(makePostRequest({ content: "Good point" }), mockParams("node-1"));
+
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 403 when verifyProjectReadAccessByNode denies access", async () => {
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({
+      authorized: false,
+      response: new NextResponse(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(makePostRequest({ content: "note" }), mockParams("node-1"));
+
+    expect(res.status).toBe(403);
   });
 });

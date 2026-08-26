@@ -282,33 +282,6 @@ export async function verifyProjectWriteAccessByNode(
 }
 
 /**
- * Verify comment access to a resource via its parent project.
- * Allows owners, editors, and readers (via ProjectShare).
- * Used for annotation creation — a collaborative action open to all share roles.
- */
-export async function verifyProjectCommentAccessByNode(
-    nodeId: string,
-    userId: string | null,
-    userEmail?: string | null
-): Promise<{ authorized: true; projectId: string; role: "OWNER" | "READER" | "EDITOR" | null } | { authorized: false; response: NextResponse }> {
-    const node = await prisma.structureNode.findUnique({
-        where: { id: nodeId },
-        select: { projectId: true },
-    });
-
-    if (!node) {
-        return {
-            authorized: false,
-            response: NextResponse.json({ error: "Node not found" }, { status: 404 }),
-        };
-    }
-
-    const access = await verifyProjectReadAccess(node.projectId, userId, userEmail);
-    if (!access.authorized) return access;
-    return { authorized: true, projectId: node.projectId, role: access.role };
-}
-
-/**
  * Validate the CSRF custom header to protect state-changing endpoints.
  *
  * Expects the `x-csrf-protection` header to be present with the exact value `"1"`.
