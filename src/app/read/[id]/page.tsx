@@ -23,6 +23,7 @@ async function getManuscriptData(projectId: string) {
       author: true,
       genre: true,
       synopsis: true,
+      userId: true,
     },
   });
 
@@ -92,7 +93,8 @@ async function getManuscriptData(projectId: string) {
   }
   roots.sort((a, b) => a.orderIndex - b.orderIndex);
 
-  return { project, outline: roots };
+  const { userId: ownerId, ...projectData } = project;
+  return { project: projectData, outline: roots, ownerId };
 }
 
 async function checkReaderAccess(
@@ -185,5 +187,7 @@ export default async function ReaderPage({
     );
   }
 
-  return <ReaderView project={data.project} outline={data.outline} />;
+  const isOwner = !userId || data.ownerId === userId;
+
+  return <ReaderView project={data.project} outline={data.outline} isOwner={isOwner} />;
 }
