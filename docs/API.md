@@ -305,6 +305,15 @@ Export the project manuscript as an EPUB file.
 
 ---
 
+### `GET /api/projects/:id/export/docx`
+Export the project manuscript as a DOCX file.
+
+**Auth**: Project owner or shared reader access required.
+
+**Response**: Binary DOCX file (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `Content-Disposition: attachment; filename="<title>.docx"`).
+
+---
+
 ## Structure Nodes
 
 ### `GET /api/nodes/:id`

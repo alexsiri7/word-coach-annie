@@ -223,7 +223,10 @@ Handled by `ProjectsController` — templates assembled from structure nodes and
 ### EPUB
 `src/app/api/projects/[id]/export/epub/route.ts` — server-side EPUB generation using `epub-gen-memory`. The route assembles `EpubChapter` objects from the outline tree (PART → CHAPTER → SCENE hierarchy), strips beat annotations via `stripBeats`, and returns `application/epub+zip` with `Content-Disposition: attachment`. Scenes with empty content are excluded.
 
-Both PDF and EPUB routes require project owner or shared reader access (`verifyProjectReadAccess`).
+### DOCX
+`src/app/api/projects/[id]/export/docx/route.ts` — server-side DOCX generation using `docx`. The route fetches the project's outline tree with latest scene content, converts HTML to plain text via `stripHtml`, and renders PART/CHAPTER/SCENE nodes as Arial paragraphs (LEFT-aligned). Returns `application/vnd.openxmlformats-officedocument.wordprocessingml.document` with `Content-Disposition: attachment`.
+
+All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`).
 
 ### Google Docs
 `src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document.
