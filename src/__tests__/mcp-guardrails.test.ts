@@ -229,8 +229,10 @@ describe("mcpRun StaleWriteError logging", () => {
     });
 
     it("uses logger.warn (not logger.error) for StaleWriteError", () => {
-        const catchIdx = mcpSource.indexOf("} catch (e) {");
-        const catchBlock = mcpSource.slice(catchIdx, catchIdx + 400);
+        const mcpRunIdx = mcpSource.indexOf("async function mcpRun(");
+        const mcpRunSection = mcpSource.slice(mcpRunIdx, mcpRunIdx + 800);
+        const catchIdx = mcpRunSection.indexOf("} catch (e) {");
+        const catchBlock = mcpRunSection.slice(catchIdx, catchIdx + 400);
         expect(catchBlock).toContain("e instanceof StaleWriteError");
         expect(catchBlock).toContain("logger.warn(");
         // Ensure the else branch still calls logger.error for non-stale errors
@@ -238,8 +240,10 @@ describe("mcpRun StaleWriteError logging", () => {
     });
 
     it("returns isError: true for both StaleWriteError and generic errors", () => {
-        const catchIdx = mcpSource.indexOf("} catch (e) {");
-        const catchBlock = mcpSource.slice(catchIdx, catchIdx + 400);
+        const mcpRunIdx = mcpSource.indexOf("async function mcpRun(");
+        const mcpRunSection = mcpSource.slice(mcpRunIdx, mcpRunIdx + 800);
+        const catchIdx = mcpRunSection.indexOf("} catch (e) {");
+        const catchBlock = mcpRunSection.slice(catchIdx, catchIdx + 400);
         expect(catchBlock).toContain("isError: true");
     });
 });
