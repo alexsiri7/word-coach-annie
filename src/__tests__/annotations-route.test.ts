@@ -84,4 +84,35 @@ describe("POST /api/nodes/[id]/annotations", () => {
     expect(res.status).toBe(500);
     expect(body.error).toBe("Internal server error");
   });
+
+  it("passes range string through to StructureController.addAnnotation", async () => {
+    const rangePayload = JSON.stringify({
+      type: "textQuote",
+      selectedText: "fox",
+      prefix: "quick ",
+      suffix: " jumps",
+    });
+    vi.mocked(StructureController.addAnnotation).mockResolvedValue({
+      id: "ann-1",
+      nodeId: "node-1",
+      content: "note",
+      range: rangePayload,
+      resolved: false,
+      selectedText: "fox",
+      externalId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    await POST(
+      makePostRequest({ content: "note", range: rangePayload, selectedText: "fox" }),
+      mockParams("node-1")
+    );
+    expect(StructureController.addAnnotation).toHaveBeenCalledWith(
+      "node-1",      // nodeId
+      "note",        // content (sanitized)
+      rangePayload,  // range — the TextQuoteRange JSON string
+      "fox"          // selectedText
+    );
+  });
 });

@@ -451,10 +451,34 @@ List open (unresolved) annotations.
     "nodeTitle": "string",
     "projectTitle": "string",
     "selectedText": "string | null",
+    "range": "string | null",
     "createdAt": "ISO 8601 timestamp"
   }
 ]
 ```
+
+#### Range Encoding
+
+The `range` field, when non-null, is a JSON string encoding one of two shapes:
+
+**Read View annotation** (`TextQuoteRange`):
+```json
+{
+  "type": "textQuote",
+  "selectedText": "the highlighted text",
+  "prefix": "up to 32 chars before",
+  "suffix": "up to 32 chars after"
+}
+```
+`prefix` is used to disambiguate when the same text appears more than once. `suffix` is stored but not currently used for re-highlighting.
+
+**Editor annotation** (`ProseRange`):
+```json
+{ "from": 42, "to": 67 }
+```
+These are ProseMirror document offsets — only meaningful within the editor context. Note: `ProseRange` has no `type` field; distinguish from `TextQuoteRange` by checking for the `type` property at runtime.
+
+Legacy annotations may have `range: ""` (empty string), which falls back to first-occurrence highlighting.
 
 ---
 

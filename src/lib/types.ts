@@ -129,7 +129,13 @@ export interface ContentVersion {
   createdAt: string;
 }
 
-/** Range encoding for annotations created inside the ProseMirror editor. */
+/**
+ * Range encoding for annotations created inside the ProseMirror editor.
+ * Note: ProseRange has no `type` field. At runtime, distinguish from TextQuoteRange
+ * by checking `'type' in range` or `range.type === "textQuote"`. Legacy annotations
+ * stored as `{"from":N,"to":N}` predate the discriminated union — adding a `type: "prose"`
+ * field would require a DB migration and is deferred.
+ */
 export interface ProseRange {
   from: number;
   to: number;

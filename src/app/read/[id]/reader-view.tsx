@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Annotation, TextQuoteRange } from "@/lib/types";
+import { PREFIX_SUFFIX_LEN, getTextOffset, applyHighlight, parseAnnotationRange } from "@/lib/reader-view-utils";
 
 interface OutlineNode {
   id: string;
@@ -103,74 +104,6 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
   return scenes;
 }
 
-const PREFIX_SUFFIX_LEN = 32;
-
-function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: number): number {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let total = 0;
-  let textNode: Text | null;
-  while ((textNode = walker.nextNode() as Text | null)) {
-    if (textNode === targetNode) return total + targetOffset;
-    total += textNode.textContent?.length ?? 0;
-  }
-  return total;
-}
-
-function applyHighlight(container: HTMLElement, searchText: string, annotationId: string, prefix = ""): void {
-  if (!searchText) return;
-
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  const nodes: { node: Text; start: number }[] = [];
-  let fullText = "";
-  let textNode: Text | null;
-
-  while ((textNode = walker.nextNode() as Text | null)) {
-    if ((textNode.parentElement as HTMLElement)?.tagName === "MARK") continue;
-    nodes.push({ node: textNode, start: fullText.length });
-    fullText += textNode.textContent ?? "";
-  }
-
-  let idx = -1;
-  if (prefix) {
-    const contextIdx = fullText.indexOf(prefix + searchText);
-    if (contextIdx !== -1) idx = contextIdx + prefix.length;
-  }
-  if (idx === -1) idx = fullText.indexOf(searchText);
-  if (idx === -1) return;
-
-  const endIdx = idx + searchText.length;
-  let startNode: Text | undefined, startOffset = 0;
-  let endNode: Text | undefined, endOffset = 0;
-
-  for (const { node, start } of nodes) {
-    const nodeEnd = start + (node.textContent?.length ?? 0);
-    if (!startNode && nodeEnd > idx) {
-      startNode = node;
-      startOffset = idx - start;
-    }
-    if (!endNode && nodeEnd >= endIdx) {
-      endNode = node;
-      endOffset = endIdx - start;
-      break;
-    }
-  }
-
-  if (!startNode || !endNode) return;
-
-  try {
-    const range = document.createRange();
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset);
-
-    const mark = document.createElement("mark");
-    mark.dataset.annotationId = annotationId;
-    mark.className = "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer";
-
-    range.surroundContents(mark);
-  } catch {
-    // Cannot wrap this selection — skip silently
-  }
-}
 
 function removeHighlights(container: HTMLElement): void {
   const marks = container.querySelectorAll("mark[data-annotation-id]");
@@ -262,9 +195,10 @@ function SelectionPopover({
       const domRange = selection.getRangeAt(0);
       const rect = domRange.getBoundingClientRect();
       const startOff = getTextOffset(proseEl, domRange.startContainer, domRange.startOffset);
+      const endOff = getTextOffset(proseEl, domRange.endContainer, domRange.endOffset);
       const fullText = proseEl.textContent ?? "";
-      const prefix = fullText.slice(Math.max(0, startOff - PREFIX_SUFFIX_LEN), startOff);
-      const suffix = fullText.slice(startOff + selectedText.length, startOff + selectedText.length + PREFIX_SUFFIX_LEN);
+      const prefix = startOff >= 0 ? fullText.slice(Math.max(0, startOff - PREFIX_SUFFIX_LEN), startOff) : "";
+      const suffix = endOff >= 0 ? fullText.slice(endOff, endOff + PREFIX_SUFFIX_LEN) : "";
       setSel({
         position: {
           x: rect.left + rect.width / 2,
@@ -455,10 +389,8 @@ function SceneContent({
     if (!annotations || annotations.length === 0) return;
     const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
     for (const annotation of unresolved) {
-      const parsedRange = (() => {
-        try { return annotation.range ? JSON.parse(annotation.range) : null; } catch { return null; }
-      })();
-      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
+      const parsedRange = parseAnnotationRange(annotation.range, annotation.id);
+      const prefix = parsedRange && "type" in parsedRange && parsedRange.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
       applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
     }
   }, [annotations, sanitized]);
