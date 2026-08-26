@@ -23,7 +23,7 @@ export function setup() {
     );
   }
 
-  execSync("npx prisma db push --accept-data-loss --url " + JSON.stringify(TEST_DATABASE_URL), {
+  execSync("npx prisma db push --url " + JSON.stringify(TEST_DATABASE_URL), {
     env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL, DIRECT_DATABASE_URL: TEST_DATABASE_URL },
     stdio: "inherit",
   });

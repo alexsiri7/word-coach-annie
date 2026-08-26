@@ -143,7 +143,8 @@ export const HarperSpellcheck = Extension.create<{
             if (meta) return meta;
             if (!tr.docChanged) return value;
             return {
-              decorations: value.decorations.map(tr.mapping, newState.doc),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              decorations: value.decorations.map(tr.mapping as any, newState.doc as any),
               lints: value.lints.map((l) => ({
                 ...l,
                 from: tr.mapping.map(l.from),
@@ -152,7 +153,8 @@ export const HarperSpellcheck = Extension.create<{
             };
           },
         },
-        view: (view: EditorView) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        view: (view: any) => {
           let linter: Linter | null = null;
           let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -201,8 +203,10 @@ export const HarperSpellcheck = Extension.create<{
                 )
                 .map((l, i) => {
                   const span = l.span();
-                  const from = charOffsetToPos(doc, span.start);
-                  const to = charOffsetToPos(doc, span.end);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const from = charOffsetToPos(doc as any, span.start);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const to = charOffsetToPos(doc as any, span.end);
                   return {
                     id: `harper-${i}-${span.start}-${span.end}`,
                     from,
@@ -217,7 +221,8 @@ export const HarperSpellcheck = Extension.create<{
                 .filter((r) => r.from < r.to);
 
               const decorations = DecorationSet.create(
-                doc,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                doc as any,
                 results.map((r) =>
                   Decoration.inline(r.from, r.to, {
                     class: "harper-error",
@@ -247,7 +252,8 @@ export const HarperSpellcheck = Extension.create<{
           return {
             update(currentView, prevState) {
               if (!currentView.state.doc.eq(prevState.doc)) {
-                scheduleRun(currentView);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                scheduleRun(currentView as any);
               }
             },
             destroy() {
@@ -261,7 +267,8 @@ export const HarperSpellcheck = Extension.create<{
           };
         },
         props: {
-          decorations(state) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          decorations(state): any {
             return (
               harperPluginKey.getState(state)?.decorations ??
               DecorationSet.empty
