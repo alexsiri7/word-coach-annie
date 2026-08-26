@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   List,
   X as XIcon,
@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import type { Annotation } from "@/lib/types";
 
 interface OutlineNode {
   id: string;
@@ -85,21 +86,170 @@ function collectTocEntries(nodes: OutlineNode[], depth: number = 0): TocEntry[] 
   return entries;
 }
 
-function SceneContent({ content }: { content: string }) {
+function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
+  const scenes: OutlineNode[] = [];
+  for (const node of nodes) {
+    if (node.type === "SCENE" && node.content && node.content !== "<p></p>") {
+      scenes.push(node);
+    }
+    scenes.push(...collectSceneNodes(node.children));
+  }
+  return scenes;
+}
+
+function applyHighlight(container: HTMLElement, searchText: string, annotationId: string): void {
+  if (!searchText) return;
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const nodes: { node: Text; start: number }[] = [];
+  let fullText = "";
+  let textNode: Text | null;
+
+  while ((textNode = walker.nextNode() as Text | null)) {
+    if ((textNode.parentElement as HTMLElement)?.tagName === "MARK") continue;
+    nodes.push({ node: textNode, start: fullText.length });
+    fullText += textNode.textContent ?? "";
+  }
+
+  const idx = fullText.indexOf(searchText);
+  if (idx === -1) return;
+
+  const endIdx = idx + searchText.length;
+  let startNode: Text | undefined, startOffset = 0;
+  let endNode: Text | undefined, endOffset = 0;
+
+  for (const { node, start } of nodes) {
+    const nodeEnd = start + (node.textContent?.length ?? 0);
+    if (!startNode && nodeEnd > idx) {
+      startNode = node;
+      startOffset = idx - start;
+    }
+    if (!endNode && nodeEnd >= endIdx) {
+      endNode = node;
+      endOffset = endIdx - start;
+      break;
+    }
+  }
+
+  if (!startNode || !endNode) return;
+
+  try {
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+
+    const mark = document.createElement("mark");
+    mark.dataset.annotationId = annotationId;
+    mark.className = "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer";
+
+    range.surroundContents(mark);
+  } catch {
+    // Cannot wrap this selection — skip silently
+  }
+}
+
+function removeHighlights(container: HTMLElement): void {
+  const marks = container.querySelectorAll("mark[data-annotation-id]");
+  marks.forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+    parent.normalize();
+  });
+}
+
+function AnnotationTooltip({
+  annotation,
+  position,
+  onClose,
+}: {
+  annotation: Annotation;
+  position: { x: number; y: number };
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="fixed z-50 w-72 bg-surface-raised border border-border rounded-lg shadow-xl p-3 text-sm"
+        style={{
+          left: Math.min(position.x, window.innerWidth - 300),
+          top: position.y + 8,
+        }}
+      >
+        <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
+          {annotation.content}
+        </div>
+        {annotation.selectedText && (
+          <div className="mt-2">
+            <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
+              &quot;{annotation.selectedText}&quot;
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SceneContent({
+  content,
+  sceneId: _sceneId,
+  annotations,
+  onAnnotationClick,
+}: {
+  content: string;
+  sceneId?: string;
+  annotations?: Annotation[];
+  onAnnotationClick?: (annotation: Annotation, pos: { x: number; y: number }) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const cleaned = stripBeats(content);
   if (!cleaned || cleaned === "<p></p>") return null;
 
   // Sanitize HTML to prevent XSS — content may come from another user via sharing.
   // isomorphic-dompurify works on both SSR and client, so no window guard needed.
+  // ADD_TAGS: ["mark"] allows the <mark> elements we inject post-sanitize.
   const sanitized = useMemo(() => {
     const DOMPurify = require("isomorphic-dompurify");
-    return DOMPurify.sanitize(cleaned);
+    return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
   }, [cleaned]);
+
+  // Apply DOM highlights after render
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    removeHighlights(container);
+    if (!annotations || annotations.length === 0) return;
+    const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
+    for (const annotation of unresolved) {
+      applyHighlight(container, annotation.selectedText!, annotation.id);
+    }
+  }, [annotations, sanitized]);
+
+  // Click handler delegated to container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onAnnotationClick) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest("mark[data-annotation-id]") as HTMLElement | null;
+      if (!target) return;
+      const id = target.dataset.annotationId;
+      const annotation = annotations?.find((a) => a.id === id);
+      if (!annotation) return;
+      const rect = target.getBoundingClientRect();
+      onAnnotationClick(annotation, { x: rect.left, y: rect.bottom });
+    };
+    container.addEventListener("click", handleClick);
+    return () => container.removeEventListener("click", handleClick);
+  }, [annotations, onAnnotationClick]);
 
   return (
     // NOTE: class name "reader-prose" is referenced in sentry.client.config.ts
     // for session replay masking (PII). Update sentry config if this class is renamed.
     <div
+      ref={containerRef}
       className="reader-prose"
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
@@ -110,10 +260,14 @@ function ManuscriptNode({
   node,
   chapterCounter,
   isFirst,
+  annotationsByScene,
+  onAnnotationClick,
 }: {
   node: OutlineNode;
   chapterCounter: { value: number };
   isFirst?: boolean;
+  annotationsByScene: Map<string, Annotation[]>;
+  onAnnotationClick: (annotation: Annotation, pos: { x: number; y: number }) => void;
 }) {
   if (node.type === "PART") {
     return (
@@ -132,6 +286,8 @@ function ManuscriptNode({
             node={child}
             chapterCounter={chapterCounter}
             isFirst={i === 0 && isFirst}
+            annotationsByScene={annotationsByScene}
+            onAnnotationClick={onAnnotationClick}
           />
         ))}
       </section>
@@ -167,7 +323,12 @@ function ManuscriptNode({
               {i > 0 && scene.content && scene.content !== "<p></p>" && (
                 <hr className="my-10 border-0 h-px bg-border/30" />
               )}
-              <SceneContent content={scene.content || ""} />
+              <SceneContent
+                content={scene.content || ""}
+                sceneId={scene.id}
+                annotations={annotationsByScene.get(scene.id)}
+                onAnnotationClick={onAnnotationClick}
+              />
             </div>
           ))
         ) : (
@@ -183,7 +344,12 @@ function ManuscriptNode({
   if (node.type === "SCENE" && node.content && node.content !== "<p></p>") {
     return (
       <section id={node.id} className="my-8">
-        <SceneContent content={node.content} />
+        <SceneContent
+          content={node.content}
+          sceneId={node.id}
+          annotations={annotationsByScene.get(node.id)}
+          onAnnotationClick={onAnnotationClick}
+        />
       </section>
     );
   }
@@ -194,10 +360,44 @@ function ManuscriptNode({
 export function ReaderView({ project, outline }: ReaderViewProps) {
   const [tocOpen, setTocOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [annotationsByScene, setAnnotationsByScene] = useState<Map<string, Annotation[]>>(new Map());
+  const [activeAnnotation, setActiveAnnotation] = useState<Annotation | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const tocEntries = collectTocEntries(outline);
   const wordCount = countWords(outline);
   const readingTime = estimateReadingTime(wordCount);
   const chapterCounter = { value: 0 };
+
+  useEffect(() => {
+    const scenes = collectSceneNodes(outline);
+    if (scenes.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      scenes.map(async (scene) => {
+        try {
+          const res = await fetch(`/api/nodes/${scene.id}/annotations`);
+          if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
+          const data: Annotation[] = await res.json();
+          return { sceneId: scene.id, annotations: data };
+        } catch {
+          return { sceneId: scene.id, annotations: [] as Annotation[] };
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      const map = new Map<string, Annotation[]>();
+      for (const { sceneId, annotations } of results) {
+        map.set(sceneId, annotations);
+      }
+      setAnnotationsByScene(map);
+    });
+    return () => { cancelled = true; };
+  }, [outline]);
+
+  const handleTooltipClose = useCallback(() => {
+    setActiveAnnotation(null);
+    setTooltipPos(null);
+  }, []);
 
   const handleTocClick = (id: string) => {
     setTocOpen(false);
@@ -355,6 +555,11 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
                 node={node}
                 chapterCounter={chapterCounter}
                 isFirst={i === 0}
+                annotationsByScene={annotationsByScene}
+                onAnnotationClick={(annotation, pos) => {
+                  setActiveAnnotation(annotation);
+                  setTooltipPos(pos);
+                }}
               />
             ))
           )}
@@ -432,6 +637,14 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
         projectId={project.id}
         projectTitle={project.title}
       />
+
+      {activeAnnotation && tooltipPos && (
+        <AnnotationTooltip
+          annotation={activeAnnotation}
+          position={tooltipPos}
+          onClose={handleTooltipClose}
+        />
+      )}
     </div>
   );
 }
