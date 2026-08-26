@@ -129,6 +129,25 @@ export interface ContentVersion {
   createdAt: string;
 }
 
+/** Range encoding for annotations created inside the ProseMirror editor. */
+export interface ProseRange {
+  from: number;
+  to: number;
+}
+
+/** Range encoding for annotations created from plain HTML (Read View). */
+export interface TextQuoteRange {
+  type: "textQuote";
+  selectedText: string;
+  /** Up to 32 characters of text immediately before the selection. */
+  prefix: string;
+  /** Up to 32 characters of text immediately after the selection. */
+  suffix: string;
+}
+
+/** Union of all range shapes serialized into Annotation.range (JSON string). */
+export type AnnotationRange = ProseRange | TextQuoteRange;
+
 export interface Annotation {
   id: string;
   nodeId: string;
