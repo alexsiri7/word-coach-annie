@@ -9,7 +9,12 @@ import {
   ArrowLeft,
   Flag,
   Download,
+  MessageSquare,
+  Plus,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ReportContentDialog } from "@/components/report-content-dialog";
 import {
@@ -42,6 +47,7 @@ interface Project {
 interface ReaderViewProps {
   project: Project;
   outline: OutlineNode[];
+  isOwner: boolean;
 }
 
 /** Strip beat annotations from HTML content */
@@ -193,12 +199,204 @@ function AnnotationTooltip({
   );
 }
 
+interface SelectionState {
+  position: { x: number; y: number };
+  sceneId: string;
+  selectedText: string;
+  mode: "buttons" | "comment" | "task";
+}
+
+function SelectionPopover({
+  projectId,
+  isOwner,
+  onAnnotationCreated,
+}: {
+  projectId: string;
+  isOwner: boolean;
+  onAnnotationCreated: (sceneId: string, annotation: Annotation) => void;
+}) {
+  const [sel, setSel] = useState<SelectionState | null>(null);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+  const taskRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+        setSel(null);
+        return;
+      }
+      const anchorEl =
+        selection.anchorNode?.nodeType === Node.TEXT_NODE
+          ? selection.anchorNode.parentElement
+          : (selection.anchorNode as HTMLElement | null);
+      const proseEl = anchorEl?.closest<HTMLElement>(".reader-prose");
+      if (!proseEl) {
+        setSel(null);
+        return;
+      }
+      const sceneId = proseEl.dataset.nodeId;
+      if (!sceneId) return;
+      const selectedText = selection.toString().trim();
+      if (!selectedText) return;
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setSel({
+        position: {
+          x: rect.left + rect.width / 2,
+          y: rect.bottom,
+        },
+        sceneId,
+        selectedText,
+        mode: "buttons",
+      });
+    };
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  useEffect(() => {
+    if (!sel) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSel(null);
+    };
+    const handleSelectionChange = () => {
+      if (sel.mode !== "buttons") return;
+      const s = window.getSelection();
+      if (!s || s.isCollapsed) setSel(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [sel]);
+
+  const handleCommentSave = async () => {
+    const text = commentRef.current?.value.trim();
+    if (!text || !sel) return;
+    try {
+      const res = await fetch(`/api/nodes/${sel.sceneId}/annotations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text, range: "", selectedText: sel.selectedText }),
+      });
+      if (res.ok) {
+        const annotation: Annotation = await res.json();
+        onAnnotationCreated(sel.sceneId, annotation);
+        setSel(null);
+      }
+    } catch (e) {
+      console.error("Failed to add annotation", e);
+    }
+  };
+
+  const handleTaskSave = async () => {
+    const name = taskRef.current?.value.trim();
+    if (!name || !sel) return;
+    try {
+      const res = await fetch("/api/writing-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          sceneId: sel.sceneId,
+          name,
+          whatIsNeeded: sel.selectedText,
+        }),
+      });
+      if (res.ok) setSel(null);
+    } catch (e) {
+      console.error("Failed to create writing task", e);
+    }
+  };
+
+  if (!sel) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={() => setSel(null)} />
+      <div
+        className="fixed z-50 bg-surface-raised border border-border rounded-lg shadow-xl p-2 text-sm"
+        style={{
+          left: Math.min(sel.position.x - 60, window.innerWidth - 240),
+          top: sel.position.y + 8,
+        }}
+      >
+        {sel.mode === "buttons" && (
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setSel((s) => s && { ...s, mode: "comment" })}
+            >
+              <MessageSquare className="h-3 w-3" /> Comment
+            </Button>
+            {isOwner && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={() => setSel((s) => s && { ...s, mode: "task" })}
+              >
+                <Plus className="h-3 w-3" /> Add task
+              </Button>
+            )}
+          </div>
+        )}
+        {sel.mode === "comment" && (
+          <div className="flex flex-col gap-2 w-64">
+            <h4 className="font-medium text-xs text-text-secondary">Add Comment</h4>
+            <Textarea
+              ref={commentRef}
+              placeholder="Type your comment..."
+              className="text-sm min-h-[80px] w-full"
+              autoFocus
+            />
+            <div className="flex justify-end gap-1">
+              <Button size="sm" variant="ghost" onClick={() => setSel(null)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCommentSave}>
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
+        {sel.mode === "task" && (
+          <div className="flex flex-col gap-2 w-64">
+            <h4 className="font-medium text-xs text-text-secondary">Add Task</h4>
+            <Input
+              ref={taskRef}
+              placeholder="Task name..."
+              className="text-sm"
+              autoFocus
+            />
+            <div className="flex justify-end gap-1">
+              <Button size="sm" variant="ghost" onClick={() => setSel(null)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleTaskSave}>
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function SceneContent({
   content,
+  nodeId,
   annotations,
   onAnnotationClick,
 }: {
   content: string;
+  nodeId?: string;
   annotations?: Annotation[];
   onAnnotationClick?: (annotation: Annotation, pos: { x: number; y: number }) => void;
 }) {
@@ -249,6 +447,7 @@ function SceneContent({
     <div
       ref={containerRef}
       className="reader-prose"
+      data-node-id={nodeId}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
@@ -322,6 +521,7 @@ function ManuscriptNode({
                 <hr className="my-10 border-0 h-px bg-border/30" />
               )}
               <SceneContent
+                nodeId={scene.id}
                 content={scene.content || ""}
                 annotations={annotationsByScene.get(scene.id)}
                 onAnnotationClick={onAnnotationClick}
@@ -342,6 +542,7 @@ function ManuscriptNode({
     return (
       <section id={node.id} className="my-8">
         <SceneContent
+          nodeId={node.id}
           content={node.content}
           annotations={annotationsByScene.get(node.id)}
           onAnnotationClick={onAnnotationClick}
@@ -353,7 +554,7 @@ function ManuscriptNode({
   return null;
 }
 
-export function ReaderView({ project, outline }: ReaderViewProps) {
+export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
   const [tocOpen, setTocOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [annotationsByScene, setAnnotationsByScene] = useState<Map<string, Annotation[]>>(new Map());
@@ -402,6 +603,15 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
     },
     []
   );
+
+  const handleAnnotationCreated = useCallback((sceneId: string, annotation: Annotation) => {
+    setAnnotationsByScene(prev => {
+      const next = new Map(prev);
+      const existing = next.get(sceneId) ?? [];
+      next.set(sceneId, [annotation, ...existing]);
+      return next;
+    });
+  }, []);
 
   const handleTocClick = (id: string) => {
     setTocOpen(false);
@@ -649,6 +859,12 @@ export function ReaderView({ project, outline }: ReaderViewProps) {
           onClose={handleTooltipClose}
         />
       )}
+
+      <SelectionPopover
+        projectId={project.id}
+        isOwner={isOwner}
+        onAnnotationCreated={handleAnnotationCreated}
+      />
     </div>
   );
 }
