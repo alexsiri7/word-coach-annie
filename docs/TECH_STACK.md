@@ -37,6 +37,7 @@ hierarchical story structure, world-building tools, and AI chat integration.
 | AI | Google AI + @google/adk 0.6 | Gemini 2.0 Flash via native ADK integration |
 | PDF Export | @react-pdf/renderer | Server-side PDF generation from React components |
 | EPUB Export | epub-gen-memory | Server-side EPUB 3 generation from HTML chapters |
+| DOCX Export | docx | Server-side DOCX generation (OOXML); Arial font, LEFT alignment |
 | Google APIs | googleapis | Google Docs export, Drive |
 | OAuth | google-auth-library | Google authentication |
 | MCP | @modelcontextprotocol/sdk | AI tool integration server |

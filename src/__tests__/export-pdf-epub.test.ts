@@ -718,3 +718,185 @@ describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
     }
   });
 });
+
+// ─── Unit Tests: buildDocxParagraphs ─────────────────────────────────────────
+
+// Inline copy of the function under test (same pattern as stripHtml tests above).
+// Keep in sync with src/app/api/projects/[id]/export/docx/route.ts
+interface TestOutlineNode {
+  id: string;
+  type: string;
+  title: string;
+  orderIndex: number;
+  parentId: string | null;
+  children: TestOutlineNode[];
+  content?: string;
+}
+
+interface TestParagraph {
+  children: TestTextRun[];
+  alignment: string;
+}
+
+interface TestTextRun {
+  text: string;
+  font: string;
+  size: number;
+  bold?: boolean;
+}
+
+function buildDocxParagraphsForTest(nodes: TestOutlineNode[]): TestParagraph[] {
+  const paragraphs: TestParagraph[] = [];
+
+  function stripHtmlLocal(html: string): string {
+    if (!html || html === "<p></p>") return "";
+    let text = html;
+    text = text.replace(/<!--\s*beat:.*?-->/gi, "");
+    text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
+    text = text.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<[^>]+>/g, "");
+    text = text
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&ldquo;/g, "\u201C")
+      .replace(/&rdquo;/g, "\u201D")
+      .replace(/&mdash;/g, "\u2014")
+      .replace(/&ndash;/g, "\u2013");
+    return text.replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  function walk(node: TestOutlineNode) {
+    if (node.type === "PART") {
+      paragraphs.push({
+        children: [{ text: node.title, font: "Arial", size: 32, bold: true }],
+        alignment: "left",
+      });
+      for (const child of node.children) walk(child);
+    } else if (node.type === "CHAPTER") {
+      paragraphs.push({
+        children: [{ text: node.title, font: "Arial", size: 28, bold: true }],
+        alignment: "left",
+      });
+      for (const child of node.children) walk(child);
+    } else if (node.type === "SCENE" && node.content) {
+      const text = stripHtmlLocal(node.content);
+      if (text) {
+        for (const block of text.split("\n\n")) {
+          const trimmed = block.trim();
+          if (trimmed) {
+            paragraphs.push({
+              children: [{ text: trimmed, font: "Arial", size: 24 }],
+              alignment: "left",
+            });
+          }
+        }
+      }
+    }
+  }
+
+  for (const node of nodes) walk(node);
+  return paragraphs;
+}
+
+describe("buildDocxParagraphs (DOCX export utility)", () => {
+  it("emits a 32pt bold paragraph for PART nodes", () => {
+    const node: TestOutlineNode = {
+      id: "1", type: "PART", title: "Part One",
+      orderIndex: 0, parentId: null, children: [],
+    };
+    const paras = buildDocxParagraphsForTest([node]);
+    expect(paras).toHaveLength(1);
+    expect(paras[0].children[0].text).toBe("Part One");
+    expect(paras[0].children[0].font).toBe("Arial");
+    expect(paras[0].children[0].size).toBe(32);
+    expect(paras[0].children[0].bold).toBe(true);
+    expect(paras[0].alignment).toBe("left");
+  });
+
+  it("emits a 28pt bold paragraph for CHAPTER nodes", () => {
+    const node: TestOutlineNode = {
+      id: "2", type: "CHAPTER", title: "Chapter One",
+      orderIndex: 0, parentId: null, children: [],
+    };
+    const paras = buildDocxParagraphsForTest([node]);
+    expect(paras).toHaveLength(1);
+    expect(paras[0].children[0].text).toBe("Chapter One");
+    expect(paras[0].children[0].font).toBe("Arial");
+    expect(paras[0].children[0].size).toBe(28);
+    expect(paras[0].children[0].bold).toBe(true);
+    expect(paras[0].alignment).toBe("left");
+  });
+
+  it("emits a 24pt paragraph for SCENE content with Arial font and LEFT alignment", () => {
+    const node: TestOutlineNode = {
+      id: "3", type: "SCENE", title: "Scene 1",
+      orderIndex: 0, parentId: null, children: [],
+      content: "<p>Once upon a time.</p>",
+    };
+    const paras = buildDocxParagraphsForTest([node]);
+    expect(paras).toHaveLength(1);
+    expect(paras[0].children[0].text).toBe("Once upon a time.");
+    expect(paras[0].children[0].font).toBe("Arial");
+    expect(paras[0].children[0].size).toBe(24);
+    expect(paras[0].children[0].bold).toBeUndefined();
+    expect(paras[0].alignment).toBe("left");
+  });
+
+  it("splits SCENE content on double newlines into separate paragraphs", () => {
+    const node: TestOutlineNode = {
+      id: "3", type: "SCENE", title: "Scene 1",
+      orderIndex: 0, parentId: null, children: [],
+      content: "<p>First block</p><p>Second block</p>",
+    };
+    const paras = buildDocxParagraphsForTest([node]);
+    expect(paras).toHaveLength(2);
+    expect(paras[0].children[0].text).toBe("First block");
+    expect(paras[1].children[0].text).toBe("Second block");
+  });
+
+  it("skips SCENE nodes with no content", () => {
+    const node: TestOutlineNode = {
+      id: "4", type: "SCENE", title: "Empty Scene",
+      orderIndex: 0, parentId: null, children: [],
+    };
+    expect(buildDocxParagraphsForTest([node])).toHaveLength(0);
+  });
+
+  it("skips SCENE nodes with empty HTML content", () => {
+    const node: TestOutlineNode = {
+      id: "5", type: "SCENE", title: "Empty Para Scene",
+      orderIndex: 0, parentId: null, children: [],
+      content: "<p></p>",
+    };
+    expect(buildDocxParagraphsForTest([node])).toHaveLength(0);
+  });
+
+  it("recurses into PART children (chapters and scenes)", () => {
+    const scene: TestOutlineNode = {
+      id: "3", type: "SCENE", title: "Scene 1",
+      orderIndex: 1, parentId: "2", children: [],
+      content: "<p>Body text.</p>",
+    };
+    const chapter: TestOutlineNode = {
+      id: "2", type: "CHAPTER", title: "Chapter One",
+      orderIndex: 0, parentId: "1", children: [scene],
+    };
+    const part: TestOutlineNode = {
+      id: "1", type: "PART", title: "Part One",
+      orderIndex: 0, parentId: null, children: [chapter],
+    };
+    const paras = buildDocxParagraphsForTest([part]);
+    // PART heading + CHAPTER heading + SCENE content
+    expect(paras).toHaveLength(3);
+    expect(paras[0].children[0].text).toBe("Part One");
+    expect(paras[0].children[0].size).toBe(32);
+    expect(paras[1].children[0].text).toBe("Chapter One");
+    expect(paras[1].children[0].size).toBe(28);
+    expect(paras[2].children[0].text).toBe("Body text.");
+    expect(paras[2].children[0].size).toBe(24);
+  });
+});
