@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Annotation } from "@/lib/types";
+import { addAnnotationToMap } from "./utils";
 
 interface OutlineNode {
   id: string;
@@ -188,10 +189,8 @@ function AnnotationTooltip({
           {annotation.content}
         </div>
         {annotation.selectedText && (
-          <div className="mt-2">
-            <div className="bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
-              &quot;{annotation.selectedText}&quot;
-            </div>
+          <div className="mt-2 bg-surface-sunken p-1.5 rounded text-xs text-text-muted italic border border-border-subtle">
+            &quot;{annotation.selectedText}&quot;
           </div>
         )}
       </div>
@@ -621,12 +620,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
   );
 
   const handleAnnotationCreated = useCallback((sceneId: string, annotation: Annotation) => {
-    setAnnotationsByScene(prev => {
-      const next = new Map(prev);
-      const existing = next.get(sceneId) ?? [];
-      next.set(sceneId, [annotation, ...existing]);
-      return next;
-    });
+    setAnnotationsByScene(prev => addAnnotationToMap(prev, sceneId, annotation));
   }, []);
 
   const handleTocClick = (id: string) => {

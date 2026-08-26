@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth";
 import { ReaderView } from "./reader-view";
+import { deriveIsOwner } from "./utils";
 
 interface OutlineNode {
   id: string;
@@ -187,8 +188,7 @@ export default async function ReaderPage({
     );
   }
 
-  // !userId = unauthenticated dev/API_TOKEN mode → treat as owner
-  const isOwner = !userId || data.ownerId === userId;
+  const isOwner = deriveIsOwner(userId, data.ownerId ?? "");
 
   return <ReaderView project={data.project} outline={data.outline} isOwner={isOwner} />;
 }
