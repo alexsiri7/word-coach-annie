@@ -349,3 +349,14 @@ GHSA-5qjj-4xww-7phc
 # Upgrade path: fix available (deepmerge-ts >=8.0.0). Consider running `npm audit fix`.
 # App risk: LOW — no user-controlled input reaches deepmerge-ts; config merging only.
 GHSA-ggr8-5vv4-36mx
+#
+# Source: serialize-javascript (via @ducanh2912/next-pwa -> workbox-build -> @rollup/plugin-terser)
+# Justification: serialize-javascript RCE (via RegExp.flags/Date.toISOString) and DoS
+# (via crafted array-like objects) require the app to deserialize attacker-controlled
+# serialized output at runtime. This app does not use serialize-javascript directly;
+# it is a build-time dependency used by Rollup's terser plugin during workbox service
+# worker bundling. No runtime deserialization of untrusted serialized data occurs.
+# Upgrade path: no fixed version available (<=7.0.4 affected). Blocked by workbox-build.
+# App risk: LOW — build-time only; no runtime deserialization of untrusted input.
+GHSA-5c6j-r48x-rmvq
+GHSA-qj8w-gfj5-8c6v

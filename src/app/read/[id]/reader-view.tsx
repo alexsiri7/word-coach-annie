@@ -105,6 +105,15 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
 
 const PREFIX_SUFFIX_LEN = 32;
 
+function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
+  if (!range) return null;
+  try {
+    return JSON.parse(range);
+  } catch {
+    return null;
+  }
+}
+
 function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: number): number {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let total = 0;
@@ -172,24 +181,14 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   }
 }
 
-function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
-  if (!range) return null;
-  try {
-    return JSON.parse(range);
-  } catch {
-    return null;
-  }
-}
-
 function removeHighlights(container: HTMLElement): void {
-  const marks = container.querySelectorAll("mark[data-annotation-id]");
-  marks.forEach((mark) => {
+  for (const mark of container.querySelectorAll("mark[data-annotation-id]")) {
     const parent = mark.parentNode;
-    if (!parent) return;
+    if (!parent) continue;
     while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
     parent.removeChild(mark);
     parent.normalize();
-  });
+  }
 }
 
 function AnnotationTooltip({

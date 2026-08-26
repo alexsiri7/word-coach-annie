@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
-    "dev:secure": "next dev --experimental-https -H 0.0.0.0",
+    "dev": "next dev -H 0.0.0.0 --webpack",
+    "dev:secure": "next dev --experimental-https -H 0.0.0.0 --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "test": "vitest",
@@ -108,5 +108,8 @@
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "undici": "^7.28.0"
   }
 }
