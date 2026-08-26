@@ -6,6 +6,7 @@ import { listSkills, loadSkill } from "./skills";
 import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
+import { StaleWriteError } from "@/mcp/content-hash";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
@@ -179,7 +180,11 @@ async function mcpRun(
         const result = await fn();
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (e) {
-        logger.error(`${logLabel}: failed`, e);
+        if (e instanceof StaleWriteError) {
+            logger.warn(`${logLabel}: stale write rejected`, e);
+        } else {
+            logger.error(`${logLabel}: failed`, e);
+        }
         const message = e instanceof Error ? e.message : String(e);
         return { content: [{ type: "text", text: `${errorPrefix}: ${message}` }], isError: true };
     }
