@@ -625,11 +625,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
       })
     ).then((results) => {
       if (cancelled) return;
-      const map = new Map<string, Annotation[]>();
-      for (const { sceneId, annotations } of results) {
-        map.set(sceneId, annotations);
-      }
-      setAnnotationsByScene(map);
+      setAnnotationsByScene(new Map(results.map(({ sceneId, annotations }) => [sceneId, annotations])));
     });
     return () => { cancelled = true; };
   }, [outline]);
@@ -639,13 +635,10 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
     setTooltipPos(null);
   }, []);
 
-  const handleAnnotationClick = useCallback(
-    (annotation: Annotation, pos: { x: number; y: number }) => {
-      setActiveAnnotation(annotation);
-      setTooltipPos(pos);
-    },
-    []
-  );
+  const handleAnnotationClick = useCallback((annotation: Annotation, pos: { x: number; y: number }) => {
+    setActiveAnnotation(annotation);
+    setTooltipPos(pos);
+  }, []);
 
   const handleAnnotationCreated = useCallback((sceneId: string, annotation: Annotation) => {
     setAnnotationsByScene(prev => {

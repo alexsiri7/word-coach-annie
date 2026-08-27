@@ -55,8 +55,8 @@ async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
   });
 
   const sceneIds = nodes
-    .filter((n: { type: string }) => n.type === "SCENE")
-    .map((n: { id: string }) => n.id);
+    .filter((n) => n.type === "SCENE")
+    .map((n) => n.id);
   const contentMap: Record<string, string> = {};
 
   if (sceneIds.length > 0) {
