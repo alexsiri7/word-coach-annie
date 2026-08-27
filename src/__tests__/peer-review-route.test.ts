@@ -149,7 +149,7 @@ describe("POST /api/projects/:id/peer-review", () => {
         strengths: ["Setup lands"],
         weaknesses: [],
         detailedFeedback: "The punchline delivers.",
-        recommendation: "sharp",
+        recommendation: "emotionally earned",
       });
       // Simulate model appending an example structure after the JSON
       const rawWithTrailing = validJson + "\n\nTemplate: {Setup: [X]} → {Punchline: [Y]}";
@@ -166,6 +166,37 @@ describe("POST /api/projects/:id/peer-review", () => {
       expect(res.status).toBe(200);
       const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
       expect((createArg.data.comedy as { overallImpression?: string })?.overallImpression).toBe("Sharp timing");
+      // logger.error should NOT have been called for comedy
+      expect(vi.mocked(logger.error)).not.toHaveBeenCalledWith(
+        expect.stringContaining("comedy"),
+        expect.anything()
+      );
+    });
+
+    it("handles JSON whose string values contain braces, followed by trailing content", async () => {
+      const validJson = JSON.stringify({
+        overallImpression: "Use {callback} pattern",
+        strengths: ["Setup {A} → Punchline {B}"],
+        weaknesses: [],
+        detailedFeedback: "Try {this}.",
+        recommendation: "emotionally earned",
+      });
+      // Trailing content also has braces — stresses both inString tracking and trailing-content paths
+      const rawWithBracesEverywhere = validJson + "\n\nExample: {Setup: [X]}";
+
+      vi.mocked(runSimpleCompletion)
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+        .mockResolvedValueOnce(rawWithBracesEverywhere) // comedy — braces inside string values + trailing content
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "E", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "emotionally earned" }))
+        .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Revise" }));
+
+      const res = await POST(makeRequest(), makeParams());
+      expect(res.status).toBe(200);
+      const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+      expect((createArg.data.comedy as { overallImpression?: string })?.overallImpression)
+        .toBe("Use {callback} pattern");
       // logger.error should NOT have been called for comedy
       expect(vi.mocked(logger.error)).not.toHaveBeenCalledWith(
         expect.stringContaining("comedy"),
