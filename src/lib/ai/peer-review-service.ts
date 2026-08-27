@@ -120,10 +120,34 @@ Return ONLY valid JSON (no markdown fences):
 }
 
 function parseJson<T>(raw: string): T | null {
+  // Try direct parse first — responseMimeType: "application/json" usually gives clean JSON.
   try {
-    // Extract the first {...} block — handles cases where the model wraps JSON in markdown fences.
-    const match = raw.match(/\{[\s\S]*\}/);
-    return match ? JSON.parse(match[0]) : null;
+    return JSON.parse(raw.trim()) as T;
+  } catch {
+    // no-op — fall through to extraction
+  }
+  // Extract the first balanced {...} block — handles markdown-fenced responses and trailing content.
+  try {
+    const start = raw.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < raw.length; i++) {
+      const ch = raw[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\" && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          return JSON.parse(raw.slice(start, i + 1)) as T;
+        }
+      }
+    }
+    return null;
   } catch {
     return null;
   }

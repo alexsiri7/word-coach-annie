@@ -143,6 +143,36 @@ describe("POST /api/projects/:id/peer-review", () => {
       expect((createArg.data.publisher as { overallImpression?: string })?.overallImpression).toBe("Good");
     });
 
+    it("handles JSON followed by trailing content with braces", async () => {
+      const validJson = JSON.stringify({
+        overallImpression: "Sharp timing",
+        strengths: ["Setup lands"],
+        weaknesses: [],
+        detailedFeedback: "The punchline delivers.",
+        recommendation: "sharp",
+      });
+      // Simulate model appending an example structure after the JSON
+      const rawWithTrailing = validJson + "\n\nTemplate: {Setup: [X]} → {Punchline: [Y]}";
+
+      vi.mocked(runSimpleCompletion)
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+        .mockResolvedValueOnce(rawWithTrailing) // comedy — trailing brace content
+        .mockResolvedValueOnce(JSON.stringify({ overallImpression: "E", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "emotionally earned" }))
+        .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Revise" }));
+
+      const res = await POST(makeRequest(), makeParams());
+      expect(res.status).toBe(200);
+      const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+      expect((createArg.data.comedy as { overallImpression?: string })?.overallImpression).toBe("Sharp timing");
+      // logger.error should NOT have been called for comedy
+      expect(vi.mocked(logger.error)).not.toHaveBeenCalledWith(
+        expect.stringContaining("comedy"),
+        expect.anything()
+      );
+    });
+
     it("falls back to DEFAULT_REVIEW when AI returns invalid JSON", async () => {
       vi.mocked(runSimpleCompletion)
         .mockResolvedValueOnce("not json at all") // publisher parse fails
