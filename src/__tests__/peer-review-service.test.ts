@@ -170,6 +170,81 @@ describe("runPeerReview", () => {
     expect(result.consensusError).toBeUndefined();
   });
 
+  it("parses actor JSON when response has trailing brace content", async () => {
+    const validJson = JSON.stringify({
+      overallImpression: "Emotionally earned",
+      strengths: ["earned emotion"],
+      weaknesses: [],
+      detailedFeedback: "Works well.",
+      recommendation: "emotionally earned",
+    });
+    // Simulate model appending illustrative brace notation after the JSON
+    const rawWithTrailing = validJson + "\n\nTry: {character} feels {emotion} because {setup}.";
+
+    vi.mocked(runSimpleCompletion)
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
+      .mockResolvedValueOnce(rawWithTrailing) // actor — trailing brace content
+      .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Revise" }));
+
+    await runPeerReview("proj-1");
+
+    const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+    expect((createArg.data.actor as { overallImpression?: string })?.overallImpression).toBe("Emotionally earned");
+    expect(vi.mocked(logger.error)).not.toHaveBeenCalledWith(
+      expect.stringContaining("actor"),
+      expect.anything()
+    );
+  });
+
+  it("falls back to DEFAULT_REVIEW and logs error when actor returns invalid JSON", async () => {
+    vi.mocked(runSimpleCompletion)
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
+      .mockResolvedValueOnce("not valid json at all") // actor — unparseable
+      .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Revise" }));
+
+    await runPeerReview("proj-1");
+
+    const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+    expect((createArg.data.actor as { overallImpression?: string })?.overallImpression).toBe("Unable to parse review");
+    expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+      expect.stringContaining("actor"),
+      expect.objectContaining({ raw: expect.any(String) })
+    );
+  });
+
+  it("parses actor JSON when string values contain curly braces", async () => {
+    const validJson = JSON.stringify({
+      overallImpression: "Needs work",
+      strengths: [],
+      weaknesses: ["Try {substituting} stronger {verbs}"],
+      detailedFeedback: "Use {active} voice throughout.",
+      recommendation: "revise",
+    });
+
+    vi.mocked(runSimpleCompletion)
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "A", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "publish" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "B", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "loved it" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "C", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "strong" }))
+      .mockResolvedValueOnce(JSON.stringify({ overallImpression: "D", strengths: [], weaknesses: [], detailedFeedback: "", recommendation: "sharp" }))
+      .mockResolvedValueOnce(validJson) // actor — string values contain { }
+      .mockResolvedValueOnce(JSON.stringify({ pointsOfAgreement: [], pointsOfDisagreement: [], topPriorities: [], synthesizedRecommendation: "Revise" }));
+
+    await runPeerReview("proj-1");
+
+    const createArg = vi.mocked(prisma.peerReview.create).mock.calls[0][0];
+    expect((createArg.data.actor as { overallImpression?: string })?.overallImpression).toBe("Needs work");
+    expect(vi.mocked(logger.error)).not.toHaveBeenCalledWith(
+      expect.stringContaining("actor"),
+      expect.anything()
+    );
+  });
+
   it("propagates DB failure without swallowing", async () => {
     vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
     await expect(runPeerReview("proj-1")).rejects.toThrow("db down");
