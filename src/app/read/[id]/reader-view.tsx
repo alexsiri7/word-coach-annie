@@ -134,7 +134,7 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   let textNode: Text | null;
 
   while ((textNode = walker.nextNode() as Text | null)) {
-    if ((textNode.parentElement as HTMLElement)?.tagName === "MARK") continue;
+    if (textNode.parentElement?.tagName === "MARK") continue;
     nodes.push({ node: textNode, start: fullText.length });
     fullText += textNode.textContent ?? "";
   }
@@ -148,8 +148,10 @@ function applyHighlight(container: HTMLElement, searchText: string, annotationId
   if (idx === -1) return;
 
   const endIdx = idx + searchText.length;
-  let startNode: Text | undefined, startOffset = 0;
-  let endNode: Text | undefined, endOffset = 0;
+  let startNode: Text | undefined;
+  let startOffset = 0;
+  let endNode: Text | undefined;
+  let endOffset = 0;
 
   for (const { node, start } of nodes) {
     const nodeEnd = start + (node.textContent?.length ?? 0);
@@ -612,21 +614,22 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
     const scenes = collectSceneNodes(outline);
     if (scenes.length === 0) return;
     let cancelled = false;
-    Promise.all(
-      scenes.map(async (scene) => {
-        try {
-          const res = await fetch(`/api/nodes/${scene.id}/annotations`);
-          if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
-          const data: Annotation[] = await res.json();
-          return { sceneId: scene.id, annotations: data };
-        } catch {
-          return { sceneId: scene.id, annotations: [] as Annotation[] };
-        }
-      })
-    ).then((results) => {
+    (async () => {
+      const results = await Promise.all(
+        scenes.map(async (scene) => {
+          try {
+            const res = await fetch(`/api/nodes/${scene.id}/annotations`);
+            if (!res.ok) return { sceneId: scene.id, annotations: [] as Annotation[] };
+            const data: Annotation[] = await res.json();
+            return { sceneId: scene.id, annotations: data };
+          } catch {
+            return { sceneId: scene.id, annotations: [] as Annotation[] };
+          }
+        })
+      );
       if (cancelled) return;
       setAnnotationsByScene(new Map(results.map(({ sceneId, annotations }) => [sceneId, annotations])));
-    });
+    })();
     return () => { cancelled = true; };
   }, [outline]);
 
