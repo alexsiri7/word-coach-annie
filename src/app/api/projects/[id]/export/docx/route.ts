@@ -155,10 +155,7 @@ export async function GET(
     const outline = await buildOutlineTree(id);
 
     const titleParagraphs: Paragraph[] = [
-      new Paragraph({
-        children: [new TextRun({ text: project.title, font: "Arial", size: 32, bold: true })],
-        alignment: AlignmentType.LEFT,
-      }),
+      headingParagraph(project.title, 32),
     ];
     if (project.author) {
       titleParagraphs.push(

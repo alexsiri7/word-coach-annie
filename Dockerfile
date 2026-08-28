@@ -36,12 +36,13 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Cap V8 old-space at 400 MB for the 512 MB Railway plan.
-# Estimated RSS at 400 MB heap ≈ ~419–430 MB (~82–84% of 512 MB container RAM),
-# plus non-heap (Prisma engine, code cache, OS) — total headroom is thin.
-# NOTE: 512 MB proved insufficient at production load (see #976/#1032).
-# Upgrade to 1 GB Railway plan and use --max-old-space-size=768 instead.
-ENV NODE_OPTIONS="--max-old-space-size=400"
+# Cap V8 old-space at 340 MB for the 512 MB Railway plan.
+# Measured non-heap RSS overhead ≈ 89 MB (Prisma engine binary, OpenTelemetry
+# instrumentation, Node.js module code cache, OS buffers). At 340 MB heap cap,
+# V8 fills the cap at steady state: 340 + 89 ≈ 429 MB ≈ 84% of 512 MB — a
+# 6% buffer below the 90% alert threshold. See #1040 for measurement details.
+# NOTE: Long-term fix is upgrading to 1 GB Railway plan → --max-old-space-size=768.
+ENV NODE_OPTIONS="--max-old-space-size=340"
 
 # Next.js standalone output includes only what's needed
 COPY --from=builder /app/.next/standalone ./

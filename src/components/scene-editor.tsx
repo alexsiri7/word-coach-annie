@@ -216,7 +216,8 @@ export function SceneEditor({
           if (docNode.isText) textContent += docNode.text + " ";
           return true;
         });
-        const words = textContent.trim() === "" ? 0 : textContent.trim().split(/\s+/).length;
+        const trimmed = textContent.trim();
+        const words = trimmed ? trimmed.split(/\s+/).length : 0;
         setWordCount(words);
         session.onActivity(words);
 
@@ -321,7 +322,7 @@ export function SceneEditor({
     });
     onNodeUpdated?.();
     // Show next-scene prompt when marking a scene as done
-    if (newStatus === "DRAFT" || newStatus === "REVISED" || newStatus === "FINAL") {
+    if (["DRAFT", "REVISED", "FINAL"].includes(newStatus)) {
       try {
         const res = await fetch(`/api/projects/${projectId}/progress`);
         if (res.ok) {
