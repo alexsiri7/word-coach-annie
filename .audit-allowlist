@@ -360,3 +360,16 @@ GHSA-ggr8-5vv4-36mx
 # App risk: LOW — build-time only; no runtime deserialization of untrusted input.
 GHSA-5c6j-r48x-rmvq
 GHSA-qj8w-gfj5-8c6v
+#
+# Source: mariadb (via @google/adk -> @mikro-orm/mariadb transitive chain)
+# Justification: mariadb connector CVEs (SSL MitM credential leak, cleartext transmission,
+# SQL injection via big5/gbk/sjis/cp932/gb18030 charset escaping). These vulnerabilities
+# require establishing a MariaDB database connection. This app uses PostgreSQL exclusively
+# (via Prisma); mariadb is a transitive dep of @google/adk's @mikro-orm/mariadb adapter
+# and is never instantiated or connected to at runtime.
+# Upgrade path: fixed in mariadb >=3.4.6/3.5.x. Blocked by @mikro-orm/mariadb pinning
+# mariadb@3.4.5 exactly — requires upstream @mikro-orm release.
+# App risk: NONE — no MariaDB connections in this app; PostgreSQL only.
+GHSA-cqhc-2h57-wpxf
+GHSA-42r5-vhpq-m858
+GHSA-g5xc-5w98-jfvm
