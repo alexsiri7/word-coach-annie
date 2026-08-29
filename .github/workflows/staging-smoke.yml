@@ -140,8 +140,8 @@ jobs:
             exit 1
           fi
 
-          echo "Polling Railway for staging deployment status..."
-          MAX_ATTEMPTS=10
+          echo "Polling Railway for staging deployment status every 30s (up to 20 attempts / 10 min)..."
+          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
           INTERVAL=30
 
           STAGING_STATUS=""
