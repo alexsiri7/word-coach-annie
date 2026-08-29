@@ -196,6 +196,8 @@ export const HarperSpellcheck = Extension.create<{
                 language: "plaintext",
               });
 
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const pmDoc = doc as any;
               const results: LintResult[] = rawLints
                 .filter(
                   (l) =>
@@ -203,10 +205,8 @@ export const HarperSpellcheck = Extension.create<{
                 )
                 .map((l, i) => {
                   const span = l.span();
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const from = charOffsetToPos(doc as any, span.start);
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const to = charOffsetToPos(doc as any, span.end);
+                  const from = charOffsetToPos(pmDoc, span.start);
+                  const to = charOffsetToPos(pmDoc, span.end);
                   return {
                     id: `harper-${i}-${span.start}-${span.end}`,
                     from,
@@ -221,8 +221,7 @@ export const HarperSpellcheck = Extension.create<{
                 .filter((r) => r.from < r.to);
 
               const decorations = DecorationSet.create(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                doc as any,
+                pmDoc,
                 results.map((r) =>
                   Decoration.inline(r.from, r.to, {
                     class: "harper-error",
