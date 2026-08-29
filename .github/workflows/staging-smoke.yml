@@ -67,7 +67,7 @@ jobs:
 
       - name: Wait for healthy staging deploy
         run: |
-          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
+          MAX_ATTEMPTS=20       # up to ~10 minutes (19 sleeps × 30s = 9m30s)
           INTERVAL=30
           echo "Polling staging health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
           for i in $(seq 1 $MAX_ATTEMPTS); do
@@ -141,7 +141,7 @@ jobs:
           fi
 
           echo "Polling Railway for staging deployment status every 30s (up to 20 attempts / 10 min)..."
-          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
+          MAX_ATTEMPTS=20       # up to ~10 minutes (19 sleeps × 30s = 9m30s)
           INTERVAL=30
 
           STAGING_STATUS=""
@@ -234,7 +234,7 @@ jobs:
         id: check
         run: |
           HEALTH_URL="https://annie.interstellarai.net/api/health"
-          MAX_ATTEMPTS=20       # 20 × 30s = 10 minutes max
+          MAX_ATTEMPTS=20       # up to ~10 minutes (19 sleeps × 30s = 9m30s)
           INTERVAL=30
 
           echo "Polling production health every ${INTERVAL}s (up to ${MAX_ATTEMPTS} attempts / 10 min)..."
