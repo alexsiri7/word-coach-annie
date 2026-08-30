@@ -175,7 +175,7 @@ export function EditorToolbar({
                 <Icon className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
+            <TooltipContent side="bottom">{label}</TooltipContent>
           </Tooltip>
         ))}
       </div>
@@ -201,7 +201,7 @@ export function EditorToolbar({
                 <Icon className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
+            <TooltipContent side="bottom">{label}</TooltipContent>
           </Tooltip>
         ))}
       </div>
@@ -227,7 +227,7 @@ export function EditorToolbar({
                 <Icon className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
+            <TooltipContent side="bottom">{label}</TooltipContent>
           </Tooltip>
         ))}
       </div>
@@ -246,7 +246,7 @@ export function EditorToolbar({
             <Bookmark className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Insert beat</TooltipContent>
+        <TooltipContent side="bottom">Insert beat</TooltipContent>
       </Tooltip>
 
       <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
@@ -257,7 +257,7 @@ export function EditorToolbar({
             <Undo className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Undo</TooltipContent>
+        <TooltipContent side="bottom">Undo</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -265,7 +265,7 @@ export function EditorToolbar({
             <Redo className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Redo</TooltipContent>
+        <TooltipContent side="bottom">Redo</TooltipContent>
       </Tooltip>
 
       <div className="flex-1" />
@@ -328,7 +328,7 @@ export function EditorToolbar({
               </div>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{annotationsLabel}</TooltipContent>
+          <TooltipContent side="bottom">{annotationsLabel}</TooltipContent>
         </Tooltip>
 
         {onToggleConsistencyAlerts && (
@@ -352,7 +352,7 @@ export function EditorToolbar({
                 </div>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{consistencyAlertsLabel}</TooltipContent>
+            <TooltipContent side="bottom">{consistencyAlertsLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -370,7 +370,7 @@ export function EditorToolbar({
                 <Mic className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{voiceMonitorLabel}</TooltipContent>
+            <TooltipContent side="bottom">{voiceMonitorLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -388,7 +388,7 @@ export function EditorToolbar({
                 <Sparkles className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{critiquePanelLabel}</TooltipContent>
+            <TooltipContent side="bottom">{critiquePanelLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -406,7 +406,7 @@ export function EditorToolbar({
                 <PanelRight className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{sceneContextLabel}</TooltipContent>
+            <TooltipContent side="bottom">{sceneContextLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -424,7 +424,7 @@ export function EditorToolbar({
                 <SpellCheck className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{spellCheckLabel}</TooltipContent>
+            <TooltipContent side="bottom">{spellCheckLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -441,7 +441,7 @@ export function EditorToolbar({
                 <LayoutList className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Plan scene beats</TooltipContent>
+            <TooltipContent side="bottom">Plan scene beats</TooltipContent>
           </Tooltip>
         )}
 
@@ -458,7 +458,7 @@ export function EditorToolbar({
                 <ClipboardCheck className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Review this scene</TooltipContent>
+            <TooltipContent side="bottom">Review this scene</TooltipContent>
           </Tooltip>
         )}
 
@@ -475,7 +475,7 @@ export function EditorToolbar({
                 <ShieldCheck className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Canon check — cross-reference story bible</TooltipContent>
+            <TooltipContent side="bottom">Canon check — cross-reference story bible</TooltipContent>
           </Tooltip>
         )}
 
@@ -492,7 +492,7 @@ export function EditorToolbar({
                 <Maximize className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Focus mode</TooltipContent>
+            <TooltipContent side="bottom">Focus mode</TooltipContent>
           </Tooltip>
         )}
 
@@ -562,7 +562,7 @@ export function EditorToolbar({
               <Clock className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Version history</TooltipContent>
+          <TooltipContent side="bottom">Version history</TooltipContent>
         </Tooltip>
       </div>
     </div>
