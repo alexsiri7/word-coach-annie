@@ -1,6 +1,30 @@
-import { describe, it, expect } from "vitest";
-import { charOffsetToPos } from "@/components/editor/extensions/harper-spellcheck";
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import {
+  charOffsetToPos,
+  HarperSpellcheck,
+} from "@/components/editor/extensions/harper-spellcheck";
 import { Node as PmNode, Schema } from "@tiptap/pm/model";
+
+const mockLint = vi.fn().mockResolvedValue([]);
+const mockDispose = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("harper.js", () => {
+  const WorkerLinter = vi.fn().mockImplementation(function (this: {
+    lint: typeof mockLint;
+    dispose: typeof mockDispose;
+  }) {
+    this.lint = mockLint;
+    this.dispose = mockDispose;
+  });
+  return { WorkerLinter };
+});
+
+vi.mock("harper.js/binary", () => ({
+  binary: { url: "mock-binary" },
+}));
 
 const testSchema = new Schema({
   nodes: {
@@ -84,5 +108,43 @@ describe("charOffsetToPos — edge cases", () => {
     // First paragraph is empty; offset 0 should not crash
     const pos = charOffsetToPos(doc, 0);
     expect(pos).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("HarperSpellcheck — re-enable toggle (#reenable-fix)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockLint.mockClear().mockResolvedValue([]);
+    mockDispose.mockClear().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resumes linting (calls linter.lint again) after being disabled and re-enabled, with no doc edit", async () => {
+    const editor = new Editor({
+      extensions: [StarterKit, HarperSpellcheck],
+      content: "<p>Hello wrold</p>",
+    });
+
+    try {
+      // Let the extension's lazy harper.js import + initial scheduled lint run.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mockLint).toHaveBeenCalled();
+
+      // Disable spell-check.
+      editor.commands.setSpellCheckEnabled(false);
+      mockLint.mockClear();
+
+      // Re-enable without touching the document at all — before the fix,
+      // nothing would ever call linter.lint() again until the next edit.
+      editor.commands.setSpellCheckEnabled(true);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockLint).toHaveBeenCalled();
+    } finally {
+      editor.destroy();
+    }
   });
 });
