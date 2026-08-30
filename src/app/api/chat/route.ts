@@ -410,7 +410,9 @@ export async function POST(request: NextRequest) {
               encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
             );
           } catch (err) {
-            // Client disconnected — controller already closed, nothing to do
+            // Client disconnected — absorb known "controller closed" errors, log anything unexpected.
+            // String matching is intentional: Node.js/undici throws a plain TypeError here (no typed
+            // DOMException), so there's no better discriminator than the message text.
             const msg = err instanceof Error ? err.message : String(err);
             if (!msg.includes("Controller is already closed") && !msg.includes("Invalid state")) {
               logger.error("POST /api/chat: unexpected error in stream enqueue", err);
