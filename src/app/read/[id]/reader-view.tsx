@@ -703,7 +703,8 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
       prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
     );
     try {
-      await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
+      const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
+      if (!res.ok) throw new Error(`complete failed: ${res.status}`);
     } catch {
       // Revert on failure
       setTasks((prev) =>
