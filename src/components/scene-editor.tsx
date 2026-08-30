@@ -227,11 +227,13 @@ export function SceneEditor({
     [initialContent]
   );
 
-  // Sync spell-check toggle with the harper extension (#1001)
-  // Extension defaults to enabled=true; only dispatch when toggling off to avoid no-op transaction on mount
+  // Sync spell-check toggle with the harper extension (#1001, reenable fix).
+  // setSpellCheckEnabled() is idempotent (no-ops if the extension is already in
+  // this state), so it's safe to dispatch unconditionally on every change —
+  // this also covers re-enabling, which previously never resumed linting.
   useEffect(() => {
-    if (editor && !spellCheckEnabled) {
-      editor.commands.setSpellCheckEnabled(false);
+    if (editor) {
+      editor.commands.setSpellCheckEnabled(spellCheckEnabled);
     }
   }, [editor, spellCheckEnabled]);
 

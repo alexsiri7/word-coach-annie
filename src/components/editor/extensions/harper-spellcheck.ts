@@ -70,12 +70,25 @@ declare module "@tiptap/core" {
   }
 }
 
-export const HarperSpellcheck = Extension.create<{
+interface HarperSpellcheckStorage {
   enabled: boolean;
-  debounceMs: number;
-  onSuggestionOpen: (payload: SuggestionOpenPayload) => void;
-  onSuggestionClose: () => void;
-}>({
+  linter: Linter | null;
+  /** Set by the ProseMirror plugin's view() while it's mounted; lets the
+   * setSpellCheckEnabled command kick off an immediate (debounced) lint pass
+   * when re-enabling, since a flag flip alone doesn't touch the document and
+   * the plugin's update() only schedules a run when the doc changes. */
+  requestLint: (() => void) | null;
+}
+
+export const HarperSpellcheck = Extension.create<
+  {
+    enabled: boolean;
+    debounceMs: number;
+    onSuggestionOpen: (payload: SuggestionOpenPayload) => void;
+    onSuggestionClose: () => void;
+  },
+  HarperSpellcheckStorage
+>({
   name: "harperSpellcheck",
 
   addOptions() {
@@ -90,7 +103,8 @@ export const HarperSpellcheck = Extension.create<{
   addStorage() {
     return {
       enabled: true,
-      linter: null as Linter | null,
+      linter: null,
+      requestLint: null,
     };
   },
 
@@ -99,6 +113,11 @@ export const HarperSpellcheck = Extension.create<{
       setSpellCheckEnabled:
         (enabled: boolean) =>
         ({ dispatch, tr }) => {
+          // No-op if already in this state — keeps the command idempotent so
+          // callers can dispatch it unconditionally on every render without
+          // triggering redundant transactions or re-lint passes.
+          if (this.storage.enabled === enabled) return true;
+
           this.storage.enabled = enabled;
           if (dispatch) {
             if (!enabled) {
@@ -111,6 +130,11 @@ export const HarperSpellcheck = Extension.create<{
           }
           if (!enabled) {
             this.options.onSuggestionClose();
+          } else {
+            // Re-enabling doesn't change the document, so the plugin's
+            // update() hook (which only schedules a run on doc changes)
+            // would otherwise never re-lint until the next edit.
+            this.storage.requestLint?.();
           }
           return true;
         },
@@ -249,6 +273,8 @@ export const HarperSpellcheck = Extension.create<{
             console.error("[harper] Failed to initialize spell-check linter:", err);
           });
 
+          extension.storage.requestLint = () => scheduleRun(view);
+
           return {
             update(currentView, prevState) {
               if (!currentView.state.doc.eq(prevState.doc)) {
@@ -258,6 +284,7 @@ export const HarperSpellcheck = Extension.create<{
             },
             destroy() {
               if (debounceTimer) clearTimeout(debounceTimer);
+              extension.storage.requestLint = null;
               if (linter) {
                 linter.dispose().catch((err) => {
                   console.warn("[harper] linter.dispose() failed:", err);
