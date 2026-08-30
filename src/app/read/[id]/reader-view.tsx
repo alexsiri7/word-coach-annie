@@ -682,6 +682,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
   }, []);
 
   const handleTasksOpen = useCallback(async () => {
+    setTocOpen(false);
     setTasksOpen(true);
     setTasksLoading(true);
     try {
@@ -690,8 +691,8 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
         const data: { tasks: WritingTask[] } = await res.json();
         setTasks(data.tasks);
       }
-    } catch {
-      // silent fail — drawer will show empty state
+    } catch (e) {
+      console.error("Failed to load writing tasks", e);
     } finally {
       setTasksLoading(false);
     }
@@ -713,7 +714,8 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
     try {
       const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
       if (!res.ok) throw new Error(`complete failed: ${res.status}`);
-    } catch {
+    } catch (e) {
+      console.error("Failed to complete writing task", e);
       // Revert on failure
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, completed: false } : t))
@@ -787,7 +789,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
             </DropdownMenu>
             {tocEntries.length > 0 && (
               <button
-                onClick={() => setTocOpen(!tocOpen)}
+                onClick={() => { setTasksOpen(false); setTocOpen(!tocOpen); }}
                 className={cn(
                   "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
                   "hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
@@ -809,7 +811,11 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
               )}
               aria-label="Writing tasks"
             >
-              <CheckSquare className="h-4 w-4" />
+              {tasksOpen ? (
+                <XIcon className="h-4 w-4" />
+              ) : (
+                <CheckSquare className="h-4 w-4" />
+              )}
             </button>
           </div>
         </div>
@@ -977,7 +983,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
         <div className="flex items-center gap-6 md:gap-8">
           {tocEntries.length > 0 && (
             <button
-              onClick={() => setTocOpen(!tocOpen)}
+              onClick={() => { setTasksOpen(false); setTocOpen(!tocOpen); }}
               className="flex flex-col items-center gap-1 group"
             >
               <List className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
