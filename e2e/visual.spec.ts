@@ -397,6 +397,97 @@ const MOCK_WRITING_TASKS = {
   total: 2,
 }
 
+// ── Reader view helpers ────────────────────────────────────────────────────
+
+const API_TOKEN = process.env.API_TOKEN || 'e2e-test-token'
+const AUTH_HEADERS = { 'Authorization': `Bearer ${API_TOKEN}` }
+
+/** Create a minimal project + chapter + scene via API for reader view tests.
+ *  Returns { projectId, chapterId, sceneId } for cleanup. */
+async function createReaderTestData(baseURL: string): Promise<{
+  projectId: string
+  chapterId: string
+  sceneId: string
+} | null> {
+  try {
+    // Create project
+    const projRes = await fetch(`${baseURL}/api/projects`, {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Visual Test — Reader View',
+        author: 'Jane Doe',
+        genre: 'Fantasy',
+        projectType: 'FICTION',
+      }),
+    })
+    if (!projRes.ok) return null
+    const proj = await projRes.json()
+    const projectId = proj.id as string
+
+    // Create chapter node
+    const chapterRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'CHAPTER', title: 'The Summons', status: 'FINAL', orderIndex: 0 }),
+    })
+    if (!chapterRes.ok) return null
+    const chapter = await chapterRes.json()
+    const chapterId = (chapter.id ?? chapter.node?.id) as string
+
+    // Create scene node
+    const sceneRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'SCENE', title: 'Throne Room', status: 'FINAL', orderIndex: 0, parentId: chapterId }),
+    })
+    if (!sceneRes.ok) return null
+    const scene = await sceneRes.json()
+    const sceneId = (scene.id ?? scene.node?.id) as string
+
+    // Write scene content
+    await fetch(`${baseURL}/api/nodes/${sceneId}/content`, {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '<p>The heavy oak doors groaned open, admitting a gust of winter wind and a figure wrapped in a travel-stained cloak. Queen Mira straightened on her throne.</p>' }),
+    })
+
+    return { projectId, chapterId, sceneId }
+  } catch {
+    return null
+  }
+}
+
+/** Delete the test project created for reader view tests (best-effort). */
+async function cleanupReaderTestData(baseURL: string, projectId: string): Promise<void> {
+  try {
+    await fetch(`${baseURL}/api/projects/${projectId}/archive`, {
+      method: 'POST',
+      headers: AUTH_HEADERS,
+    })
+    await fetch(`${baseURL}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmTitle: 'Visual Test — Reader View' }),
+    })
+  } catch {
+    // cleanup is best-effort
+  }
+}
+
+/** Mock client-side API calls the reader view makes after server render. */
+async function mockReaderClientApis(page: Page, projectId: string) {
+  await page.route('**/api/nodes/*/annotations', route =>
+    route.fulfill({ json: [], status: 200 })
+  )
+  await page.route(`**/api/writing-tasks*`, route =>
+    route.fulfill({ json: MOCK_WRITING_TASKS, status: 200 })
+  )
+  await page.route(`**/api/writing-tasks/*/complete`, route =>
+    route.fulfill({ json: { ok: true }, status: 200 })
+  )
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 // 6 screens × 3 viewports (desktop, mobile, dark-desktop) = 18 screenshots
 
@@ -535,5 +626,55 @@ test.describe('Visual regression – Annie', () => {
     await expect(page).toHaveScreenshot('tasks.png', {
       animations: 'disabled',
     })
+  })
+
+  test('reader view default state', async ({ page, baseURL }) => {
+    const testData = await createReaderTestData(baseURL ?? 'http://localhost:3001')
+    if (!testData) {
+      test.skip()
+      return
+    }
+    const { projectId } = testData
+    try {
+      await mockReaderClientApis(page, projectId)
+      await page.goto(`/read/${projectId}`)
+      await page.waitForSelector('header', { timeout: 20_000 })
+      // Wait for manuscript content to appear
+      await page.getByText('The Summons').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+      await disableAnimations(page)
+
+      await expect(page).toHaveScreenshot('reader-view.png', {
+        animations: 'disabled',
+      })
+    } finally {
+      await cleanupReaderTestData(baseURL ?? 'http://localhost:3001', projectId)
+    }
+  })
+
+  test('reader view tasks drawer open', async ({ page, baseURL }) => {
+    const testData = await createReaderTestData(baseURL ?? 'http://localhost:3001')
+    if (!testData) {
+      test.skip()
+      return
+    }
+    const { projectId } = testData
+    try {
+      await mockReaderClientApis(page, projectId)
+      await page.goto(`/read/${projectId}`)
+      await page.waitForSelector('header', { timeout: 20_000 })
+      await page.getByText('The Summons').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+      await disableAnimations(page)
+
+      // Open the tasks drawer via the header button
+      await page.getByRole('button', { name: 'Writing tasks' }).click()
+      // Wait for tasks to load (mocked to return immediately)
+      await page.getByText('Revise the opening confrontation').waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+
+      await expect(page).toHaveScreenshot('reader-view-tasks-drawer.png', {
+        animations: 'disabled',
+      })
+    } finally {
+      await cleanupReaderTestData(baseURL ?? 'http://localhost:3001', projectId)
+    }
   })
 })

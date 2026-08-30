@@ -11,6 +11,7 @@ import {
   Download,
   MessageSquare,
   Plus,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { Annotation, TextQuoteRange } from "@/lib/types";
+import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
 
 interface OutlineNode {
   id: string;
@@ -626,6 +627,9 @@ function ManuscriptNode({
 
 export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
   const [tocOpen, setTocOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [tasks, setTasks] = useState<WritingTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [annotationsByScene, setAnnotationsByScene] = useState<Map<string, Annotation[]>>(new Map());
   const [activeAnnotation, setActiveAnnotation] = useState<Annotation | null>(null);
@@ -675,6 +679,46 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
       next.set(sceneId, [annotation, ...existing]);
       return next;
     });
+  }, []);
+
+  const handleTasksOpen = useCallback(async () => {
+    setTasksOpen(true);
+    setTasksLoading(true);
+    try {
+      const res = await fetch(`/api/writing-tasks?projectId=${project.id}`);
+      if (res.ok) {
+        const data: { tasks: WritingTask[] } = await res.json();
+        setTasks(data.tasks);
+      }
+    } catch {
+      // silent fail — drawer will show empty state
+    } finally {
+      setTasksLoading(false);
+    }
+  }, [project.id]);
+
+  const handleTasksToggle = useCallback(() => {
+    if (tasksOpen) {
+      setTasksOpen(false);
+    } else {
+      handleTasksOpen();
+    }
+  }, [tasksOpen, handleTasksOpen]);
+
+  const handleTaskComplete = useCallback(async (taskId: string) => {
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
+    );
+    try {
+      const res = await fetch(`/api/writing-tasks/${taskId}/complete`, { method: "POST" });
+      if (!res.ok) throw new Error(`complete failed: ${res.status}`);
+    } catch {
+      // Revert on failure
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, completed: false } : t))
+      );
+    }
   }, []);
 
   const handleTocClick = (id: string) => {
@@ -757,6 +801,16 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
                 )}
               </button>
             )}
+            <button
+              onClick={handleTasksToggle}
+              className={cn(
+                "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
+                "hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
+              )}
+              aria-label="Writing tasks"
+            >
+              <CheckSquare className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </header>
@@ -799,6 +853,59 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
                   </li>
                 ))}
               </ul>
+            </div>
+          </nav>
+        </>
+      )}
+
+      {/* Writing tasks drawer */}
+      {tasksOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => setTasksOpen(false)}
+          />
+          <nav className="fixed top-0 right-0 z-50 h-full w-80 max-w-[85vw] bg-surface-raised border-l border-border/15 shadow-2xl overflow-y-auto animate-slide-in-right">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="label-md text-text-muted">Tasks</h2>
+                <button
+                  onClick={() => setTasksOpen(false)}
+                  className="h-8 w-8 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-overlay transition-colors"
+                  aria-label="Close tasks"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+              {tasksLoading ? (
+                <p className="text-sm text-text-muted text-center py-8">Loading…</p>
+              ) : tasks.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-8">No tasks yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {tasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className={cn(
+                        "flex items-start gap-3 px-3 py-2 rounded-md",
+                        task.completed && "opacity-50"
+                      )}
+                    >
+                      <button
+                        disabled={task.completed}
+                        onClick={() => handleTaskComplete(task.id)}
+                        className="mt-0.5 flex-shrink-0 h-4 w-4 rounded border border-border/40 flex items-center justify-center hover:border-accent transition-colors disabled:cursor-default"
+                        aria-label={task.completed ? "Completed" : "Mark complete"}
+                      >
+                        {task.completed && <CheckSquare className="h-3 w-3 text-accent" />}
+                      </button>
+                      <span className={cn("text-sm flex-1", task.completed ? "line-through text-text-muted" : "text-text-secondary")}>
+                        {task.name}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </nav>
         </>
@@ -877,6 +984,13 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
               <span className="label-md text-[10px] font-bold tracking-wider text-text-muted">Outline</span>
             </button>
           )}
+          <button
+            onClick={handleTasksToggle}
+            className="flex flex-col items-center gap-1 group"
+          >
+            <CheckSquare className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
+            <span className="label-md text-[10px] font-bold tracking-wider text-text-muted">Tasks</span>
+          </button>
         </div>
         {/* Progress bar (desktop) */}
         <div className="hidden md:flex items-center gap-4">
