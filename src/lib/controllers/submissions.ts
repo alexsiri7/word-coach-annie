@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
+import { NotFoundError, ConflictError } from "@/lib/errors";
 import type { Provider, ContestSubmission, PublicationSubmission } from "@prisma/client";
 
 function serializeProvider(p: Provider) {
@@ -44,6 +46,9 @@ function serializePublicationSubmission(s: PublicationSubmission) {
 
 export class ProviderController {
     static async listProviders(userId: string | null) {
+        if (!userId) {
+            logger.warn("listProviders called with null userId — returning all providers (dev mode only)");
+        }
         const where = userId ? { userId } : {};
         const providers = await prisma.provider.findMany({
             where,
@@ -60,7 +65,7 @@ export class ProviderController {
     }) {
         const provider = await prisma.provider.create({
             data: {
-                userId: params.userId ?? "local",
+                userId: params.userId ?? "local", // dev-mode fallback; "local" user is seeded in test setup
                 name: params.name.trim(),
                 website: params.website,
                 notes: params.notes ?? "",
@@ -77,7 +82,7 @@ export class ProviderController {
             where: { id: providerId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Provider not found: ${providerId}`);
+        if (!existing) throw new NotFoundError(`Provider not found: ${providerId}`);
 
         const provider = await prisma.provider.update({
             where: { id: providerId },
@@ -93,9 +98,14 @@ export class ProviderController {
     static async deleteProvider(providerId: string) {
         const existing = await prisma.provider.findUnique({
             where: { id: providerId },
-            select: { id: true },
+            select: { id: true, _count: { select: { contestSubmissions: true } } },
         });
-        if (!existing) throw new Error(`Provider not found: ${providerId}`);
+        if (!existing) throw new NotFoundError(`Provider not found: ${providerId}`);
+        if (existing._count.contestSubmissions > 0) {
+            throw new ConflictError(
+                `Cannot delete provider: ${existing._count.contestSubmissions} contest submission(s) reference it`
+            );
+        }
 
         await prisma.provider.delete({ where: { id: providerId } });
         return { success: true, id: providerId };
@@ -108,7 +118,7 @@ export class PublicationSubmissionController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new NotFoundError(`Project not found: ${projectId}`);
 
         const submissions = await prisma.publicationSubmission.findMany({
             where: { projectId },
@@ -128,7 +138,7 @@ export class PublicationSubmissionController {
             where: { id: params.projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new NotFoundError(`Project not found: ${params.projectId}`);
 
         const submission = await prisma.publicationSubmission.create({
             data: {
@@ -150,7 +160,7 @@ export class PublicationSubmissionController {
             where: { id: submissionId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Publication submission not found: ${submissionId}`);
+        if (!existing) throw new NotFoundError(`Publication submission not found: ${submissionId}`);
 
         const submission = await prisma.publicationSubmission.update({
             where: { id: submissionId },
@@ -169,7 +179,7 @@ export class PublicationSubmissionController {
             where: { id: submissionId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Publication submission not found: ${submissionId}`);
+        if (!existing) throw new NotFoundError(`Publication submission not found: ${submissionId}`);
 
         await prisma.publicationSubmission.delete({ where: { id: submissionId } });
         return { success: true, id: submissionId };
@@ -182,7 +192,7 @@ export class ContestSubmissionController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new NotFoundError(`Project not found: ${projectId}`);
 
         const submissions = await prisma.contestSubmission.findMany({
             where: { projectId },
@@ -205,13 +215,13 @@ export class ContestSubmissionController {
             where: { id: params.projectId },
             select: { id: true, userId: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new NotFoundError(`Project not found: ${params.projectId}`);
 
         const provider = await prisma.provider.findUnique({
             where: { id: params.providerId },
             select: { id: true, userId: true },
         });
-        if (!provider) throw new Error(`Provider not found: ${params.providerId}`);
+        if (!provider) throw new NotFoundError(`Provider not found: ${params.providerId}`);
 
         // Verify provider belongs to same user as project (when user scoping is active)
         if (project.userId && provider.userId !== project.userId) {
@@ -247,16 +257,20 @@ export class ContestSubmissionController {
     ) {
         const existing = await prisma.contestSubmission.findUnique({
             where: { id: submissionId },
-            select: { id: true },
+            select: { id: true, project: { select: { userId: true } } },
         });
-        if (!existing) throw new Error(`Contest submission not found: ${submissionId}`);
+        if (!existing) throw new NotFoundError(`Contest submission not found: ${submissionId}`);
 
         if (data.providerId) {
             const provider = await prisma.provider.findUnique({
                 where: { id: data.providerId },
-                select: { id: true },
+                select: { id: true, userId: true },
             });
-            if (!provider) throw new Error(`Provider not found: ${data.providerId}`);
+            if (!provider) throw new NotFoundError(`Provider not found: ${data.providerId}`);
+            // Verify provider belongs to same user as project (when user scoping is active)
+            if (existing.project.userId && provider.userId !== existing.project.userId) {
+                throw new Error("Provider does not belong to the project owner");
+            }
         }
 
         const submission = await prisma.contestSubmission.update({
@@ -279,7 +293,7 @@ export class ContestSubmissionController {
             where: { id: submissionId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Contest submission not found: ${submissionId}`);
+        if (!existing) throw new NotFoundError(`Contest submission not found: ${submissionId}`);
 
         await prisma.contestSubmission.delete({ where: { id: submissionId } });
         return { success: true, id: submissionId };

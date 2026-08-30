@@ -5,6 +5,7 @@ import { ProviderUpdateSchema } from "@/schemas/submissions";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
+import { NotFoundError, ConflictError } from "@/lib/errors";
 
 type ProviderResolution =
     | { ok: true; id: string }
@@ -62,6 +63,9 @@ export async function PATCH(
 
         return NextResponse.json(provider);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("PATCH /api/submissions/providers/[id] error", error);
         return NextResponse.json(
             { error: "Internal server error" },
@@ -83,6 +87,9 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof ConflictError) {
+            return NextResponse.json({ error: error.message }, { status: 409 });
+        }
         logger.error("DELETE /api/submissions/providers/[id] error", error);
         return NextResponse.json(
             { error: "Internal server error" },

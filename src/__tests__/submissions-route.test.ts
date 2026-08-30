@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { testPrisma } from "./setup";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -175,6 +175,40 @@ describe("Providers API", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe("Provider ownership check", () => {
+    it("returns 403 when user does not own the provider (PATCH)", async () => {
+      const { getCurrentUserId } = await import("@/lib/api-auth");
+      const provider = await testPrisma.provider.create({
+        data: { userId: "local", name: "My Provider" },
+      });
+
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("other-user");
+
+      const { PATCH } = await import("@/app/api/submissions/providers/[id]/route");
+      const res = await PATCH(
+        makePatchRequest(`/api/submissions/providers/${provider.id}`, { name: "Hijacked" }),
+        { params: Promise.resolve({ id: provider.id }) }
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 403 when user does not own the provider (DELETE)", async () => {
+      const { getCurrentUserId } = await import("@/lib/api-auth");
+      const provider = await testPrisma.provider.create({
+        data: { userId: "local", name: "My Provider" },
+      });
+
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("other-user");
+
+      const { DELETE } = await import("@/app/api/submissions/providers/[id]/route");
+      const res = await DELETE(
+        makeDeleteRequest(`/api/submissions/providers/${provider.id}`),
+        { params: Promise.resolve({ id: provider.id }) }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
 
 describe("Publication Submissions API", () => {
@@ -310,6 +344,38 @@ describe("Publication Submissions API", () => {
         { params: Promise.resolve({ id: "nonexistent" }) }
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Access control rejection", () => {
+    it("returns 403 when user lacks write access to POST /publications", async () => {
+      const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+      vi.mocked(verifyProjectWriteAccess).mockResolvedValueOnce({
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      });
+
+      const { POST } = await import("@/app/api/submissions/publications/route");
+      const res = await POST(
+        makePostRequest("/api/submissions/publications", {
+          projectId,
+          venueName: "Test Venue",
+          submissionDate: "2026-01-15T00:00:00.000Z",
+        })
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 403 when user lacks read access to GET /publications", async () => {
+      const { verifyProjectReadAccess } = await import("@/lib/api-auth");
+      vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      });
+
+      const { GET } = await import("@/app/api/submissions/publications/route");
+      const res = await GET(makeGetRequest(`/api/submissions/publications?projectId=${projectId}`));
+      expect(res.status).toBe(403);
     });
   });
 });
@@ -462,6 +528,39 @@ describe("Contest Submissions API", () => {
         { params: Promise.resolve({ id: "nonexistent" }) }
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Access control rejection", () => {
+    it("returns 403 when user lacks write access to POST /contests", async () => {
+      const { verifyProjectWriteAccess } = await import("@/lib/api-auth");
+      vi.mocked(verifyProjectWriteAccess).mockResolvedValueOnce({
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      });
+
+      const { POST } = await import("@/app/api/submissions/contests/route");
+      const res = await POST(
+        makePostRequest("/api/submissions/contests", {
+          projectId,
+          providerId,
+          contestName: "Test Contest",
+          submissionDate: "2026-03-01T00:00:00.000Z",
+        })
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 403 when user lacks read access to GET /contests", async () => {
+      const { verifyProjectReadAccess } = await import("@/lib/api-auth");
+      vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({
+        authorized: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      });
+
+      const { GET } = await import("@/app/api/submissions/contests/route");
+      const res = await GET(makeGetRequest(`/api/submissions/contests?projectId=${projectId}`));
+      expect(res.status).toBe(403);
     });
   });
 });
