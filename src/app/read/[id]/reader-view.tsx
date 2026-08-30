@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ReportContentDialog } from "@/components/report-content-dialog";
+import { useToast } from "@/components/ui/toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -246,9 +247,19 @@ function SelectionPopover({
   const [sel, setSel] = useState<SelectionState | null>(null);
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const taskRef = useRef<HTMLInputElement>(null);
+  const { error: toastError } = useToast();
 
   useEffect(() => {
     const handleMouseUp = () => {
+      // Once the popover is in an editing mode (comment/task entry), the
+      // document selection has already been collapsed by the
+      // textarea/input's autoFocus — that's expected, not a reason to close
+      // the popover. Without this guard, releasing the mouse on the Save
+      // button (or anywhere else) sees a collapsed selection and clears
+      // `sel` before the button's own click handler runs, silently
+      // discarding whatever the user typed. Mirrors the same guard in
+      // handleSelectionChange below.
+      if (sel && sel.mode !== "buttons") return;
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed) {
         setSel(null);
@@ -287,7 +298,7 @@ function SelectionPopover({
     };
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, []);
+  }, [sel]);
 
   useEffect(() => {
     if (!sel) return;
@@ -329,9 +340,16 @@ function SelectionPopover({
         const annotation: Annotation = await res.json();
         onAnnotationCreated(sel.sceneId, annotation);
         setSel(null);
+      } else {
+        // Keep the popover open (with the typed text intact) so the user
+        // can see something went wrong and retry, instead of the request
+        // failing silently.
+        console.error("Failed to add annotation", res.status, await res.text().catch(() => ""));
+        toastError("Failed to add comment. Please try again.");
       }
     } catch (e) {
       console.error("Failed to add annotation", e);
+      toastError("Failed to add comment. Please try again.");
     }
   };
 
@@ -373,6 +391,12 @@ function SelectionPopover({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs gap-1"
+              // Clicking this button targets an element outside the current
+              // text selection, so the browser's default mousedown behavior
+              // would collapse the selection before the click handler below
+              // ever runs — preventDefault suppresses that collapse so the
+              // selection (and this popover) survives into the click.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setSel((s) => s && { ...s, mode: "comment" })}
             >
               <MessageSquare className="h-3 w-3" /> Comment
@@ -382,6 +406,7 @@ function SelectionPopover({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs gap-1"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setSel((s) => s && { ...s, mode: "task" })}
               >
                 <Plus className="h-3 w-3" /> Add task
