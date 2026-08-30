@@ -38,6 +38,7 @@ export const testPrisma = new PrismaClient({ adapter });
 beforeEach(async () => {
   await testPrisma.$executeRawUnsafe(
     `TRUNCATE TABLE
+      "ContestSubmission", "PublicationSubmission", "Provider",
       "OAuthClient", "GoogleDocExport", "GoogleCredential", "ChatMessage",
       "UserAiSettings", "AiSettings", "WritingSession", "Relationship",
       "Annotation", "ContentVersion", "StoryObject", "StructureNode",
