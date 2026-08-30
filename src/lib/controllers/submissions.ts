@@ -273,13 +273,20 @@ export class ContestSubmissionController {
             }
         }
 
+        let reviewDate: Date | null | undefined;
+        if (data.reviewDate === null) {
+            reviewDate = null;
+        } else if (data.reviewDate) {
+            reviewDate = new Date(data.reviewDate);
+        }
+
         const submission = await prisma.contestSubmission.update({
             where: { id: submissionId },
             data: {
                 contestName: data.contestName?.trim(),
                 providerId: data.providerId,
                 submissionDate: data.submissionDate ? new Date(data.submissionDate) : undefined,
-                reviewDate: data.reviewDate === null ? null : data.reviewDate ? new Date(data.reviewDate) : undefined,
+                reviewDate,
                 submissionUrl: data.submissionUrl,
                 status: data.status,
                 notes: data.notes,
