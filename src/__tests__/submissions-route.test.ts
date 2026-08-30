@@ -174,6 +174,35 @@ describe("Providers API", () => {
       );
       expect(res.status).toBe(404);
     });
+
+    it("returns 409 when provider has linked contest submissions", async () => {
+      const user = await testPrisma.user.create({
+        data: { email: "conflict@test.com", googleId: "google-conflict", name: "Conflict User" },
+      });
+      const project = await testPrisma.project.create({
+        data: { title: "Test Project", author: "Author", userId: user.id },
+      });
+      const provider = await testPrisma.provider.create({
+        data: { userId: "local", name: "Provider With Submissions" },
+      });
+      await testPrisma.contestSubmission.create({
+        data: {
+          projectId: project.id,
+          providerId: provider.id,
+          contestName: "Linked Contest",
+          submissionDate: new Date("2026-03-01"),
+        },
+      });
+
+      const { DELETE } = await import("@/app/api/submissions/providers/[id]/route");
+      const res = await DELETE(
+        makeDeleteRequest(`/api/submissions/providers/${provider.id}`),
+        { params: Promise.resolve({ id: provider.id }) }
+      );
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toMatch(/contest submission/i);
+    });
   });
 
   describe("Provider ownership check", () => {
@@ -429,7 +458,7 @@ describe("Contest Submissions API", () => {
       expect(res.status).toBe(400);
     });
 
-    it("returns 500 when providerId does not exist", async () => {
+    it("returns 404 when providerId does not exist", async () => {
       const { POST } = await import("@/app/api/submissions/contests/route");
       const res = await POST(
         makePostRequest("/api/submissions/contests", {
@@ -439,7 +468,7 @@ describe("Contest Submissions API", () => {
           submissionDate: "2026-03-01T00:00:00.000Z",
         })
       );
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(404);
     });
   });
 
