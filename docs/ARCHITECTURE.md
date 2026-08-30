@@ -97,6 +97,8 @@ Project (1) ──────────────────┬─── (
                               │         └─── (N) WritingTask (optional scene link)
                               ├─── (N) StoryObject (CHARACTER | LOCATION | PLOTLINE | WORLD_ELEMENT | NOTE)
                               ├─── (N) WritingTask (project-level tasks)
+                              ├─── (N) ContestSubmission ──── Provider (N:1)
+                              ├─── (N) PublicationSubmission
                               └─── (N) Conversation (named chat thread)
                                         └─── (N) ChatMessage (AI chat history)
 
@@ -110,6 +112,8 @@ AiSettings ─── global default AI provider config
 UserAiSettings ─── per-user AI provider config (overrides global) and quota overrides (e.g. maxActiveProjects)
 GoogleCredential ─── OAuth tokens per user
 GoogleDocExport ─── (entity + mode) → Google Doc ID mapping
+
+User (1) ─────────────────────── (N) Provider (submission target, user-scoped)
 ```
 
 ### Relationship Types

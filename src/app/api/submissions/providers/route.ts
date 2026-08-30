@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json().catch(() => null);
+        const body = await request.json().catch((err) => {
+            logger.warn("POST /api/submissions/providers: invalid JSON body", err);
+            return null;
+        });
         if (body === null) {
             return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
         }

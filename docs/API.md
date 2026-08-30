@@ -932,3 +932,164 @@ Mark a writing task as complete.
 **Response**: Updated `WritingTask` with `completed: true`.
 
 **Errors**: `404` task not found; `401`/`403` unauthorized
+
+---
+
+## Submission Tracking
+
+### Providers
+
+Providers are submission targets (contests, publishers) associated with the current user.
+
+### `GET /api/submissions/providers`
+List all providers for the authenticated user.
+
+**Response**: `{ providers: Provider[], total: number }`
+
+**Errors**: `401` unauthenticated
+
+---
+
+### `POST /api/submissions/providers`
+Create a new provider.
+
+**Body**: `{ name: string, website?: string, notes?: string }`
+
+**Response**: Created `Provider` object (status 201).
+
+**Errors**: `400` validation failure; `401` unauthenticated
+
+---
+
+### `GET /api/submissions/providers/:id`
+Get a single provider by ID.
+
+**Response**: `Provider` object.
+
+**Errors**: `404` not found; `401`/`403` unauthorized
+
+---
+
+### `PATCH /api/submissions/providers/:id`
+Update a provider's fields.
+
+**Body**: Any subset of `{ name, website, notes }`
+
+**Response**: Updated `Provider` object.
+
+**Errors**: `400` empty body or validation failure; `404` not found; `401`/`403` unauthorized
+
+---
+
+### `DELETE /api/submissions/providers/:id`
+Delete a provider.
+
+**Response**: `{ success: true }`
+
+**Errors**: `404` not found; `409` provider has linked contest submissions (delete or reassign them first); `401`/`403` unauthorized
+
+---
+
+### Contest Submissions
+
+### `GET /api/submissions/contests`
+List contest submissions for a project.
+
+**Query params**: `projectId` (required)
+
+**Response**: `{ submissions: ContestSubmission[], total: number }`
+
+**Errors**: `400` if `projectId` missing; `401`/`403` unauthorized
+
+---
+
+### `POST /api/submissions/contests`
+Create a new contest submission.
+
+**Body**: `{ projectId: string, providerId: string, contestName: string, submissionDate: string (ISO 8601), reviewDate?: string (ISO 8601), submissionUrl?: string (URL), status?: string, notes?: string }`
+
+**Response**: Created `ContestSubmission` object (status 201).
+
+**Errors**: `400` validation failure; `404` project or provider not found; `401`/`403` unauthorized
+
+---
+
+### `GET /api/submissions/contests/:id`
+Get a single contest submission.
+
+**Response**: `ContestSubmission` object.
+
+**Errors**: `404` not found; `401`/`403` unauthorized
+
+---
+
+### `PATCH /api/submissions/contests/:id`
+Update a contest submission.
+
+**Body**: Any subset of `{ contestName, submissionDate, reviewDate, submissionUrl, status, notes, providerId }`
+
+**Response**: Updated `ContestSubmission` object.
+
+**Errors**: `400` empty body or validation failure; `404` not found or provider not found; `401`/`403` unauthorized
+
+---
+
+### `DELETE /api/submissions/contests/:id`
+Delete a contest submission.
+
+**Response**: `{ success: true }`
+
+**Errors**: `404` not found; `401`/`403` unauthorized
+
+---
+
+### Publication Submissions
+
+### `GET /api/submissions/publications`
+List publication submissions for a project.
+
+**Query params**: `projectId` (required)
+
+**Response**: `{ submissions: PublicationSubmission[], total: number }`
+
+**Errors**: `400` if `projectId` missing; `401`/`403` unauthorized
+
+---
+
+### `POST /api/submissions/publications`
+Create a new publication submission.
+
+**Body**: `{ projectId: string, venueName: string, submissionDate: string (ISO 8601), status?: string, notes?: string }`
+
+**Response**: Created `PublicationSubmission` object (status 201).
+
+**Errors**: `400` validation failure; `404` project not found; `401`/`403` unauthorized
+
+---
+
+### `GET /api/submissions/publications/:id`
+Get a single publication submission.
+
+**Response**: `PublicationSubmission` object.
+
+**Errors**: `404` not found; `401`/`403` unauthorized
+
+---
+
+### `PATCH /api/submissions/publications/:id`
+Update a publication submission.
+
+**Body**: Any subset of `{ venueName, submissionDate, status, notes }`
+
+**Response**: Updated `PublicationSubmission` object.
+
+**Errors**: `400` empty body or validation failure; `404` not found; `401`/`403` unauthorized
+
+---
+
+### `DELETE /api/submissions/publications/:id`
+Delete a publication submission.
+
+**Response**: `{ success: true }`
+
+**Errors**: `404` not found; `401`/`403` unauthorized

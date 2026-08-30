@@ -5,6 +5,7 @@ import { PublicationSubmissionUpdateSchema } from "@/schemas/submissions";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
+import { NotFoundError } from "@/lib/errors";
 
 type SubmissionResolution =
     | { ok: true; id: string }
@@ -61,6 +62,9 @@ export async function PATCH(
 
         return NextResponse.json(submission);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("PATCH /api/submissions/publications/[id] error", error);
         return NextResponse.json(
             { error: "Internal server error" },

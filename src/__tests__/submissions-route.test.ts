@@ -336,6 +336,23 @@ describe("Publication Submissions API", () => {
       expect(body.status).toBe("accepted");
     });
 
+    it("returns 400 for empty update body", async () => {
+      const submission = await testPrisma.publicationSubmission.create({
+        data: {
+          projectId,
+          venueName: "Test Venue",
+          submissionDate: new Date("2026-01-15"),
+        },
+      });
+
+      const { PATCH } = await import("@/app/api/submissions/publications/[id]/route");
+      const res = await PATCH(
+        makePatchRequest(`/api/submissions/publications/${submission.id}`, {}),
+        { params: Promise.resolve({ id: submission.id }) }
+      );
+      expect(res.status).toBe(400);
+    });
+
     it("returns 404 for non-existent submission", async () => {
       const { PATCH } = await import("@/app/api/submissions/publications/[id]/route");
       const res = await PATCH(
@@ -519,6 +536,24 @@ describe("Contest Submissions API", () => {
       expect(body.status).toBe("rejected");
     });
 
+    it("returns 400 for empty update body", async () => {
+      const submission = await testPrisma.contestSubmission.create({
+        data: {
+          projectId,
+          providerId,
+          contestName: "Test Contest",
+          submissionDate: new Date("2026-03-01"),
+        },
+      });
+
+      const { PATCH } = await import("@/app/api/submissions/contests/[id]/route");
+      const res = await PATCH(
+        makePatchRequest(`/api/submissions/contests/${submission.id}`, {}),
+        { params: Promise.resolve({ id: submission.id }) }
+      );
+      expect(res.status).toBe(400);
+    });
+
     it("returns 404 for non-existent submission", async () => {
       const { PATCH } = await import("@/app/api/submissions/contests/[id]/route");
       const res = await PATCH(
@@ -526,6 +561,48 @@ describe("Contest Submissions API", () => {
         { params: Promise.resolve({ id: "nonexistent" }) }
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Optional field serialization", () => {
+    it("serializes reviewDate as ISO string and null submissionUrl correctly in GET response", async () => {
+      await testPrisma.contestSubmission.create({
+        data: {
+          projectId,
+          providerId,
+          contestName: "Contest With Review Date",
+          submissionDate: new Date("2026-03-01"),
+          reviewDate: new Date("2026-04-01"),
+          submissionUrl: "https://example.com/submit",
+        },
+      });
+
+      const { GET } = await import("@/app/api/submissions/contests/route");
+      const res = await GET(makeGetRequest(`/api/submissions/contests?projectId=${projectId}`));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const s = body.submissions[0];
+      expect(s.reviewDate).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(s.submissionUrl).toBe("https://example.com/submit");
+    });
+
+    it("returns null for missing optional fields in GET response", async () => {
+      await testPrisma.contestSubmission.create({
+        data: {
+          projectId,
+          providerId,
+          contestName: "Contest Without Optional Fields",
+          submissionDate: new Date("2026-03-01"),
+        },
+      });
+
+      const { GET } = await import("@/app/api/submissions/contests/route");
+      const res = await GET(makeGetRequest(`/api/submissions/contests?projectId=${projectId}`));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const s = body.submissions[0];
+      expect(s.reviewDate).toBeNull();
+      expect(s.submissionUrl).toBeNull();
     });
   });
 
