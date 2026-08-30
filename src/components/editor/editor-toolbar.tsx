@@ -155,7 +155,7 @@ export function EditorToolbar({
 
   return (
     <TooltipProvider>
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-surface-raised shrink-0 overflow-x-auto" role="toolbar" aria-label="Text formatting">
       <div className="flex items-center gap-0.5 mr-3 shrink-0">
         {[
           { icon: Bold, label: "Bold", action: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive("bold") },
@@ -565,7 +565,7 @@ export function EditorToolbar({
           <TooltipContent side="bottom">Version history</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+      </div>
     </TooltipProvider>
   );
 }

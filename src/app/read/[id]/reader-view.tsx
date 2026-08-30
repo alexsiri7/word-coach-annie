@@ -697,6 +697,14 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
     }
   }, [project.id]);
 
+  const handleTasksToggle = useCallback(() => {
+    if (tasksOpen) {
+      setTasksOpen(false);
+    } else {
+      handleTasksOpen();
+    }
+  }, [tasksOpen, handleTasksOpen]);
+
   const handleTaskComplete = useCallback(async (taskId: string) => {
     // Optimistic update
     setTasks((prev) =>
@@ -794,7 +802,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
               </button>
             )}
             <button
-              onClick={tasksOpen ? () => setTasksOpen(false) : handleTasksOpen}
+              onClick={handleTasksToggle}
               className={cn(
                 "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
                 "hover:bg-surface-overlay text-text-secondary hover:text-text-primary"
@@ -977,7 +985,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
             </button>
           )}
           <button
-            onClick={tasksOpen ? () => setTasksOpen(false) : handleTasksOpen}
+            onClick={handleTasksToggle}
             className="flex flex-col items-center gap-1 group"
           >
             <CheckSquare className="h-4 w-4 text-text-muted group-hover:text-text-primary transition-colors" />
