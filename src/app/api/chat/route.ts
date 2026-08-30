@@ -405,9 +405,17 @@ export async function POST(request: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         const send = (data: Record<string, unknown>) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-          );
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+            );
+          } catch (err) {
+            // Client disconnected — controller already closed, nothing to do
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes("Controller is already closed") && !msg.includes("Invalid state")) {
+              logger.error("POST /api/chat: unexpected error in stream enqueue", err);
+            }
+          }
         };
 
         try {
@@ -455,12 +463,12 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
+          try { controller.enqueue(encoder.encode("data: [DONE]\n\n")); } catch { /* already closed */ }
+          try { controller.close(); } catch { /* already closed */ }
         } catch (err) {
           logger.error("Stream error", err);
           send({ error: "Stream error" });
-          controller.close();
+          try { controller.close(); } catch { /* already closed */ }
         }
       },
     });
