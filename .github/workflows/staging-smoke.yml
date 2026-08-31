@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: staging-production-pipeline
+  cancel-in-progress: false
+
 jobs:
   # ── Stage 1: Validate staging ─────────────────────────────────────────
   staging-e2e:
