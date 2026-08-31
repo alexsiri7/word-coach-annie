@@ -44,3 +44,9 @@ Current feature issues: https://github.com/alexsiri7/word-coach-annie/issues
 
 If your bead description mentions a GitHub issue number, use it. If not, check the
 issues list to see if your work maps to an existing feature issue.
+
+**Exception**: Lachesis-authored PRs that add a new `requirements/*.md` file (i.e. the
+requirement doc itself) are exempt from this rule — by design, no issue exists yet for
+a requirement that hasn't been filed as a doc. The doc *becomes* the source that later
+spin-off issues (e.g. "requirement NNN" issues) reference. Reviewers (automated or
+human) should not flag these PRs for a missing issue link.
