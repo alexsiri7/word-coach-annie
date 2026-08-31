@@ -44,6 +44,7 @@ model User {
   universes  Universe[]
   aiSettings UserAiSettings?
   consents   UserConsent[]
+  providers  Provider[]
 }
 
 model UserConsent {
@@ -80,8 +81,10 @@ model Project {
   hashnodeExports  HashnodeExport[]
   writingSessions  WritingSession[]
   shares           ProjectShare[]
-  peerReviews      PeerReview[]
-  writingTasks     WritingTask[]
+  peerReviews              PeerReview[]
+  writingTasks             WritingTask[]
+  contestSubmissions       ContestSubmission[]
+  publicationSubmissions   PublicationSubmission[]
 
   @@index([userId])
 }
@@ -403,6 +406,51 @@ model WritingTask {
   @@index([projectId])
   @@index([sceneId])
   @@index([projectId, completed])
+}
+
+model Provider {
+  id                 String              @id @default(cuid())
+  userId             String?
+  name               String
+  website            String              @default("")
+  notes              String              @default("")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contestSubmissions ContestSubmission[]
+
+  @@index([userId])
+}
+
+model ContestSubmission {
+  id             String    @id @default(cuid())
+  projectId      String
+  providerId     String
+  contestName    String
+  submissionDate DateTime
+  reviewDate     DateTime?
+  submissionUrl  String    @default("")
+  status         String    @default("submitted")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider       Provider  @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([projectId])
+  @@index([providerId])
+}
+
+model PublicationSubmission {
+  id             String   @id @default(cuid())
+  projectId      String
+  venueName      String
+  submissionDate DateTime
+  status         String   @default("submitted")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model RevokedToken {
