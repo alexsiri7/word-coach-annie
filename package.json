@@ -88,7 +88,7 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.6",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/archiver": "^7.0.0",
     "@types/dompurify": "^3.2.0",
