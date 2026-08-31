@@ -35,12 +35,10 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
         const { id } = resolved;
+        const userId = getCurrentUserId(request)!;
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });

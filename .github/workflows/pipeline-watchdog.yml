@@ -2,7 +2,7 @@ name: Pipeline Deploy Watchdog
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -48,39 +48,22 @@ jobs:
           fi
           echo "CI succeeded for $MAIN_SHA (run $CI_RUN)"
 
-          # Check if pipeline is currently in-flight (in_progress or queued) for this SHA.
-          # We intentionally do NOT exit 0 on cancelled/failed runs — those warrant re-dispatch.
-          PIPELINE_ACTIVE=$(gh run list \
+          # Check if pipeline has any non-failed run for this SHA (in_progress, queued, or success)
+          PIPELINE_EXISTING=$(gh run list \
             --repo "$REPO" \
             --workflow=staging-smoke.yml \
             --commit "$MAIN_SHA" \
-            --status in_progress \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId // empty')
+            --limit 5 \
+            --json databaseId,status,conclusion \
+            --jq '[.[] | select(.status == "in_progress" or .status == "queued" or .conclusion == "success")] | .[0].databaseId // empty')
 
-          if [ -n "$PIPELINE_ACTIVE" ]; then
-            echo "Pipeline run $PIPELINE_ACTIVE is in progress for $MAIN_SHA — nothing to do"
+          if [ -n "$PIPELINE_EXISTING" ]; then
+            echo "Pipeline already exists for $MAIN_SHA (run $PIPELINE_EXISTING) — nothing to do"
             echo "redispatched=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          PIPELINE_QUEUED=$(gh run list \
-            --repo "$REPO" \
-            --workflow=staging-smoke.yml \
-            --commit "$MAIN_SHA" \
-            --status queued \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId // empty')
-
-          if [ -n "$PIPELINE_QUEUED" ]; then
-            echo "Pipeline run $PIPELINE_QUEUED is queued for $MAIN_SHA — nothing to do"
-            echo "redispatched=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "No active pipeline run for $MAIN_SHA despite CI success — re-dispatching"
+          echo "No successful or active pipeline run for $MAIN_SHA despite CI success — re-dispatching"
           gh workflow run staging-smoke.yml --repo "$REPO" --ref main
           echo "Re-dispatch triggered"
           echo "redispatched=true" >> "$GITHUB_OUTPUT"

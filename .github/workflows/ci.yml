@@ -188,3 +188,22 @@ jobs:
 
       - name: Build
         run: ./scripts/gates.sh build
+
+  trigger-pipeline:
+    name: Trigger Staging Pipeline
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test, e2e, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch staging-smoke pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh workflow run staging-smoke.yml \
+            --repo "$REPO" \
+            --ref main
+          echo "✓ Dispatched staging-smoke.yml for $SHA"
