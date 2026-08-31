@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { PublicationSubmissionController } from "@/lib/controllers/submissions";
+import { PublicationSubmissionController, NotFoundError } from "@/lib/controllers/submissions";
 import { PublicationSubmissionUpdateSchema } from "@/schemas/submissions";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -58,6 +58,9 @@ export async function PATCH(
         const submission = await PublicationSubmissionController.updatePublicationSubmission(id, data);
         return NextResponse.json(submission);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("PATCH /api/projects/[id]/submissions/publications/[submissionId] error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

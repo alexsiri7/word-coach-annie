@@ -18,6 +18,9 @@ export async function GET(
         const result = await ContestSubmissionController.listContestSubmissions({ projectId });
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("GET /api/projects/[id]/submissions/contests error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

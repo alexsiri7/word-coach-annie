@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PublicationSubmissionController } from "@/lib/controllers/submissions";
+import { PublicationSubmissionController, NotFoundError } from "@/lib/controllers/submissions";
 import { PublicationSubmissionCreateSchema } from "@/schemas/submissions";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -18,6 +18,9 @@ export async function GET(
         const result = await PublicationSubmissionController.listPublicationSubmissions({ projectId });
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("GET /api/projects/[id]/submissions/publications error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
@@ -55,6 +58,9 @@ export async function POST(
 
         return NextResponse.json(submission, { status: 201 });
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("POST /api/projects/[id]/submissions/publications error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
