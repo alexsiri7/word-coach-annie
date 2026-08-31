@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 import { Prisma } from "@prisma/client";
 
 type ProviderResolution =
-    | { ok: true; id: string }
+    | { ok: true; id: string; userId: string }
     | { ok: false; response: NextResponse };
 
 async function resolveProvider(request: NextRequest, params: Promise<{ id: string }>): Promise<ProviderResolution> {
@@ -27,7 +27,7 @@ async function resolveProvider(request: NextRequest, params: Promise<{ id: strin
     if (existing.userId !== userId) {
         return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
     }
-    return { ok: true, id };
+    return { ok: true, id, userId };
 }
 
 export async function PATCH(
@@ -35,12 +35,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
-        const { id } = resolved;
+        const { id, userId } = resolved;
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -72,12 +69,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
-        const { id } = resolved;
+        const { id, userId } = resolved;
 
         await ProviderController.deleteProvider(id, userId);
         return NextResponse.json({ success: true });
