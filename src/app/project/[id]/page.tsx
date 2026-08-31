@@ -22,6 +22,7 @@ import {
   Eye,
   ClipboardList,
   ListTodo,
+  SendHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,7 @@ const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => 
 const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
 const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
 const PeerReviewPanel = dynamic(() => import("@/components/editor/peer-review-panel").then(m => m.PeerReviewPanel));
+import { SubmissionActivitySummary } from "@/components/submission-activity-summary";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ShareButton } from "@/components/share-dialog";
@@ -493,6 +495,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         >
           <Eye className="h-4 w-4" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push(`/project/${projectId}/submissions`)}
+          aria-label="Submissions"
+        >
+          <SendHorizontal className="h-4 w-4" />
+        </Button>
         <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button
           variant="ghost"
@@ -792,6 +803,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       ? "Create a chapter to get started"
                       : "Select a scene to start writing"}
                   </p>
+                  <SubmissionActivitySummary projectId={projectId} />
                 </div>
               </div>
             )}
