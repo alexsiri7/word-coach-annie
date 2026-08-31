@@ -306,6 +306,12 @@ async function mockProjectEditorApi(page: Page) {
   await page.route('**/api/chat', route =>
     route.fulfill({ json: { message: 'Mock response' }, status: 200 })
   )
+  await page.route('**/api/projects/proj-1/submissions/contests', route =>
+    route.fulfill({ json: { submissions: [{ id: 's-1', status: 'submitted', reviewDate: null }], total: 1 }, status: 200 })
+  )
+  await page.route('**/api/projects/proj-1/submissions/publications', route =>
+    route.fulfill({ json: { submissions: [], total: 0 }, status: 200 })
+  )
   // Use function matcher for exact project endpoint to avoid intercepting sub-routes
   await page.route(
     url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
