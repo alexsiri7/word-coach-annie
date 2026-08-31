@@ -200,8 +200,10 @@ jobs:
       - name: Dispatch staging-smoke pipeline
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
           gh workflow run staging-smoke.yml \
-            --repo ${{ github.repository }} \
+            --repo "$REPO" \
             --ref main
-          echo "✓ Dispatched staging-smoke.yml for ${{ github.sha }}"
+          echo "✓ Dispatched staging-smoke.yml for $SHA"
