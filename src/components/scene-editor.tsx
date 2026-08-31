@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { StructureNode, SceneStatus, ContentVersion, Annotation, StoryObject } from "@/lib/types";
 import { getEditorExtensions, commentsToBeats } from "@/components/editor/editor-config";
+import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
 import { useAutoSave } from "@/components/editor/use-auto-save";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { VersionHistoryPanel } from "@/components/editor/version-history-panel";
@@ -206,7 +207,15 @@ export function SceneEditor({
         },
       },
       immediatelyRender: false,
-      onUpdate: ({ editor }) => {
+      onUpdate: ({ editor, transaction }) => {
+        // Annotation-reconciliation transactions (below) mark themselves
+        // "silent" — they only add display-only marks for annotations that
+        // already exist on the server (created from the Reader view), so
+        // they must not trigger a save (which would create a bogus new
+        // ContentVersion and trip other clients' external-change polling)
+        // or recompute word count.
+        if (transaction.getMeta("silent")) return;
+
         const html = editor.getHTML();
 
         // Word count excluding beats
@@ -226,6 +235,89 @@ export function SceneEditor({
     },
     [initialContent]
   );
+
+  // Reconcile annotations that don't yet have an "annotation" mark embedded
+  // in the document. Annotations created directly in this editor (via
+  // addAnnotation below) apply their mark immediately and it gets persisted
+  // as part of the saved HTML on the next save. But annotations created
+  // from the Reader view only ever produce an Annotation row with a
+  // text-quote anchor (no ProseMirror position — the Reader view has no
+  // ProseMirror doc to address into), so they never show up as a mark in
+  // content loaded here, and never highlight.
+  //
+  // This resolves those text-quote anchors against the live document (via
+  // the same resolveAnnotationRanges logic the Reader view uses against its
+  // own DOM) and adds the mark for display purposes only — the "silent"
+  // transaction meta (see onUpdate above) prevents it from triggering a
+  // save. It's recomputed fresh on every load rather than persisted, which
+  // keeps this idempotent and mirrors how the Reader view derives its own
+  // highlights from the same anchor data every time instead of baking them
+  // in.
+  useEffect(() => {
+    if (!editor) return;
+
+    const embeddedIds = new Set<string>();
+    editor.state.doc.descendants((docNode) => {
+      docNode.marks?.forEach((mark) => {
+        if (mark.type.name === "annotation" && mark.attrs.id) embeddedIds.add(mark.attrs.id);
+      });
+      return true;
+    });
+
+    const pending = annotations.filter(
+      (a) => !a.resolved && a.selectedText && !embeddedIds.has(a.id)
+    );
+    if (pending.length === 0) return;
+
+    // Flatten the doc's text nodes (skipping beats, same as the word-count
+    // logic above and the Reader view's own beat-stripped flattening) into
+    // one string plus each segment's ProseMirror start position.
+    const segments: { pos: number; text: string }[] = [];
+    let fullText = "";
+    editor.state.doc.descendants((docNode, pos) => {
+      if (docNode.type.name === "beatAnnotation") return false;
+      if (docNode.isText && docNode.text) {
+        segments.push({ pos, text: docNode.text });
+        fullText += docNode.text;
+      }
+      return true;
+    });
+
+    const resolved = resolveAnnotationRanges(fullText, pending);
+    if (resolved.length === 0) return;
+
+    // Mirrors mapOffsetToNode in the Reader view: a start boundary needs
+    // the first segment whose span extends PAST the offset; an end
+    // boundary needs the first segment whose span REACHES the offset —
+    // otherwise an end offset sitting exactly on a segment boundary would
+    // spill into the next segment.
+    const mapOffsetToPos = (offset: number, preferEnd: boolean): number | null => {
+      let consumed = 0;
+      for (const seg of segments) {
+        const segEnd = consumed + seg.text.length;
+        if (preferEnd ? segEnd >= offset : segEnd > offset) {
+          return seg.pos + (offset - consumed);
+        }
+        consumed = segEnd;
+      }
+      return null;
+    };
+
+    const tr = editor.state.tr;
+    let changed = false;
+    for (const { id, start, end } of resolved) {
+      const from = mapOffsetToPos(start, false);
+      const to = mapOffsetToPos(end, true);
+      if (from === null || to === null || from >= to) continue;
+      tr.addMark(from, to, editor.schema.marks.annotation.create({ id }));
+      changed = true;
+    }
+    if (!changed) return;
+
+    tr.setMeta("silent", true);
+    tr.setMeta("addToHistory", false);
+    editor.view.dispatch(tr);
+  }, [editor, annotations]);
 
   // Sync spell-check toggle with the harper extension (#1001, reenable fix).
   // setSpellCheckEnabled() is idempotent (no-ops if the extension is already in
