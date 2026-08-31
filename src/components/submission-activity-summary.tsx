@@ -38,10 +38,9 @@ export function SubmissionActivitySummary({ projectId }: { projectId: string }) 
         ]);
         const contests: ContestSubmission[] = contestsData.submissions ?? [];
         const pubs: PublicationSubmission[] = pubsData.submissions ?? [];
-        const activeCount = [
-          ...contests.filter((s) => s.status === "submitted"),
-          ...pubs.filter((s) => s.status === "submitted"),
-        ].length;
+        const activeCount =
+          contests.filter((s) => s.status === "submitted").length +
+          pubs.filter((s) => s.status === "submitted").length;
         const upcoming =
           contests
             .filter((s) => s.status === "submitted" && s.reviewDate)
