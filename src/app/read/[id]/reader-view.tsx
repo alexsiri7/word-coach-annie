@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
+import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
 
 interface OutlineNode {
   id: string;
@@ -107,15 +108,6 @@ function collectSceneNodes(nodes: OutlineNode[]): OutlineNode[] {
 
 const PREFIX_SUFFIX_LEN = 32;
 
-function parseAnnotationRange(range: string | null | undefined): { type: string; prefix?: string } | null {
-  if (!range) return null;
-  try {
-    return JSON.parse(range);
-  } catch {
-    return null;
-  }
-}
-
 function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: number): number {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let total = 0;
@@ -127,66 +119,96 @@ function getTextOffset(container: HTMLElement, targetNode: Node, targetOffset: n
   return total;
 }
 
-function applyHighlight(container: HTMLElement, searchText: string, annotationId: string, prefix = ""): void {
-  if (!searchText) return;
-
+/** Flatten every text node under `container` into one string, in document order. */
+function collectTextSegments(container: HTMLElement): { nodes: { node: Text; start: number }[]; fullText: string } {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   const nodes: { node: Text; start: number }[] = [];
   let fullText = "";
   let textNode: Text | null;
-
   while ((textNode = walker.nextNode() as Text | null)) {
-    if (textNode.parentElement?.tagName === "MARK") continue;
     nodes.push({ node: textNode, start: fullText.length });
     fullText += textNode.textContent ?? "";
   }
+  return { nodes, fullText };
+}
 
-  let idx = -1;
-  if (prefix) {
-    const contextIdx = fullText.indexOf(prefix + searchText);
-    if (contextIdx !== -1) idx = contextIdx + prefix.length;
-  }
-  if (idx === -1) idx = fullText.indexOf(searchText);
-  if (idx === -1) return;
-
-  const endIdx = idx + searchText.length;
-  let startNode: Text | undefined;
-  let startOffset = 0;
-  let endNode: Text | undefined;
-  let endOffset = 0;
-
+/**
+ * Map a character offset (into the flattened text produced by
+ * `collectTextSegments`) back onto a {node, offset} boundary.
+ *
+ * `preferEnd` mirrors the asymmetry a range needs at its two ends: a start
+ * boundary should land in the first node whose span extends past the
+ * offset, while an end boundary should land in the first node whose span
+ * reaches (or passes) the offset — otherwise an end offset sitting exactly
+ * on a node boundary would spill into the next node.
+ */
+function mapOffsetToNode(
+  nodes: { node: Text; start: number }[],
+  offset: number,
+  preferEnd: boolean
+): { node: Text; offset: number } | null {
   for (const { node, start } of nodes) {
-    const nodeEnd = start + (node.textContent?.length ?? 0);
-    if (!startNode && nodeEnd > idx) {
-      startNode = node;
-      startOffset = idx - start;
-    }
-    if (!endNode && nodeEnd >= endIdx) {
-      endNode = node;
-      endOffset = endIdx - start;
-      break;
+    const length = node.textContent?.length ?? 0;
+    const end = start + length;
+    if (preferEnd ? end >= offset : end > offset) {
+      return { node, offset: offset - start };
     }
   }
+  return null;
+}
 
-  if (!startNode || !endNode) return;
+/**
+ * Highlight every resolvable annotation's selected text inside `container`
+ * by wrapping each match in a `<mark>`.
+ *
+ * All matches are resolved up front against ONE unmutated flattening of the
+ * container's text (see resolveAnnotationRanges), then applied to the DOM
+ * in descending start-offset order. Applying highest-offset-first matters:
+ * each `Range.surroundContents` call splits text nodes only at/after its
+ * own boundaries, so nodes/offsets for matches still pending (all at lower
+ * offsets) are never invalidated by an insertion that already happened.
+ * Recomputing the text/node list from a partially-highlighted DOM between
+ * matches — the previous behavior — silently excludes already-wrapped text
+ * from the search space and corrupts matching for every annotation
+ * processed afterward, not just the one that happened to be wrapped first.
+ */
+function applyHighlights(container: HTMLElement, annotations: Annotation[]): void {
+  const { nodes, fullText } = collectTextSegments(container);
+  const resolved = resolveAnnotationRanges(fullText, annotations);
 
-  try {
-    const range = document.createRange();
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset);
+  for (const { id, start, end } of resolved) {
+    const startBoundary = mapOffsetToNode(nodes, start, false);
+    const endBoundary = mapOffsetToNode(nodes, end, true);
+    if (!startBoundary || !endBoundary) continue;
 
-    const mark = document.createElement("mark");
-    mark.dataset.annotationId = annotationId;
-    mark.className = "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer";
+    try {
+      const range = document.createRange();
+      range.setStart(startBoundary.node, startBoundary.offset);
+      range.setEnd(endBoundary.node, endBoundary.offset);
 
-    range.surroundContents(mark);
-  } catch {
-    // Cannot wrap this selection — skip silently
+      const mark = document.createElement("mark");
+      mark.dataset.annotationId = id;
+      mark.dataset.readerHighlight = "true";
+      mark.className = "bg-yellow-200 dark:bg-yellow-900/50 border-b-2 border-yellow-500 cursor-pointer";
+
+      range.surroundContents(mark);
+    } catch {
+      // Cannot wrap this selection — skip silently
+    }
   }
 }
 
+/**
+ * Remove only the highlight marks THIS component added (`data-reader-
+ * highlight`). Annotations created natively in the editor get their
+ * `<mark data-annotation-id>` baked directly into the persisted scene
+ * content HTML — those must survive untouched here, both because they're
+ * already correctly positioned and because re-deriving their location via
+ * text-quote search would risk re-anchoring them to the wrong occurrence
+ * (native annotations don't carry prefix/suffix context).
+ */
 function removeHighlights(container: HTMLElement): void {
-  for (const mark of container.querySelectorAll("mark[data-annotation-id]")) {
+  for (const mark of container.querySelectorAll("mark[data-reader-highlight]")) {
     const parent = mark.parentNode;
     if (!parent) continue;
     while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
@@ -471,15 +493,30 @@ function SceneContent({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleaned = stripBeats(content);
-  if (!cleaned || cleaned === "<p></p>") return null;
 
   // Sanitize HTML to prevent XSS — content may come from another user via sharing.
   // isomorphic-dompurify works on both SSR and client, so no window guard needed.
-  // ADD_TAGS: ["mark"] allows the <mark> elements we inject post-sanitize.
+  // ADD_TAGS: ["mark"] allows the <mark> elements already embedded in saved
+  // content (from the editor's native annotation mark) plus the ones we
+  // inject client-side below for annotations that aren't embedded.
   const sanitized = useMemo(() => {
     const DOMPurify = require("isomorphic-dompurify");
     return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
   }, [cleaned]);
+
+  // `dangerouslySetInnerHTML` MUST receive a referentially-stable object, not
+  // a fresh `{ __html: sanitized }` literal on every render. This component
+  // isn't memoized (its parent, ManuscriptNode, re-renders it on every
+  // ReaderView state change — e.g. clicking ANY annotation on the page sets
+  // ReaderView's activeAnnotation/tooltipPos, which re-renders every
+  // SceneContent instance for every scene). A fresh wrapper object each
+  // render makes React treat the prop as changed and reset the container's
+  // innerHTML back to `sanitized` on every one of those re-renders — wiping
+  // out the `<mark>` elements the effect below inserted via raw DOM APIs
+  // (they live outside React's tree, so React has no way to preserve them
+  // across an innerHTML reset). That silently destroyed every highlight on
+  // the page on the very next click anywhere, not just the one clicked.
+  const htmlProp = useMemo(() => ({ __html: sanitized }), [sanitized]);
 
   // Apply DOM highlights after render
   useEffect(() => {
@@ -487,12 +524,20 @@ function SceneContent({
     if (!container) return;
     removeHighlights(container);
     if (!annotations || annotations.length === 0) return;
-    const unresolved = annotations.filter((a) => !a.resolved && a.selectedText);
-    for (const annotation of unresolved) {
-      const parsedRange = parseAnnotationRange(annotation.range);
-      const prefix = parsedRange?.type === "textQuote" ? (parsedRange.prefix ?? "") : "";
-      applyHighlight(container, annotation.selectedText!, annotation.id, prefix);
-    }
+
+    // Annotations created natively in the editor already have their
+    // `<mark data-annotation-id>` baked into `sanitized` (see removeHighlights'
+    // docstring) — skip those here rather than re-deriving their position.
+    const embeddedIds = new Set(
+      Array.from(container.querySelectorAll("mark[data-annotation-id]"))
+        .map((el) => (el as HTMLElement).dataset.annotationId)
+        .filter((id): id is string => !!id)
+    );
+    const unresolved = annotations.filter(
+      (a) => !a.resolved && a.selectedText && !embeddedIds.has(a.id)
+    );
+    if (unresolved.length === 0) return;
+    applyHighlights(container, unresolved);
   }, [annotations, sanitized]);
 
   // Click handler delegated to container
@@ -512,6 +557,8 @@ function SceneContent({
     return () => container.removeEventListener("click", handleClick);
   }, [annotations, onAnnotationClick]);
 
+  if (!cleaned || cleaned === "<p></p>") return null;
+
   return (
     // NOTE: class name "reader-prose" is referenced in sentry.client.config.ts
     // for session replay masking (PII). Update sentry config if this class is renamed.
@@ -519,7 +566,7 @@ function SceneContent({
       ref={containerRef}
       className="reader-prose"
       data-node-id={nodeId}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
+      dangerouslySetInnerHTML={htmlProp}
     />
   );
 }
