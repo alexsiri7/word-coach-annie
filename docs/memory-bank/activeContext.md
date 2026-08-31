@@ -7,6 +7,7 @@ Post-M9: All core milestones complete. Focus on AI chat upgrade and infrastructu
 - Docker container running on port 3000 (Cloudflare Tunnel for public access)
 - Database: 11 Prisma models, SQLite at `./data/word-coach-annie.db` (2.6MB)
 - All CRUD APIs complete for Projects, Nodes, StoryObjects, Relationships, Universes, WorldObjects
+- Submission tracking: contest and publication submissions with full CRUD UI, inline provider creation
 - Content versioning with save, history, restore, and pruning
 - Markdown export: full manuscript, per-chapter, story bible, Medium — all with configurable options
 - Google Docs export with idempotent sync (3 modes: Universe, Internal, Reader)

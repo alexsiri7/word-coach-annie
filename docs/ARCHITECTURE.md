@@ -44,6 +44,8 @@ src/
 │   │   ├── mcp/                # HTTP MCP proxy endpoint
 │   │   ├── nodes/              # Structure node CRUD + content versioning
 │   │   ├── projects/           # Project CRUD, outline, search, export
+│   │   │   └── [id]/submissions/  # Contest + publication submission CRUD
+│   │   ├── providers/          # Contest provider CRUD
 │   │   ├── relationships/      # Entity relationship management
 │   │   ├── setup-status/       # First-run setup check
 │   │   ├── story-objects/      # Character/location/plotline CRUD

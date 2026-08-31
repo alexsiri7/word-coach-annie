@@ -932,3 +932,182 @@ Mark a writing task as complete.
 **Response**: Updated `WritingTask` with `completed: true`.
 
 **Errors**: `404` task not found; `401`/`403` unauthorized
+
+---
+
+## Providers
+
+Providers represent contest-organising bodies (e.g. SFWA, Hugo Awards). They are scoped to the authenticated user.
+
+### `GET /api/providers`
+List all providers for the current user.
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Response**:
+```json
+{ "providers": [{ "id": "string", "name": "string", "website": "string | null", "notes": "string | null" }] }
+```
+
+---
+
+### `POST /api/providers`
+Create a new provider.
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Body**: `{ "name": "string", "website"?: "string", "notes"?: "string" }`
+
+**Response**: Created provider object (status 201).
+
+**Errors**: `400` validation failure (missing or empty `name`); `401` unauthenticated
+
+---
+
+### `PATCH /api/providers/:id`
+Update a provider's fields.
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Body**: Any subset of `{ name, website, notes }`. At least one field required.
+
+**Response**: Updated provider object.
+
+**Errors**: `400` empty body; `401` unauthenticated; `403` forbidden (not owner); `404` provider not found
+
+---
+
+### `DELETE /api/providers/:id`
+Delete a provider.
+
+**Authentication**: Required. Returns `401` if not authenticated.
+
+**Response**: `{ "success": true }`
+
+**Errors**: `401` unauthenticated; `403` forbidden; `404` not found; `409` provider has existing contest submissions and cannot be deleted
+
+---
+
+## Submissions
+
+Submission tracking for publication and contest submissions, scoped to a project.
+
+### `GET /api/projects/:id/submissions/publications`
+List all publication submissions for a project.
+
+**Authentication**: Required.
+
+**Response**:
+```json
+{
+  "submissions": [{
+    "id": "string",
+    "projectId": "string",
+    "venueName": "string",
+    "submissionDate": "ISO8601",
+    "status": "submitted | accepted | rejected | withdrawn",
+    "createdAt": "ISO8601",
+    "updatedAt": "ISO8601"
+  }]
+}
+```
+
+---
+
+### `POST /api/projects/:id/submissions/publications`
+Create a publication submission.
+
+**Authentication**: Required.
+
+**Body**: `{ "venueName": "string", "submissionDate": "ISO8601", "status": "submitted | accepted | rejected | withdrawn", "notes"?: "string" }`
+
+**Response**: Created publication submission object (status 201).
+
+**Errors**: `400` validation failure; `401` unauthenticated; `403` forbidden
+
+---
+
+### `PATCH /api/projects/:id/submissions/publications/:submissionId`
+Update a publication submission.
+
+**Authentication**: Required.
+
+**Body**: Any subset of `{ venueName, submissionDate, status, notes }`.
+
+**Response**: Updated publication submission object.
+
+**Errors**: `400` empty body; `401` unauthenticated; `403` forbidden; `404` not found
+
+---
+
+### `DELETE /api/projects/:id/submissions/publications/:submissionId`
+Delete a publication submission.
+
+**Authentication**: Required.
+
+**Response**: `{ "success": true }`
+
+**Errors**: `401` unauthenticated; `403` forbidden; `404` not found
+
+---
+
+### `GET /api/projects/:id/submissions/contests`
+List all contest submissions for a project. Includes the associated provider.
+
+**Authentication**: Required.
+
+**Response**:
+```json
+{
+  "submissions": [{
+    "id": "string",
+    "projectId": "string",
+    "providerId": "string",
+    "contestName": "string",
+    "submissionDate": "ISO8601",
+    "reviewDate": "ISO8601 | null",
+    "submissionUrl": "string",
+    "status": "submitted | accepted | rejected | withdrawn",
+    "createdAt": "ISO8601",
+    "updatedAt": "ISO8601",
+    "provider": { "id": "string", "name": "string" }
+  }]
+}
+```
+
+---
+
+### `POST /api/projects/:id/submissions/contests`
+Create a contest submission.
+
+**Authentication**: Required.
+
+**Body**: `{ "providerId": "string", "contestName": "string", "submissionDate": "ISO8601", "status": "submitted | accepted | rejected | withdrawn", "reviewDate"?: "ISO8601", "submissionUrl"?: "string" }`
+
+**Response**: Created contest submission object (status 201).
+
+**Errors**: `400` validation failure; `401` unauthenticated; `403` forbidden
+
+---
+
+### `PATCH /api/projects/:id/submissions/contests/:submissionId`
+Update a contest submission.
+
+**Authentication**: Required.
+
+**Body**: Any subset of `{ providerId, contestName, submissionDate, status, reviewDate, submissionUrl }`.
+
+**Response**: Updated contest submission object.
+
+**Errors**: `400` empty body; `401` unauthenticated; `403` forbidden; `404` not found
+
+---
+
+### `DELETE /api/projects/:id/submissions/contests/:submissionId`
+Delete a contest submission.
+
+**Authentication**: Required.
+
+**Response**: `{ "success": true }`
+
+**Errors**: `401` unauthenticated; `403` forbidden; `404` not found

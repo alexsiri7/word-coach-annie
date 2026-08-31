@@ -677,4 +677,51 @@ test.describe('Visual regression – Annie', () => {
       await cleanupReaderTestData(baseURL ?? 'http://localhost:3001', projectId)
     }
   })
+
+  test('submissions page populated', async ({ page }) => {
+    const MOCK_PROVIDERS = { providers: [{ id: 'prov-1', name: 'Asimov Foundation' }] }
+    const MOCK_CONTEST_SUBMISSIONS = {
+      submissions: [{
+        id: 'cs-1', projectId: 'proj-1', providerId: 'prov-1',
+        contestName: 'Hugo Awards 2026',
+        submissionDate: '2026-03-01T00:00:00Z',
+        reviewDate: '2026-06-01T00:00:00Z',
+        submissionUrl: 'https://example.com/submission',
+        status: 'submitted',
+        createdAt: '2026-03-01T00:00:00Z',
+        updatedAt: '2026-03-01T00:00:00Z',
+        provider: { id: 'prov-1', name: 'Asimov Foundation' },
+      }],
+    }
+    const MOCK_PUB_SUBMISSIONS = {
+      submissions: [{
+        id: 'ps-1', projectId: 'proj-1', venueName: 'The New Yorker',
+        submissionDate: '2026-02-15T00:00:00Z', status: 'accepted',
+        createdAt: '2026-02-15T00:00:00Z', updatedAt: '2026-02-15T00:00:00Z',
+      }],
+    }
+
+    await page.route('**/api/projects/proj-1/submissions/contests', route =>
+      route.fulfill({ json: MOCK_CONTEST_SUBMISSIONS, status: 200 })
+    )
+    await page.route('**/api/projects/proj-1/submissions/publications', route =>
+      route.fulfill({ json: MOCK_PUB_SUBMISSIONS, status: 200 })
+    )
+    await page.route('**/api/providers', route =>
+      route.fulfill({ json: MOCK_PROVIDERS, status: 200 })
+    )
+    await page.route(
+      url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
+      route => route.fulfill({ json: MOCK_PROJECTS.projects[0], status: 200 })
+    )
+
+    await page.goto('/project/proj-1/submissions')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Hugo Awards 2026').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('submissions.png', {
+      animations: 'disabled',
+    })
+  })
 })

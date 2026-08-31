@@ -139,6 +139,11 @@
 - XSS protection via DOMPurify on all user content
 - N+1 query fixes for performance
 
+### 2026-08: Submission Tracking (FR: Submission CRUD)
+- Data model: PublicationSubmission, ContestSubmission, Provider (PR #1052)
+- API routes: /api/projects/:id/submissions/publications, /api/projects/:id/submissions/contests, /api/providers
+- Full CRUD UI on /project/[id]/submissions with dialog-based add/edit/delete, inline provider creation (PR #1053/#1068)
+
 ## Current State (as of 2026-03-14)
 
 **Test suite**: 12 test files, 69+ tests, ~6.6% coverage

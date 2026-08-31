@@ -3,8 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, SendHorizontal, Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -119,6 +118,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
     | null
   >(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -144,6 +144,9 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
         if (providersRes.ok) {
           const providersData = await providersRes.json();
           setProviders(providersData.providers ?? []);
+        } else {
+          console.error("[submissions/page] loadData: providers fetch failed", providersRes.status);
+          // providers stays [] — contest form will only offer "Create new provider"
         }
       } catch (err) {
         console.error("[submissions/page] loadData failed", err);
@@ -159,6 +162,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
 
   // ── Utility ───────────────────────────────────────────────
 
+  // Returns today's date as YYYY-MM-DD in UTC (consistent with API ISO serialisation).
   function todayStr(): string {
     return new Date().toISOString().slice(0, 10);
   }
@@ -327,6 +331,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       const url =
         deleteTarget.type === "publication"
@@ -342,6 +347,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       setDeleteTarget(null);
     } catch (err) {
       console.error("[submissions/page] handleDelete failed", err);
+      setDeleteError("Failed to delete. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -634,6 +640,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                     {providers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
+                    {/* Sentinel value — triggers inline-create flow; not a real provider ID */}
                     <SelectItem value="__new__">＋ Create new provider…</SelectItem>
                   </SelectContent>
                 </Select>
@@ -715,7 +722,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       {/* Delete Confirmation */}
       <AlertDialog
         open={!!deleteTarget}
-        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+        onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteError(null); } }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -724,6 +731,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
               This will permanently remove the submission. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-destructive px-1">{deleteError}</p>}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
