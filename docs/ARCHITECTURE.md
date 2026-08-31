@@ -97,8 +97,12 @@ Project (1) ──────────────────┬─── (
                               │         └─── (N) WritingTask (optional scene link)
                               ├─── (N) StoryObject (CHARACTER | LOCATION | PLOTLINE | WORLD_ELEMENT | NOTE)
                               ├─── (N) WritingTask (project-level tasks)
+                              ├─── (N) ContestSubmission ──── (1) Provider (RESTRICT delete)
+                              ├─── (N) PublicationSubmission
                               └─── (N) Conversation (named chat thread)
                                         └─── (N) ChatMessage (AI chat history)
+
+User (1) ─────────────────────└─── (N) Provider (user-scoped, reusable across projects)
 
 Universe (1) ─────────────────┬─── (N) WorldObject (CHARACTER | LOCATION | WORLD_ELEMENT)
                               │         └─── (N) WorldObjectTimelineEntry
@@ -134,6 +138,9 @@ Business logic is separated into controller classes under `src/lib/controllers/`
 | `FocusController` | Focus mode scene context + related elements |
 | `GoogleAuthController` | Google OAuth flow + Docs export |
 | `WritingTaskController` | Writing task CRUD, completion tracking |
+| `ProviderController` | Provider CRUD (user-scoped contest/publication organizations) |
+| `ContestSubmissionController` | Contest submission CRUD, provider validation |
+| `PublicationSubmissionController` | Publication submission CRUD |
 
 ## AI Architecture
 

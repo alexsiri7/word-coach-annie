@@ -35,14 +35,15 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+        // No pre-check needed — resolveProvider handles 401/403/404
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
         const { id } = resolved;
 
-        const body = await request.json().catch(() => null);
+        const body = await request.json().catch((e: unknown) => {
+            logger.warn("Invalid JSON body received", { path: request.url, error: e instanceof Error ? e.message : String(e) });
+            return null;
+        });
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
         const parsed = ProviderUpdateSchema.safeParse(body);
@@ -59,6 +60,8 @@ export async function PATCH(
         if (data.website !== undefined) data.website = sanitizeInput(data.website);
         if (data.notes !== undefined) data.notes = sanitizeInput(data.notes);
 
+        // userId is safe to non-null assert here: resolveProvider already verified it
+        const userId = getCurrentUserId(request)!;
         const provider = await ProviderController.updateProvider(id, userId, data);
         return NextResponse.json(provider);
     } catch (error) {
@@ -72,13 +75,13 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+        // No pre-check needed — resolveProvider handles 401/403/404
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
         const { id } = resolved;
 
+        // userId is safe to non-null assert here: resolveProvider already verified it
+        const userId = getCurrentUserId(request)!;
         await ProviderController.deleteProvider(id, userId);
         return NextResponse.json({ success: true });
     } catch (error) {

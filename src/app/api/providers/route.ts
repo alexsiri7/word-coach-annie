@@ -20,16 +20,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json().catch(() => null);
+        // Auth first — matches project convention
+        const userId = getCurrentUserId(request);
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const body = await request.json().catch((e: unknown) => {
+            logger.warn("Invalid JSON body received", { path: request.url, error: e instanceof Error ? e.message : String(e) });
+            return null;
+        });
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
         const parsed = ProviderCreateSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
         }
-
-        const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const provider = await ProviderController.createProvider({
             userId,

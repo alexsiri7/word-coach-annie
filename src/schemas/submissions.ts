@@ -29,7 +29,8 @@ export const ContestSubmissionUpdateSchema = z.object({
     providerId: z.string().min(1).optional(),
     contestName: z.string().min(1, "contestName must be non-empty").optional(),
     submissionDate: z.iso.datetime().optional(),
-    reviewDate: z.iso.datetime().optional(),
+    // null = explicitly clear the review date; absent = no change
+    reviewDate: z.iso.datetime().nullable().optional(),
     submissionUrl: z.string().optional(),
     status: SubmissionStatus.optional(),
 });

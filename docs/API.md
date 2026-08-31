@@ -931,4 +931,134 @@ Mark a writing task as complete.
 
 **Response**: Updated `WritingTask` with `completed: true`.
 
+---
+
+## Providers
+
+User-scoped list of contest and publication organizations (reusable across projects).
+
+### `GET /api/providers`
+List all providers for the authenticated user.
+
+**Response**: `{ providers: Provider[], total: number }` where `Provider` is `{ id, name, website, notes, createdAt, updatedAt }`
+
+**Errors**: `401` unauthenticated
+
+---
+
+### `POST /api/providers`
+Create a new provider.
+
+**Body**: `{ name: string, website?: string, notes?: string }`
+
+**Response**: Created `Provider` object (status 201).
+
+**Errors**: `400` validation failure; `401` unauthenticated
+
+---
+
+### `PATCH /api/providers/:id`
+Update a provider's fields.
+
+**Body**: Any subset of `{ name, website, notes }`
+
+**Response**: Updated `Provider` object.
+
+**Errors**: `400` empty body or validation failure; `401` unauthenticated; `403` not owned by user; `404` not found
+
+---
+
+### `DELETE /api/providers/:id`
+Delete a provider.
+
+**Note**: Deletion is blocked (`409`) if the provider has associated contest submissions. Delete all submissions first.
+
+**Response**: `{ success: true }`
+
+**Errors**: `401` unauthenticated; `403` not owned by user; `404` not found; `409` provider has submissions
+
+---
+
+## Submission Tracking
+
+Contest and publication submissions are project-scoped records.
+
+### `GET /api/projects/:id/submissions/contests`
+List contest submissions for a project.
+
+**Response**: `{ submissions: ContestSubmission[], total: number }` where each submission includes `provider: { id, name }`
+
+**Errors**: `401` unauthenticated; `403` no read access to project; `404` project not found
+
+---
+
+### `POST /api/projects/:id/submissions/contests`
+Create a contest submission.
+
+**Body**: `{ providerId: string, contestName: string, submissionDate: string (ISO 8601), reviewDate?: string (ISO 8601), submissionUrl?: string, status?: "submitted"|"accepted"|"rejected"|"withdrawn" }`
+
+**Response**: Created `ContestSubmission` object (status 201).
+
+**Errors**: `400` validation failure; `401`/`403` unauthorized; `404` project or provider not found
+
+---
+
+### `PATCH /api/projects/:id/submissions/contests/:submissionId`
+Update a contest submission. Pass `null` for `reviewDate` to clear a previously set review date.
+
+**Body**: Any subset of `{ providerId, contestName, submissionDate, reviewDate, submissionUrl, status }`
+
+**Response**: Updated `ContestSubmission` object.
+
+**Errors**: `400` empty body or validation failure; `401`/`403` unauthorized; `404` submission not found or wrong project
+
+---
+
+### `DELETE /api/projects/:id/submissions/contests/:submissionId`
+Delete a contest submission.
+
+**Response**: `{ success: true }`
+
+**Errors**: `401`/`403` unauthorized; `404` submission not found or wrong project
+
+---
+
+### `GET /api/projects/:id/submissions/publications`
+List publication submissions for a project.
+
+**Response**: `{ submissions: PublicationSubmission[], total: number }`
+
+**Errors**: `401` unauthenticated; `403` no read access to project; `404` project not found
+
+---
+
+### `POST /api/projects/:id/submissions/publications`
+Create a publication submission.
+
+**Body**: `{ venueName: string, submissionDate: string (ISO 8601), status?: "submitted"|"accepted"|"rejected"|"withdrawn" }`
+
+**Response**: Created `PublicationSubmission` object (status 201).
+
+**Errors**: `400` validation failure; `401`/`403` unauthorized; `404` project not found
+
+---
+
+### `PATCH /api/projects/:id/submissions/publications/:submissionId`
+Update a publication submission.
+
+**Body**: Any subset of `{ venueName, submissionDate, status }`
+
+**Response**: Updated `PublicationSubmission` object.
+
+**Errors**: `400` empty body or validation failure; `401`/`403` unauthorized; `404` submission not found or wrong project
+
+---
+
+### `DELETE /api/projects/:id/submissions/publications/:submissionId`
+Delete a publication submission.
+
+**Response**: `{ success: true }`
+
+**Errors**: `401`/`403` unauthorized; `404` submission not found or wrong project
+
 **Errors**: `404` task not found; `401`/`403` unauthorized

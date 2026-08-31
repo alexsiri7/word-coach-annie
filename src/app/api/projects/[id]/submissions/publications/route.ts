@@ -30,17 +30,21 @@ export async function POST(
     try {
         const { id: projectId } = await params;
 
-        const body = await request.json().catch(() => null);
+        // Auth first — matches project convention
+        const userId = getCurrentUserId(request);
+        const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
+        if (!access.authorized) return access.response;
+
+        const body = await request.json().catch((e: unknown) => {
+            logger.warn("Invalid JSON body received", { path: request.url, error: e instanceof Error ? e.message : String(e) });
+            return null;
+        });
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
         const parsed = PublicationSubmissionCreateSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
         }
-
-        const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get("x-user-email"));
-        if (!access.authorized) return access.response;
 
         const submission = await PublicationSubmissionController.createPublicationSubmission({
             projectId,

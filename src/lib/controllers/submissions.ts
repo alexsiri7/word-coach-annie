@@ -1,6 +1,29 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 
+// Custom error classes for type-safe error handling in route catch blocks
+export class ForbiddenError extends Error {
+    constructor(msg = "Forbidden") {
+        super(msg);
+        this.name = "ForbiddenError";
+    }
+}
+
+export class NotFoundError extends Error {
+    constructor(msg: string) {
+        super(msg);
+        this.name = "NotFoundError";
+    }
+}
+
+// Guard against edge-case invalid Date objects (e.g. if Zod validation
+// somehow passes but the JS Date constructor still fails).
+function parseDate(value: string, field: string): Date {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) throw new Error(`Invalid date for ${field}: ${value}`);
+    return d;
+}
+
 // ── Provider ────────────────────────────────────────────────────────────
 
 function serializeProvider(p: Prisma.ProviderGetPayload<object>) {
@@ -31,6 +54,7 @@ export class ProviderController {
         website?: string;
         notes?: string;
     }) {
+        // userId is required at create time; nullable in schema for future shared/global providers
         const provider = await prisma.provider.create({
             data: {
                 userId: params.userId,
@@ -52,8 +76,8 @@ export class ProviderController {
             where: { id },
             select: { id: true, userId: true },
         });
-        if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (existing.userId !== userId) throw new Error("Forbidden");
+        if (!existing) throw new NotFoundError(`Provider not found: ${id}`);
+        if (existing.userId !== userId) throw new ForbiddenError();
 
         const provider = await prisma.provider.update({
             where: { id },
@@ -72,8 +96,8 @@ export class ProviderController {
             where: { id },
             select: { id: true, userId: true },
         });
-        if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (existing.userId !== userId) throw new Error("Forbidden");
+        if (!existing) throw new NotFoundError(`Provider not found: ${id}`);
+        if (existing.userId !== userId) throw new ForbiddenError();
 
         await prisma.provider.delete({ where: { id } });
 
@@ -147,8 +171,8 @@ export class ContestSubmissionController {
                 projectId: params.projectId,
                 providerId: params.providerId,
                 contestName: params.contestName.trim(),
-                submissionDate: new Date(params.submissionDate),
-                reviewDate: params.reviewDate ? new Date(params.reviewDate) : null,
+                submissionDate: parseDate(params.submissionDate, "submissionDate"),
+                reviewDate: params.reviewDate ? parseDate(params.reviewDate, "reviewDate") : null,
                 submissionUrl: params.submissionUrl ?? "",
                 status: params.status ?? "submitted",
             },
@@ -164,7 +188,8 @@ export class ContestSubmissionController {
             providerId?: string;
             contestName?: string;
             submissionDate?: string;
-            reviewDate?: string;
+            // null = explicitly clear the field; undefined = no change
+            reviewDate?: string | null;
             submissionUrl?: string;
             status?: string;
         }
@@ -188,8 +213,15 @@ export class ContestSubmissionController {
             data: {
                 providerId: data.providerId,
                 contestName: data.contestName?.trim(),
-                submissionDate: data.submissionDate ? new Date(data.submissionDate) : undefined,
-                reviewDate: data.reviewDate ? new Date(data.reviewDate) : undefined,
+                submissionDate: data.submissionDate
+                    ? parseDate(data.submissionDate, "submissionDate")
+                    : undefined,
+                reviewDate:
+                    data.reviewDate === null
+                        ? null // explicitly clear
+                        : data.reviewDate
+                          ? parseDate(data.reviewDate, "reviewDate") // set new value
+                          : undefined, // no change
                 submissionUrl: data.submissionUrl,
                 status: data.status,
             },
@@ -259,7 +291,7 @@ export class PublicationSubmissionController {
             data: {
                 projectId: params.projectId,
                 venueName: params.venueName.trim(),
-                submissionDate: new Date(params.submissionDate),
+                submissionDate: parseDate(params.submissionDate, "submissionDate"),
                 status: params.status ?? "submitted",
             },
         });
@@ -285,7 +317,9 @@ export class PublicationSubmissionController {
             where: { id },
             data: {
                 venueName: data.venueName?.trim(),
-                submissionDate: data.submissionDate ? new Date(data.submissionDate) : undefined,
+                submissionDate: data.submissionDate
+                    ? parseDate(data.submissionDate, "submissionDate")
+                    : undefined,
                 status: data.status,
             },
         });

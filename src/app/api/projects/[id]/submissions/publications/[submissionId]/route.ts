@@ -37,7 +37,10 @@ export async function PATCH(
         if (!resolved.ok) return resolved.response;
         const { id } = resolved;
 
-        const body = await request.json().catch(() => null);
+        const body = await request.json().catch((e: unknown) => {
+            logger.warn("Invalid JSON body received", { path: request.url, error: e instanceof Error ? e.message : String(e) });
+            return null;
+        });
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
         const parsed = PublicationSubmissionUpdateSchema.safeParse(body);

@@ -42,6 +42,7 @@ beforeEach(async () => {
       "UserAiSettings", "AiSettings", "WritingSession", "Relationship",
       "Annotation", "ContentVersion", "StoryObject", "StructureNode",
       "ProjectShare", "WorldObjectTimelineEntry", "WorldObject", "WritingTask",
+      "ContestSubmission", "PublicationSubmission", "Provider",
       "Project", "Universe", "User", "HashnodeCredential", "HashnodeExport"
     CASCADE`
   );
