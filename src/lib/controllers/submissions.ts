@@ -208,6 +208,11 @@ export class ContestSubmissionController {
             if (!provider) throw new NotFoundError(`Provider not found: ${data.providerId}`);
         }
 
+        let reviewDate: Date | null | undefined;
+        if (data.reviewDate === null) reviewDate = null; // explicitly clear
+        else if (data.reviewDate) reviewDate = parseDate(data.reviewDate, "reviewDate"); // set new value
+        // else reviewDate remains undefined — no change
+
         const submission = await prisma.contestSubmission.update({
             where: { id },
             data: {
@@ -216,12 +221,7 @@ export class ContestSubmissionController {
                 submissionDate: data.submissionDate
                     ? parseDate(data.submissionDate, "submissionDate")
                     : undefined,
-                reviewDate:
-                    data.reviewDate === null
-                        ? null // explicitly clear
-                        : data.reviewDate
-                          ? parseDate(data.reviewDate, "reviewDate") // set new value
-                          : undefined, // no change
+                reviewDate,
                 submissionUrl: data.submissionUrl,
                 status: data.status,
             },
@@ -332,7 +332,7 @@ export class PublicationSubmissionController {
             where: { id },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Publication submission not found: ${id}`);
+        if (!existing) throw new NotFoundError(`Publication submission not found: ${id}`);
 
         await prisma.publicationSubmission.delete({ where: { id } });
 
