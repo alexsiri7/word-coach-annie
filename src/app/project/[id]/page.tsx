@@ -56,15 +56,6 @@ import {
 import dynamic from "next/dynamic";
 import { OutlineTree } from "@/components/outline-tree";
 import { ErrorBoundary } from "@/components/error-boundary";
-
-const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
-  loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
-});
-const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
-const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
-const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
-const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
-const PeerReviewPanel = dynamic(() => import("@/components/editor/peer-review-panel").then(m => m.PeerReviewPanel));
 import { SubmissionActivitySummary } from "@/components/submission-activity-summary";
 import { UserMenu } from "@/components/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -75,6 +66,15 @@ import { PROJECT_TYPE_LABELS } from "@/lib/constants";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { Project, OutlineNode, PlotlineIndicator, StoryObject, StoryObjectType, SceneStatus } from "@/lib/types";
 import { buildReviewPrompt, buildPlanBeatsPrompt, buildCanonCheckPrompt } from "@/lib/review-prompts";
+
+const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
+  loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
+});
+const StoryObjectPanel = dynamic(() => import("@/components/story-object-panel").then(m => m.StoryObjectPanel));
+const SearchPanel = dynamic(() => import("@/components/search-panel").then(m => m.SearchPanel));
+const SceneAwareChatPanel = dynamic(() => import("@/components/scene-aware-chat-panel").then(m => m.SceneAwareChatPanel));
+const ManuscriptAiPanel = dynamic(() => import("@/components/manuscript-ai-panel").then(m => m.ManuscriptAiPanel));
+const PeerReviewPanel = dynamic(() => import("@/components/editor/peer-review-panel").then(m => m.PeerReviewPanel));
 
 type SidebarTab = "outline" | "characters" | "locations" | "plotlines" | "world" | "notes" | "ai-chat" | "peer-review";
 

@@ -15,6 +15,7 @@
 - [x] **FR6**: Scene Focus Mode
 - [x] **FR7**: Timeline View
 - [x] **FR8**: Google Docs Export / Sync
+- [x] **FR9**: Submission Tracking (data model, API, dashboard widget, submissions list page)
 
 ## Completed Work
 
@@ -113,6 +114,13 @@
 - Dynamic UI labels (Chapter→Article, Scene→Section, Character→Persona, etc.)
 - Medium-compatible Markdown export with front matter
 - MCP tool: `export_medium`
+
+### 2026-08-31: FR9 — Submission Tracking UI
+- Added `SubmissionActivitySummary` widget to project dashboard empty state
+- Added header nav button (SendHorizontal) linking to `/project/[id]/submissions`
+- Added read-only `/project/[id]/submissions` page listing contest and publication submissions
+- Extracted `computeSubmissionSummary` pure helper for testability
+- Submission data model and API endpoints added in prior PRs (#1052, #1054)
 
 ### 2026-03: FR8 — Google Docs Export / Sync
 - OAuth2 flow with Google (googleapis + google-auth-library)

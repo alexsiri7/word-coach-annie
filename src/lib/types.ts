@@ -182,3 +182,27 @@ export interface WritingTask {
   updatedAt: string;
   scene?: { id: string; title: string } | null;
 }
+
+export interface ContestSubmission {
+  id: string;
+  projectId: string;
+  providerId: string;
+  contestName: string;
+  submissionDate: string;
+  reviewDate: string | null;
+  submissionUrl: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  provider: { id: string; name: string };
+}
+
+export interface PublicationSubmission {
+  id: string;
+  projectId: string;
+  venueName: string;
+  submissionDate: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}

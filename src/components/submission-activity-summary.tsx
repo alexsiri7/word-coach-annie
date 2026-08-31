@@ -4,20 +4,37 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
-interface ContestSubmission {
+export interface ContestSubmissionSummary {
   id: string;
   status: string;
   reviewDate: string | null;
 }
 
-interface PublicationSubmission {
+export interface PublicationSubmissionSummary {
   id: string;
   status: string;
 }
 
-interface SubmissionSummary {
+export interface SubmissionSummary {
   activeCount: number;
   nextReviewDate: string | null;
+}
+
+export function computeSubmissionSummary(
+  contests: ContestSubmissionSummary[],
+  pubs: PublicationSubmissionSummary[]
+): SubmissionSummary {
+  const activeCount = [
+    ...contests.filter((s) => s.status === "submitted"),
+    ...pubs.filter((s) => s.status === "submitted"),
+  ].length;
+  const nextReviewDate =
+    contests
+      .filter((s) => s.status === "submitted" && s.reviewDate)
+      .map((s) => s.reviewDate!)
+      .filter((d) => new Date(d) > new Date())
+      .sort()[0] ?? null;
+  return { activeCount, nextReviewDate };
 }
 
 export function SubmissionActivitySummary({ projectId }: { projectId: string }) {
@@ -31,26 +48,23 @@ export function SubmissionActivitySummary({ projectId }: { projectId: string }) 
           fetch(`/api/projects/${projectId}/submissions/contests`),
           fetch(`/api/projects/${projectId}/submissions/publications`),
         ]);
-        if (!contestsRes.ok || !pubsRes.ok) return;
+        if (!contestsRes.ok || !pubsRes.ok) {
+          console.warn("[SubmissionActivitySummary] fetch returned non-OK", {
+            contests: contestsRes.status,
+            publications: pubsRes.status,
+          });
+          return;
+        }
         const [contestsData, pubsData] = await Promise.all([
           contestsRes.json(),
           pubsRes.json(),
         ]);
-        const contests: ContestSubmission[] = contestsData.submissions ?? [];
-        const pubs: PublicationSubmission[] = pubsData.submissions ?? [];
-        const activeCount = [
-          ...contests.filter((s) => s.status === "submitted"),
-          ...pubs.filter((s) => s.status === "submitted"),
-        ].length;
-        const upcoming =
-          contests
-            .filter((s) => s.status === "submitted" && s.reviewDate)
-            .map((s) => s.reviewDate!)
-            .filter((d) => new Date(d) > new Date())
-            .sort()[0] ?? null;
-        setSummary({ activeCount, nextReviewDate: upcoming });
-      } catch {
-        // silent - widget is non-critical
+        const contests: ContestSubmissionSummary[] = contestsData.submissions ?? [];
+        const pubs: PublicationSubmissionSummary[] = pubsData.submissions ?? [];
+        setSummary(computeSubmissionSummary(contests, pubs));
+      } catch (err) {
+        console.error("[SubmissionActivitySummary] load failed", err);
+        // Widget stays hidden — non-critical, by design
       }
     }
     load();

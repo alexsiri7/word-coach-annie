@@ -7,30 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-
-interface ContestSubmission {
-  id: string;
-  projectId: string;
-  providerId: string;
-  contestName: string;
-  submissionDate: string;
-  reviewDate: string | null;
-  submissionUrl: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  provider: { id: string; name: string };
-}
-
-interface PublicationSubmission {
-  id: string;
-  projectId: string;
-  venueName: string;
-  submissionDate: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { ContestSubmission, PublicationSubmission } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   submitted: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -58,8 +35,17 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           fetch(`/api/projects/${projectId}/submissions/publications`),
           fetch(`/api/projects/${projectId}`),
         ]);
-        if (!contestsRes.ok || !pubsRes.ok) throw new Error("Failed to load submissions");
-        if (!projectRes.ok) throw new Error("Failed to load project");
+        if (!contestsRes.ok || !pubsRes.ok) {
+          console.error("[submissions/page] API error", {
+            contests: contestsRes.status,
+            publications: pubsRes.status,
+          });
+          throw new Error("Failed to load submissions");
+        }
+        if (!projectRes.ok) {
+          console.error("[submissions/page] project fetch error", projectRes.status);
+          throw new Error("Failed to load project");
+        }
         const [contestsData, pubsData, proj] = await Promise.all([
           contestsRes.json(),
           pubsRes.json(),
