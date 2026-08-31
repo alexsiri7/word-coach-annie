@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **73 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **91 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -855,6 +855,155 @@ Update fields on an existing writing task. All fields except `taskId` are option
 | `completed` | boolean? | Mark task complete (`true`) or incomplete (`false`) |
 
 Returns the updated `WritingTask` object.
+
+---
+
+### Submissions
+
+Track story submissions to literary contests and publication venues. Providers (contest/publication organizers) are scoped to the **current user**, not to a project — ownership is enforced by matching `userId`. Contest and publication submissions are scoped to a **project** — ownership is enforced the same way as other project-scoped tools (via `verifyProjectOwnership`).
+
+#### `list_providers`
+List all submission providers (publications and contest-running organizations) for the current user.
+
+Returns `{ providers: Provider[], total: number }`.
+
+---
+
+#### `create_provider`
+Create a new submission provider — a publication or contest-running organization you submit stories to.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `name` | string | Provider name |
+| `website` | string? | Provider website URL |
+| `notes` | string? | Additional notes about this provider |
+
+Returns the created `Provider` object.
+
+---
+
+#### `update_provider`
+Update fields on an existing provider. Only providers owned by the current user can be updated. All fields except `providerId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `providerId` | string | The provider ID to update |
+| `name` | string? | New provider name |
+| `website` | string? | New website URL |
+| `notes` | string? | New notes |
+
+Returns the updated `Provider` object.
+
+---
+
+#### `delete_provider`
+Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions cannot be deleted. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `providerId` | string | The provider ID to delete |
+
+---
+
+#### `list_contest_submissions`
+List contest submissions for a project, newest first.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID |
+
+Returns `{ submissions: ContestSubmission[], total: number }`. Each submission includes its linked `provider` (`{ id, name }`).
+
+---
+
+#### `create_contest_submission`
+Record a new contest submission for a project.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID |
+| `providerId` | string | The provider (contest organizer) ID |
+| `contestName` | string | Name of the contest |
+| `submissionDate` | string | ISO 8601 date/time the story was submitted |
+| `reviewDate` | string? | ISO 8601 date/time the submission was/will be reviewed |
+| `submissionUrl` | string? | URL of the submission or contest listing |
+| `status` | `"submitted" \| "accepted" \| "rejected" \| "withdrawn"`? | Submission status (default `"submitted"`) |
+
+Returns the created `ContestSubmission` object.
+
+---
+
+#### `update_contest_submission`
+Update fields on an existing contest submission. All fields except `submissionId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `submissionId` | string | The contest submission ID to update |
+| `providerId` | string? | New provider (contest organizer) ID |
+| `contestName` | string? | New contest name |
+| `submissionDate` | string? | New ISO 8601 submission date/time |
+| `reviewDate` | string? | New ISO 8601 review date/time |
+| `submissionUrl` | string? | New submission URL |
+| `status` | `"submitted" \| "accepted" \| "rejected" \| "withdrawn"`? | New submission status |
+
+Returns the updated `ContestSubmission` object.
+
+---
+
+#### `delete_contest_submission`
+Delete a contest submission. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `submissionId` | string | The contest submission ID to delete |
+
+---
+
+#### `list_publication_submissions`
+List publication submissions for a project, newest first.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID |
+
+Returns `{ submissions: PublicationSubmission[], total: number }`.
+
+---
+
+#### `create_publication_submission`
+Record a new publication submission for a project.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID |
+| `venueName` | string | Name of the publication venue |
+| `submissionDate` | string | ISO 8601 date/time the story was submitted |
+| `status` | `"submitted" \| "accepted" \| "rejected" \| "withdrawn"`? | Submission status (default `"submitted"`) |
+
+Returns the created `PublicationSubmission` object.
+
+---
+
+#### `update_publication_submission`
+Update fields on an existing publication submission. All fields except `submissionId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `submissionId` | string | The publication submission ID to update |
+| `venueName` | string? | New publication venue name |
+| `submissionDate` | string? | New ISO 8601 submission date/time |
+| `status` | `"submitted" \| "accepted" \| "rejected" \| "withdrawn"`? | New submission status |
+
+Returns the updated `PublicationSubmission` object.
+
+---
+
+#### `delete_publication_submission`
+Delete a publication submission. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `submissionId` | string | The publication submission ID to delete |
 
 ---
 

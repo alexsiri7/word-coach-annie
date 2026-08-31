@@ -58,6 +58,20 @@ import {
     deleteRelationship,
 } from "./tools/relationships";
 import {
+    listProviders,
+    createProvider,
+    updateProvider,
+    deleteProvider,
+    listContestSubmissions,
+    createContestSubmission,
+    updateContestSubmission,
+    deleteContestSubmission,
+    listPublicationSubmissions,
+    createPublicationSubmission,
+    updatePublicationSubmission,
+    deletePublicationSubmission,
+} from "./tools/submissions";
+import {
     exportManuscript,
     exportStoryBible,
     getProjectSummary,
@@ -216,6 +230,24 @@ async function getProjectIdForStoryObject(objectId: string): Promise<string> {
         select: { projectId: true },
     });
     return obj.projectId;
+}
+
+/** Look up the projectId that owns a contest submission. */
+async function getProjectIdForContestSubmission(submissionId: string): Promise<string> {
+    const submission = await prisma.contestSubmission.findUniqueOrThrow({
+        where: { id: submissionId },
+        select: { projectId: true },
+    });
+    return submission.projectId;
+}
+
+/** Look up the projectId that owns a publication submission. */
+async function getProjectIdForPublicationSubmission(submissionId: string): Promise<string> {
+    const submission = await prisma.publicationSubmission.findUniqueOrThrow({
+        where: { id: submissionId },
+        select: { projectId: true },
+    });
+    return submission.projectId;
 }
 
 // ─── Project Tools ───────────────────────────────────────────────────────────
@@ -879,6 +911,184 @@ server.tool(
     async ({ relationshipId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
         const result = await deleteRelationship(relationshipId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Provider Tools (user-scoped) ────────────────────────────────────────────
+// Providers (publications/contest organizers) belong to the current user, not to
+// a project, so these tools check ownership via userId rather than verifyProjectOwnership.
+
+server.tool(
+    "list_providers",
+    "List all submission providers (publications and contest-running organizations) for the current user.",
+    {},
+    async () =>
+        mcpRun("list_providers", "Error listing providers", () => listProviders(userId))
+);
+
+server.tool(
+    "create_provider",
+    "Create a new submission provider — a publication or contest-running organization you submit stories to.",
+    {
+        name: z.string().describe("Provider name"),
+        website: z.string().optional().describe("Provider website URL"),
+        notes: z.string().optional().describe("Additional notes about this provider"),
+    },
+    async (params) =>
+        mcpRun("create_provider", "Error creating provider", () => createProvider({ ...params, userId }))
+);
+
+server.tool(
+    "update_provider",
+    "Update fields on an existing provider. Only providers owned by the current user can be updated. All fields except providerId are optional — only provided fields are changed.",
+    {
+        providerId: z.string().describe("The provider ID to update"),
+        name: z.string().optional().describe("New provider name"),
+        website: z.string().optional().describe("New website URL"),
+        notes: z.string().optional().describe("New notes"),
+    },
+    async (params) =>
+        mcpRun("update_provider", "Error updating provider", () => updateProvider({ ...params, userId }))
+);
+
+server.tool(
+    "delete_provider",
+    "Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions cannot be deleted.",
+    {
+        providerId: z.string().describe("The provider ID to delete"),
+    },
+    async ({ providerId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await deleteProvider(providerId, userId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Contest Submission Tools (project-scoped) ───────────────────────────────
+
+server.tool(
+    "list_contest_submissions",
+    "List contest submissions for a project (a story's submissions to literary contests), newest first.",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async (params) =>
+        mcpRun("list_contest_submissions", "Error listing contest submissions", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return listContestSubmissions(params);
+        })
+);
+
+server.tool(
+    "create_contest_submission",
+    "Record a new contest submission for a project.",
+    {
+        projectId: z.string().describe("The project ID"),
+        providerId: z.string().describe("The provider (contest organizer) ID"),
+        contestName: z.string().describe("Name of the contest"),
+        submissionDate: z.string().describe("ISO 8601 date/time the story was submitted"),
+        reviewDate: z.string().optional().describe("ISO 8601 date/time the submission was/will be reviewed"),
+        submissionUrl: z.string().optional().describe("URL of the submission or contest listing"),
+        status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("Submission status (default \"submitted\")"),
+    },
+    async (params) =>
+        mcpRun("create_contest_submission", "Error creating contest submission", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return createContestSubmission(params);
+        })
+);
+
+server.tool(
+    "update_contest_submission",
+    "Update fields on an existing contest submission. All fields except submissionId are optional — only provided fields are changed.",
+    {
+        submissionId: z.string().describe("The contest submission ID to update"),
+        providerId: z.string().optional().describe("New provider (contest organizer) ID"),
+        contestName: z.string().optional().describe("New contest name"),
+        submissionDate: z.string().optional().describe("New ISO 8601 submission date/time"),
+        reviewDate: z.string().optional().describe("New ISO 8601 review date/time"),
+        submissionUrl: z.string().optional().describe("New submission URL"),
+        status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("New submission status"),
+    },
+    async ({ submissionId, ...data }) =>
+        mcpRun("update_contest_submission", "Error updating contest submission", async () => {
+            await verifyProjectOwnership(await getProjectIdForContestSubmission(submissionId), userId);
+            return updateContestSubmission({ submissionId, ...data });
+        })
+);
+
+server.tool(
+    "delete_contest_submission",
+    "Delete a contest submission.",
+    {
+        submissionId: z.string().describe("The contest submission ID to delete"),
+    },
+    async ({ submissionId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        await verifyProjectOwnership(await getProjectIdForContestSubmission(submissionId), userId);
+        const result = await deleteContestSubmission(submissionId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Publication Submission Tools (project-scoped) ───────────────────────────
+
+server.tool(
+    "list_publication_submissions",
+    "List publication submissions for a project (a story's submissions to publication venues), newest first.",
+    {
+        projectId: z.string().describe("The project ID"),
+    },
+    async (params) =>
+        mcpRun("list_publication_submissions", "Error listing publication submissions", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return listPublicationSubmissions(params);
+        })
+);
+
+server.tool(
+    "create_publication_submission",
+    "Record a new publication submission for a project.",
+    {
+        projectId: z.string().describe("The project ID"),
+        venueName: z.string().describe("Name of the publication venue"),
+        submissionDate: z.string().describe("ISO 8601 date/time the story was submitted"),
+        status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("Submission status (default \"submitted\")"),
+    },
+    async (params) =>
+        mcpRun("create_publication_submission", "Error creating publication submission", async () => {
+            await verifyProjectOwnership(params.projectId, userId);
+            return createPublicationSubmission(params);
+        })
+);
+
+server.tool(
+    "update_publication_submission",
+    "Update fields on an existing publication submission. All fields except submissionId are optional — only provided fields are changed.",
+    {
+        submissionId: z.string().describe("The publication submission ID to update"),
+        venueName: z.string().optional().describe("New publication venue name"),
+        submissionDate: z.string().optional().describe("New ISO 8601 submission date/time"),
+        status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("New submission status"),
+    },
+    async ({ submissionId, ...data }) =>
+        mcpRun("update_publication_submission", "Error updating publication submission", async () => {
+            await verifyProjectOwnership(await getProjectIdForPublicationSubmission(submissionId), userId);
+            return updatePublicationSubmission({ submissionId, ...data });
+        })
+);
+
+server.tool(
+    "delete_publication_submission",
+    "Delete a publication submission.",
+    {
+        submissionId: z.string().describe("The publication submission ID to delete"),
+    },
+    async ({ submissionId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        await verifyProjectOwnership(await getProjectIdForPublicationSubmission(submissionId), userId);
+        const result = await deletePublicationSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

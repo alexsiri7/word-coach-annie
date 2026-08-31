@@ -15,7 +15,7 @@ function serializeProvider(p: Prisma.ProviderGetPayload<object>) {
 }
 
 export class ProviderController {
-    static async listProviders(userId: string) {
+    static async listProviders(userId: string | null) {
         const rawProviders = await prisma.provider.findMany({
             where: { userId },
             orderBy: { name: "asc" },
@@ -26,7 +26,7 @@ export class ProviderController {
     }
 
     static async createProvider(params: {
-        userId: string;
+        userId: string | null;
         name: string;
         website?: string;
         notes?: string;
@@ -45,7 +45,7 @@ export class ProviderController {
 
     static async updateProvider(
         id: string,
-        userId: string,
+        userId: string | null,
         data: { name?: string; website?: string; notes?: string }
     ) {
         const existing = await prisma.provider.findUnique({
@@ -67,7 +67,7 @@ export class ProviderController {
         return serializeProvider(provider);
     }
 
-    static async deleteProvider(id: string, userId: string) {
+    static async deleteProvider(id: string, userId: string | null) {
         const existing = await prisma.provider.findUnique({
             where: { id },
             select: { id: true, userId: true },
