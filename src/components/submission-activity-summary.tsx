@@ -24,10 +24,9 @@ export function computeSubmissionSummary(
   contests: ContestSubmissionSummary[],
   pubs: PublicationSubmissionSummary[]
 ): SubmissionSummary {
-  const activeCount = [
-    ...contests.filter((s) => s.status === "submitted"),
-    ...pubs.filter((s) => s.status === "submitted"),
-  ].length;
+  const activeCount =
+    contests.filter((s) => s.status === "submitted").length +
+    pubs.filter((s) => s.status === "submitted").length;
   const nextReviewDate =
     contests
       .filter((s) => s.status === "submitted" && s.reviewDate)

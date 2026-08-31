@@ -16,12 +16,12 @@ function serializeProvider(p: Prisma.ProviderGetPayload<object>) {
 
 export class ProviderController {
     static async listProviders(userId: string) {
-        const rawProviders = await prisma.provider.findMany({
-            where: { userId },
-            orderBy: { name: "asc" },
-        });
-
-        const providers = rawProviders.map(serializeProvider);
+        const providers = (
+            await prisma.provider.findMany({
+                where: { userId },
+                orderBy: { name: "asc" },
+            })
+        ).map(serializeProvider);
         return { providers, total: providers.length };
     }
 
@@ -111,13 +111,13 @@ export class ContestSubmissionController {
         });
         if (!project) throw new Error(`Project not found: ${params.projectId}`);
 
-        const rawSubmissions = await prisma.contestSubmission.findMany({
-            where: { projectId: params.projectId },
-            include: { provider: { select: { id: true, name: true } } },
-            orderBy: { submissionDate: "desc" },
-        });
-
-        const submissions = rawSubmissions.map(serializeContestSubmission);
+        const submissions = (
+            await prisma.contestSubmission.findMany({
+                where: { projectId: params.projectId },
+                include: { provider: { select: { id: true, name: true } } },
+                orderBy: { submissionDate: "desc" },
+            })
+        ).map(serializeContestSubmission);
         return { submissions, total: submissions.length };
     }
 
@@ -234,12 +234,12 @@ export class PublicationSubmissionController {
         });
         if (!project) throw new Error(`Project not found: ${params.projectId}`);
 
-        const rawSubmissions = await prisma.publicationSubmission.findMany({
-            where: { projectId: params.projectId },
-            orderBy: { submissionDate: "desc" },
-        });
-
-        const submissions = rawSubmissions.map(serializePublicationSubmission);
+        const submissions = (
+            await prisma.publicationSubmission.findMany({
+                where: { projectId: params.projectId },
+                orderBy: { submissionDate: "desc" },
+            })
+        ).map(serializePublicationSubmission);
         return { submissions, total: submissions.length };
     }
 
