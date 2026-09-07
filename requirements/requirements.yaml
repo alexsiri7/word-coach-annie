@@ -1,0 +1,631 @@
+# Canonical requirements spec. IDs are permanent — never renumber or reuse; append new ones.
+#
+# Reverse-engineered 2026-09-07 from the codebase (README, docs/, prisma schema,
+# src/app/api routes, src/mcp, and the Vitest/Playwright suites) plus the existing
+# per-feature docs in requirements/*.md. Statements describe what the system does
+# TODAY, in EARS style. Needs human review before being treated as canon.
+meta:
+  project: word-coach-annie
+  prefix: WCA
+  ported: 2026-09-07
+requirements:
+  # ── Projects & structure ────────────────────────────────────────────────
+
+  - id: WCA-001
+    title: Project lifecycle management
+    statement: "When an authenticated user creates, renames, archives, unarchives, or deletes a project, the system shall persist the change and reflect it on the dashboard, which lists each project with its word count and last-modified date."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/001, docs/REQUIREMENTS.md F1
+    acceptance:
+      - "POST /api/projects creates a project and it appears on the dashboard"
+      - "Archiving sets archivedAt and removes the project from the active list without deleting data"
+      - "Deleting a project removes it and its structure nodes, story objects, and versions"
+
+  - id: WCA-002
+    title: Project types with adaptive labels
+    statement: "When a project has type FICTION, ARTICLE_COLLECTION, or GENERAL, the system shall render type-appropriate UI labels (e.g. Chapter→Article, Scene→Section for article collections) while sharing the same underlying structure model."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/015
+    acceptance:
+      - "Creating a project accepts one of the three type values"
+      - "An ARTICLE_COLLECTION project shows Article/Section labels where a FICTION project shows Chapter/Scene"
+
+  - id: WCA-003
+    title: Hierarchical manuscript structure
+    statement: "While a project is open, the system shall maintain a Part → Chapter → Scene tree in which every node has a title, synopsis, status (Outline/Draft/Revised/Final), and order index, and shall support creating, renaming, reordering (including drag-and-drop across parents), and deleting nodes at any level."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/001, src/lib/controllers/structure.ts
+    acceptance:
+      - "Nodes CRUD via /api/nodes preserves parent/child integrity and order indexes"
+      - "Reordering a node within or across parents renumbers siblings consistently"
+      - "Scene status is one of OUTLINE/DRAFT/REVISED/FINAL and is shown color-coded in the outline"
+
+  - id: WCA-004
+    title: Insert sibling scene in place
+    statement: "When the author chooses 'Next Scene' from a scene's context menu and confirms a title, the system shall create a new scene under the same parent positioned immediately after the current scene, shifting later siblings down, and shall select the new scene in the outline."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/024
+    acceptance:
+      - "New scene's orderIndex equals current scene's +1 and subsequent siblings are shifted"
+      - "The new scene becomes the selected node after creation"
+
+  # ── Editing ────────────────────────────────────────────────────────────
+
+  - id: WCA-005
+    title: Rich text scene editing with auto-save
+    statement: "While the author edits a scene in the Tiptap editor, the system shall auto-save content on a debounce without explicit user action, and shall recompute scene and project word counts on save."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/002
+    acceptance:
+      - "Typing in a scene persists content without pressing a save button"
+      - "Scene word count and total project word count update after save"
+      - "Formatting (bold, italic, headings, lists) round-trips through save/load"
+
+  - id: WCA-006
+    title: Scene content versioning
+    statement: "When scene content is saved, the system shall create a new ContentVersion, retain at most the latest 50 versions per scene (pruning older ones), and shall allow the author to view version history and restore a prior version as a new version."
+    category: functional
+    priority: must
+    status: active
+    source: docs/REQUIREMENTS.md F7, src/lib/controllers/structure.ts (prune at 50)
+    acceptance:
+      - "Each save adds a ContentVersion row for the scene"
+      - "A scene never retains more than 50 versions"
+      - "Restoring version N creates a new head version containing N's content (history is never rewritten)"
+
+  - id: WCA-007
+    title: Scene beats
+    statement: "While a scene contains beat markers (`<!-- beat: ... -->` HTML comments), the editor shall render them as styled inline cards distinct from prose, and every export format shall strip them from output."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/002, requirements/009, src/__tests__/beats.test.ts
+    acceptance:
+      - "A beat comment in scene HTML renders as a beat card in the editor"
+      - "Markdown, PDF, EPUB, DOCX, and Google Docs exports contain no beat text"
+
+  - id: WCA-008
+    title: Focus mode
+    statement: "When the author enters focus mode for a scene, the system shall present a distraction-free three-panel layout: scene info, editor, and related story elements."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/003, src/app/api/focus
+    acceptance:
+      - "Focus mode is reachable from the project view and shows the three panels"
+      - "/api/focus returns the scene context (scene, related objects) used by the panels"
+
+  - id: WCA-009
+    title: Inline spelling and grammar checking
+    statement: "While the author writes prose in the scene editor with checking enabled, the system shall flag misspellings and grammar issues inline using client-side WASM (harper.js), offer accept/dismiss suggestions on click, run entirely on-device (working offline, sending no manuscript text to external services), and remain advisory — never blocking save or autosave."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/026, requirements/027, PR #1056
+    acceptance:
+      - "Flagged spans appear as the author types and clicking one shows correcting suggestions"
+      - "No network request carries manuscript text for checking purposes"
+      - "A per-session toolbar toggle turns checking off and back on (re-enabling restores flags)"
+      - "Checking works identically under the dev (Turbopack) and production bundlers"
+    notes: "PR #1056 fixed the toggle staying off after re-enable; PR #1031 fixed WASM loading under Turbopack — treat those regressions as guarded."
+
+  # ── Story objects, relationships, universes ────────────────────────────
+
+  - id: WCA-010
+    title: Story object management
+    statement: "When the author manages story objects, the system shall support full CRUD for the five types — Character, Location, Plotline, World Element, Note — each with description, notes, and free-form tags, filterable by type."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/004
+    acceptance:
+      - "/api/story-objects supports create/read/update/delete for all five types"
+      - "Objects can be listed filtered by type and searched by name"
+
+  - id: WCA-011
+    title: Typed entity relationships
+    statement: "When the author or an agent creates a relationship, the system shall link any two entities (structure nodes, story objects, or — when the project is linked to a universe — that universe's world objects) with a typed edge (APPEARS_IN, LOCATED_AT, PART_OF_PLOTLINE, RELATED_TO, ...) resolvable in both directions."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/005, requirements/023
+    acceptance:
+      - "Relationships CRUD via /api/relationships and the create_relationship MCP tool"
+      - "A relationship between a local story object and a linked universe's world object is accepted and resolves in both directions"
+      - "An entity's relationship panel lists all edges touching it"
+
+  - id: WCA-012
+    title: Universes and shared world objects
+    statement: "When an author manages a universe, the system shall support creating universes, linking/unlinking projects to them, CRUD for universe-scoped world objects (Character/Location/World Element), and ordered timeline entries tracking each world object's evolution."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/006
+    acceptance:
+      - "A project can be linked to and unlinked from a universe"
+      - "World objects and their ordered timeline entries CRUD via /api/universes and /api/world-objects"
+
+  - id: WCA-013
+    title: Timeline matrix view
+    statement: "When the author opens the timeline view, the system shall render a matrix of story objects (rows) against scenes (columns) showing where each character/location appears, based on APPEARS_IN-style relationships."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/007, src/app/api/timeline
+    acceptance:
+      - "/api/timeline returns the object×scene presence matrix for a project"
+      - "Timeline supports updating/reordering entries via its PATCH/reorder endpoints"
+
+  - id: WCA-014
+    title: Full-text search
+    statement: "When the author submits a search query in a project, the system shall search all scene content and story objects and return matches with highlighted snippets."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/008, src/__tests__/search-route.test.ts
+    acceptance:
+      - "GET /api/projects/[id]/search returns scene and story-object hits with snippet highlighting"
+      - "Overlong queries are rejected by input-size validation rather than executed"
+
+  # ── Annotations, tasks, read view, sharing ─────────────────────────────
+
+  - id: WCA-015
+    title: Range-based annotations
+    statement: "When a user adds an annotation to a text range in a scene, the system shall persist it with its range and selected text, render it as a visible highlight in both the editor and the Read view, and allow it to be resolved or deleted."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/annotations, PRs #1084 #1061, src/lib/annotation-anchoring.ts
+    acceptance:
+      - "An annotation created from the Read view selection popover persists and is highlighted"
+      - "Annotations created in the Reader view appear in the editor and survive click interactions"
+      - "Resolving an annotation removes it from the active highlight set"
+    notes: "Anchoring re-locates ranges when content shifts (annotation-anchoring.ts); exact re-anchor tolerance is encoded in its tests."
+
+  - id: WCA-016
+    title: Writing tasks
+    statement: "When a user creates a writing task (from the Read view selection popover or the project tasks page), the system shall persist it with name and completion status, optionally linked to a scene, and shall let the author view the full task list and mark tasks complete from within the Read view via a tasks drawer."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/029, PR #1063, src/app/api/writing-tasks
+    acceptance:
+      - "Task CRUD via /api/writing-tasks and equivalent MCP tools"
+      - "Read view exposes a tasks drawer listing name + completion status with mark-complete action"
+
+  - id: WCA-017
+    title: Read view manuscript rendering
+    statement: "When a user with read access opens a project's Read view, the system shall render the manuscript as chapters and scenes including only scenes whose status is DRAFT, REVISED, or FINAL — excluding OUTLINE scenes."
+    category: functional
+    priority: must
+    status: active
+    source: src/__tests__/sharing.test.ts (manuscript API)
+    acceptance:
+      - "GET /api/projects/[id]/manuscript excludes OUTLINE scenes and includes DRAFT/REVISED/FINAL"
+      - "Response preserves chapter > scene ordering with content"
+
+  - id: WCA-018
+    title: Project sharing with roles
+    statement: "When a project owner shares a project by email, the system shall create a share with role READER or EDITOR (defaulting to READER for missing or invalid roles), shall let only the owner list, change, or remove shares, and shall grant shared users access according to their role while returning 403 to non-shared users."
+    category: functional
+    priority: must
+    status: active
+    source: src/__tests__/sharing.test.ts
+    acceptance:
+      - "POST share with no/invalid role creates a READER share; duplicate email returns 409"
+      - "Non-owners receive 403 on share list/create/update/delete"
+      - "A shared READER can fetch the manuscript; an unshared user gets 403"
+
+  # ── Export & publishing ────────────────────────────────────────────────
+
+  - id: WCA-019
+    title: Markdown export
+    statement: "When the author exports a project, the system shall produce clean Markdown as a full manuscript, per-chapter files, or a story bible (characters/locations/plotlines reference), with configurable inclusion of synopses, scene breaks, and chapter numbering."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/009, docs/REQUIREMENTS.md F6
+    acceptance:
+      - "Full-manuscript export yields one .md with front matter and part/chapter/scene headings"
+      - "Story-bible export lists all story objects with descriptions"
+      - "Export options toggle synopsis/scene-break/numbering content"
+
+  - id: WCA-020
+    title: PDF, EPUB, and DOCX downloads
+    statement: "When a user chooses a download format in the Read view, the system shall produce a server-rendered PDF, an EPUB 3 file, or a DOCX file (body text Arial 12pt, left-justified) covering the same content scope as the manuscript view, with beat annotations stripped."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/028, README, src/__tests__/export-pdf-epub.test.ts
+    acceptance:
+      - "Read view download menu offers PDF, EPUB, and DOCX"
+      - "DOCX body paragraphs are Arial 12pt left-justified"
+      - "No export contains beat marker text"
+
+  - id: WCA-021
+    title: Google Docs export and comment sync
+    statement: "When a user with linked Google credentials exports to Google Docs, the system shall create or update a Doc idempotently per (entity, mode) — supporting Universe, Internal, and Reader modes — and when syncing, shall import Doc comments back as Annie annotations, skipping comments already imported (tracked via externalId)."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/010, src/lib/export/google-docs-*.ts
+    acceptance:
+      - "Re-running an export updates the existing Doc (GoogleDocExport mapping) instead of creating a duplicate"
+      - "Comment sync creates annotations only for comments without a matching externalId"
+      - "Google Docs OAuth flow stores per-user credentials and is separate from login OAuth"
+
+  - id: WCA-022
+    title: External publishing (Medium-style Markdown, Hashnode)
+    statement: "When the author publishes an article project, the system shall produce Medium-ready Markdown with front matter, and shall support publishing to Hashnode using an encrypted stored credential, tracking each export's status."
+    category: functional
+    priority: may
+    status: active
+    source: README, prisma HashnodeCredential/HashnodeExport, src/__tests__/publish-to-hashnode-route.test.ts
+    acceptance:
+      - "Medium export emits article-optimized Markdown with front matter"
+      - "Hashnode publish creates a post via stored credential and records a HashnodeExport"
+
+  - id: WCA-023
+    title: Project JSON import/export
+    statement: "When the author exports a project as JSON, the system shall emit a complete portable representation; when importing, the system shall recreate the project from that JSON, enforcing input size limits."
+    category: functional
+    priority: should
+    status: active
+    source: src/lib/export-json.ts, src/lib/import-json.ts, src/__tests__/project-import-route.test.ts
+    acceptance:
+      - "Export → import round-trips structure, content, story objects, and relationships"
+      - "Oversized import payloads are rejected with a 4xx, not processed"
+
+  # ── AI features ────────────────────────────────────────────────────────
+
+  - id: WCA-024
+    title: Streaming AI chat with story context
+    statement: "When the author chats in a project's AI panel, the system shall stream responses from the configured model with full story context injected (characters, outline, current scene), persist messages in named per-project conversations, and compress long histories to stay within context limits."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/011, src/__tests__/chat-*.test.ts
+    acceptance:
+      - "POST /api/chat streams a response and appends both turns to the conversation"
+      - "Conversations CRUD via /api/conversations scoped to a project"
+      - "Long chat histories are compressed rather than failing (chat-compression tests)"
+      - "A client disconnect mid-stream does not crash the stream controller (PR #1064)"
+
+  - id: WCA-025
+    title: AI inline and manuscript-level actions
+    statement: "When the author selects text and invokes an inline AI action (brainstorm/expand/summarize) or runs a manuscript-level AI analysis, the system shall return suggestions in a side panel that the author explicitly applies or discards — never auto-editing scene content."
+    category: functional
+    priority: may
+    status: active
+    source: docs/REQUIREMENTS.md F8, src/app/api/ai-inline, src/app/api/ai-manuscript
+    acceptance:
+      - "AI results never mutate scene content without an explicit user apply action"
+      - "/api/ai-inline and /api/ai-manuscript enforce input size limits"
+
+  - id: WCA-026
+    title: Peer review personas
+    statement: "When a peer review is run (web UI or run_peer_review MCP tool), the system shall execute the five reviewer personas — acquisitions editor, fan reader, peer author, acting coach, comedy writer — store the results as a PeerReview record with a consensus field, and expose stored reviews and persona prompts for retrieval, with persona lens text kept in a single shared module."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/019, requirements/020, src/lib/review-personas.ts
+    acceptance:
+      - "run_peer_review returns the created PeerReview (or the pending one if a run is in progress)"
+      - "get_peer_reviews returns stored records newest-first with structured result fields"
+      - "get_peer_review_prompts returns lens text sourced from lib/review-personas.ts (no duplication with chat route)"
+
+  - id: WCA-027
+    title: Writing session tracking
+    statement: "While the author writes, the system shall auto-track writing sessions (project, scene, words written, duration, date) and present progress views including a session heatmap."
+    category: functional
+    priority: may
+    status: active
+    source: prisma WritingSession, src/__tests__/sessions-*.test.ts
+    acceptance:
+      - "Saving work records/updates a WritingSession for the day"
+      - "/api/sessions progress and heatmap endpoints aggregate sessions correctly"
+
+  # ── MCP / agentic access ───────────────────────────────────────────────
+
+  - id: WCA-028
+    title: MCP server tool coverage
+    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and database snapshots — full read/write parity with the web UI's core data."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/012, src/mcp/tools/*
+    acceptance:
+      - "Tool registry includes categories matching src/mcp/tools modules"
+      - "MCP writes produce the same persisted state as the equivalent API route"
+    notes: "Tool count drifts (docs say 48/67/72 in different places); the registry is the source of truth, not a fixed number."
+
+  - id: WCA-029
+    title: Structural-collaborator guardrails
+    statement: "When an agent begins working with Annie, the get_initial_instructions tool shall deliver collaboration guidelines establishing Claude as a structural collaborator (beats/annotations by default, prose only on explicit author request); write_scene_content shall accept CONTENT blocks without a hard server-side guard, and update_paragraph shall accept an optional intent:'editorial' flag as a semantic signal."
+    category: functional
+    priority: must
+    status: active
+    source: requirements/016-018, src/__tests__/mcp-guardrails.test.ts
+    acceptance:
+      - "get_initial_instructions returns CLAUDE_COLLABORATION_INSTRUCTIONS text"
+      - "ANNIE_HARD_RULE is prepended to review and plan_beats prompts"
+      - "write_scene_content contains no CONTENT-block rejection; its description states BEAT-by-default semantics"
+      - "update_paragraph schema includes the intent enum; the handler does not enforce it"
+
+  - id: WCA-030
+    title: insert_beat with intra-block targeting
+    statement: "When an agent calls insert_beat with a paragraph index that falls inside a CONTENT block, the system shall split that block at the paragraph boundary, insert the BEAT, and reconstruct the block sequence — repositioning paragraphs without writing or altering any prose."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/016, requirements/018
+    acceptance:
+      - "insert_beat between blocks inserts a lone BEAT block with no CONTENT payload"
+      - "insert_beat mid-block splits the CONTENT block and total prose text is byte-identical before/after"
+
+  - id: WCA-031
+    title: Stale-write protection via content hash
+    statement: "When a scene write supplies an expected content hash that does not match the scene's current content, the system shall reject the write with a stale-hash error instead of overwriting, so concurrent editors and agents never silently clobber each other."
+    category: functional
+    priority: must
+    status: active
+    source: src/mcp/content-hash.ts, src/__tests__/content-hash.test.ts
+    acceptance:
+      - "A write with a mismatched expectedContentHash fails with the stale-hash error and leaves content unchanged"
+      - "Collaboration instructions tell agents to use stale-write protection"
+
+  - id: WCA-032
+    title: Destructive MCP tool gating
+    statement: "While the MCP server runs without destructive operations enabled (allowDestructive option or MCP_ALLOW_DESTRUCTIVE=true), the system shall block destructive tools (deletes, restores) while leaving non-destructive tools functional; the default with no configuration shall be blocking."
+    category: functional
+    priority: must
+    status: active
+    source: src/__tests__/mcp-destructive-gating.test.ts
+    acceptance:
+      - "Destructive tools error when gating is off; succeed when enabled by option or env"
+      - "Unset MCP_ALLOW_DESTRUCTIVE defaults to blocked"
+
+  - id: WCA-033
+    title: Database snapshot and restore
+    statement: "When significant data changes occur or an agent requests it, the system shall support creating a database snapshot, listing snapshots, and restoring one via MCP tools, and most write operations shall trigger an automatic snapshot for agentic safety."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/014, src/mcp/snapshot.ts
+    acceptance:
+      - "snapshot_database / list_snapshots / restore_snapshot round-trip"
+      - "Snapshot inputs (message, limit, hash) are validated/escaped before reaching any shell (SECURITY-AUDIT CRITICAL-01 regression guard)"
+
+  - id: WCA-034
+    title: Writing skills as MCP prompts
+    statement: "When an MCP client lists prompts, the system shall expose the curated writing skills (developmental edit, line edit, consistency check, plot structure analysis, character arc review, scene drafting assistant, and related skills) loaded from the skills directory with parsed metadata."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/013, src/mcp/skills.ts
+    acceptance:
+      - "list_prompts returns the registered skills; list_skills returns their metadata"
+      - "plan_beats prompt loads the scene-drafting-assistant skill and includes scene status, chapter, and word count context"
+
+  - id: WCA-035
+    title: Submission tracking
+    statement: "When the author tracks where a story has been submitted, the system shall support CRUD for reusable Providers (venue/contest host with name, website, notes) and per-project publication submissions (venue, date, status) and contest submissions (name, provider, dates, URL, status), via web UI pages linked from the project dashboard, a dashboard activity summary, and equivalent MCP tools."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/030, PRs #1065 #1066 #1068 #1085
+    acceptance:
+      - "Providers are project-independent and reusable across submissions"
+      - "Submissions page supports full CRUD for providers and both submission types"
+      - "Project dashboard shows active/pending counts and upcoming contest review dates"
+      - "MCP tools provide parity for all three entities (mcp-submissions tests)"
+
+  # ── Offline & resilience ───────────────────────────────────────────────
+
+  - id: WCA-036
+    title: Offline editing with sync queue
+    statement: "While the app is offline, the system shall serve projects and scene content from the local cache and queue API mutations locally (returning 202, never queuing GETs or non-API requests); when connectivity returns, it shall replay queued ops in order, mark a replayed op as 'conflict' with the server's content when the server returns 409, skip conflicted ops during automatic replay, retry failures up to a maximum, and surface sync state (up to date / offline with pending count / syncing / conflict) in the header, letting the author resolve conflicts explicitly via a diff — never silently discarding work."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/021, src/lib/offline/*, src/__tests__/sync-queue.test.ts
+    acceptance:
+      - "Offline mutation returns 202 and is queued; GETs are not queued"
+      - "Reconnect replays ops in order; 409 marks the op conflict with server content attached"
+      - "Conflicted ops are skipped by auto-replay and resolvable via the conflict modal (keep-mine force replay or keep-server)"
+      - "Ops exceeding max retries are skipped"
+
+  - id: WCA-037
+    title: No forced reload on app update
+    statement: "When a new app version or service worker becomes available (including after an offline period), the system shall surface a dismissible update banner and shall reload the page only when the author explicitly chooses to refresh — unsaved editor content survives the offline-to-online transition undisturbed."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/025, issues #997 #998, src/hooks/use-version-check.ts
+    acceptance:
+      - "A service worker controllerchange never triggers an unprompted reload"
+      - "The update banner's refresh action is the only path to window.location.reload()"
+
+  - id: WCA-038
+    title: In-app feedback to GitHub
+    statement: "When a user submits feedback (optionally with a screenshot), the system shall create a GitHub issue in the configured repository, uploading images via the issues upload API with issues:write scope only."
+    category: functional
+    priority: may
+    status: active
+    source: src/app/api/feedback/route.ts
+    acceptance:
+      - "Feedback submission creates a GitHub issue with the report content"
+      - "Feedback is rate-limited to 5/hour per user and size-limited"
+
+  # ── Non-functional: auth, security, privacy ────────────────────────────
+
+  - id: WCA-039
+    title: Authentication on all non-public routes
+    statement: "When a request arrives for any path outside the public allowlist (health, login/logout/refresh, landing, privacy/terms, OAuth metadata/register/token, version.json), the middleware shall require a valid session cookie, API bearer token, or MCP OAuth token, and shall reject unauthenticated requests."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/middleware.ts, src/__tests__/middleware.test.ts
+    acceptance:
+      - "Unauthenticated request to a protected /api route is rejected; public paths pass"
+      - "/api/mcp accepts a verified MCP OAuth token (mcp-route-auth tests)"
+    notes: "Sign-in is Google OAuth; docs/ARCHITECTURE.md and SECURITY-AUDIT.md predate auth and describe a no-auth SQLite era — they are stale, not authoritative."
+
+  - id: WCA-040
+    title: Session lifetime and revocation
+    statement: "While a user is signed in, the system shall issue a 1-hour session JWT plus a 30-day refresh token (verified only in Node.js against a revocation blocklist), shall transparently refresh sessions so an active user stays logged in indefinitely, and on logout shall revoke the refresh token so it cannot be reused."
+    category: non-functional
+    priority: must
+    status: active
+    source: requirements/022, src/lib/auth.ts, src/__tests__/auth-refresh-route.test.ts, token-blocklist.test.ts
+    acceptance:
+      - "Session tokens expire at 1h; /api/auth/refresh mints a new session from a valid refresh token"
+      - "A user active daily is never forced to re-authenticate; autosave does not silently fail on session expiry"
+      - "A revoked (logged-out) refresh token is rejected"
+
+  - id: WCA-041
+    title: Invite-only email allowlist
+    statement: "While ALLOWED_EMAILS is configured, the system shall reject Google sign-ins from any email not on the comma-separated allowlist (case-insensitive), redirecting to the login page with an invite_only error."
+    category: non-functional
+    priority: should
+    status: active
+    source: src/app/api/auth/google/callback/route.ts
+    acceptance:
+      - "A non-allowlisted email completing OAuth lands on /login?error=invite_only with no session"
+      - "Allowlist matching is case-insensitive and whitespace-tolerant"
+
+  - id: WCA-042
+    title: Per-project authorization
+    statement: "When any project-scoped operation executes (API or MCP), the system shall verify the requesting user owns or is shared on the project, returning 403 otherwise; when the MCP server runs with a null userId (single-user mode), ownership checks shall be bypassed."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/__tests__/sharing.test.ts, mcp-destructive-gating.test.ts (ownership), null-userid-guard.test.ts
+    acceptance:
+      - "MCP tool access with a non-owner userId is rejected; owner and null userId are allowed"
+      - "verifyProjectAccess/verifyProjectReadAccess gate project routes by role"
+
+  - id: WCA-043
+    title: Per-user rate limiting
+    statement: "When a user exceeds an endpoint's rate limit — chat 30/min, reads 120/min, writes 60/min, project creation 100/hour, project import 20/hour, feedback 5/hour — the system shall respond 429 with Retry-After and X-RateLimit-* headers; the DISABLE_RATE_LIMIT bypass shall be ignored in production."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/middleware.ts, src/lib/rate-limit.ts
+    acceptance:
+      - "Exceeding each configured limit yields 429 with correct headers"
+      - "Limits are keyed per user; Redis is used when configured, in-memory otherwise"
+      - "DISABLE_RATE_LIMIT=true has no effect when NODE_ENV=production"
+
+  - id: WCA-044
+    title: Input validation, size limits, and sanitization
+    statement: "When user-supplied content enters the system, API routes shall validate it with Zod schemas, enforce per-endpoint size limits (chat, ai-inline, import, feedback, search), and sanitize HTML content on both client and server to prevent stored XSS."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/__tests__/input-size-limits.test.ts, sanitize.test.ts, sanitize-server.test.ts
+    acceptance:
+      - "Oversized payloads on the covered endpoints return 4xx without processing"
+      - "Script/event-handler content in saved HTML is stripped before persistence and on render"
+
+  - id: WCA-045
+    title: Security response headers
+    statement: "When any page is served, the middleware shall attach a Content-Security-Policy using a per-request script nonce (no unsafe-inline scripts), frame-ancestors 'none', and restricted connect/img/font sources."
+    category: non-functional
+    priority: should
+    status: active
+    source: src/middleware.ts buildCsp
+    acceptance:
+      - "Responses carry a CSP whose script-src is 'self' plus a nonce"
+      - "The app functions with that CSP (no inline-script violations in normal use)"
+
+  - id: WCA-046
+    title: Secrets and manuscript privacy
+    statement: "When users store provider credentials (AI API keys, Hashnode tokens), the system shall encrypt them at rest with ENCRYPTION_KEY and return only masked values on read; error telemetry sent to Sentry shall be scrubbed of manuscript text and PII."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/crypto.ts, src/lib/sentry-scrub.ts, README env table
+    acceptance:
+      - "GET on settings endpoints never returns a full stored API key"
+      - "Sentry event payloads contain no scene content or user email after scrubbing (sentry-scrub tests)"
+
+  - id: WCA-047
+    title: Data portability, deletion, and consent
+    statement: "When a user requests their data, the system shall provide a full export via /api/auth/export-data; when a user deletes their account, the system shall remove their account and owned data; the system shall record user consent decisions, and shall serve privacy, terms, and DMCA pages publicly."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/app/api/auth/export-data, delete-account, account/consent; src/app/{privacy,terms,dmca}
+    acceptance:
+      - "export-data returns the user's projects and content in a portable format"
+      - "delete-account removes the user's data and invalidates their sessions"
+      - "Consent state persists per user (UserConsent)"
+
+  - id: WCA-048
+    title: Observability
+    statement: "While the app runs, the system shall expose an unauthenticated /api/health check, emit metrics and telemetry, and report errors to Sentry across client, edge, and server runtimes."
+    category: non-functional
+    priority: may
+    status: active
+    source: src/app/api/health, src/lib/metrics.ts, sentry.*.config.ts
+    acceptance:
+      - "/api/health returns success without authentication"
+      - "Metrics endpoint aggregates request/usage counters"
+
+  - id: WCA-049
+    title: Memory budget for 512 MB container
+    statement: "While deployed on the 512 MB Railway container, the system shall run with a V8 heap cap (~300 MB) sized to leave headroom, and shall not exceed the container memory alert threshold under normal use."
+    category: non-functional
+    priority: should
+    status: active
+    source: PRs #1033 #1041 #1043 #1035
+    acceptance:
+      - "Start command pins --max-old-space-size at the configured cap"
+      - "Normal operation stays under the 90% memory alert threshold"
+    notes: "The cap was tuned repeatedly (340→300 MB); treat the exact number as configuration, the budget as the requirement."
+
+  # ── Constraints ────────────────────────────────────────────────────────
+
+  - id: WCA-050
+    title: Database platform and safe migrations
+    statement: "The system shall use PostgreSQL (Supabase) via Prisma with checked-in migrations applied automatically on container start, and the migration runner shall refuse destructive DDL when the database contains live data; prisma db push and migrate reset are prohibited against production."
+    category: constraint
+    priority: must
+    status: active
+    source: CLAUDE.md, scripts/migrate.mjs
+    acceptance:
+      - "Container start applies pending migrations idempotently"
+      - "A migration that would drop populated tables is refused by migrate.mjs"
+
+  - id: WCA-051
+    title: OAuth 2.0 authorization server for MCP clients
+    statement: "When an external MCP client integrates over HTTP, the system shall act as an OAuth 2.0 authorization server — publishing /.well-known/oauth-authorization-server metadata and supporting dynamic client registration, the authorize flow, and the token endpoint — issuing tokens accepted by /api/mcp."
+    category: constraint
+    priority: should
+    status: active
+    source: src/__tests__/oauth-*.test.ts, src/middleware.ts PUBLIC_PATHS
+    acceptance:
+      - "Metadata, register, authorize, and token endpoints conform to the tests' expected flows"
+      - "A token minted via this flow authenticates /api/mcp requests"
+
+  - id: WCA-052
+    title: Deployment and integration surface
+    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployable behind a Cloudflare Tunnel, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
+    category: constraint
+    priority: must
+    status: active
+    source: README, src/lib/env.ts, docker-compose.yml
+    acceptance:
+      - "docker compose up starts the app with only DATABASE_URL strictly required"
+      - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
