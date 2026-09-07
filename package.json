@@ -103,7 +103,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.4.0",
     "postcss": "^8.5.15",
-    "prisma": "^7.9.1",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4.2.4",
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.23.13",
