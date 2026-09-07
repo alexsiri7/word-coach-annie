@@ -1,7 +1,7 @@
 ---
 created: '2026-08-30'
 github_issue: null
-id: 030
+id: '030'
 status: draft
 title: Track story submissions to publications and literary contests
 updated: '2026-08-30'
