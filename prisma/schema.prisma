@@ -33,18 +33,19 @@ model ContentVersion {
 }
 
 model User {
-  id         String          @id @default(cuid())
-  email      String          @unique
-  googleId   String          @unique
-  name       String          @default("")
-  picture    String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  projects   Project[]
-  universes  Universe[]
-  aiSettings UserAiSettings?
-  consents   UserConsent[]
-  providers  Provider[]
+  id            String          @id @default(cuid())
+  email         String          @unique
+  googleId      String          @unique
+  name          String          @default("")
+  picture       String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  projects      Project[]
+  universes     Universe[]
+  aiSettings    UserAiSettings?
+  consents      UserConsent[]
+  providers     Provider[]
+  opportunities Opportunity[]
 }
 
 model UserConsent {
@@ -60,31 +61,32 @@ model UserConsent {
 }
 
 model Project {
-  id               String            @id @default(cuid())
-  universeId       String?
-  userId           String?
-  title            String
-  author           String            @default("")
-  synopsis         String            @default("")
-  genre            String            @default("")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  archivedAt       DateTime?
-  storyObjects     StoryObject[]
-  structureNodes   StructureNode[]
-  universe         Universe?         @relation(fields: [universeId], references: [id])
-  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectType      String            @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
-  isSample         Boolean           @default(false)
-  conversations    Conversation[]
-  googleDocExports GoogleDocExport[]
-  hashnodeExports  HashnodeExport[]
-  writingSessions  WritingSession[]
-  shares           ProjectShare[]
-  peerReviews              PeerReview[]
-  writingTasks             WritingTask[]
-  contestSubmissions       ContestSubmission[]
-  publicationSubmissions   PublicationSubmission[]
+  id                     String                  @id @default(cuid())
+  universeId             String?
+  userId                 String?
+  title                  String
+  author                 String                  @default("")
+  synopsis               String                  @default("")
+  genre                  String                  @default("")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  archivedAt             DateTime?
+  storyObjects           StoryObject[]
+  structureNodes         StructureNode[]
+  universe               Universe?               @relation(fields: [universeId], references: [id])
+  user                   User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectType            String                  @default("FICTION") // FICTION, ARTICLE_COLLECTION, GENERAL
+  isSample               Boolean                 @default(false)
+  conversations          Conversation[]
+  googleDocExports       GoogleDocExport[]
+  hashnodeExports        HashnodeExport[]
+  writingSessions        WritingSession[]
+  shares                 ProjectShare[]
+  peerReviews            PeerReview[]
+  writingTasks           WritingTask[]
+  contestSubmissions     ContestSubmission[]
+  publicationSubmissions PublicationSubmission[]
+  opportunityCandidates  OpportunityCandidate[]
 
   @@index([userId])
 }
@@ -418,23 +420,25 @@ model Provider {
   updatedAt          DateTime            @updatedAt
   user               User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   contestSubmissions ContestSubmission[]
+  opportunities      Opportunity[]
 
   @@index([userId])
 }
 
 model ContestSubmission {
-  id             String    @id @default(cuid())
-  projectId      String
-  providerId     String
-  contestName    String
-  submissionDate DateTime
-  reviewDate     DateTime?
-  submissionUrl  String    @default("")
-  status         String    @default("submitted")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  provider       Provider  @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  id                    String                 @id @default(cuid())
+  projectId             String
+  providerId            String
+  contestName           String
+  submissionDate        DateTime
+  reviewDate            DateTime?
+  submissionUrl         String                 @default("")
+  status                String                 @default("submitted")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  project               Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider              Provider               @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  opportunityCandidates OpportunityCandidate[]
 
   @@index([projectId])
   @@index([providerId])
@@ -451,6 +455,48 @@ model PublicationSubmission {
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model Opportunity {
+  id                String                 @id @default(cuid())
+  userId            String?
+  providerId        String
+  title             String
+  closeDate         DateTime
+  reviewDate        DateTime?
+  rulesUrl          String?
+  entryFee          String?
+  wordLimit         Int?
+  lineLimit         Int?
+  genreRestrictions String?
+  eligibilityNotes  String?
+  status            String                 @default("found")
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  user              User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          Provider               @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  candidates        OpportunityCandidate[]
+
+  @@index([userId])
+  @@index([providerId])
+}
+
+model OpportunityCandidate {
+  id            String             @id @default(cuid())
+  opportunityId String
+  projectId     String
+  state         String             @default("candidate")
+  notes         String?
+  submissionId  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  opportunity   Opportunity        @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submission    ContestSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  @@unique([opportunityId, projectId])
+  @@index([projectId])
+  @@index([submissionId])
 }
 
 model RevokedToken {

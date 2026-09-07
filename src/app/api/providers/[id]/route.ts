@@ -82,7 +82,7 @@ export async function DELETE(
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
             return NextResponse.json(
-                { error: "Provider has existing submissions and cannot be deleted." },
+                { error: "Provider has existing submissions or opportunities and cannot be deleted." },
                 { status: 409 }
             );
         }

@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **91 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **100 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -897,7 +897,7 @@ Returns the updated `Provider` object.
 ---
 
 #### `delete_provider`
-Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions cannot be deleted. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions or tracked opportunities cannot be deleted. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -1004,6 +1004,127 @@ Delete a publication submission. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 | Param | Type | Description |
 |-------|------|-------------|
 | `submissionId` | string | The publication submission ID to delete |
+
+---
+
+### Opportunities
+
+Track contests and calls for submission you are considering, and the projects put forward for each one. Opportunities are scoped to the **current user**, like providers — ownership is enforced by matching `userId`. A candidate links a project to an opportunity; both its opportunity and its project must be owned by the current user.
+
+#### `list_opportunities`
+List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first.
+
+Returns `{ opportunities: Opportunity[], total: number }`.
+
+---
+
+#### `create_opportunity`
+Track a new submission opportunity — a contest or call for submissions with a deadline.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `providerId` | string | The provider (contest organizer or publication) ID |
+| `title` | string | Opportunity title |
+| `closeDate` | string | ISO 8601 date/time submissions close |
+| `reviewDate` | string? | ISO 8601 date/time results are expected |
+| `rulesUrl` | string? | URL of the rules or call for submissions |
+| `entryFee` | string? | Entry fee as free text, e.g. `"£10"` or `"free for subscribers"` |
+| `wordLimit` | number? | Maximum word count accepted |
+| `lineLimit` | number? | Maximum line count accepted |
+| `genreRestrictions` | string? | Genre restrictions, e.g. `"speculative fiction only"` |
+| `eligibilityNotes` | string? | Eligibility rules — residency, previously-published, multiple-entry rules |
+| `status` | `"found" \| "considering" \| "closed"`? | Opportunity status (default `"found"`) |
+
+Returns the created `Opportunity` object.
+
+---
+
+#### `update_opportunity`
+Update fields on an existing opportunity. Only opportunities owned by the current user can be updated. All fields except `opportunityId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `opportunityId` | string | The opportunity ID to update |
+| `providerId` | string? | New provider ID |
+| `title` | string? | New title |
+| `closeDate` | string? | New ISO 8601 close date/time |
+| `reviewDate` | string \| null? | New ISO 8601 review date/time, or `null` to clear it |
+| `rulesUrl` | string \| null? | New rules URL, or `null` to clear it |
+| `entryFee` | string \| null? | New entry fee, or `null` to clear it |
+| `wordLimit` | number \| null? | New word limit, or `null` to clear it |
+| `lineLimit` | number \| null? | New line limit, or `null` to clear it |
+| `genreRestrictions` | string \| null? | New genre restrictions, or `null` to clear it |
+| `eligibilityNotes` | string \| null? | New eligibility notes, or `null` to clear it |
+| `status` | `"found" \| "considering" \| "closed"`? | New status |
+
+Returns the updated `Opportunity` object.
+
+---
+
+#### `delete_opportunity`
+Delete an opportunity and every candidate entry attached to it. Only opportunities owned by the current user can be deleted. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `opportunityId` | string | The opportunity ID to delete |
+
+---
+
+#### `list_opportunity_candidates`
+List the projects put forward as candidate entries for an opportunity, oldest first.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `opportunityId` | string | The opportunity ID |
+
+Returns `{ candidates: OpportunityCandidate[], total: number }`.
+
+---
+
+#### `create_opportunity_candidate`
+Put a project forward as a candidate entry for an opportunity. A project can be a candidate for an opportunity only once.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `opportunityId` | string | The opportunity ID |
+| `projectId` | string | The project (story) being considered |
+| `state` | `"candidate" \| "chosen" \| "dropped"`? | Candidate state (default `"candidate"`) |
+| `notes` | string? | Why this piece fits, or why it was dropped |
+
+Returns the created `OpportunityCandidate` object.
+
+---
+
+#### `update_opportunity_candidate`
+Update the state or notes of a candidate entry. All fields except `candidateId` are optional — only provided fields are changed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `candidateId` | string | The candidate ID to update |
+| `state` | `"candidate" \| "chosen" \| "dropped"`? | New candidate state |
+| `notes` | string \| null? | New notes, or `null` to clear them |
+
+Returns the updated `OpportunityCandidate` object.
+
+---
+
+#### `delete_opportunity_candidate`
+Remove a candidate entry from an opportunity. The opportunity and the project are both kept. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `candidateId` | string | The candidate ID to delete |
+
+---
+
+#### `promote_opportunity_candidate`
+Promote a chosen candidate into a real contest submission, carrying over the opportunity's provider, title, review date and rules URL. The candidate record is kept and gains the new submission ID. Fails unless the candidate is in state `"chosen"` and has not been promoted already.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `candidateId` | string | The candidate ID to promote |
+
+Returns `{ candidate: OpportunityCandidate, submission: ContestSubmission }`.
 
 ---
 

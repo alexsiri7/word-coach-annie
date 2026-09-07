@@ -72,6 +72,17 @@ import {
     deletePublicationSubmission,
 } from "./tools/submissions";
 import {
+    listOpportunities,
+    createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+    listOpportunityCandidates,
+    createOpportunityCandidate,
+    updateOpportunityCandidate,
+    deleteOpportunityCandidate,
+    promoteOpportunityCandidate,
+} from "./tools/opportunities";
+import {
     exportManuscript,
     exportStoryBible,
     getProjectSummary,
@@ -954,7 +965,7 @@ server.tool(
 
 server.tool(
     "delete_provider",
-    "Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions cannot be deleted.",
+    "Delete a submission provider. Only providers owned by the current user can be deleted. Providers with existing contest submissions or tracked opportunities cannot be deleted.",
     {
         providerId: z.string().describe("The provider ID to delete"),
     },
@@ -1030,6 +1041,142 @@ server.tool(
         const result = await deleteContestSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
+);
+
+// ─── Opportunity Tools (user-scoped) ─────────────────────────────────────────
+// Opportunities (contests and calls for submission you are considering) belong to
+// the current user, like providers, so ownership is checked via userId.
+
+server.tool(
+    "list_opportunities",
+    "List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first.",
+    {},
+    async () =>
+        mcpRun("list_opportunities", "Error listing opportunities", () => listOpportunities(userId))
+);
+
+server.tool(
+    "create_opportunity",
+    "Track a new submission opportunity — a contest or call for submissions with a deadline.",
+    {
+        providerId: z.string().describe("The provider (contest organizer or publication) ID"),
+        title: z.string().describe("Opportunity title"),
+        closeDate: z.string().describe("ISO 8601 date/time submissions close"),
+        reviewDate: z.string().optional().describe("ISO 8601 date/time results are expected"),
+        rulesUrl: z.string().optional().describe("URL of the rules or call for submissions"),
+        entryFee: z.string().optional().describe("Entry fee as free text, e.g. \"£10\" or \"free for subscribers\""),
+        wordLimit: z.number().optional().describe("Maximum word count accepted"),
+        lineLimit: z.number().optional().describe("Maximum line count accepted"),
+        genreRestrictions: z.string().optional().describe("Genre restrictions, e.g. \"speculative fiction only\""),
+        eligibilityNotes: z.string().optional().describe("Eligibility rules — residency, previously-published, multiple-entry rules"),
+        status: z.enum(["found", "considering", "closed"]).optional().describe("Opportunity status (default \"found\")"),
+    },
+    async (params) =>
+        mcpRun("create_opportunity", "Error creating opportunity", () => createOpportunity({ ...params, userId }))
+);
+
+server.tool(
+    "update_opportunity",
+    "Update fields on an existing opportunity. Only opportunities owned by the current user can be updated. All fields except opportunityId are optional — only provided fields are changed.",
+    {
+        opportunityId: z.string().describe("The opportunity ID to update"),
+        providerId: z.string().optional().describe("New provider ID"),
+        title: z.string().optional().describe("New title"),
+        closeDate: z.string().optional().describe("New ISO 8601 close date/time"),
+        reviewDate: z.string().nullable().optional().describe("New ISO 8601 review date/time, or null to clear it"),
+        rulesUrl: z.string().nullable().optional().describe("New rules URL, or null to clear it"),
+        entryFee: z.string().nullable().optional().describe("New entry fee, or null to clear it"),
+        wordLimit: z.number().nullable().optional().describe("New word limit, or null to clear it"),
+        lineLimit: z.number().nullable().optional().describe("New line limit, or null to clear it"),
+        genreRestrictions: z.string().nullable().optional().describe("New genre restrictions, or null to clear it"),
+        eligibilityNotes: z.string().nullable().optional().describe("New eligibility notes, or null to clear it"),
+        status: z.enum(["found", "considering", "closed"]).optional().describe("New status"),
+    },
+    async (params) =>
+        mcpRun("update_opportunity", "Error updating opportunity", () => updateOpportunity({ ...params, userId }))
+);
+
+server.tool(
+    "delete_opportunity",
+    "Delete an opportunity and every candidate entry attached to it. Only opportunities owned by the current user can be deleted.",
+    {
+        opportunityId: z.string().describe("The opportunity ID to delete"),
+    },
+    async ({ opportunityId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await deleteOpportunity(opportunityId, userId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Opportunity Candidate Tools ─────────────────────────────────────────────
+// A candidate links a project to an opportunity: the piece you are considering
+// entering. Ownership follows the opportunity and the project it points at.
+
+server.tool(
+    "list_opportunity_candidates",
+    "List the projects put forward as candidate entries for an opportunity, oldest first.",
+    {
+        opportunityId: z.string().describe("The opportunity ID"),
+    },
+    async ({ opportunityId }) =>
+        mcpRun("list_opportunity_candidates", "Error listing opportunity candidates", () =>
+            listOpportunityCandidates(opportunityId, userId)
+        )
+);
+
+server.tool(
+    "create_opportunity_candidate",
+    "Put a project forward as a candidate entry for an opportunity. A project can be a candidate for an opportunity only once.",
+    {
+        opportunityId: z.string().describe("The opportunity ID"),
+        projectId: z.string().describe("The project (story) being considered"),
+        state: z.enum(["candidate", "chosen", "dropped"]).optional().describe("Candidate state (default \"candidate\")"),
+        notes: z.string().optional().describe("Why this piece fits, or why it was dropped"),
+    },
+    async (params) =>
+        mcpRun("create_opportunity_candidate", "Error creating opportunity candidate", () =>
+            createOpportunityCandidate({ ...params, userId })
+        )
+);
+
+server.tool(
+    "update_opportunity_candidate",
+    "Update the state or notes of a candidate entry. All fields except candidateId are optional — only provided fields are changed.",
+    {
+        candidateId: z.string().describe("The candidate ID to update"),
+        state: z.enum(["candidate", "chosen", "dropped"]).optional().describe("New candidate state"),
+        notes: z.string().nullable().optional().describe("New notes, or null to clear them"),
+    },
+    async (params) =>
+        mcpRun("update_opportunity_candidate", "Error updating opportunity candidate", () =>
+            updateOpportunityCandidate({ ...params, userId })
+        )
+);
+
+server.tool(
+    "delete_opportunity_candidate",
+    "Remove a candidate entry from an opportunity. The opportunity and the project are both kept.",
+    {
+        candidateId: z.string().describe("The candidate ID to delete"),
+    },
+    async ({ candidateId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        const result = await deleteOpportunityCandidate(candidateId, userId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+server.tool(
+    "promote_opportunity_candidate",
+    "Promote a chosen candidate into a real contest submission, carrying over the opportunity's provider, title, review date and rules URL. The candidate record is kept and gains the new submission ID. Fails unless the candidate is in state \"chosen\" and has not been promoted already.",
+    {
+        candidateId: z.string().describe("The candidate ID to promote"),
+    },
+    async ({ candidateId }) =>
+        mcpRun("promote_opportunity_candidate", "Error promoting opportunity candidate", () =>
+            promoteOpportunityCandidate(candidateId, userId)
+        )
 );
 
 // ─── Publication Submission Tools (project-scoped) ───────────────────────────
