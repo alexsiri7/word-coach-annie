@@ -11,10 +11,9 @@ updated: '2026-09-07'
 
 Tracking a literary contest from "found it" to "submitted" currently spans three disconnected tools. An AI assistant searches for and summarises contests, Annie's submission tools only record an entry after it has been submitted, and deadline reminders have to be set up by hand in a calendar. There is no single place to see the contests under consideration, with their deadlines, rules and status, before a submission actually happens.
 
-Two further gaps in the current model. First, the relationship between a piece and an opportunity is many-to-many in practice: one contest may suit several stories, and one story may suit several contests. The existing submission model assumes one submission per project. Second, the author often does not know what to submit at the point of discovery. A contest found six months out is worth recording immediately, but the decision about which piece to enter is made much later, typically once the deadline is近 enough to plan around. The system should support recording the opportunity first and attaching candidate pieces to it over time, rather than requiring the decision up front.
+Two further gaps in the current model. First, the relationship between a piece and an opportunity is many-to-many in practice: one contest may suit several stories, and one story may suit several contests. The existing submission model assumes one submission per project. Second, the author often does not know what to submit at the point of discovery. A contest found six months out is worth recording immediately, but the decision about which piece to enter is made much later, typically once the deadline is close enough to plan around. The system should support recording the opportunity first and attaching candidate pieces to it over time, rather than requiring the decision up front.
 
 Discovery itself remains out of scope: researching and summarising contests stays a job for the AI assistant. Annie's job is to hold the resulting structured data, track its lifecycle, and surface deadlines where the author will see them.
-
 ## What
 
 **Opportunities**
