@@ -373,3 +373,12 @@ GHSA-qj8w-gfj5-8c6v
 GHSA-cqhc-2h57-wpxf
 GHSA-42r5-vhpq-m858
 GHSA-g5xc-5w98-jfvm
+#
+# Source: adm-zip (via @google/adk -> Agent Skills zip loader transitive chain)
+# Justification: adm-zip unbounded memory allocation when decompressing a crafted ZIP
+# requires calling @google/adk's Agent Skills loader (skills/loader.js) on an
+# attacker-supplied zip file. This app implements its own writing-skills system
+# (@/mcp/skills) and does not use @google/adk's skill-zip loading feature.
+# Upgrade path: requires @google/adk to bump its adm-zip dependency (upstream fix).
+# App risk: NONE — the vulnerable code path is never invoked by this app.
+GHSA-xcpc-8h2w-3j85

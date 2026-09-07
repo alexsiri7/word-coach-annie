@@ -27,7 +27,10 @@ const nextConfig: NextConfig = {
   // isomorphic-dompurify: externalized because its ESM/CJS hybrid does not bundle correctly
   // under webpack in Next.js 16 (peer issue with dompurify's jsdom path).
   // ioredis: uses node:diagnostics_channel (Node.js built-in) which webpack cannot bundle
-  serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify", "ioredis"],
+  // @google/adk: dynamically requires optional peer deps (@mikro-orm/postgresql,
+  // @mikro-orm/sqlite, GCS/OTel exporters) for session backends this app doesn't use.
+  // Next.js's bundler tries to statically resolve those requires and fails the build.
+  serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify", "ioredis", "@google/adk"],
   experimental: {
     optimizePackageImports: [
       "lucide-react",
