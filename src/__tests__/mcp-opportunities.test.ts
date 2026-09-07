@@ -103,6 +103,21 @@ describe("MCP Opportunity Tools", () => {
             ).rejects.toThrow("Forbidden");
         });
 
+        it("rejects repointing an opportunity at another user's provider", async () => {
+            const created = await makeOpportunity();
+            const other = await prisma.user.create({
+                data: { id: "opp-user-4", email: "opp-user-4@test.com", googleId: "google-opp-user-4" },
+            });
+            const otherProvider = await createProvider({ userId: other.id, name: "Their Org" });
+
+            await expect(
+                updateOpportunity({ opportunityId: created.id, userId, providerId: otherProvider.id })
+            ).rejects.toThrow("Forbidden");
+
+            const stored = await prisma.opportunity.findUnique({ where: { id: created.id } });
+            expect(stored?.providerId).toBe(providerId);
+        });
+
         it("supports the single-user (no auth) path — null userId is passed through, not substituted", async () => {
             const provider = await createProvider({ userId: null, name: "No Auth Org" });
             const created = await createOpportunity({

@@ -128,7 +128,7 @@ describe("Opportunity API routes", () => {
         const { POST: promote } = await import(
             "@/app/api/opportunities/[id]/candidates/[candidateId]/promote/route"
         );
-        const candidateParams = { params: Promise.resolve({ candidateId: candidate.id }) };
+        const candidateParams = { params: Promise.resolve({ id: opportunity.id, candidateId: candidate.id }) };
 
         const tooEarly = await promote(jsonRequest("POST"), candidateParams);
         expect(tooEarly.status).toBe(409);
@@ -141,6 +141,74 @@ describe("Opportunity API routes", () => {
         const promoted = await promote(jsonRequest("POST"), candidateParams);
         expect(promoted.status).toBe(201);
         expect((await promoted.json()).submission).toMatchObject({ projectId, contestName: "Spring Prize" });
+    });
+
+    it("returns 409 when the same project is put forward twice for one opportunity", async () => {
+        const opportunity = await (await createOpportunityViaApi()).json();
+        const opportunityParams = { params: Promise.resolve({ id: opportunity.id }) };
+
+        const { POST } = await import("@/app/api/opportunities/[id]/candidates/route");
+        expect((await POST(jsonRequest("POST", { projectId }), opportunityParams)).status).toBe(201);
+
+        const duplicate = await POST(jsonRequest("POST", { projectId }), opportunityParams);
+        expect(duplicate.status).toBe(409);
+        expect((await duplicate.json()).error).toBe("A project can be a candidate for an opportunity only once.");
+    });
+
+    describe("a candidate reached through the wrong parent opportunity", () => {
+        async function candidateUnderAnotherOpportunity() {
+            const owner = await (await createOpportunityViaApi({ title: "Owning Prize" })).json();
+            const impostor = await (await createOpportunityViaApi({ title: "Other Prize" })).json();
+
+            const { POST } = await import("@/app/api/opportunities/[id]/candidates/route");
+            const candidate = await (
+                await POST(jsonRequest("POST", { projectId }), { params: Promise.resolve({ id: owner.id }) })
+            ).json();
+
+            return { candidate, mismatched: { params: Promise.resolve({ id: impostor.id, candidateId: candidate.id }) } };
+        }
+
+        it("is not patchable", async () => {
+            const { candidate, mismatched } = await candidateUnderAnotherOpportunity();
+            const { PATCH } = await import("@/app/api/opportunities/[id]/candidates/[candidateId]/route");
+
+            expect((await PATCH(jsonRequest("PATCH", { state: "chosen" }), mismatched)).status).toBe(404);
+            expect((await prisma.opportunityCandidate.findUnique({ where: { id: candidate.id } }))?.state).toBe(
+                "candidate"
+            );
+        });
+
+        it("is not deletable", async () => {
+            const { candidate, mismatched } = await candidateUnderAnotherOpportunity();
+            const { DELETE } = await import("@/app/api/opportunities/[id]/candidates/[candidateId]/route");
+
+            expect((await DELETE(jsonRequest("DELETE"), mismatched)).status).toBe(404);
+            expect(await prisma.opportunityCandidate.findUnique({ where: { id: candidate.id } })).not.toBeNull();
+        });
+
+        it("is not promotable", async () => {
+            const { candidate, mismatched } = await candidateUnderAnotherOpportunity();
+            await prisma.opportunityCandidate.update({ where: { id: candidate.id }, data: { state: "chosen" } });
+            const { POST } = await import(
+                "@/app/api/opportunities/[id]/candidates/[candidateId]/promote/route"
+            );
+
+            expect((await POST(jsonRequest("POST"), mismatched)).status).toBe(404);
+            expect(await prisma.contestSubmission.count()).toBe(0);
+        });
+    });
+
+    it("refuses to delete a provider that still has an opportunity", async () => {
+        await createOpportunityViaApi();
+
+        const { DELETE } = await import("@/app/api/providers/[id]/route");
+        const res = await DELETE(jsonRequest("DELETE"), { params: Promise.resolve({ id: providerId }) });
+
+        expect(res.status).toBe(409);
+        expect((await res.json()).error).toBe(
+            "Provider has existing submissions or opportunities and cannot be deleted."
+        );
+        expect(await prisma.provider.findUnique({ where: { id: providerId } })).not.toBeNull();
     });
 
     it("returns 403 when attaching a project owned by another user", async () => {

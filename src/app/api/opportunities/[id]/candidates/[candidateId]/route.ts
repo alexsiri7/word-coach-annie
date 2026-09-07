@@ -7,7 +7,7 @@ import { opportunityErrorResponse } from "../../../errors";
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: Promise<{ candidateId: string }> }
+    { params }: { params: Promise<{ id: string; candidateId: string }> }
 ) {
     try {
         const userId = getCurrentUserId(request);
@@ -24,11 +24,16 @@ export async function PATCH(
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });
         }
 
-        const { candidateId } = await params;
-        const candidate = await OpportunityCandidateController.updateCandidate(candidateId, userId, {
-            ...parsed.data,
-            notes: typeof parsed.data.notes === "string" ? sanitizeInput(parsed.data.notes) : parsed.data.notes,
-        });
+        const { id, candidateId } = await params;
+        const candidate = await OpportunityCandidateController.updateCandidate(
+            candidateId,
+            userId,
+            {
+                ...parsed.data,
+                notes: typeof parsed.data.notes === "string" ? sanitizeInput(parsed.data.notes) : parsed.data.notes,
+            },
+            id
+        );
 
         return NextResponse.json(candidate);
     } catch (error) {
@@ -38,14 +43,14 @@ export async function PATCH(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: Promise<{ candidateId: string }> }
+    { params }: { params: Promise<{ id: string; candidateId: string }> }
 ) {
     try {
         const userId = getCurrentUserId(request);
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const { candidateId } = await params;
-        const result = await OpportunityCandidateController.deleteCandidate(candidateId, userId);
+        const { id, candidateId } = await params;
+        const result = await OpportunityCandidateController.deleteCandidate(candidateId, userId, id);
         return NextResponse.json(result);
     } catch (error) {
         return opportunityErrorResponse("DELETE /api/opportunities/[id]/candidates/[candidateId]", error);

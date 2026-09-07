@@ -121,28 +121,32 @@ export class ContestSubmissionController {
         return { submissions, total: submissions.length };
     }
 
-    static async createContestSubmission(params: {
-        projectId: string;
-        providerId: string;
-        contestName: string;
-        submissionDate: string;
-        reviewDate?: string;
-        submissionUrl?: string;
-        status?: string;
-    }) {
-        const project = await prisma.project.findUnique({
+    /** `client` lets a caller enrol this write in its own transaction. */
+    static async createContestSubmission(
+        params: {
+            projectId: string;
+            providerId: string;
+            contestName: string;
+            submissionDate: string;
+            reviewDate?: string;
+            submissionUrl?: string;
+            status?: string;
+        },
+        client: Prisma.TransactionClient = prisma
+    ) {
+        const project = await client.project.findUnique({
             where: { id: params.projectId },
             select: { id: true },
         });
         if (!project) throw new Error(`Project not found: ${params.projectId}`);
 
-        const provider = await prisma.provider.findUnique({
+        const provider = await client.provider.findUnique({
             where: { id: params.providerId },
             select: { id: true },
         });
         if (!provider) throw new Error(`Provider not found: ${params.providerId}`);
 
-        const submission = await prisma.contestSubmission.create({
+        const submission = await client.contestSubmission.create({
             data: {
                 projectId: params.projectId,
                 providerId: params.providerId,

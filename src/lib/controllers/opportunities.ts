@@ -148,9 +148,17 @@ function serializeCandidate(c: Prisma.OpportunityCandidateGetPayload<object>) {
     };
 }
 
-async function requireOwnedCandidate(candidateId: string, userId: string | null) {
+/**
+ * `opportunityId` is the parent a nested route's URL names. The candidate must really
+ * live under it, so a path that pairs a candidate with the wrong opportunity is a 404
+ * rather than an operation on a sibling candidate the caller happens to also own.
+ */
+async function requireOwnedCandidate(candidateId: string, userId: string | null, opportunityId?: string) {
     const candidate = await prisma.opportunityCandidate.findUnique({ where: { id: candidateId } });
     if (!candidate) throw new NotFoundError(`Opportunity candidate not found: ${candidateId}`);
+    if (opportunityId !== undefined && candidate.opportunityId !== opportunityId) {
+        throw new NotFoundError(`Opportunity candidate not found: ${candidateId}`);
+    }
     const opportunity = await requireOwnedOpportunity(candidate.opportunityId, userId);
     return { candidate, opportunity };
 }
@@ -193,9 +201,10 @@ export class OpportunityCandidateController {
     static async updateCandidate(
         candidateId: string,
         userId: string | null,
-        data: { state?: CandidateStateValue; notes?: string | null }
+        data: { state?: CandidateStateValue; notes?: string | null },
+        opportunityId?: string
     ) {
-        await requireOwnedCandidate(candidateId, userId);
+        await requireOwnedCandidate(candidateId, userId, opportunityId);
 
         const candidate = await prisma.opportunityCandidate.update({
             where: { id: candidateId },
@@ -205,8 +214,8 @@ export class OpportunityCandidateController {
         return serializeCandidate(candidate);
     }
 
-    static async deleteCandidate(candidateId: string, userId: string | null) {
-        await requireOwnedCandidate(candidateId, userId);
+    static async deleteCandidate(candidateId: string, userId: string | null, opportunityId?: string) {
+        await requireOwnedCandidate(candidateId, userId, opportunityId);
 
         await prisma.opportunityCandidate.delete({ where: { id: candidateId } });
 
@@ -218,8 +227,8 @@ export class OpportunityCandidateController {
      * opportunity already records instead of re-prompting for it. The candidate row
      * survives promotion — it stays the link between the piece and the opportunity.
      */
-    static async promoteCandidate(candidateId: string, userId: string | null) {
-        const { candidate, opportunity } = await requireOwnedCandidate(candidateId, userId);
+    static async promoteCandidate(candidateId: string, userId: string | null, opportunityId?: string) {
+        const { candidate, opportunity } = await requireOwnedCandidate(candidateId, userId, opportunityId);
 
         if (candidate.state !== "chosen") {
             throw new ConflictError(`Only a candidate in state "chosen" can be promoted (this one is "${candidate.state}")`);
@@ -228,18 +237,25 @@ export class OpportunityCandidateController {
             throw new ConflictError(`Candidate was already promoted to submission ${candidate.submissionId}`);
         }
 
-        const submission = await ContestSubmissionController.createContestSubmission({
-            projectId: candidate.projectId,
-            providerId: opportunity.providerId,
-            contestName: opportunity.title,
-            submissionDate: new Date().toISOString(),
-            reviewDate: opportunity.reviewDate?.toISOString(),
-            submissionUrl: opportunity.rulesUrl ?? undefined,
-        });
+        const { promoted, submission } = await prisma.$transaction(async (tx) => {
+            const submission = await ContestSubmissionController.createContestSubmission(
+                {
+                    projectId: candidate.projectId,
+                    providerId: opportunity.providerId,
+                    contestName: opportunity.title,
+                    submissionDate: new Date().toISOString(),
+                    reviewDate: opportunity.reviewDate?.toISOString(),
+                    submissionUrl: opportunity.rulesUrl ?? undefined,
+                },
+                tx
+            );
 
-        const promoted = await prisma.opportunityCandidate.update({
-            where: { id: candidateId },
-            data: { submissionId: submission.id },
+            const promoted = await tx.opportunityCandidate.update({
+                where: { id: candidateId },
+                data: { submissionId: submission.id },
+            });
+
+            return { promoted, submission };
         });
 
         return { candidate: serializeCandidate(promoted), submission };
