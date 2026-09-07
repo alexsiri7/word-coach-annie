@@ -32,13 +32,15 @@ A chosen candidate can be promoted into an actual contest submission without re-
 
 **Seeing the state of play**
 
-The author can see, in one place, which contests are open and what is happening with each: the contest, when it closes, and which stories are shortlisted, chosen, or already submitted, identified by name rather than counted. Contests being considered and contests already submitted to appear together, since they are stages of one process and the author should not need to know which stage something has reached in order to find it.
+Publishing and contests are reachable from the author's home dashboard, drawing attention only when something needs a decision rather than displaying a permanent total.
 
-Each contest presents a single readable state, resolved from the opportunity, its candidates and any resulting submission, so the author is not left to assemble it from three separate records.
+From there the author can see which contests are open and what is happening with each: the contest, when it closes, and which stories are shortlisted, chosen, or already submitted, identified by name rather than counted. Contests being considered and contests already submitted to appear together, since they are stages of one process and the author should not need to know which stage something has reached in order to find it. Each contest presents a single readable state, resolved from the opportunity, its candidates and any resulting submission, so the author is not left to assemble it from three separate records.
 
-A contest whose deadline passed with nothing submitted is visibly distinct from one still open and from one entered. Nothing else records that a deadline was missed, and a missed contest would otherwise be indistinguishable from one never seriously pursued.
+The same information is available from the other direction: for each story, where it currently is — not yet out anywhere, shortlisted, chosen but not yet sent, awaiting a response, or published. Contests and publications are shown together, since the question being asked is whether a story has got anywhere, not which kind of place it was sent to.
 
-The relationship is asked from both ends. From a story, the author can see which contests it is a candidate for and at what state.
+Two situations are made visible that nothing else records, both of them failures of silence rather than of action. A contest whose deadline passed with nothing submitted is distinct from one still open and from one entered; otherwise a missed deadline is indistinguishable from a contest never seriously pursued. And a story whose last submission was rejected and which has not been sent anywhere since is distinct from one never submitted; otherwise a piece that quietly stopped circulating looks the same as one that has not started.
+
+Where a story is out with more than one provider at the same time, this is surfaced to the author. Many providers forbid simultaneous submission, but those rules are recorded as free text and are not reliably machine-checkable, so the system makes the overlap visible and the author judges it.
 
 **Deadline calendar feed**
 
