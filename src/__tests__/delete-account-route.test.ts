@@ -199,6 +199,31 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(await testPrisma.googleCredential.findFirst({ where: { userId: user.id } })).toBeNull();
   });
 
+  it("deletes the user's opportunities without tripping the provider's restrict rule", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u9", email: "del9@test.com", googleId: "g-del9" },
+    });
+    const provider = await testPrisma.provider.create({
+      data: { userId: user.id, name: "Contest Org" },
+    });
+    const opportunity = await testPrisma.opportunity.create({
+      data: {
+        userId: user.id,
+        providerId: provider.id,
+        title: "Spring Prize",
+        closeDate: new Date("2030-04-01"),
+      },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "del9@test.com" }));
+    expect(res.status).toBe(200);
+
+    expect(await testPrisma.opportunity.findUnique({ where: { id: opportunity.id } })).toBeNull();
+    expect(await testPrisma.provider.findUnique({ where: { id: provider.id } })).toBeNull();
+  });
+
   it("returns 400 for malformed email format", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u8", email: "del8@test.com", googleId: "g-del8" },
