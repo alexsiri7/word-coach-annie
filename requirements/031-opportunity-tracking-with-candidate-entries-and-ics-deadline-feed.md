@@ -1,8 +1,8 @@
 ---
 created: '2026-09-07'
-github_issue: null
+github_issue: 1088
 id: '031'
-status: draft
+status: idea
 title: Opportunity tracking with candidate entries and ICS deadline feed
 updated: '2026-09-07'
 ---
@@ -46,4 +46,7 @@ Subscription is authenticated by an unguessable feed URL that the author can reg
 
 ## Issues
 
-_None yet._
+- #1088 — Opportunity and OpportunityCandidate data model
+- #1089 — Opportunities page: list, detail, and candidate management
+- #1090 — ICS deadline feed for opportunities
+- #1091 — MCP tools for opportunities and candidates
