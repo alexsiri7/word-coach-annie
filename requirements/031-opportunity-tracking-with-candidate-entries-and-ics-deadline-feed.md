@@ -54,6 +54,7 @@ Subscription is authenticated by an unguessable feed URL that the author can reg
 ## Issues
 
 - #1088 — Opportunity and OpportunityCandidate data model
-- #1089 — Opportunities page: list, detail, and candidate management
+- #1089 — Contests and stories page: which contests are open and what is happening with each
 - #1090 — ICS deadline feed for opportunities
 - #1091 — MCP tools for opportunities and candidates
+- #1108 — Publishing & contests hub: story status view and home dashboard entry point
