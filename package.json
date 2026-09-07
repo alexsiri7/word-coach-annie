@@ -88,7 +88,7 @@
     "mysql2": "^3.24.3"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.3.3",
+    "@next/bundle-analyzer": "^16.3.4",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/archiver": "^7.0.0",
