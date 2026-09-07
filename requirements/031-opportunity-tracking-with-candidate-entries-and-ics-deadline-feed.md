@@ -22,8 +22,6 @@ The author can record an opportunity — a contest or publication they are consi
 
 An opportunity has a status of found, considering or closed. Statuses describing the outcome of a submission do not live here — they belong to the candidate that was actually submitted.
 
-The author can list opportunities filtered by status, provider or project, sorted by close date, so that "what is coming up next" is answerable in a single view or call.
-
 **Candidate entries**
 
 The author can attach zero or more projects to an opportunity as candidate entries, and the same project can be a candidate for several opportunities. Each candidate carries its own state — candidate, chosen, or dropped — and free-text notes on why the piece fits or does not.
@@ -31,6 +29,16 @@ The author can attach zero or more projects to an opportunity as candidate entri
 More than one candidate may be marked chosen for the same opportunity. Contests vary on whether multiple entries per author are permitted, and that rule is captured in the opportunity's eligibility notes rather than enforced by the system.
 
 A chosen candidate can be promoted into an actual contest submission without re-entering data already captured on the opportunity or the candidate.
+
+**Seeing the state of play**
+
+The author can see, in one place, which contests are open and what is happening with each: the contest, when it closes, and which stories are shortlisted, chosen, or already submitted, identified by name rather than counted. Contests being considered and contests already submitted to appear together, since they are stages of one process and the author should not need to know which stage something has reached in order to find it.
+
+Each contest presents a single readable state, resolved from the opportunity, its candidates and any resulting submission, so the author is not left to assemble it from three separate records.
+
+A contest whose deadline passed with nothing submitted is visibly distinct from one still open and from one entered. Nothing else records that a deadline was missed, and a missed contest would otherwise be indistinguishable from one never seriously pursued.
+
+The relationship is asked from both ends. From a story, the author can see which contests it is a candidate for and at what state.
 
 **Deadline calendar feed**
 
@@ -43,7 +51,6 @@ The feed reflects current state on each refresh: an opportunity that is closed, 
 The feed itself does not specify reminder timings. The author configures alerts once in their own calendar application — for example two weeks and one day before — and those apply to every deadline in the feed. Per-opportunity reminder offsets are deliberately not supported: Google Calendar discards alarm definitions carried in a subscribed feed, so offsets set by Annie would not survive. A single set of author-configured rules is the reliable path to a notification actually firing.
 
 Subscription is authenticated by an unguessable feed URL that the author can regenerate, since calendar clients cannot perform an interactive login.
-
 ## Issues
 
 - #1088 — Opportunity and OpportunityCandidate data model
