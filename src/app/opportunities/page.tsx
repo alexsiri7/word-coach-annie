@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trophy } from "lucide-react";
+import { ArrowLeft, BookText, Plus, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -184,6 +184,14 @@ export default function OpportunitiesPage() {
                     onClick={() => { setCreateForm(EMPTY_CREATE_FORM); setCreateError(null); setCreateOpen(true); }}
                   >
                     <Plus className="h-3.5 w-3.5" /> New contest
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => router.push("/publishing")}
+                  >
+                    <BookText className="h-3.5 w-3.5" /> Stories
                   </Button>
                 </div>
               </header>
