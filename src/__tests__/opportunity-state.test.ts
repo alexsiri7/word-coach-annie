@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     deriveOpportunityState,
+    deriveSubmissionState,
     daysUntilClose,
     closeCountdown,
     type Opportunity,
@@ -166,5 +167,14 @@ describe("closeCountdown", () => {
         expect(closeCountdown(14)).toBe("closes in 14 days");
         expect(closeCountdown(-1)).toBe("closed 1 day ago");
         expect(closeCountdown(-31)).toBe("closed 31 days ago");
+    });
+});
+
+describe("deriveSubmissionState", () => {
+    it("reports the submission's own outcome, with no candidates to name", () => {
+        expect(deriveSubmissionState("submitted")).toEqual({ kind: "submitted", label: "Submitted", candidates: [] });
+        expect(deriveSubmissionState("accepted")).toEqual({ kind: "accepted", label: "Accepted", candidates: [] });
+        expect(deriveSubmissionState("rejected")).toEqual({ kind: "rejected", label: "Rejected", candidates: [] });
+        expect(deriveSubmissionState("withdrawn")).toEqual({ kind: "withdrawn", label: "Withdrawn", candidates: [] });
     });
 });

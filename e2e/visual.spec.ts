@@ -587,7 +587,20 @@ const MOCK_CONTESTS = {
       candidates: [],
     },
   ],
-  total: 5,
+  // An entry recorded before opportunities were tracked: no close date, no rules, no fee.
+  unlinkedSubmissions: [
+    {
+      id: 'cs-9',
+      projectId: 'proj-1',
+      providerId: 'prov-2',
+      contestName: 'Estuary Prize',
+      submissionDate: '2026-02-14T10:00:00Z',
+      status: 'submitted',
+      provider: { id: 'prov-2', name: 'Harbour Review' },
+      project: { id: 'proj-1', title: 'The Amber Throne' },
+    },
+  ],
+  total: 6,
 }
 
 /** Intercept API calls for the account-level contests pages. */

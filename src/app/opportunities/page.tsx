@@ -15,7 +15,8 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import {
-  deriveOpportunityState, daysUntilClose, formatCloseDate, closeCountdown, type Opportunity,
+  deriveOpportunityState, deriveSubmissionState, daysUntilClose, formatCloseDate, formatDate,
+  closeCountdown, type Opportunity, type UnlinkedContestSubmission,
 } from "@/lib/opportunity-state";
 import { OpportunityStateBadge } from "@/components/opportunity-state-badge";
 import { OpportunityStatus } from "@/schemas/opportunities";
@@ -52,6 +53,7 @@ const EMPTY_CREATE_FORM: CreateForm = { providerId: "", title: "", closeDate: ""
 export default function OpportunitiesPage() {
   const router = useRouter();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [unlinkedSubmissions, setUnlinkedSubmissions] = useState<UnlinkedContestSubmission[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,7 @@ export default function OpportunitiesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [backfillFor, setBackfillFor] = useState<UnlinkedContestSubmission | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -82,6 +85,7 @@ export default function OpportunitiesPage() {
 
         const opportunitiesData = await opportunitiesRes.json();
         setOpportunities(opportunitiesData.opportunities ?? []);
+        setUnlinkedSubmissions(opportunitiesData.unlinkedSubmissions ?? []);
         if (providersRes.ok) setProviders((await providersRes.json()).providers ?? []);
         if (projectsRes.ok) setProjects((await projectsRes.json()).projects ?? []);
       } catch (err) {
@@ -110,12 +114,14 @@ export default function OpportunitiesPage() {
           title: createForm.title.trim(),
           closeDate: new Date(createForm.closeDate).toISOString(),
           ...(createForm.rulesUrl.trim() ? { rulesUrl: createForm.rulesUrl.trim() } : {}),
+          ...(backfillFor ? { submissionId: backfillFor.id } : {}),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Could not create the contest");
       const created = await res.json();
       setCreateOpen(false);
       setCreateForm(EMPTY_CREATE_FORM);
+      setBackfillFor(null);
       router.push(`/opportunities/${created.id}`);
     } catch (err) {
       console.error("[opportunities/page] handleCreate failed", err);
@@ -125,12 +131,23 @@ export default function OpportunitiesPage() {
     }
   }
 
+  function openBackfill(submission: UnlinkedContestSubmission) {
+    setBackfillFor(submission);
+    setCreateForm({
+      ...EMPTY_CREATE_FORM,
+      providerId: submission.providerId,
+      title: submission.contestName,
+    });
+    setCreateError(null);
+    setCreateOpen(true);
+  }
+
   function toggleStatus(status: string) {
     setFilters((prev) => ({ ...prev, status: prev.status === status ? undefined : status }));
   }
 
   const now = new Date();
-  const count = opportunities.length;
+  const count = opportunities.length + unlinkedSubmissions.length;
   const hasFilters = Object.values(filters).some((v) => v !== undefined);
 
   return (
@@ -181,7 +198,12 @@ export default function OpportunitiesPage() {
                     variant="outline"
                     size="sm"
                     className="h-7 gap-1 text-xs"
-                    onClick={() => { setCreateForm(EMPTY_CREATE_FORM); setCreateError(null); setCreateOpen(true); }}
+                    onClick={() => {
+                      setBackfillFor(null);
+                      setCreateForm(EMPTY_CREATE_FORM);
+                      setCreateError(null);
+                      setCreateOpen(true);
+                    }}
                   >
                     <Plus className="h-3.5 w-3.5" /> New contest
                   </Button>
@@ -245,7 +267,7 @@ export default function OpportunitiesPage() {
                 </div>
               </div>
 
-              {opportunities.length === 0 ? (
+              {count === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-text-muted">
                   <Trophy className="h-12 w-12 opacity-20 mb-4" />
                   <p className="text-lg font-editorial italic">No contests found</p>
@@ -288,6 +310,41 @@ export default function OpportunitiesPage() {
                       </div>
                     );
                   })}
+                  {unlinkedSubmissions.map((submission) => {
+                    const state = deriveSubmissionState(submission.status);
+                    return (
+                      <div
+                        key={submission.id}
+                        className="bg-surface border border-dashed border-border rounded-lg p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {submission.contestName}
+                            </p>
+                            <p className="text-xs text-text-muted mt-0.5">
+                              {submission.provider.name} &middot; {submission.project.title} &middot; Submitted{" "}
+                              {formatDate(submission.submissionDate)}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <OpportunityStateBadge state={state} />
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap bg-surface-overlay text-text-muted">
+                                No opportunity record
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs self-start flex-shrink-0"
+                            onClick={() => openBackfill(submission)}
+                          >
+                            Add opportunity details
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -298,7 +355,7 @@ export default function OpportunitiesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>New contest</DialogTitle>
+            <DialogTitle>{backfillFor ? "Add opportunity details" : "New contest"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">

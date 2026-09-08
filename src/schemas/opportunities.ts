@@ -16,6 +16,8 @@ export const OpportunityCreateSchema = z.object({
     genreRestrictions: z.string().optional(),
     eligibilityNotes: z.string().optional(),
     status: OpportunityStatus.optional().default("found"),
+    // Present when the contest was already entered and only its details are being recorded.
+    submissionId: z.string().min(1).optional(),
 });
 
 // Nullable fields accept an explicit null to clear a value recorded earlier.

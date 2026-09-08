@@ -17,12 +17,23 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: parsedStatus.error.issues[0].message }, { status: 400 });
         }
 
-        const result = await OpportunityController.listOpportunities(userId, {
+        const filters = {
             status: parsedStatus?.data,
             providerId: params.get("providerId") ?? undefined,
             projectId: params.get("projectId") ?? undefined,
+        };
+        // The contests list is both halves: the opportunities, and the entries that never had
+        // one. Only this page wants the union — listOpportunities stays what MCP and the
+        // publishing hub read.
+        const [{ opportunities }, { submissions }] = await Promise.all([
+            OpportunityController.listOpportunities(userId, filters),
+            OpportunityController.listSubmissionsWithoutOpportunity(userId, filters),
+        ]);
+        return NextResponse.json({
+            opportunities,
+            unlinkedSubmissions: submissions,
+            total: opportunities.length + submissions.length,
         });
-        return NextResponse.json(result);
     } catch (error) {
         return opportunityErrorResponse("GET /api/opportunities", error);
     }

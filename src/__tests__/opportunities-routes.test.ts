@@ -12,6 +12,7 @@ vi.mock("@/lib/logger", () => ({
 import { getCurrentUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { ProjectsController } from "@/lib/controllers/projects";
+import { deriveOpportunityState, type Opportunity } from "@/lib/opportunity-state";
 
 const CLOSE_DATE = "2030-04-01T00:00:00.000Z";
 
@@ -116,6 +117,185 @@ describe("Opportunity API routes", () => {
         it("rejects a status that is not one an opportunity can have", async () => {
             const { GET } = await import("@/app/api/opportunities/route");
             expect((await GET(listRequest("status=submitted"))).status).toBe(400);
+        });
+    });
+
+    describe("contest submissions with no opportunity behind them", () => {
+        const SUBMITTED_ON = "2026-01-20T10:00:00.000Z";
+
+        async function seedSubmission(overrides: Record<string, unknown> = {}) {
+            return prisma.contestSubmission.create({
+                data: {
+                    projectId,
+                    providerId,
+                    contestName: "Estuary Prize",
+                    submissionDate: new Date(SUBMITTED_ON),
+                    ...overrides,
+                },
+            });
+        }
+
+        async function list(query = "") {
+            const { GET } = await import("@/app/api/opportunities/route");
+            const res = await GET(listRequest(query));
+            expect(res.status).toBe(200);
+            return res.json();
+        }
+
+        async function listUnlinkedNames(query = ""): Promise<string[]> {
+            const { unlinkedSubmissions } = await list(query);
+            return unlinkedSubmissions.map((u: { contestName: string }) => u.contestName);
+        }
+
+        it("lists one beside the opportunities, with the detail its row needs", async () => {
+            const submission = await seedSubmission();
+            await createOpportunityViaApi();
+
+            const body = await list();
+
+            expect(body.unlinkedSubmissions).toEqual([
+                {
+                    id: submission.id,
+                    projectId,
+                    providerId,
+                    contestName: "Estuary Prize",
+                    submissionDate: SUBMITTED_ON,
+                    status: "submitted",
+                    provider: { id: providerId, name: "Contest Org" },
+                    project: { id: projectId, title: "Test Project" },
+                },
+            ]);
+            expect(body.total).toBe(2);
+        });
+
+        it("leaves out a submission a candidate already links", async () => {
+            const opportunity = await (await createOpportunityViaApi()).json();
+            const opportunityParams = { params: Promise.resolve({ id: opportunity.id }) };
+            const { POST: postCandidate } = await import("@/app/api/opportunities/[id]/candidates/route");
+            const candidate = await (await postCandidate(jsonRequest("POST", { projectId }), opportunityParams)).json();
+
+            const { PATCH: patchCandidate } = await import(
+                "@/app/api/opportunities/[id]/candidates/[candidateId]/route"
+            );
+            const candidateParams = { params: Promise.resolve({ id: opportunity.id, candidateId: candidate.id }) };
+            await patchCandidate(jsonRequest("PATCH", { state: "chosen" }), candidateParams);
+
+            const { POST: promote } = await import(
+                "@/app/api/opportunities/[id]/candidates/[candidateId]/promote/route"
+            );
+            expect((await promote(jsonRequest("POST"), candidateParams)).status).toBe(201);
+
+            expect((await list()).unlinkedSubmissions).toEqual([]);
+        });
+
+        it("leaves out another author's submission and one on a story put away", async () => {
+            const other = await prisma.user.create({
+                data: { id: "opp-route-unlinked", email: "opp-unlinked@test.com", googleId: "google-opp-unlinked" },
+            });
+            const theirProvider = await prisma.provider.create({ data: { userId: other.id, name: "Their Org" } });
+            const theirProject = await ProjectsController.createProject({ title: "Their Novel", userId: other.id });
+            await seedSubmission({
+                projectId: theirProject.id,
+                providerId: theirProvider.id,
+                contestName: "Their Prize",
+            });
+
+            const archived = await ProjectsController.createProject({ title: "Shelved", userId });
+            await prisma.project.update({ where: { id: archived.id }, data: { archivedAt: new Date() } });
+            await seedSubmission({ projectId: archived.id, contestName: "Shelved Prize" });
+
+            const mine = await seedSubmission();
+
+            expect((await list()).unlinkedSubmissions.map((u: { id: string }) => u.id)).toEqual([mine.id]);
+        });
+
+        it("narrows by provider and by story the same way opportunities do", async () => {
+            const otherProvider = await prisma.provider.create({ data: { userId, name: "Second Org" } });
+            const otherProject = await ProjectsController.createProject({ title: "Second Story", userId });
+            await seedSubmission();
+            await seedSubmission({
+                projectId: otherProject.id,
+                contestName: "Same Org, Other Story",
+                submissionDate: new Date("2026-01-19T10:00:00.000Z"),
+            });
+            await seedSubmission({
+                providerId: otherProvider.id,
+                contestName: "Other Org, Same Story",
+                submissionDate: new Date("2026-01-18T10:00:00.000Z"),
+            });
+
+            expect(await listUnlinkedNames(`providerId=${providerId}`)).toEqual([
+                "Estuary Prize",
+                "Same Org, Other Story",
+            ]);
+            expect(await listUnlinkedNames(`projectId=${projectId}`)).toEqual([
+                "Estuary Prize",
+                "Other Org, Same Story",
+            ]);
+        });
+
+        it("drops out of a status filter, having no opportunity status to match", async () => {
+            await seedSubmission();
+
+            const body = await list("status=found");
+            expect(body.unlinkedSubmissions).toEqual([]);
+            expect(body.total).toBe(0);
+        });
+
+        it("backfilling details links the submission that exists instead of entering it again", async () => {
+            const submission = await seedSubmission();
+
+            const res = await createOpportunityViaApi({ submissionId: submission.id });
+            expect(res.status).toBe(201);
+            const opportunity = await res.json();
+
+            expect(await prisma.contestSubmission.count()).toBe(1);
+
+            const { GET: getOne } = await import("@/app/api/opportunities/[id]/route");
+            const detail = await (
+                await getOne(jsonRequest("GET"), { params: Promise.resolve({ id: opportunity.id }) })
+            ).json();
+            expect(detail.candidates).toMatchObject([
+                { state: "chosen", projectId, submission: { id: submission.id, status: "submitted" } },
+            ]);
+
+            expect((await list()).unlinkedSubmissions).toEqual([]);
+        });
+
+        it("reads as entered rather than as a deadline that was missed", async () => {
+            const PASSED = "2026-01-25T00:00:00.000Z";
+            const now = new Date("2026-06-01T12:00:00.000Z");
+            const submission = await seedSubmission();
+            await createOpportunityViaApi({
+                title: "Backfilled Prize",
+                closeDate: PASSED,
+                submissionId: submission.id,
+            });
+            await createOpportunityViaApi({ title: "Untouched Prize", closeDate: PASSED });
+
+            const { opportunities } = await list();
+            const byTitle = Object.fromEntries(
+                (opportunities as Opportunity[]).map((o) => [o.title, deriveOpportunityState(o, now)])
+            );
+
+            expect(byTitle["Backfilled Prize"]).toMatchObject({ kind: "submitted", label: "Submitted" });
+            expect(byTitle["Untouched Prize"]).toMatchObject({ kind: "missed", label: "Closed, nothing entered" });
+        });
+
+        it("refuses a backfill for a submission that is missing, another author's, or already linked", async () => {
+            expect((await createOpportunityViaApi({ submissionId: "missing" })).status).toBe(404);
+
+            const other = await prisma.user.create({
+                data: { id: "opp-route-backfill", email: "opp-backfill@test.com", googleId: "google-opp-backfill" },
+            });
+            const theirProvider = await prisma.provider.create({ data: { userId: other.id, name: "Their Org" } });
+            const theirProject = await ProjectsController.createProject({ title: "Their Novel", userId: other.id });
+            const theirs = await seedSubmission({ projectId: theirProject.id, providerId: theirProvider.id });
+            expect((await createOpportunityViaApi({ submissionId: theirs.id })).status).toBe(403);
+
+            const mine = await seedSubmission();
+            expect((await createOpportunityViaApi({ submissionId: mine.id })).status).toBe(201);
+            expect((await createOpportunityViaApi({ submissionId: mine.id })).status).toBe(409);
         });
     });
 
