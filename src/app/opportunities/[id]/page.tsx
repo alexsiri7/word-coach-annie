@@ -20,6 +20,7 @@ import {
   type Opportunity, type OpportunityCandidate,
 } from "@/lib/opportunity-state";
 import { OpportunityStateBadge } from "@/components/opportunity-state-badge";
+import { CandidateState, OpportunityStatus } from "@/schemas/opportunities";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
 interface Provider {
@@ -46,8 +47,8 @@ interface EditForm {
   status: OpportunityStatusValue;
 }
 
-const STATUS_OPTIONS: OpportunityStatusValue[] = ["found", "considering", "closed"];
-const CANDIDATE_STATES: CandidateStateValue[] = ["candidate", "chosen", "dropped"];
+const STATUS_OPTIONS = OpportunityStatus.options;
+const CANDIDATE_STATES = CandidateState.options;
 
 /** `<input type="date">` speaks calendar days; the API speaks ISO instants. */
 function toDateInput(iso: string | null): string {

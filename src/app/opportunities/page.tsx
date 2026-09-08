@@ -18,6 +18,7 @@ import {
   deriveOpportunityState, daysUntilClose, formatCloseDate, closeCountdown, type Opportunity,
 } from "@/lib/opportunity-state";
 import { OpportunityStateBadge } from "@/components/opportunity-state-badge";
+import { OpportunityStatus } from "@/schemas/opportunities";
 
 interface Provider {
   id: string;
@@ -35,7 +36,7 @@ interface Filters {
   projectId?: string;
 }
 
-const STATUS_OPTIONS = ["found", "considering", "closed"] as const;
+const STATUS_OPTIONS = OpportunityStatus.options;
 
 const ANY = "any";
 
