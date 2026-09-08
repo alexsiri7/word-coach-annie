@@ -23,6 +23,7 @@ import {
   ClipboardList,
   ListTodo,
   SendHorizontal,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -503,6 +504,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           aria-label="Submissions"
         >
           <SendHorizontal className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push("/opportunities")}
+          aria-label="Contests"
+        >
+          <Trophy className="h-4 w-4" />
         </Button>
         <ShareButton projectId={projectId} projectTitle={project.title} />
         <Button

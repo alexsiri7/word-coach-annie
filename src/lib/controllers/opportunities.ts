@@ -29,6 +29,32 @@ function serializeOpportunity(o: Prisma.OpportunityGetPayload<object>) {
     };
 }
 
+const withCandidateDetail = {
+    provider: { select: { id: true, name: true } },
+    candidates: {
+        orderBy: { createdAt: "asc" },
+        include: {
+            project: { select: { id: true, title: true } },
+            submission: { select: { id: true, status: true } },
+        },
+    },
+} as const;
+
+type OpportunityWithCandidateDetail = Prisma.OpportunityGetPayload<{ include: typeof withCandidateDetail }>;
+
+function serializeOpportunityWithCandidates(o: OpportunityWithCandidateDetail) {
+    const { provider, candidates, ...opportunity } = o;
+    return {
+        ...serializeOpportunity(opportunity),
+        provider,
+        candidates: candidates.map((c) => ({
+            ...serializeCandidate(c),
+            project: c.project,
+            submission: c.submission,
+        })),
+    };
+}
+
 async function requireOwnedOpportunity(id: string, userId: string | null) {
     const existing = await prisma.opportunity.findUnique({
         where: { id },
@@ -90,23 +116,23 @@ export class OpportunityController {
 
         const raw = await prisma.opportunity.findMany({
             where,
+            include: withCandidateDetail,
             orderBy: { closeDate: "asc" },
         });
 
-        const opportunities = raw.map(serializeOpportunity);
+        const opportunities = raw.map(serializeOpportunityWithCandidates);
         return { opportunities, total: opportunities.length };
     }
 
     static async getOpportunity(id: string, userId: string | null) {
         const opportunity = await prisma.opportunity.findUnique({
             where: { id },
-            include: { candidates: { orderBy: { createdAt: "asc" } } },
+            include: withCandidateDetail,
         });
         if (!opportunity) throw new NotFoundError(`Opportunity not found: ${id}`);
         if (opportunity.userId !== userId) throw new ForbiddenError("Forbidden");
 
-        const { candidates, ...rest } = opportunity;
-        return { ...serializeOpportunity(rest), candidates: candidates.map(serializeCandidate) };
+        return serializeOpportunityWithCandidates(opportunity);
     }
 
     static async createOpportunity(

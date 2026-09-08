@@ -488,8 +488,124 @@ async function mockReaderClientApis(page: Page, projectId: string) {
   )
 }
 
+
+// ── Contest (opportunity) helpers ──────────────────────────────────────────
+
+/** Frozen so the "closes in N days" countdown does not drift between runs. */
+const CONTESTS_NOW = new Date('2026-06-01T12:00:00Z')
+
+const MOCK_PROVIDERS = {
+  providers: [
+    { id: 'prov-1', name: 'Northern Lights Society', website: '', notes: '' },
+    { id: 'prov-2', name: 'Harbour Review', website: '', notes: '' },
+  ],
+  total: 2,
+}
+
+function mockCandidate(
+  id: string,
+  projectId: string,
+  title: string,
+  state: string,
+  submissionStatus?: string
+) {
+  return {
+    id,
+    opportunityId: 'opp-x',
+    projectId,
+    state,
+    notes: state === 'dropped' ? 'Too long for the word limit — revisit for a novella call.' : null,
+    submissionId: submissionStatus ? `sub-${id}` : null,
+    createdAt: '2026-03-01T10:00:00Z',
+    updatedAt: '2026-03-01T10:00:00Z',
+    project: { id: projectId, title },
+    submission: submissionStatus ? { id: `sub-${id}`, status: submissionStatus } : null,
+  }
+}
+
+const MOCK_CONTEST_DETAIL = {
+  id: 'opp-3',
+  providerId: 'prov-1',
+  title: 'Coastal Fiction Prize',
+  closeDate: '2026-06-15T12:00:00Z',
+  reviewDate: '2026-08-01T12:00:00Z',
+  rulesUrl: 'https://example.org/coastal-rules',
+  entryFee: '£12',
+  wordLimit: 5000,
+  lineLimit: null,
+  genreRestrictions: 'Literary and speculative fiction',
+  eligibilityNotes: 'UK and Ireland residents. Multiple entries permitted.',
+  status: 'considering',
+  createdAt: '2026-02-01T10:00:00Z',
+  updatedAt: '2026-03-01T10:00:00Z',
+  provider: { id: 'prov-1', name: 'Northern Lights Society' },
+  candidates: [
+    mockCandidate('cand-1', 'proj-1', 'The Amber Throne', 'chosen'),
+    mockCandidate('cand-2', 'proj-2', 'Echoes of Mars', 'chosen'),
+    mockCandidate('cand-3', 'proj-3', 'Writing Better Dialogue', 'dropped'),
+  ],
+}
+
+/** Sorted by close date ascending, as the API returns them. */
+const MOCK_CONTESTS = {
+  opportunities: [
+    {
+      ...MOCK_CONTEST_DETAIL,
+      id: 'opp-1',
+      title: 'Harbour Review Contest',
+      providerId: 'prov-2',
+      provider: { id: 'prov-2', name: 'Harbour Review' },
+      closeDate: '2026-04-15T12:00:00Z',
+      status: 'closed',
+      candidates: [mockCandidate('cand-4', 'proj-1', 'The Amber Throne', 'chosen', 'accepted')],
+    },
+    {
+      ...MOCK_CONTEST_DETAIL,
+      id: 'opp-2',
+      title: 'Winter Anthology Call',
+      closeDate: '2026-05-01T12:00:00Z',
+      status: 'considering',
+      candidates: [mockCandidate('cand-5', 'proj-2', 'Echoes of Mars', 'candidate')],
+    },
+    MOCK_CONTEST_DETAIL,
+    {
+      ...MOCK_CONTEST_DETAIL,
+      id: 'opp-4',
+      title: 'Northern Lights Award',
+      closeDate: '2026-06-20T12:00:00Z',
+      candidates: [
+        mockCandidate('cand-6', 'proj-1', 'The Amber Throne', 'candidate'),
+        mockCandidate('cand-7', 'proj-3', 'Writing Better Dialogue', 'candidate'),
+      ],
+    },
+    {
+      ...MOCK_CONTEST_DETAIL,
+      id: 'opp-5',
+      title: 'Spring Short Story Prize',
+      closeDate: '2026-07-01T12:00:00Z',
+      status: 'found',
+      candidates: [],
+    },
+  ],
+  total: 5,
+}
+
+/** Intercept API calls for the account-level contests pages. */
+async function mockContestsApi(page: Page) {
+  await page.clock.setFixedTime(CONTESTS_NOW)
+  await page.route('**/api/providers', route => route.fulfill({ json: MOCK_PROVIDERS, status: 200 }))
+  await page.route('**/api/projects*', route => route.fulfill({ json: MOCK_PROJECTS, status: 200 }))
+  await page.route(
+    url => /\/api\/opportunities\/opp-3\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_CONTEST_DETAIL, status: 200 })
+  )
+  await page.route(
+    url => /\/api\/opportunities\/?$/.test(url.pathname),
+    route => route.fulfill({ json: MOCK_CONTESTS, status: 200 })
+  )
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
-// 6 screens × 3 viewports (desktop, mobile, dark-desktop) = 18 screenshots
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
@@ -676,5 +792,29 @@ test.describe('Visual regression – Annie', () => {
     } finally {
       await cleanupReaderTestData(baseURL ?? 'http://localhost:3001', projectId)
     }
+  })
+
+  test('contests list populated', async ({ page }) => {
+    await mockContestsApi(page)
+    await page.goto('/opportunities')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Coastal Fiction Prize').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('contests.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('contest detail populated', async ({ page }) => {
+    await mockContestsApi(page)
+    await page.goto('/opportunities/opp-3')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Echoes of Mars').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('contest-detail.png', {
+      animations: 'disabled',
+    })
   })
 })

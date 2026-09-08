@@ -47,6 +47,7 @@ export const PublicationSubmissionUpdateSchema = z.object({
     status: SubmissionStatus.optional(),
 });
 
+export type SubmissionStatusValue = z.infer<typeof SubmissionStatus>;
 export type ProviderCreateInput = z.infer<typeof ProviderCreateSchema>;
 export type ProviderUpdateInput = z.infer<typeof ProviderUpdateSchema>;
 export type ContestSubmissionCreateInput = z.infer<typeof ContestSubmissionCreateSchema>;

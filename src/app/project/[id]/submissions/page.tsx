@@ -22,6 +22,8 @@ import {
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
+import { daysUntilClose, formatCloseDate, closeCountdown, type Opportunity } from "@/lib/opportunity-state";
+import { CandidateStateBadge } from "@/components/opportunity-state-badge";
 
 interface ContestSubmission {
   id: string;
@@ -88,6 +90,9 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
   // Providers
   const [providers, setProviders] = useState<Provider[]>([]);
 
+  // Contests this story is a candidate for — the same many-to-many link read from the story's end.
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+
   // Publication dialog
   const [pubDialogOpen, setPubDialogOpen] = useState(false);
   const [pubDialogMode, setPubDialogMode] = useState<DialogMode>("create");
@@ -124,13 +129,16 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       try {
         setLoading(true);
         setError(null);
-        const [contestsRes, pubsRes, projectRes, providersRes] = await Promise.all([
+        const [contestsRes, pubsRes, projectRes, providersRes, opportunitiesRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/submissions/contests`),
           fetch(`/api/projects/${projectId}/submissions/publications`),
           fetch(`/api/projects/${projectId}`),
           fetch(`/api/providers`),
+          fetch(`/api/opportunities?projectId=${projectId}`),
         ]);
-        if (!contestsRes.ok || !pubsRes.ok) throw new Error("Failed to load submissions");
+        if (!contestsRes.ok || !pubsRes.ok || !opportunitiesRes.ok) {
+          throw new Error("Failed to load submissions");
+        }
         if (!projectRes.ok) throw new Error("Failed to load project");
         const [contestsData, pubsData, proj] = await Promise.all([
           contestsRes.json(),
@@ -144,6 +152,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           const providersData = await providersRes.json();
           setProviders(providersData.providers ?? []);
         }
+        setOpportunities((await opportunitiesRes.json()).opportunities ?? []);
       } catch (err) {
         console.error("[submissions/page] loadData failed", err);
         setError("Failed to load submissions. Please try again.");
@@ -155,6 +164,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
   }, [projectId]);
 
   const totalCount = contestSubmissions.length + publicationSubmissions.length;
+  const now = new Date();
 
   // ── Utility ───────────────────────────────────────────────
 
@@ -387,7 +397,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
             <div className="flex flex-col items-center justify-center py-20 text-text-muted">
               <p className="text-sm text-destructive">{error}</p>
             </div>
-          ) : totalCount === 0 ? (
+          ) : totalCount === 0 && opportunities.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-text-muted">
               <SendHorizontal className="h-12 w-12 opacity-20 mb-4" />
               <p className="text-lg font-editorial italic">No submissions yet</p>
@@ -421,6 +431,51 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                   </Button>
                 </div>
               </header>
+
+              {opportunities.length > 0 && (
+                <section className="mb-10">
+                  <h2 className="text-xs font-bold tracking-widest text-text-muted uppercase mb-4">
+                    Contests This Story Is Up For
+                  </h2>
+                  <div className="space-y-3">
+                    {opportunities.map((opportunity) => {
+                      const candidate = opportunity.candidates.find((c) => c.projectId === projectId);
+                      if (!candidate) return null;
+                      return (
+                        <div
+                          key={opportunity.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => router.push(`/opportunities/${opportunity.id}`)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              router.push(`/opportunities/${opportunity.id}`);
+                            }
+                          }}
+                          className="flex items-center gap-4 p-4 bg-surface-raised border border-border rounded-lg cursor-pointer transition-all hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent/50"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">{opportunity.title}</p>
+                            <p className="text-xs text-text-muted mt-0.5">
+                              {opportunity.provider.name} &middot; Closes {formatCloseDate(opportunity.closeDate)}{" "}
+                              &middot; {closeCountdown(daysUntilClose(opportunity.closeDate, now))}
+                            </p>
+                          </div>
+                          <CandidateStateBadge state={candidate.state} />
+                          {candidate.submission && (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[candidate.submission.status] ?? ""}`}
+                            >
+                              {candidate.submission.status}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
               {contestSubmissions.length > 0 && (
                 <section className="mb-10">
