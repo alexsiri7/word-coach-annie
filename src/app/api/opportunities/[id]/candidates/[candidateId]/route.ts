@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpportunityCandidateController } from "@/lib/controllers/opportunities";
 import { CandidateUpdateSchema } from "@/schemas/opportunities";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { opportunityErrorResponse } from "../../../errors";
 
@@ -11,7 +12,7 @@ export async function PATCH(
 ) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -47,7 +48,7 @@ export async function DELETE(
 ) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { id, candidateId } = await params;
         const result = await OpportunityCandidateController.deleteCandidate(candidateId, userId, id);
