@@ -136,7 +136,9 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           fetch(`/api/providers`),
           fetch(`/api/opportunities?projectId=${projectId}`),
         ]);
-        if (!contestsRes.ok || !pubsRes.ok) throw new Error("Failed to load submissions");
+        if (!contestsRes.ok || !pubsRes.ok || !opportunitiesRes.ok) {
+          throw new Error("Failed to load submissions");
+        }
         if (!projectRes.ok) throw new Error("Failed to load project");
         const [contestsData, pubsData, proj] = await Promise.all([
           contestsRes.json(),
@@ -150,9 +152,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           const providersData = await providersRes.json();
           setProviders(providersData.providers ?? []);
         }
-        if (opportunitiesRes.ok) {
-          setOpportunities((await opportunitiesRes.json()).opportunities ?? []);
-        }
+        setOpportunities((await opportunitiesRes.json()).opportunities ?? []);
       } catch (err) {
         console.error("[submissions/page] loadData failed", err);
         setError("Failed to load submissions. Please try again.");
