@@ -230,6 +230,55 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     expect(cardCount).toBe(0)
   })
 
+  test('500: publishing check failure is shown, not counted as nothing to attend to', async ({
+    page,
+  }) => {
+    // The dashboard only reaches the hub link once it has a project to show
+    const projects = {
+      projects: [
+        {
+          id: 'proj-1',
+          title: 'The Amber Throne',
+          author: 'Jane Doe',
+          synopsis: 'A reluctant queen must unite warring kingdoms.',
+          genre: 'Fantasy',
+          projectType: 'FICTION',
+          wordCount: 42500,
+          nodeCount: 18,
+          createdAt: '2026-01-15T10:00:00Z',
+          updatedAt: '2026-03-10T14:30:00Z',
+        },
+      ],
+      total: 1,
+    }
+    await page.route('**/api/projects?*', (route) =>
+      route.fulfill({ json: projects, status: 200 }),
+    )
+    await page.route('**/api/projects', (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ json: projects, status: 200 })
+      }
+      return route.continue()
+    })
+    await page.route('**/api/publishing', (route) =>
+      route.fulfill({ json: { error: 'Internal server error' }, status: 500 }),
+    )
+    await page.route('**/api/health', (route) =>
+      route.fulfill({ json: { status: 'ok' }, status: 200 }),
+    )
+    // Keep the first-run wizard from covering the dashboard
+    await page.addInitScript(() => {
+      localStorage.setItem('setup-wizard-dismissed', 'true')
+    })
+
+    await page.goto('/')
+    await page.waitForSelector('main', { timeout: 20_000 })
+
+    // A check that never completed must read as unknown, not as a clean zero
+    await expect(page.getByText("Couldn't check")).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/need.*attention/i)).toHaveCount(0)
+  })
+
   test('500: server error on project page shows loading state, not project content', async ({
     page,
   }) => {

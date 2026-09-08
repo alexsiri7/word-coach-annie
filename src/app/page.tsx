@@ -73,6 +73,12 @@ interface Project {
   isSample?: boolean;
 }
 
+/** A count the user can act on, kept apart from a check that never completed. */
+type AttentionCount =
+  | { status: "unknown" }
+  | { status: "counted"; count: number }
+  | { status: "failed" };
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -109,7 +115,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [showArchived, setShowArchived] = useState(false);
-  const [needsAttention, setNeedsAttention] = useState(0);
+  const [needsAttention, setNeedsAttention] = useState<AttentionCount>({ status: "unknown" });
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -185,11 +191,15 @@ export default function Dashboard() {
   const fetchNeedsAttention = async () => {
     try {
       const res = await fetch("/api/publishing");
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`Publishing check returned ${res.status}`);
       const data: { stories: Story[]; opportunities: Opportunity[] } = await res.json();
-      setNeedsAttention(countNeedsAttention(data.stories, data.opportunities, new Date()));
-    } catch {
-      // Publishing fetch failed — leave the link without a count rather than guessing one
+      setNeedsAttention({
+        status: "counted",
+        count: countNeedsAttention(data.stories, data.opportunities, new Date()),
+      });
+    } catch (err) {
+      console.error("[dashboard] needs-attention check failed", err);
+      setNeedsAttention({ status: "failed" });
     }
   };
 
@@ -453,9 +463,14 @@ export default function Dashboard() {
                 <span className="font-label text-xs uppercase font-bold tracking-widest text-text-primary">
                   Publishing &amp; contests
                 </span>
-                {needsAttention > 0 && (
+                {needsAttention.status === "counted" && needsAttention.count > 0 && (
                   <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                    {needsAttention} need{needsAttention === 1 ? "s" : ""} attention
+                    {needsAttention.count} need{needsAttention.count === 1 ? "s" : ""} attention
+                  </span>
+                )}
+                {needsAttention.status === "failed" && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container text-text-secondary">
+                    Couldn&apos;t check
                   </span>
                 )}
               </button>

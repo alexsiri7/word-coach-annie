@@ -145,6 +145,84 @@ async function mockDashboardApi(
   })
 }
 
+/** Frozen so the deadline window the attention count uses is deterministic. */
+const PUBLISHING_NOW = new Date('2026-06-01T12:00:00Z')
+
+/** Stories and contests that are all accounted for — a real count that lands on zero. */
+const MOCK_PUBLISHING_SETTLED = {
+  stories: [
+    {
+      id: 'proj-1',
+      title: 'The Amber Throne',
+      candidates: [],
+      contestSubmissions: [],
+      publicationSubmissions: [
+        {
+          id: 'ps-1',
+          venueName: 'The Quarterly',
+          status: 'submitted',
+          submissionDate: '2026-05-20T10:00:00Z',
+        },
+      ],
+    },
+    {
+      id: 'proj-2',
+      title: 'Echoes of Mars',
+      candidates: [],
+      contestSubmissions: [
+        {
+          id: 'cs-1',
+          contestName: 'Spring Short Story Prize',
+          status: 'accepted',
+          submissionDate: '2026-01-20T10:00:00Z',
+          provider: { id: 'prov-1', name: 'Northern Lights Society' },
+        },
+      ],
+      publicationSubmissions: [],
+    },
+  ],
+  opportunities: [
+    {
+      id: 'opp-1',
+      title: 'Coastal Fiction Prize',
+      status: 'found',
+      closeDate: '2026-06-05T12:00:00Z',
+      provider: { id: 'prov-1', name: 'Northern Lights Society' },
+      candidates: [
+        {
+          id: 'cand-1',
+          state: 'chosen',
+          project: { id: 'proj-1', title: 'The Amber Throne' },
+          submission: null,
+        },
+      ],
+    },
+    {
+      id: 'opp-2',
+      title: 'Northern Lights Award',
+      status: 'found',
+      closeDate: '2026-09-01T12:00:00Z',
+      provider: { id: 'prov-1', name: 'Northern Lights Society' },
+      candidates: [],
+    },
+  ],
+}
+
+/** Keep the first-run wizard from covering the dashboard. */
+async function dismissSetupWizard(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('setup-wizard-dismissed', 'true')
+  })
+}
+
+/** Mock the dashboard's publishing attention count. */
+async function mockPublishingApi(page: Page) {
+  await page.clock.setFixedTime(PUBLISHING_NOW)
+  await page.route('**/api/publishing', (route) =>
+    route.fulfill({ json: MOCK_PUBLISHING_SETTLED, status: 200 }),
+  )
+}
+
 /** Mock the project editor APIs (detail, outline, story objects, etc.) */
 async function mockProjectEditorApi(page: Page) {
   await page.route('**/api/projects/proj-1', (route) => {
@@ -546,5 +624,25 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect(
       page.locator('button[title="Characters"]').first(),
     ).toBeVisible()
+  })
+
+  test('6. Dashboard hides the attention pill when nothing needs attention', async ({
+    page,
+  }) => {
+    await mockDashboardApi(page)
+    await mockPublishingApi(page)
+    await dismissSetupWizard(page)
+
+    const counted = page.waitForResponse((res) => res.url().includes('/api/publishing'))
+    await page.goto('/')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await counted
+
+    // The hub is reachable, but a settled count earns no badge and no failure note
+    await expect(
+      page.getByRole('button', { name: /Publishing & contests/i }),
+    ).toBeVisible()
+    await expect(page.getByText(/need.*attention/i)).toHaveCount(0)
+    await expect(page.getByText("Couldn't check")).toHaveCount(0)
   })
 })
