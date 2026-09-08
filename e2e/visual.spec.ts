@@ -605,11 +605,119 @@ async function mockContestsApi(page: Page) {
   )
 }
 
+/** One story per derived state, so every branch of the story view is rendered. */
+const MOCK_PUBLISHING = {
+  stories: [
+    {
+      id: 'proj-1',
+      title: 'The Amber Throne',
+      candidates: [],
+      contestSubmissions: [
+        {
+          id: 'cs-1',
+          contestName: 'Harbour Review Contest',
+          status: 'submitted',
+          submissionDate: '2026-04-28T10:00:00Z',
+          provider: { id: 'prov-2', name: 'Harbour Review' },
+        },
+      ],
+      publicationSubmissions: [
+        { id: 'ps-1', venueName: 'The Quarterly', status: 'submitted', submissionDate: '2026-05-22T10:00:00Z' },
+      ],
+    },
+    {
+      id: 'proj-2',
+      title: 'Echoes of Mars',
+      candidates: [],
+      contestSubmissions: [],
+      publicationSubmissions: [
+        { id: 'ps-2', venueName: 'Lantern Magazine', status: 'rejected', submissionDate: '2026-02-10T10:00:00Z' },
+      ],
+    },
+    {
+      id: 'proj-3',
+      title: 'Writing Better Dialogue',
+      candidates: [
+        {
+          id: 'cand-8',
+          state: 'chosen',
+          opportunity: {
+            id: 'opp-3',
+            title: 'Coastal Fiction Prize',
+            provider: { id: 'prov-1', name: 'Northern Lights Society' },
+          },
+          submission: null,
+        },
+      ],
+      contestSubmissions: [],
+      publicationSubmissions: [],
+    },
+    {
+      id: 'proj-4',
+      title: 'The Salt Road',
+      candidates: [
+        {
+          id: 'cand-9',
+          state: 'candidate',
+          opportunity: {
+            id: 'opp-4',
+            title: 'Northern Lights Award',
+            provider: { id: 'prov-1', name: 'Northern Lights Society' },
+          },
+          submission: null,
+        },
+      ],
+      contestSubmissions: [],
+      publicationSubmissions: [],
+    },
+    {
+      id: 'proj-5',
+      title: 'Tidewater',
+      candidates: [],
+      contestSubmissions: [
+        {
+          id: 'cs-2',
+          contestName: 'Spring Short Story Prize',
+          status: 'accepted',
+          submissionDate: '2026-01-20T10:00:00Z',
+          provider: { id: 'prov-1', name: 'Northern Lights Society' },
+        },
+      ],
+      publicationSubmissions: [],
+    },
+    {
+      id: 'proj-6',
+      title: 'The Long Field',
+      candidates: [],
+      contestSubmissions: [],
+      publicationSubmissions: [],
+    },
+  ],
+  opportunities: [
+    ...MOCK_CONTESTS.opportunities,
+    {
+      ...MOCK_CONTEST_DETAIL,
+      id: 'opp-6',
+      title: 'Estuary Flash Prize',
+      closeDate: '2026-06-08T12:00:00Z',
+      status: 'found',
+      candidates: [],
+    },
+  ],
+}
+
+/** Intercept API calls for the publishing hub, and for the dashboard's attention count. */
+async function mockPublishingApi(page: Page) {
+  await page.clock.setFixedTime(CONTESTS_NOW)
+  await page.route('**/api/publishing', route => route.fulfill({ json: MOCK_PUBLISHING, status: 200 }))
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
     await mockDashboardApi(page)
+    await mockPublishingApi(page)
     // Dismiss the setup wizard so it doesn't cover the dashboard
     await page.addInitScript(() => {
       localStorage.setItem('setup-wizard-dismissed', 'true')
@@ -618,6 +726,7 @@ test.describe('Visual regression – Annie', () => {
     await page.waitForSelector('main', { timeout: 20_000 })
     await page.waitForSelector('.glass-card', { timeout: 5_000 }).catch(() => {})
     await disableAnimations(page)
+    await page.getByText('2 need attention').waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('dashboard.png', {
       animations: 'disabled',
@@ -802,6 +911,18 @@ test.describe('Visual regression – Annie', () => {
     await page.getByText('Coastal Fiction Prize').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('contests.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('publishing hub populated', async ({ page }) => {
+    await mockPublishingApi(page)
+    await page.goto('/publishing')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Back on the shelf').first().waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('publishing.png', {
       animations: 'disabled',
     })
   })

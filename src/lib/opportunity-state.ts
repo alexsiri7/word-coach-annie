@@ -105,16 +105,21 @@ export function deriveOpportunityState(opportunity: Opportunity, now: Date): Opp
 }
 
 /**
- * Whole days from today to the close date, negative once the deadline has passed.
- * Counted in calendar days so that a contest closing later today reads as still open.
+ * Whole days from `from` to `to`, counted between calendar days rather than instants so
+ * that two moments on the same day are zero days apart however many hours separate them.
  */
-export function daysUntilClose(closeDate: string, now: Date): number {
+export function calendarDaysBetween(from: Date | string, to: Date | string): number {
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
-    const close = new Date(closeDate);
-    close.setHours(0, 0, 0, 0);
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    return Math.round((close.getTime() - today.getTime()) / MS_PER_DAY);
+    const start = new Date(from);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(to);
+    end.setHours(0, 0, 0, 0);
+    return Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
+}
+
+/** Whole days from today to the close date, negative once the deadline has passed. */
+export function daysUntilClose(closeDate: string, now: Date): number {
+    return calendarDaysBetween(now, closeDate);
 }
 
 export function formatCloseDate(closeDate: string): string {

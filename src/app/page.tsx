@@ -19,6 +19,7 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
+  Trophy,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { cacheProjects, getCachedProjects } from "@/lib/offline/cache-reads";
@@ -51,6 +52,8 @@ import {
 } from "@/components/ui/select";
 import { SetupWizard } from "@/components/setup-wizard";
 import { WritingHeatmap } from "@/components/writing-heatmap";
+import { countNeedsAttention, type Story } from "@/lib/story-placement";
+import type { Opportunity } from "@/lib/opportunity-state";
 import type { ProjectType } from "@/lib/types";
 
 interface Project {
@@ -106,6 +109,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [needsAttention, setNeedsAttention] = useState(0);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -178,9 +182,21 @@ export default function Dashboard() {
     }
   };
 
+  const fetchNeedsAttention = async () => {
+    try {
+      const res = await fetch("/api/publishing");
+      if (!res.ok) return;
+      const data: { stories: Story[]; opportunities: Opportunity[] } = await res.json();
+      setNeedsAttention(countNeedsAttention(data.stories, data.opportunities, new Date()));
+    } catch {
+      // Publishing fetch failed — leave the link without a count rather than guessing one
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchTodayWords();
+    fetchNeedsAttention();
   }, []);
 
   const handleCreate = async () => {
@@ -427,6 +443,22 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
+
+              {/* ── Publishing & contests ─────────────────── */}
+              <button
+                onClick={() => router.push("/publishing")}
+                className="w-full mb-8 bg-surface-container-low p-4 flex items-center gap-3 border-l-2 border-transparent hover:border-primary transition-colors text-left"
+              >
+                <Trophy className="h-5 w-5 text-primary/40" />
+                <span className="font-label text-xs uppercase font-bold tracking-widest text-text-primary">
+                  Publishing &amp; contests
+                </span>
+                {needsAttention > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    {needsAttention} need{needsAttention === 1 ? "s" : ""} attention
+                  </span>
+                )}
+              </button>
 
               {/* ── Hero: Current Manuscript ────────────────── */}
               {heroProject && (
