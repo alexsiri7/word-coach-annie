@@ -1,4 +1,8 @@
-import { OpportunityController, OpportunityCandidateController } from "@/lib/controllers/opportunities";
+import {
+    OpportunityController,
+    OpportunityCandidateController,
+    type OpportunityFilters,
+} from "@/lib/controllers/opportunities";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 import { mcpCache } from "@/lib/cache";
 
@@ -6,9 +10,23 @@ import { mcpCache } from "@/lib/cache";
 // Like providers, opportunities belong to the current user rather than to a
 // project, so a null userId (single-user mode) is passed straight through.
 
-export async function listOpportunities(userId: string | null) {
-    const key = `opportunities:${userId}`;
-    return mcpCache.getOrSet(key, () => OpportunityController.listOpportunities(userId));
+/**
+ * Candidate entries feed both cached reads — `get_opportunity` embeds them and the
+ * project filter selects on them — so candidate writes invalidate this too.
+ */
+function invalidateOpportunities(userId: string | null) {
+    mcpCache.invalidatePrefix(`opportunities:${userId}`);
+    mcpCache.invalidatePrefix(`opportunity:${userId}`);
+}
+
+export async function listOpportunities(userId: string | null, filters: OpportunityFilters = {}) {
+    const key = `opportunities:${userId}:${filters.status ?? ""}:${filters.providerId ?? ""}:${filters.projectId ?? ""}`;
+    return mcpCache.getOrSet(key, () => OpportunityController.listOpportunities(userId, filters));
+}
+
+export async function getOpportunity(opportunityId: string, userId: string | null) {
+    const key = `opportunity:${userId}:${opportunityId}`;
+    return mcpCache.getOrSet(key, () => OpportunityController.getOpportunity(opportunityId, userId));
 }
 
 export async function createOpportunity(params: {
@@ -26,7 +44,7 @@ export async function createOpportunity(params: {
     status?: OpportunityStatusValue;
 }) {
     const result = await OpportunityController.createOpportunity(params);
-    mcpCache.invalidatePrefix(`opportunities:${params.userId}`);
+    invalidateOpportunities(params.userId);
     return result;
 }
 
@@ -50,13 +68,13 @@ export async function updateOpportunity(params: {
         throw new Error("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await OpportunityController.updateOpportunity(opportunityId, userId, data);
-    mcpCache.invalidatePrefix(`opportunities:${userId}`);
+    invalidateOpportunities(userId);
     return result;
 }
 
 export async function deleteOpportunity(opportunityId: string, userId: string | null) {
     const result = await OpportunityController.deleteOpportunity(opportunityId, userId);
-    mcpCache.invalidatePrefix(`opportunities:${userId}`);
+    invalidateOpportunities(userId);
     mcpCache.invalidatePrefix(`opportunityCandidates:${opportunityId}`);
     return result;
 }
@@ -79,6 +97,7 @@ export async function createOpportunityCandidate(params: {
 }) {
     const result = await OpportunityCandidateController.createCandidate(params);
     mcpCache.invalidatePrefix(`opportunityCandidates:${params.opportunityId}`);
+    invalidateOpportunities(params.userId);
     return result;
 }
 
@@ -94,12 +113,14 @@ export async function updateOpportunityCandidate(params: {
     }
     const result = await OpportunityCandidateController.updateCandidate(candidateId, userId, data);
     mcpCache.invalidatePrefix(`opportunityCandidates:${result.opportunityId}`);
+    invalidateOpportunities(userId);
     return result;
 }
 
 export async function deleteOpportunityCandidate(candidateId: string, userId: string | null) {
     const result = await OpportunityCandidateController.deleteCandidate(candidateId, userId);
     mcpCache.invalidatePrefix("opportunityCandidates:");
+    invalidateOpportunities(userId);
     return result;
 }
 
@@ -107,5 +128,6 @@ export async function promoteOpportunityCandidate(candidateId: string, userId: s
     const result = await OpportunityCandidateController.promoteCandidate(candidateId, userId);
     mcpCache.invalidatePrefix(`opportunityCandidates:${result.candidate.opportunityId}`);
     mcpCache.invalidatePrefix(`contestSubmissions:${result.submission.projectId}`);
+    invalidateOpportunities(userId);
     return result;
 }

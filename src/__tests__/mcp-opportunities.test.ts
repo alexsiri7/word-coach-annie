@@ -4,6 +4,7 @@ import {
     createOpportunity,
     updateOpportunity,
     deleteOpportunity,
+    getOpportunity,
     listOpportunityCandidates,
     createOpportunityCandidate,
     updateOpportunityCandidate,
@@ -132,6 +133,7 @@ describe("MCP Opportunity Tools", () => {
 
             const { total } = await listOpportunities(null);
             expect(total).toBe(1);
+            expect(await getOpportunity(created.id, null)).toMatchObject({ id: created.id, candidates: [] });
 
             expect(await deleteOpportunity(created.id, null)).toMatchObject({ success: true });
         });
@@ -177,6 +179,111 @@ describe("MCP Opportunity Tools", () => {
             await deleteOpportunity(opportunity.id, userId);
 
             expect(await prisma.opportunityCandidate.findUnique({ where: { id: candidate.id } })).toBeNull();
+        });
+    });
+
+    describe("Opportunity filters", () => {
+        it("filters by status", async () => {
+            await makeOpportunity({ title: "Still looking" });
+            await makeOpportunity({ title: "Shortlisted", status: "considering" });
+
+            const { opportunities, total } = await listOpportunities(userId, { status: "considering" });
+            expect(total).toBe(1);
+            expect(opportunities[0].title).toBe("Shortlisted");
+        });
+
+        it("filters by provider", async () => {
+            const otherProvider = await createProvider({ userId, name: "Other Org" });
+            await makeOpportunity({ title: "Theirs", providerId: otherProvider.id });
+            await makeOpportunity({ title: "Ours" });
+
+            const { opportunities, total } = await listOpportunities(userId, { providerId: otherProvider.id });
+            expect(total).toBe(1);
+            expect(opportunities[0].title).toBe("Theirs");
+        });
+
+        it("filters by the project put forward as a candidate", async () => {
+            const entered = await makeOpportunity({ title: "Entered" });
+            await makeOpportunity({ title: "Not entered" });
+            await createOpportunityCandidate({ opportunityId: entered.id, userId, projectId });
+
+            const { opportunities, total } = await listOpportunities(userId, { projectId });
+            expect(total).toBe(1);
+            expect(opportunities[0].title).toBe("Entered");
+        });
+
+        it("returns nothing when a filter matches no opportunity", async () => {
+            await makeOpportunity();
+
+            const untouched = await ProjectsController.createProject({ title: "Never entered", userId });
+            expect(await listOpportunities(userId, { projectId: untouched.id })).toMatchObject({ total: 0 });
+            expect(await listOpportunities(userId, { status: "closed" })).toMatchObject({ total: 0 });
+            expect(await listOpportunities(userId, { providerId: "no-such-provider" })).toMatchObject({ total: 0 });
+        });
+
+        it("combines filters and keeps the soonest-deadline-first order", async () => {
+            const otherProvider = await createProvider({ userId, name: "Other Org" });
+            await makeOpportunity({ title: "Wrong provider", status: "considering", providerId: otherProvider.id });
+            await makeOpportunity({ title: "Later", status: "considering", closeDate: "2030-09-01T00:00:00.000Z" });
+            await makeOpportunity({ title: "Sooner", status: "considering" });
+
+            const { opportunities } = await listOpportunities(userId, { status: "considering", providerId });
+            expect(opportunities.map((o) => o.title)).toEqual(["Sooner", "Later"]);
+        });
+
+        it("does not leak another user's opportunities through a filter", async () => {
+            const created = await makeOpportunity();
+            expect(await listOpportunities("someone-else", { providerId })).toMatchObject({ total: 0 });
+            expect(created.providerId).toBe(providerId);
+        });
+    });
+
+    describe("get_opportunity", () => {
+        it("returns the opportunity and its candidates in a single call, oldest candidate first", async () => {
+            const opportunity = await makeOpportunity({ entryFee: "£10" });
+            const second = await ProjectsController.createProject({ title: "Second Story", userId });
+            await createOpportunityCandidate({
+                opportunityId: opportunity.id,
+                userId,
+                projectId,
+                notes: "Right length",
+            });
+            await createOpportunityCandidate({
+                opportunityId: opportunity.id,
+                userId,
+                projectId: second.id,
+                state: "chosen",
+            });
+
+            const result = await getOpportunity(opportunity.id, userId);
+
+            expect(result).toMatchObject({ id: opportunity.id, title: "Spring Prize", entryFee: "£10" });
+            expect(result.candidates.map((c) => c.projectId)).toEqual([projectId, second.id]);
+            expect(result.candidates[0]).toMatchObject({ state: "candidate", notes: "Right length" });
+            expect(result.candidates[1]).toMatchObject({ state: "chosen", notes: null });
+        });
+
+        it("returns an empty candidate list for an opportunity nobody has been put forward for", async () => {
+            const opportunity = await makeOpportunity();
+            expect(await getOpportunity(opportunity.id, userId)).toMatchObject({ candidates: [] });
+        });
+
+        it("reflects a candidate added after an earlier read", async () => {
+            const opportunity = await makeOpportunity();
+            expect((await getOpportunity(opportunity.id, userId)).candidates).toHaveLength(0);
+
+            await createOpportunityCandidate({ opportunityId: opportunity.id, userId, projectId });
+
+            expect((await getOpportunity(opportunity.id, userId)).candidates).toHaveLength(1);
+        });
+
+        it("rejects reading an opportunity owned by a different user", async () => {
+            const opportunity = await makeOpportunity();
+            await expect(getOpportunity(opportunity.id, "someone-else")).rejects.toThrow("Forbidden");
+        });
+
+        it("reports a missing opportunity as not found", async () => {
+            await expect(getOpportunity("no-such-opportunity", userId)).rejects.toThrow("Opportunity not found");
         });
     });
 

@@ -73,6 +73,7 @@ import {
 } from "./tools/submissions";
 import {
     listOpportunities,
+    getOpportunity,
     createOpportunity,
     updateOpportunity,
     deleteOpportunity,
@@ -1049,10 +1050,24 @@ server.tool(
 
 server.tool(
     "list_opportunities",
-    "List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first.",
-    {},
-    async () =>
-        mcpRun("list_opportunities", "Error listing opportunities", () => listOpportunities(userId))
+    "List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first. Optional filters narrow the list; omit them all to see everything coming up.",
+    {
+        status: z.enum(["found", "considering", "closed"]).optional().describe("Only opportunities with this status"),
+        providerId: z.string().optional().describe("Only opportunities from this provider (contest organizer or publication)"),
+        projectId: z.string().optional().describe("Only opportunities this project has been put forward for as a candidate"),
+    },
+    async (filters) =>
+        mcpRun("list_opportunities", "Error listing opportunities", () => listOpportunities(userId, filters))
+);
+
+server.tool(
+    "get_opportunity",
+    "Get one opportunity with every candidate entry attached to it — the projects put forward, their state and notes — in a single call. Only opportunities owned by the current user can be read.",
+    {
+        opportunityId: z.string().describe("The opportunity ID"),
+    },
+    async ({ opportunityId }) =>
+        mcpRun("get_opportunity", "Error getting opportunity", () => getOpportunity(opportunityId, userId))
 );
 
 server.tool(
