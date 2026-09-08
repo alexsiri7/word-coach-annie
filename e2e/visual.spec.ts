@@ -606,7 +606,6 @@ async function mockContestsApi(page: Page) {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
-// 6 screens × 3 viewports (desktop, mobile, dark-desktop) = 18 screenshots
 
 test.describe('Visual regression – Annie', () => {
   test('dashboard with projects', async ({ page }) => {
