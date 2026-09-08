@@ -33,6 +33,18 @@ export interface Opportunity {
     candidates: OpportunityCandidate[];
 }
 
+/** A contest submission the author recorded without an opportunity behind it. */
+export interface UnlinkedContestSubmission {
+    id: string;
+    projectId: string;
+    providerId: string;
+    contestName: string;
+    submissionDate: string;
+    status: SubmissionStatusValue;
+    provider: { id: string; name: string };
+    project: { id: string; title: string };
+}
+
 export type OpportunityStateKind =
     | "accepted"
     | "rejected"
@@ -105,6 +117,15 @@ export function deriveOpportunityState(opportunity: Opportunity, now: Date): Opp
 }
 
 /**
+ * What a submission with no opportunity behind it reports: its own outcome. Nothing is
+ * derived, because there is no deadline to have missed and no shortlist to have been on.
+ */
+export function deriveSubmissionState(status: SubmissionStatusValue): OpportunityState {
+    const { kind, label } = OUTCOMES[status];
+    return { kind, label, candidates: [] };
+}
+
+/**
  * Whole days from `from` to `to`, counted between calendar days rather than instants so
  * that two moments on the same day are zero days apart however many hours separate them.
  */
@@ -122,8 +143,12 @@ export function daysUntilClose(closeDate: string, now: Date): number {
     return calendarDaysBetween(now, closeDate);
 }
 
+export function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export function formatCloseDate(closeDate: string): string {
-    return new Date(closeDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDate(closeDate);
 }
 
 /** How the close date reads relative to today. */

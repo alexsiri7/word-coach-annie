@@ -55,6 +55,26 @@ function serializeOpportunityWithCandidates(o: OpportunityWithCandidateDetail) {
     };
 }
 
+const withSubmissionDetail = {
+    provider: { select: { id: true, name: true } },
+    project: { select: { id: true, title: true } },
+} as const;
+
+function serializeUnlinkedSubmission(
+    s: Prisma.ContestSubmissionGetPayload<{ include: typeof withSubmissionDetail }>
+) {
+    return {
+        id: s.id,
+        projectId: s.projectId,
+        providerId: s.providerId,
+        contestName: s.contestName,
+        submissionDate: s.submissionDate.toISOString(),
+        status: s.status,
+        provider: s.provider,
+        project: s.project,
+    };
+}
+
 async function requireOwnedOpportunity(id: string, userId: string | null) {
     const existing = await prisma.opportunity.findUnique({
         where: { id },
@@ -81,6 +101,25 @@ async function requireOwnedProject(projectId: string, userId: string | null) {
     });
     if (!project) throw new NotFoundError(`Project not found: ${projectId}`);
     if (project.userId !== userId) throw new ForbiddenError("Forbidden");
+}
+
+/** The submission a backfill is about: it must be the author's, and still nobody's candidate. */
+async function requireOwnedUnlinkedSubmission(submissionId: string, userId: string | null) {
+    const submission = await prisma.contestSubmission.findUnique({
+        where: { id: submissionId },
+        select: {
+            id: true,
+            projectId: true,
+            project: { select: { userId: true } },
+            _count: { select: { opportunityCandidates: true } },
+        },
+    });
+    if (!submission) throw new NotFoundError(`Contest submission not found: ${submissionId}`);
+    if (submission.project.userId !== userId) throw new ForbiddenError("Forbidden");
+    if (submission._count.opportunityCandidates > 0) {
+        throw new ConflictError(`Contest submission ${submissionId} already belongs to an opportunity`);
+    }
+    return submission;
 }
 
 type OpportunityWritableFields = {
@@ -124,6 +163,32 @@ export class OpportunityController {
         return { opportunities, total: opportunities.length };
     }
 
+    /**
+     * Contest submissions with no opportunity behind them — everything entered before
+     * opportunities were tracked, and anything logged straight against a story. They belong
+     * in the contests list, but they hold none of an opportunity's fields, so they come back
+     * on their own rather than as opportunities with half their data missing.
+     */
+    static async listSubmissionsWithoutOpportunity(userId: string | null, filters: OpportunityFilters = {}) {
+        const { status, providerId, projectId } = filters;
+        // These rows have no Opportunity.status, so a filter on one can only rule them out.
+        if (status) return { submissions: [], total: 0 };
+
+        const raw = await prisma.contestSubmission.findMany({
+            where: {
+                opportunityCandidates: { none: {} },
+                project: { userId, archivedAt: null },
+                ...(providerId ? { providerId } : {}),
+                ...(projectId ? { projectId } : {}),
+            },
+            include: withSubmissionDetail,
+            orderBy: { submissionDate: "desc" },
+        });
+
+        const submissions = raw.map(serializeUnlinkedSubmission);
+        return { submissions, total: submissions.length };
+    }
+
     static async getOpportunity(id: string, userId: string | null) {
         const opportunity = await prisma.opportunity.findUnique({
             where: { id },
@@ -141,19 +206,37 @@ export class OpportunityController {
             providerId: string;
             title: string;
             closeDate: string;
+            /** Fills in the missing details of a contest submission that already exists. */
+            submissionId?: string;
         }
     ) {
-        const { userId, closeDate, reviewDate, title, ...rest } = params;
+        const { userId, closeDate, reviewDate, title, submissionId, ...rest } = params;
         await requireOwnedProvider(params.providerId, userId);
+        const submission = submissionId ? await requireOwnedUnlinkedSubmission(submissionId, userId) : null;
 
-        const opportunity = await prisma.opportunity.create({
-            data: {
-                ...rest,
-                userId,
-                title: title.trim(),
-                closeDate: new Date(closeDate),
-                reviewDate: reviewDate ? new Date(reviewDate) : null,
-            },
+        const data = {
+            ...rest,
+            userId,
+            title: title.trim(),
+            closeDate: new Date(closeDate),
+            reviewDate: reviewDate ? new Date(reviewDate) : null,
+        };
+
+        if (!submission) return serializeOpportunity(await prisma.opportunity.create({ data }));
+
+        // The inverse of promoting a candidate: the entry already happened, so the candidate
+        // is born chosen and already carrying its submission — there is no shortlist to record.
+        const opportunity = await prisma.$transaction(async (tx) => {
+            const created = await tx.opportunity.create({ data });
+            await tx.opportunityCandidate.create({
+                data: {
+                    opportunityId: created.id,
+                    projectId: submission.projectId,
+                    state: "chosen",
+                    submissionId: submission.id,
+                },
+            });
+            return created;
         });
 
         return serializeOpportunity(opportunity);
