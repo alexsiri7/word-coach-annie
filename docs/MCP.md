@@ -1012,9 +1012,26 @@ Delete a publication submission. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 Track contests and calls for submission you are considering, and the projects put forward for each one. Opportunities are scoped to the **current user**, like providers — ownership is enforced by matching `userId`. A candidate links a project to an opportunity; both its opportunity and its project must be owned by the current user.
 
 #### `list_opportunities`
-List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first.
+List submission opportunities (contests and calls you are tracking) for the current user, soonest deadline first. Optional filters narrow the list; omit them all to see everything coming up.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `status` | `"found" \| "considering" \| "closed"`? | Only opportunities with this status |
+| `providerId` | string? | Only opportunities from this provider (contest organizer or publication) |
+| `projectId` | string? | Only opportunities this project has been put forward for as a candidate |
 
 Returns `{ opportunities: Opportunity[], total: number }`.
+
+---
+
+#### `get_opportunity`
+Get one opportunity with every candidate entry attached to it — the projects put forward, their state and notes — in a single call, instead of following `list_opportunities` with `list_opportunity_candidates`. Only opportunities owned by the current user can be read.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `opportunityId` | string | The opportunity ID |
+
+Returns the `Opportunity` object with an added `candidates: OpportunityCandidate[]` field, oldest candidate first.
 
 ---
 

@@ -71,15 +71,42 @@ type OpportunityWritableFields = {
     status?: OpportunityStatusValue;
 };
 
+export type OpportunityFilters = {
+    status?: OpportunityStatusValue;
+    providerId?: string;
+    projectId?: string;
+};
+
 export class OpportunityController {
-    static async listOpportunities(userId: string | null) {
+    static async listOpportunities(userId: string | null, filters: OpportunityFilters = {}) {
+        const { status, providerId, projectId } = filters;
+
+        const where: Prisma.OpportunityWhereInput = { userId };
+        if (status) where.status = status;
+        if (providerId) where.providerId = providerId;
+        // An opportunity has no project of its own — it is tied to a project only by a
+        // candidate entry, so "opportunities for this project" means the ones it is up for.
+        if (projectId) where.candidates = { some: { projectId } };
+
         const raw = await prisma.opportunity.findMany({
-            where: { userId },
+            where,
             orderBy: { closeDate: "asc" },
         });
 
         const opportunities = raw.map(serializeOpportunity);
         return { opportunities, total: opportunities.length };
+    }
+
+    static async getOpportunity(id: string, userId: string | null) {
+        const opportunity = await prisma.opportunity.findUnique({
+            where: { id },
+            include: { candidates: { orderBy: { createdAt: "asc" } } },
+        });
+        if (!opportunity) throw new NotFoundError(`Opportunity not found: ${id}`);
+        if (opportunity.userId !== userId) throw new ForbiddenError("Forbidden");
+
+        const { candidates, ...rest } = opportunity;
+        return { ...serializeOpportunity(rest), candidates: candidates.map(serializeCandidate) };
     }
 
     static async createOpportunity(
