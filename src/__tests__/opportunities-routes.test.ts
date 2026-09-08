@@ -23,6 +23,10 @@ function jsonRequest(method: string, body?: unknown): NextRequest {
     });
 }
 
+function listRequest(query: string): NextRequest {
+    return new NextRequest(`http://localhost/api/opportunities?${query}`);
+}
+
 describe("Opportunity API routes", () => {
     let userId: string;
     let providerId: string;
@@ -54,6 +58,65 @@ describe("Opportunity API routes", () => {
         const res = await GET(jsonRequest("GET"));
         expect(res.status).toBe(200);
         expect(await res.json()).toMatchObject({ total: 1 });
+    });
+
+    it("carries each candidate's story and submission so a row can name them", async () => {
+        const opportunity = await (await createOpportunityViaApi()).json();
+        const { POST: postCandidate } = await import("@/app/api/opportunities/[id]/candidates/route");
+        await postCandidate(jsonRequest("POST", { projectId }), { params: Promise.resolve({ id: opportunity.id }) });
+
+        const { GET } = await import("@/app/api/opportunities/route");
+        const body = await (await GET(jsonRequest("GET"))).json();
+
+        expect(body.opportunities[0]).toMatchObject({
+            provider: { id: providerId, name: "Contest Org" },
+            candidates: [{ projectId, project: { id: projectId, title: "Test Project" }, submission: null }],
+        });
+    });
+
+    describe("list filters", () => {
+        async function seed() {
+            const otherProvider = await prisma.provider.create({ data: { userId, name: "Second Org" } });
+            const shortlisted = await (await createOpportunityViaApi({ title: "Shortlisted Prize" })).json();
+            await (await createOpportunityViaApi({ title: "Considered Prize", status: "considering" })).json();
+            const elsewhere = await (
+                await createOpportunityViaApi({ title: "Other Org Prize", providerId: otherProvider.id })
+            ).json();
+
+            const { POST: postCandidate } = await import("@/app/api/opportunities/[id]/candidates/route");
+            await postCandidate(jsonRequest("POST", { projectId }), {
+                params: Promise.resolve({ id: shortlisted.id }),
+            });
+
+            return { otherProvider, shortlisted, elsewhere };
+        }
+
+        async function listTitles(query: string): Promise<string[]> {
+            const { GET } = await import("@/app/api/opportunities/route");
+            const res = await GET(listRequest(query));
+            expect(res.status).toBe(200);
+            return (await res.json()).opportunities.map((o: { title: string }) => o.title);
+        }
+
+        it("filters by status", async () => {
+            await seed();
+            expect(await listTitles("status=considering")).toEqual(["Considered Prize"]);
+        });
+
+        it("filters by provider", async () => {
+            const { otherProvider } = await seed();
+            expect(await listTitles(`providerId=${otherProvider.id}`)).toEqual(["Other Org Prize"]);
+        });
+
+        it("filters by the story that is up for the contest", async () => {
+            await seed();
+            expect(await listTitles(`projectId=${projectId}`)).toEqual(["Shortlisted Prize"]);
+        });
+
+        it("rejects a status that is not one an opportunity can have", async () => {
+            const { GET } = await import("@/app/api/opportunities/route");
+            expect((await GET(listRequest("status=submitted"))).status).toBe(400);
+        });
     });
 
     it("returns 401 when unauthenticated", async () => {

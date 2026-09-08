@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpportunityController } from "@/lib/controllers/opportunities";
-import { OpportunityCreateSchema } from "@/schemas/opportunities";
+import { OpportunityCreateSchema, OpportunityStatus } from "@/schemas/opportunities";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { opportunityErrorResponse } from "./errors";
@@ -10,7 +10,18 @@ export async function GET(request: NextRequest) {
         const userId = getCurrentUserId(request);
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const result = await OpportunityController.listOpportunities(userId);
+        const params = request.nextUrl.searchParams;
+        const status = params.get("status");
+        const parsedStatus = status === null ? undefined : OpportunityStatus.safeParse(status);
+        if (parsedStatus && !parsedStatus.success) {
+            return NextResponse.json({ error: parsedStatus.error.issues[0].message }, { status: 400 });
+        }
+
+        const result = await OpportunityController.listOpportunities(userId, {
+            status: parsedStatus?.data,
+            providerId: params.get("providerId") ?? undefined,
+            projectId: params.get("projectId") ?? undefined,
+        });
         return NextResponse.json(result);
     } catch (error) {
         return opportunityErrorResponse("GET /api/opportunities", error);
