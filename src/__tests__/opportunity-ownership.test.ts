@@ -287,6 +287,14 @@ describe("Opportunity ownership across MCP and the web UI", () => {
                 ["POST /providers", createProviderRoute(jsonRequest(providersUrl, "POST", { name: "New Org" }))],
                 ["PATCH /providers/[id]", patchProvider(jsonRequest(providerUrl, "PATCH", { name: "Renamed" }), providerParams)],
                 ["DELETE /providers/[id]", deleteProvider(jsonRequest(providerUrl, "DELETE"), providerParams)],
+                // DELETE guards before resolving, so an unknown id is the only input that tells its
+                // own guard apart from the one inside resolveProvider (which 404s before it checks).
+                [
+                    "DELETE /providers/[id] (unknown id)",
+                    deleteProvider(jsonRequest(`${providersUrl}/no-such-provider`, "DELETE"), {
+                        params: Promise.resolve({ id: "no-such-provider" }),
+                    }),
+                ],
                 ["GET /publishing", getPublishing(new NextRequest("http://localhost/api/publishing"))],
             ];
 
