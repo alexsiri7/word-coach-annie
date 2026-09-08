@@ -64,6 +64,43 @@ describe("Calendar feed", () => {
             expect(await readToken()).toBe(first);
         });
 
+        it("returns the token another request committed rather than one it minted itself", async () => {
+            const { CalendarFeedController } = await import("@/lib/controllers/calendar-feed");
+            const committed = "committed-by-a-concurrent-request";
+            await prisma.user.update({ where: { id: userId }, data: { calendarFeedToken: committed } });
+
+            // The read that decides "no token yet" is stale by the time the write lands.
+            const staleRead = vi
+                .spyOn(prisma.user, "findUnique")
+                .mockResolvedValueOnce({ calendarFeedToken: null } as never);
+            let issued: string;
+            try {
+                issued = await CalendarFeedController.getOrCreateToken(userId);
+            } finally {
+                staleRead.mockRestore();
+            }
+
+            expect(issued).toBe(committed);
+            const stored = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { calendarFeedToken: true },
+            });
+            expect(stored?.calendarFeedToken).toBe(committed);
+            expect((await fetchFeed(`${issued}.ics`)).status).toBe(200);
+        });
+
+        it("hands concurrent first reads the same persisted token", async () => {
+            const { CalendarFeedController } = await import("@/lib/controllers/calendar-feed");
+
+            const [first, second] = await Promise.all([
+                CalendarFeedController.getOrCreateToken(userId),
+                CalendarFeedController.getOrCreateToken(userId),
+            ]);
+
+            expect(first).toBe(second);
+            expect((await fetchFeed(`${first}.ics`)).status).toBe(200);
+        });
+
         it("returns 401 when unauthenticated", async () => {
             vi.mocked(getCurrentUserId).mockReturnValue(null);
             const { GET } = await import("@/app/api/account/calendar-feed/route");

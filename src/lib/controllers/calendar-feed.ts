@@ -64,7 +64,21 @@ export class CalendarFeedController {
         if (!user) throw new NotFoundError(`User not found: ${userId}`);
         if (user.calendarFeedToken) return user.calendarFeedToken;
 
-        return CalendarFeedController.regenerateToken(userId);
+        // Conditional on the column still being null, so a concurrent mint wins outright
+        // rather than both callers handing out a token only one of them persisted.
+        const calendarFeedToken = newToken();
+        const { count } = await prisma.user.updateMany({
+            where: { id: userId, calendarFeedToken: null },
+            data: { calendarFeedToken },
+        });
+        if (count > 0) return calendarFeedToken;
+
+        const committed = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { calendarFeedToken: true },
+        });
+        if (!committed?.calendarFeedToken) throw new NotFoundError(`User not found: ${userId}`);
+        return committed.calendarFeedToken;
     }
 
     /** Regenerating invalidates the previous URL — subscriptions using it stop resolving. */

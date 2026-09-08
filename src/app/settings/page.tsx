@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2, CalendarClock, Copy, RefreshCw } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
@@ -146,7 +146,8 @@ export default function SettingsPage() {
       .finally(() => setConsentLoading(false));
   }, []);
 
-  useEffect(() => {
+  const loadFeedPath = useCallback(() => {
+    setFeedLoading(true);
     fetch("/api/account/calendar-feed")
       .then((res) => {
         if (!res.ok) throw new Error(`calendar feed fetch failed: ${res.status}`);
@@ -156,6 +157,10 @@ export default function SettingsPage() {
       .catch(console.error)
       .finally(() => setFeedLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadFeedPath();
+  }, [loadFeedPath]);
 
   const handleHashnodeConnect = async () => {
     const trimmed = hashnodeToken.trim();
@@ -872,9 +877,21 @@ export default function SettingsPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-text-muted">
-              Calendar feed unavailable — it needs a signed-in account.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-text-muted">
+                Couldn&apos;t load your subscription URL. Any calendar already subscribed keeps
+                working — this only affects showing the address here.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadFeedPath}
+                className="gap-1.5"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try again
+              </Button>
+            </div>
           )}
         </div>
 
