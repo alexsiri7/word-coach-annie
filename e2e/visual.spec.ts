@@ -726,6 +726,7 @@ test.describe('Visual regression – Annie', () => {
     await page.waitForSelector('main', { timeout: 20_000 })
     await page.waitForSelector('.glass-card', { timeout: 5_000 }).catch(() => {})
     await disableAnimations(page)
+    await page.getByText('2 need attention').waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('dashboard.png', {
       animations: 'disabled',

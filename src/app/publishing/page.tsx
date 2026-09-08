@@ -10,6 +10,11 @@ import { UserMenu } from "@/components/user-menu";
 import { deriveStoryStates, type Story } from "@/lib/story-placement";
 import { PlacementBadge, StoryStateBadge } from "@/components/story-state-badge";
 
+/** "A and B", "A, B and C" — the providers are named, never counted. */
+function nameList(names: string[]): string {
+  return [names.slice(0, -1).join(", "), names.at(-1)].filter(Boolean).join(" and ");
+}
+
 export default function PublishingPage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
@@ -135,7 +140,7 @@ export default function PublishingPage() {
                         <p className="mt-2 flex items-start gap-1.5 text-xs text-text-muted">
                           <Info className="h-3.5 w-3.5 flex-shrink-0 mt-px" />
                           <span>
-                            Out with {state.concurrentProviders.join(" and ")} at the same time — check
+                            Out with {nameList(state.concurrentProviders)} at the same time — check
                             whether they allow simultaneous submissions.
                           </span>
                         </p>
