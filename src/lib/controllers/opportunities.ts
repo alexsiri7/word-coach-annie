@@ -75,13 +75,19 @@ function serializeUnlinkedSubmission(
     };
 }
 
+/**
+ * A null `userId` is the deployment-level caller of a single-user install, not an anonymous
+ * one: routes only pass it through when `isGoogleAuthMode()` is false, so it is unscoped and
+ * matches every row — the same convention as `verifyProjectAccess` and MCP's
+ * `verifyProjectOwnership`. A real userId is still matched exactly.
+ */
 async function requireOwnedOpportunity(id: string, userId: string | null) {
     const existing = await prisma.opportunity.findUnique({
         where: { id },
         select: { id: true, userId: true, providerId: true, title: true, reviewDate: true, rulesUrl: true },
     });
     if (!existing) throw new NotFoundError(`Opportunity not found: ${id}`);
-    if (existing.userId !== userId) throw new ForbiddenError("Forbidden");
+    if (userId && existing.userId !== userId) throw new ForbiddenError("Forbidden");
     return existing;
 }
 
@@ -91,7 +97,7 @@ async function requireOwnedProvider(providerId: string, userId: string | null) {
         select: { id: true, userId: true },
     });
     if (!provider) throw new NotFoundError(`Provider not found: ${providerId}`);
-    if (provider.userId !== userId) throw new ForbiddenError("Forbidden");
+    if (userId && provider.userId !== userId) throw new ForbiddenError("Forbidden");
 }
 
 async function requireOwnedProject(projectId: string, userId: string | null) {
@@ -100,7 +106,7 @@ async function requireOwnedProject(projectId: string, userId: string | null) {
         select: { id: true, userId: true },
     });
     if (!project) throw new NotFoundError(`Project not found: ${projectId}`);
-    if (project.userId !== userId) throw new ForbiddenError("Forbidden");
+    if (userId && project.userId !== userId) throw new ForbiddenError("Forbidden");
 }
 
 /** The submission a backfill is about: it must be the author's, and still nobody's candidate. */
@@ -146,7 +152,7 @@ export class OpportunityController {
     static async listOpportunities(userId: string | null, filters: OpportunityFilters = {}) {
         const { status, providerId, projectId } = filters;
 
-        const where: Prisma.OpportunityWhereInput = { userId };
+        const where: Prisma.OpportunityWhereInput = userId ? { userId } : {};
         if (status) where.status = status;
         if (providerId) where.providerId = providerId;
         // An opportunity has no project of its own — it is tied to a project only by a
@@ -195,7 +201,7 @@ export class OpportunityController {
             include: withCandidateDetail,
         });
         if (!opportunity) throw new NotFoundError(`Opportunity not found: ${id}`);
-        if (opportunity.userId !== userId) throw new ForbiddenError("Forbidden");
+        if (userId && opportunity.userId !== userId) throw new ForbiddenError("Forbidden");
 
         return serializeOpportunityWithCandidates(opportunity);
     }

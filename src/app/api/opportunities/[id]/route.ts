@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpportunityController } from "@/lib/controllers/opportunities";
 import { OpportunityUpdateSchema } from "@/schemas/opportunities";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { opportunityErrorResponse } from "../errors";
 
@@ -13,7 +14,7 @@ function sanitizeOptional(value: string | null | undefined): string | null | und
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { id } = await params;
         const opportunity = await OpportunityController.getOpportunity(id, userId);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -58,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { id } = await params;
         const result = await OpportunityController.deleteOpportunity(id, userId);

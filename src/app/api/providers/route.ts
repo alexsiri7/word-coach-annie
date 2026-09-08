@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { ProviderController } from "@/lib/controllers/submissions";
 import { ProviderCreateSchema } from "@/schemas/submissions";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const result = await ProviderController.listProviders(userId);
         return NextResponse.json(result);
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const provider = await ProviderController.createProvider({
             userId,

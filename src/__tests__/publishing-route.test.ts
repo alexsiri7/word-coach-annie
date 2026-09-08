@@ -9,7 +9,13 @@ vi.mock("@/lib/logger", () => ({
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("@/lib/auth", async () => ({
+    ...(await vi.importActual("@/lib/auth")),
+    isGoogleAuthMode: vi.fn(() => false),
+}));
+
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { OpportunityCandidateController, OpportunityController } from "@/lib/controllers/opportunities";
@@ -42,10 +48,12 @@ describe("GET /api/publishing", () => {
         providerId = (await prisma.provider.create({ data: { userId, name: "Harbour Review" } })).id;
         projectId = (await ProjectsController.createProject({ title: "The Amber Throne", userId })).id;
         vi.mocked(getCurrentUserId).mockReturnValue(userId);
+        vi.mocked(isGoogleAuthMode).mockReturnValue(false);
     });
 
-    it("rejects a caller without a user", async () => {
+    it("rejects an unidentified caller when Google auth is on", async () => {
         vi.mocked(getCurrentUserId).mockReturnValue(null);
+        vi.mocked(isGoogleAuthMode).mockReturnValue(true);
         expect((await get()).status).toBe(401);
     });
 

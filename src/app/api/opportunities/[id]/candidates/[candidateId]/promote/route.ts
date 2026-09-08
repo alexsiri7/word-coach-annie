@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpportunityCandidateController } from "@/lib/controllers/opportunities";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { opportunityErrorResponse } from "../../../../errors";
 
 export async function POST(
@@ -9,7 +10,7 @@ export async function POST(
 ) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { id, candidateId } = await params;
         const result = await OpportunityCandidateController.promoteCandidate(candidateId, userId, id);

@@ -9,7 +9,13 @@ vi.mock("@/lib/logger", () => ({
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("@/lib/auth", async () => ({
+    ...(await vi.importActual("@/lib/auth")),
+    isGoogleAuthMode: vi.fn(() => false),
+}));
+
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { deriveOpportunityState, type Opportunity } from "@/lib/opportunity-state";
@@ -44,6 +50,7 @@ describe("Opportunity API routes", () => {
         const project = await ProjectsController.createProject({ title: "Test Project", userId });
         projectId = project.id;
         vi.mocked(getCurrentUserId).mockReturnValue(userId);
+        vi.mocked(isGoogleAuthMode).mockReturnValue(false);
     });
 
     async function createOpportunityViaApi(body: Record<string, unknown> = {}) {
@@ -299,8 +306,9 @@ describe("Opportunity API routes", () => {
         });
     });
 
-    it("returns 401 when unauthenticated", async () => {
+    it("returns 401 when Google auth is on and the caller is unauthenticated", async () => {
         vi.mocked(getCurrentUserId).mockReturnValue(null);
+        vi.mocked(isGoogleAuthMode).mockReturnValue(true);
         const { GET } = await import("@/app/api/opportunities/route");
         expect((await GET(jsonRequest("GET"))).status).toBe(401);
     });
@@ -376,9 +384,10 @@ describe("Opportunity API routes", () => {
             expect((await getOpportunity(theirs.id)).status).toBe(403);
         });
 
-        it("returns 401 when unauthenticated", async () => {
+        it("returns 401 when Google auth is on and the caller is unauthenticated", async () => {
             const opportunity = await (await createOpportunityViaApi()).json();
             vi.mocked(getCurrentUserId).mockReturnValue(null);
+            vi.mocked(isGoogleAuthMode).mockReturnValue(true);
             expect((await getOpportunity(opportunity.id)).status).toBe(401);
         });
     });

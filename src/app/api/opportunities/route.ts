@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpportunityController } from "@/lib/controllers/opportunities";
 import { OpportunityCreateSchema, OpportunityStatus } from "@/schemas/opportunities";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { opportunityErrorResponse } from "./errors";
 
 export async function GET(request: NextRequest) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const params = request.nextUrl.searchParams;
         const status = params.get("status");
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const opportunity = await OpportunityController.createOpportunity({
             ...parsed.data,

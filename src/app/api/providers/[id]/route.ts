@@ -3,12 +3,13 @@ import { prisma } from "@/lib/db";
 import { ProviderController } from "@/lib/controllers/submissions";
 import { ProviderUpdateSchema } from "@/schemas/submissions";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 import { Prisma } from "@prisma/client";
 
 type ProviderResolution =
-    | { ok: true; id: string }
+    | { ok: true; id: string; userId: string | null }
     | { ok: false; response: NextResponse };
 
 async function resolveProvider(request: NextRequest, params: Promise<{ id: string }>): Promise<ProviderResolution> {
@@ -21,13 +22,13 @@ async function resolveProvider(request: NextRequest, params: Promise<{ id: strin
         return { ok: false, response: NextResponse.json({ error: "Provider not found" }, { status: 404 }) };
     }
     const userId = getCurrentUserId(request);
-    if (!userId) {
+    if (isGoogleAuthMode() && !userId) {
         return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
     }
-    if (existing.userId !== userId) {
+    if (userId && existing.userId !== userId) {
         return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
     }
-    return { ok: true, id };
+    return { ok: true, id, userId };
 }
 
 export async function PATCH(
@@ -37,8 +38,7 @@ export async function PATCH(
     try {
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
-        const { id } = resolved;
-        const userId = getCurrentUserId(request)!;
+        const { id, userId } = resolved;
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -71,13 +71,12 @@ export async function DELETE(
 ) {
     try {
         const userId = getCurrentUserId(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (isGoogleAuthMode() && !userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const resolved = await resolveProvider(request, params);
         if (!resolved.ok) return resolved.response;
-        const { id } = resolved;
 
-        await ProviderController.deleteProvider(id, userId);
+        await ProviderController.deleteProvider(resolved.id, resolved.userId);
         return NextResponse.json({ success: true });
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {

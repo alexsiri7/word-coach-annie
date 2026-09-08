@@ -2,6 +2,9 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 
 // ── Provider ────────────────────────────────────────────────────────────
+// Ownership follows the same convention as Opportunity: a null userId is the
+// deployment-level caller of a single-user install and is unscoped; a real one
+// is matched exactly.
 
 function serializeProvider(p: Prisma.ProviderGetPayload<object>) {
     return {
@@ -17,7 +20,7 @@ function serializeProvider(p: Prisma.ProviderGetPayload<object>) {
 export class ProviderController {
     static async listProviders(userId: string | null) {
         const rawProviders = await prisma.provider.findMany({
-            where: { userId },
+            where: userId ? { userId } : {},
             orderBy: { name: "asc" },
         });
 
@@ -53,7 +56,7 @@ export class ProviderController {
             select: { id: true, userId: true },
         });
         if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (existing.userId !== userId) throw new Error("Forbidden");
+        if (userId && existing.userId !== userId) throw new Error("Forbidden");
 
         const provider = await prisma.provider.update({
             where: { id },
@@ -73,7 +76,7 @@ export class ProviderController {
             select: { id: true, userId: true },
         });
         if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (existing.userId !== userId) throw new Error("Forbidden");
+        if (userId && existing.userId !== userId) throw new Error("Forbidden");
 
         await prisma.provider.delete({ where: { id } });
 
