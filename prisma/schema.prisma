@@ -33,19 +33,21 @@ model ContentVersion {
 }
 
 model User {
-  id            String          @id @default(cuid())
-  email         String          @unique
-  googleId      String          @unique
-  name          String          @default("")
-  picture       String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  projects      Project[]
-  universes     Universe[]
-  aiSettings    UserAiSettings?
-  consents      UserConsent[]
-  providers     Provider[]
-  opportunities Opportunity[]
+  id                String          @id @default(cuid())
+  email             String          @unique
+  googleId          String          @unique
+  name              String          @default("")
+  picture           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  // Only credential a calendar client can present when fetching the deadline feed.
+  calendarFeedToken String?         @unique
+  projects          Project[]
+  universes         Universe[]
+  aiSettings        UserAiSettings?
+  consents          UserConsent[]
+  providers         Provider[]
+  opportunities     Opportunity[]
 }
 
 model UserConsent {
