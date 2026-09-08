@@ -152,6 +152,57 @@ describe("Opportunity API routes", () => {
         expect(res.status).toBe(403);
     });
 
+    describe("fetching one opportunity", () => {
+        async function getOpportunity(id: string) {
+            const { GET } = await import("@/app/api/opportunities/[id]/route");
+            return GET(jsonRequest("GET"), { params: Promise.resolve({ id }) });
+        }
+
+        it("returns the contest with its provider and candidate detail", async () => {
+            const opportunity = await (await createOpportunityViaApi()).json();
+            const { POST: postCandidate } = await import("@/app/api/opportunities/[id]/candidates/route");
+            await postCandidate(jsonRequest("POST", { projectId }), {
+                params: Promise.resolve({ id: opportunity.id }),
+            });
+
+            const res = await getOpportunity(opportunity.id);
+            expect(res.status).toBe(200);
+            expect(await res.json()).toMatchObject({
+                id: opportunity.id,
+                title: "Spring Prize",
+                provider: { id: providerId, name: "Contest Org" },
+                candidates: [{ projectId, project: { id: projectId, title: "Test Project" }, submission: null }],
+            });
+        });
+
+        it("returns 404 for an opportunity that does not exist", async () => {
+            expect((await getOpportunity("missing")).status).toBe(404);
+        });
+
+        it("returns 403 for an opportunity owned by another user", async () => {
+            const other = await prisma.user.create({
+                data: { id: "opp-route-reader", email: "opp-reader@test.com", googleId: "google-opp-reader" },
+            });
+            const theirProvider = await prisma.provider.create({ data: { userId: other.id, name: "Their Org" } });
+            const theirs = await prisma.opportunity.create({
+                data: {
+                    userId: other.id,
+                    providerId: theirProvider.id,
+                    title: "Their Prize",
+                    closeDate: new Date(CLOSE_DATE),
+                },
+            });
+
+            expect((await getOpportunity(theirs.id)).status).toBe(403);
+        });
+
+        it("returns 401 when unauthenticated", async () => {
+            const opportunity = await (await createOpportunityViaApi()).json();
+            vi.mocked(getCurrentUserId).mockReturnValue(null);
+            expect((await getOpportunity(opportunity.id)).status).toBe(401);
+        });
+    });
+
     it("returns 404 when patching an opportunity that does not exist", async () => {
         const { PATCH } = await import("@/app/api/opportunities/[id]/route");
         const res = await PATCH(jsonRequest("PATCH", { status: "closed" }), {

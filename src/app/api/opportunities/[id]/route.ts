@@ -10,6 +10,19 @@ function sanitizeOptional(value: string | null | undefined): string | null | und
     return typeof value === "string" ? sanitizeInput(value) : value;
 }
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const userId = getCurrentUserId(request);
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { id } = await params;
+        const opportunity = await OpportunityController.getOpportunity(id, userId);
+        return NextResponse.json(opportunity);
+    } catch (error) {
+        return opportunityErrorResponse("GET /api/opportunities/[id]", error);
+    }
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userId = getCurrentUserId(request);
