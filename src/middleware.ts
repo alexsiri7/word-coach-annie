@@ -31,6 +31,8 @@ function buildCsp(nonce: string): string {
 /** Paths that never require authentication. */
 const PUBLIC_PATHS = [
     "/api/health",
+    // Calendar clients cannot log in; the feed's unguessable token is its credential.
+    "/api/calendar",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/google",

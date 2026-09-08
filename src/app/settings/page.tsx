@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2, CalendarClock, Copy, RefreshCw } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,13 @@ export default function SettingsPage() {
   const [hashnodeDisconnecting, setHashnodeDisconnecting] = useState(false);
   const [hashnodeError, setHashnodeError] = useState("");
 
+  // Calendar feed state
+  const [feedPath, setFeedPath] = useState<string | null>(null);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedCopied, setFeedCopied] = useState(false);
+  const [feedRegenerateOpen, setFeedRegenerateOpen] = useState(false);
+  const [feedRegenerating, setFeedRegenerating] = useState(false);
+
   // Privacy & Data state
   const [replayAllowed, setReplayAllowed] = useState(true);
   const [consentLoading, setConsentLoading] = useState(true);
@@ -139,6 +146,17 @@ export default function SettingsPage() {
       .finally(() => setConsentLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetch("/api/account/calendar-feed")
+      .then((res) => {
+        if (!res.ok) throw new Error(`calendar feed fetch failed: ${res.status}`);
+        return res.json();
+      })
+      .then((data: { feedPath: string }) => setFeedPath(data.feedPath))
+      .catch(console.error)
+      .finally(() => setFeedLoading(false));
+  }, []);
+
   const handleHashnodeConnect = async () => {
     const trimmed = hashnodeToken.trim();
     if (!trimmed) return;
@@ -176,6 +194,37 @@ export default function SettingsPage() {
       console.error("Failed to disconnect Hashnode", err);
     } finally {
       setHashnodeDisconnecting(false);
+    }
+  };
+
+  const feedUrl = feedPath && typeof window !== "undefined" ? `${window.location.origin}${feedPath}` : "";
+
+  const handleFeedCopy = async () => {
+    if (!feedUrl) return;
+    try {
+      await navigator.clipboard.writeText(feedUrl);
+      setFeedCopied(true);
+      setTimeout(() => setFeedCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy calendar feed URL", err);
+    }
+  };
+
+  const handleFeedRegenerate = async () => {
+    setFeedRegenerating(true);
+    try {
+      const res = await fetch("/api/account/calendar-feed", {
+        method: "POST",
+        headers: { "X-CSRF-Protection": "1" },
+      });
+      if (!res.ok) throw new Error(`calendar feed regenerate failed: ${res.status}`);
+      const data: { feedPath: string } = await res.json();
+      setFeedPath(data.feedPath);
+      setFeedRegenerateOpen(false);
+    } catch (err) {
+      console.error("Failed to regenerate calendar feed URL", err);
+    } finally {
+      setFeedRegenerating(false);
     }
   };
 
@@ -754,6 +803,99 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+
+        {/* Deadline calendar feed */}
+        <div className="glass-card p-6 mt-6">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarClock className="h-4 w-4 text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">Deadline calendar feed</h2>
+          </div>
+          <p className="text-sm text-text-secondary mb-4">
+            Subscribe to every open opportunity as all-day events on their close dates. The feed
+            updates itself — closed or edited opportunities change on the next refresh.
+          </p>
+
+          {feedLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-5 w-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : feedUrl ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Input readOnly value={feedUrl} aria-label="Calendar subscription URL" className="font-mono text-xs" />
+                <Button variant="outline" size="sm" onClick={handleFeedCopy} className="gap-1.5 shrink-0">
+                  {feedCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {feedCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <p className="text-xs text-text-muted">
+                Anyone with this URL can read your opportunity deadlines — treat it as a password.
+              </p>
+
+              <div className="border-t border-border pt-4 space-y-3 text-xs text-text-muted">
+                <div>
+                  <p className="text-sm text-text-primary mb-1">Google Calendar</p>
+                  <p>
+                    Other calendars &rarr; From URL, paste the link, then Add calendar. Open its
+                    settings and add two notifications — for example 2 weeks and 1 day before — which
+                    then apply to every deadline in the feed.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-text-primary mb-1">Apple Calendar</p>
+                  <p>
+                    File &rarr; New Calendar Subscription, paste the link, then set Alerts to two
+                    reminders (for example 2 weeks and 1 day before) and Auto-refresh to every day.
+                  </p>
+                </div>
+                <p>
+                  Reminder timings live in your calendar app rather than in the feed: Google discards
+                  alarms carried in a subscription, so offsets set here would silently never fire.
+                </p>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <p className="text-sm text-text-primary mb-1">Regenerate URL</p>
+                <p className="text-xs text-text-muted mb-3">
+                  Issues a new address and stops the old one working. Use this if the link has been
+                  shared by accident — every subscribed calendar will need the new URL.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFeedRegenerateOpen(true)}
+                  className="gap-1.5"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted">
+              Calendar feed unavailable — it needs a signed-in account.
+            </p>
+          )}
+        </div>
+
+        <AlertDialog open={feedRegenerateOpen} onOpenChange={setFeedRegenerateOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Regenerate calendar URL?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The current URL stops working immediately. Any calendar already subscribed to it will
+                stop updating until you give it the new address.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={feedRegenerating}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleFeedRegenerate} disabled={feedRegenerating}>
+                {feedRegenerating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Regenerate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Privacy & Data */}
         <div className="glass-card p-6 mt-6">

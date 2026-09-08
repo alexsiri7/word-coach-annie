@@ -80,6 +80,13 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
+    it("allows the calendar feed without a session (token in the URL is the credential)", async () => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const req = createRequest("/api/calendar/opportunities/some-token.ics");
+        const res = await middleware(req);
+        expect(res.status).toBe(200);
+    });
+
     it("blocks /api/metrics path when unauthenticated (auth required)", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/metrics");
