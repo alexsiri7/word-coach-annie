@@ -37,6 +37,7 @@ export type OpportunityStateKind =
     | "accepted"
     | "rejected"
     | "submitted"
+    | "withdrawn"
     | "missed"
     | "chosen"
     | "considering"
@@ -49,6 +50,25 @@ export interface OpportunityState {
     candidates: OpportunityCandidate[];
 }
 
+type EnteredCandidate = OpportunityCandidate & { submission: NonNullable<OpportunityCandidate["submission"]> };
+
+function isEntered(candidate: OpportunityCandidate): candidate is EnteredCandidate {
+    return candidate.submission !== null;
+}
+
+/**
+ * Every outcome a promoted candidate can reach, so that a new `SubmissionStatus` member
+ * cannot quietly inherit another one's label. When an opportunity holds several entries,
+ * the lowest precedence wins — a decision already made outranks one still pending, and a
+ * withdrawal is what is left to report only when nothing else happened.
+ */
+const OUTCOMES: Record<SubmissionStatusValue, { kind: OpportunityStateKind; label: string; precedence: number }> = {
+    accepted: { kind: "accepted", label: "Accepted", precedence: 0 },
+    rejected: { kind: "rejected", label: "Rejected", precedence: 1 },
+    submitted: { kind: "submitted", label: "Submitted", precedence: 2 },
+    withdrawn: { kind: "withdrawn", label: "Withdrawn", precedence: 3 },
+};
+
 /**
  * Collapse the three records that hold an opportunity's state — the opportunity, its
  * candidates and any submission a candidate was promoted into — into the single value a
@@ -58,15 +78,15 @@ export interface OpportunityState {
  */
 export function deriveOpportunityState(opportunity: Opportunity, now: Date): OpportunityState {
     const { candidates } = opportunity;
-    const entered = candidates.filter((c) => c.submission !== null);
+    const entered = candidates.filter(isEntered);
 
-    const accepted = entered.filter((c) => c.submission?.status === "accepted");
-    if (accepted.length > 0) return { kind: "accepted", label: "Accepted", candidates: accepted };
-
-    const rejected = entered.filter((c) => c.submission?.status === "rejected");
-    if (rejected.length > 0) return { kind: "rejected", label: "Rejected", candidates: rejected };
-
-    if (entered.length > 0) return { kind: "submitted", label: "Submitted", candidates: entered };
+    if (entered.length > 0) {
+        const outcome = entered
+            .map((c) => c.submission.status)
+            .reduce((a, b) => (OUTCOMES[a].precedence <= OUTCOMES[b].precedence ? a : b));
+        const { kind, label } = OUTCOMES[outcome];
+        return { kind, label, candidates: entered.filter((c) => c.submission.status === outcome) };
+    }
 
     if (daysUntilClose(opportunity.closeDate, now) < 0) {
         return { kind: "missed", label: "Closed, nothing entered", candidates: [] };

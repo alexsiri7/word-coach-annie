@@ -127,6 +127,23 @@ describe("deriveOpportunityState", () => {
         expect(names(rejected)).toEqual(["Mars"]);
     });
 
+    it("does not read a withdrawn entry as one still waiting on the provider", () => {
+        const o = opportunity(PASSED, [candidate("Amber", "chosen", "withdrawn")]);
+
+        expect(deriveOpportunityState(o, NOW)).toMatchObject({ kind: "withdrawn", label: "Withdrawn" });
+        expect(names(o)).toEqual(["Amber"]);
+    });
+
+    it("lets a live entry outrank a withdrawn one", () => {
+        const o = opportunity(PASSED, [
+            candidate("Amber", "chosen", "withdrawn"),
+            candidate("Mars", "chosen", "submitted"),
+        ]);
+
+        expect(deriveOpportunityState(o, NOW).kind).toBe("submitted");
+        expect(names(o)).toEqual(["Mars"]);
+    });
+
     it("still reads as open on the closing day itself", () => {
         const closesToday = opportunity("2026-06-01T12:00:00.000Z", []);
 
