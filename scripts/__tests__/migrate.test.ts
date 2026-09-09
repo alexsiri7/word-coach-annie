@@ -1,6 +1,17 @@
 import { spawnSync } from 'child_process';
 import { join } from 'path';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { splitSqlStatements } from '../sql-tokenizer.mjs';
+
+const MIGRATE_SCRIPT = join(__dirname, '../migrate.mjs');
+
+function runMigrate(databaseUrl: string) {
+  return spawnSync('node', [MIGRATE_SCRIPT], {
+    env: { ...process.env, DATABASE_URL: databaseUrl },
+    encoding: 'utf-8',
+  });
+}
 
 describe('splitSqlStatements()', () => {
   it('splits simple semicolon-separated statements', () => {
@@ -111,4 +122,53 @@ describe('migrate.mjs — DATABASE_URL guard', () => {
     expect(result.stderr).toContain('DATABASE_URL is not set');
     expect(result.stderr).toContain('skipping migrations');
   });
+});
+
+describe('migrate.mjs — transient connection failures', () => {
+  it('retries before giving up, then exits non-zero', () => {
+    // Port 1 refuses immediately, so each attempt fails the same way and fast.
+    const result = runMigrate('postgresql://postgres:postgres@127.0.0.1:1/annie_test');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Migration attempt 1/3 failed');
+    expect(result.stderr).toContain('Migration attempt 2/3 failed');
+    expect(result.stderr).toContain('Migration attempt 3/3 failed');
+    expect(result.stderr).toContain('Migration failed after 3 attempts');
+  }, 60_000);
+});
+
+describe('migrate.mjs — migration bookkeeping ignores search_path', () => {
+  const SCRATCH_DB = 'annie_migrate_search_path_test';
+  let admin: PrismaClient;
+  let scratchUrl: string;
+
+  // FORCE so teardown never blocks on a lingering backend from a spawned run.
+  const dropScratch = () =>
+    admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${SCRATCH_DB} WITH (FORCE)`);
+
+  beforeAll(async () => {
+    const base = new URL(process.env.TEST_DATABASE_URL as string);
+    admin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
+    await dropScratch();
+    await admin.$executeRawUnsafe(`CREATE DATABASE ${SCRATCH_DB}`);
+
+    base.pathname = `/${SCRATCH_DB}`;
+    scratchUrl = base.href;
+  }, 60_000);
+
+  afterAll(async () => {
+    await dropScratch();
+    await admin.$disconnect();
+  }, 60_000);
+
+  it('restarts cleanly when the pooler hands back an empty search_path', () => {
+    expect(runMigrate(scratchUrl).status).toBe(0);
+
+    const emptySearchPath = `${scratchUrl}?options=-c%20search_path%3D`;
+    const restart = runMigrate(emptySearchPath);
+
+    expect(restart.stderr).not.toContain('no schema has been selected');
+    expect(restart.status).toBe(0);
+    expect(restart.stdout).toContain('Migrations up to date.');
+  }, 60_000);
 });

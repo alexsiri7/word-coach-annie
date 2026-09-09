@@ -32,12 +32,10 @@ try {
   console.error('Migration failed: could not load Prisma packages:', e);
   process.exit(1);
 }
-const adapter = new PrismaPg({ connectionString });
-const prisma = new PrismaClient({ adapter });
 
-async function ensureMigrationsTable() {
+async function ensureMigrationsTable(prisma) {
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+    CREATE TABLE IF NOT EXISTS public."_prisma_migrations" (
       "id" VARCHAR(36) NOT NULL,
       "checksum" VARCHAR(64) NOT NULL,
       "finished_at" TIMESTAMPTZ,
@@ -51,18 +49,17 @@ async function ensureMigrationsTable() {
   `);
 }
 
-async function migrate() {
-  await ensureMigrationsTable();
+async function migrate(prisma) {
+  await ensureMigrationsTable(prisma);
 
   // Get applied migrations
-  const applied = await prisma.$queryRaw`SELECT migration_name FROM _prisma_migrations WHERE rolled_back_at IS NULL`;
+  const applied = await prisma.$queryRaw`SELECT migration_name FROM public."_prisma_migrations" WHERE rolled_back_at IS NULL`;
   const appliedNames = new Set(applied.map((r) => r.migration_name));
 
   // Get migration directories (sorted)
   const migrationsDir = join(process.cwd(), 'prisma', 'migrations');
   if (!existsSync(migrationsDir)) {
     console.log('No prisma/migrations directory found, skipping.');
-    await prisma.$disconnect();
     return;
   }
 
@@ -124,7 +121,7 @@ async function migrate() {
     // Record in _prisma_migrations
     const id = randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
+      `INSERT INTO public."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
       id,
       checksum,
       dir
@@ -139,12 +136,38 @@ async function migrate() {
   } else {
     console.log(`Applied ${appliedCount} migration(s).`);
   }
-
-  await prisma.$disconnect();
 }
 
-migrate().catch(async (e) => {
-  console.error('Migration failed:', e);
-  await prisma.$disconnect();
-  process.exit(1);
-});
+const ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2000;
+
+// A failure in this ~10s startup window crashes the container with no server,
+// and nothing redeploys it automatically — so a transient connection fault
+// must not be fatal on the first try. Each attempt builds its own client so a
+// retry gets a fresh pooled connection rather than reusing the bad session.
+async function runMigrations() {
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    let failure = null;
+    try {
+      await migrate(prisma);
+    } catch (e) {
+      failure = e;
+    } finally {
+      await prisma.$disconnect().catch(() => {});
+    }
+
+    if (!failure) return;
+
+    console.error(`Migration attempt ${attempt}/${ATTEMPTS} failed:`, failure);
+
+    if (attempt === ATTEMPTS) {
+      console.error(`Migration failed after ${ATTEMPTS} attempts.`);
+      process.exit(1);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+  }
+}
+
+await runMigrations();
