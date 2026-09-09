@@ -33,6 +33,8 @@ try {
   process.exit(1);
 }
 
+const MIGRATION_TIMEOUT_MS = 5 * 60 * 1000;
+
 async function ensureMigrationsTable(prisma) {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS public."_prisma_migrations" (
@@ -107,25 +109,38 @@ async function migrate(prisma) {
     // Uses a context-aware tokenizer to handle dollar-quoted strings ($$...$$)
     // and single-quoted strings that may contain semicolons.
     const statements = splitSqlStatements(sql);
-
-    for (const [i, stmt] of statements.entries()) {
-      try {
-        await prisma.$executeRawUnsafe(stmt);
-      } catch (e) {
-        console.error(`  FAIL  ${dir} — statement ${i + 1}/${statements.length}:`);
-        console.error(`         ${stmt.slice(0, 200)}`);
-        throw e;
-      }
-    }
-
-    // Record in _prisma_migrations
     const id = randomUUID();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO public."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
-      id,
-      checksum,
-      dir
-    );
+
+    // One transaction per migration, so every statement below runs on the same
+    // backend connection. Supavisor assigns a backend per transaction, so a
+    // standalone SET search_path would not reliably bind for the unqualified
+    // statements inside migration.sql it exists to protect — an empty
+    // search_path is what crashed boot with 3F000 in #1119. SET LOCAL scopes the
+    // override to this transaction so the pooled backend is handed back
+    // unchanged. Prisma's 5s default transaction timeout is well below what a
+    // cold-start migration can legitimately take.
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET LOCAL search_path TO public, extensions');
+
+      for (const [i, stmt] of statements.entries()) {
+        try {
+          await tx.$executeRawUnsafe(stmt);
+        } catch (e) {
+          console.error(`  FAIL  ${dir} — statement ${i + 1}/${statements.length}:`);
+          console.error(`         ${stmt.slice(0, 200)}`);
+          throw e;
+        }
+      }
+
+      // Record in _prisma_migrations inside the same transaction, so a migration
+      // is never recorded without its statements having committed.
+      await tx.$executeRawUnsafe(
+        `INSERT INTO public."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
+        id,
+        checksum,
+        dir
+      );
+    }, { timeout: MIGRATION_TIMEOUT_MS });
 
     appliedCount++;
     console.log(`  done  ${dir}`);
