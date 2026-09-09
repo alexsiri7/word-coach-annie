@@ -234,6 +234,12 @@ GHSA-w62v-xxxg-mg59
 GHSA-8j4g-w8fx-2239
 GHSA-f23p-vx2j-j53r
 GHSA-54fx-42gc-7vw4
+# 2026-09-09: toSSG() path escape (unused — no static site generation), parseBody()
+# dot-notation nesting memory exhaustion, and query-parser URL-fragment differential.
+# Same exposure as above: hono only serves the locally-reachable MCP transport.
+GHSA-gqvv-2mrq-wpjv
+GHSA-g6gw-c38x-mqfc
+GHSA-crvj-82cr-hjcx
 #
 # Source: ip-address (additional SSRF/trust-boundary CVEs beyond GHSA-v2v4-37r5-5v8g)
 # Justification: SSRF bypass via octal/CIDR/IPv4-mapped address misclassification.
@@ -252,6 +258,9 @@ GHSA-22jq-vg5j-6vgg
 # App risk: LOW — no user-supplied YAML parsing at runtime.
 GHSA-52cp-r559-cp3m
 GHSA-5p4m-2wfm-xmqj
+# 2026-09-09: maxTotalMergeKeys does not bound CPU for empty merge sources (js-yaml <4.3.2).
+# Same exposure: js-yaml is transitive via @google/adk; no attacker-controlled YAML is parsed.
+GHSA-2883-xcg3-v3hh
 #
 # Source: nanoid (via various transitive chains)
 # Justification: Non-secure generators loop indefinitely with negative/zero size.
@@ -382,3 +391,7 @@ GHSA-g5xc-5w98-jfvm
 # Upgrade path: requires @google/adk to bump its adm-zip dependency (upstream fix).
 # App risk: NONE — the vulnerable code path is never invoked by this app.
 GHSA-xcpc-8h2w-3j85
+# 2026-09-09: adm-zip extraction follows destination symlinks (arbitrary file overwrite).
+# Same exposure as above: the @google/adk skill-zip loader is never invoked by this app.
+# No fixed version exists yet (affected range >=0.5.9 <=0.6.0).
+GHSA-vwc7-r8mq-g2x9
