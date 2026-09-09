@@ -114,7 +114,11 @@ async function migrate(prisma) {
       } catch (e) {
         console.error(`  FAIL  ${dir} — statement ${i + 1}/${statements.length}:`);
         console.error(`         ${stmt.slice(0, 200)}`);
-        throw e;
+        console.error(e);
+        // Statements 1..i already committed and nothing records them, so a
+        // retry would replay them. Abort for a human, like the DDL guard above.
+        console.error(`  ABORT ${dir} — partially applied, not safe to retry automatically.`);
+        process.exit(1);
       }
     }
 
@@ -141,13 +145,22 @@ async function migrate(prisma) {
 const ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;
 
+// #1118: the pooler handed back a connection whose search_path resolved to
+// nothing, so every unqualified identifier — in this script's bookkeeping and
+// in the migration SQL it executes — failed. Startup options are applied per
+// physical connection, so this covers every connection the pool opens, unlike
+// a session-level SET that only lands on whichever one served it.
+const PG_OPTIONS = '-c search_path=public';
+
 // A failure in this ~10s startup window crashes the container with no server,
 // and nothing redeploys it automatically — so a transient connection fault
 // must not be fatal on the first try. Each attempt builds its own client so a
 // retry gets a fresh pooled connection rather than reusing the bad session.
 async function runMigrations() {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = new PrismaClient({
+      adapter: new PrismaPg({ connectionString, options: PG_OPTIONS }),
+    });
     let failure = null;
     try {
       await migrate(prisma);

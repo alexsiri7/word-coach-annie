@@ -1,4 +1,7 @@
-import { spawnSync } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { AddressInfo, createConnection, createServer, Server } from 'net';
+import { tmpdir } from 'os';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -6,11 +9,54 @@ import { splitSqlStatements } from '../sql-tokenizer.mjs';
 
 const MIGRATE_SCRIPT = join(__dirname, '../migrate.mjs');
 
-function runMigrate(databaseUrl: string) {
+function runMigrate(databaseUrl: string, cwd?: string) {
   return spawnSync('node', [MIGRATE_SCRIPT], {
+    cwd,
     env: { ...process.env, DATABASE_URL: databaseUrl },
     encoding: 'utf-8',
   });
+}
+
+// spawnSync would block this process's event loop, and the retry test needs it
+// free to serve the relay the migration script connects through.
+function runMigrateAsync(databaseUrl: string) {
+  return new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
+    const child = spawn('node', [MIGRATE_SCRIPT], {
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
+
+function scratchDatabase(name: string) {
+  const state = { admin: null as unknown as PrismaClient, url: '' };
+
+  // FORCE so teardown never blocks on a lingering backend from a spawned run.
+  const drop = () => state.admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+
+  const create = async (extraSetup?: string) => {
+    const base = new URL(process.env.TEST_DATABASE_URL as string);
+    state.admin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
+    await drop();
+    await state.admin.$executeRawUnsafe(`CREATE DATABASE ${name}`);
+    if (extraSetup) await state.admin.$executeRawUnsafe(extraSetup);
+
+    base.pathname = `/${name}`;
+    state.url = base.href;
+  };
+
+  const destroy = async () => {
+    await drop();
+    await state.admin.$disconnect();
+  };
+
+  return { create, destroy, url: () => state.url };
 }
 
 describe('splitSqlStatements()', () => {
@@ -137,38 +183,120 @@ describe('migrate.mjs — transient connection failures', () => {
   }, 60_000);
 });
 
-describe('migrate.mjs — migration bookkeeping ignores search_path', () => {
-  const SCRATCH_DB = 'annie_migrate_search_path_test';
-  let admin: PrismaClient;
-  let scratchUrl: string;
+describe('migrate.mjs — connections with no usable search_path', () => {
+  const scratch = scratchDatabase('annie_migrate_search_path_test');
 
-  // FORCE so teardown never blocks on a lingering backend from a spawned run.
-  const dropScratch = () =>
-    admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${SCRATCH_DB} WITH (FORCE)`);
+  // A database-level default is the closest local stand-in for the pooler
+  // handing back a session with nothing usable in search_path (#1118).
+  beforeAll(
+    () => scratch.create(`ALTER DATABASE annie_migrate_search_path_test SET search_path TO ''`),
+    60_000
+  );
 
-  beforeAll(async () => {
-    const base = new URL(process.env.TEST_DATABASE_URL as string);
-    admin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
-    await dropScratch();
-    await admin.$executeRawUnsafe(`CREATE DATABASE ${SCRATCH_DB}`);
+  afterAll(() => scratch.destroy(), 60_000);
 
-    base.pathname = `/${SCRATCH_DB}`;
-    scratchUrl = base.href;
-  }, 60_000);
+  it('migrates a fresh database and then restarts cleanly', () => {
+    const fresh = runMigrate(scratch.url());
 
-  afterAll(async () => {
-    await dropScratch();
-    await admin.$disconnect();
-  }, 60_000);
+    expect(fresh.stderr).not.toContain('no schema has been selected');
+    expect(fresh.status).toBe(0);
+    expect(fresh.stdout).toMatch(/Applied \d+ migration\(s\)\./);
 
-  it('restarts cleanly when the pooler hands back an empty search_path', () => {
-    expect(runMigrate(scratchUrl).status).toBe(0);
-
-    const emptySearchPath = `${scratchUrl}?options=-c%20search_path%3D`;
-    const restart = runMigrate(emptySearchPath);
+    // A URL-level `options` outranks the script's own startup option, so the
+    // restart really does arrive on a connection with an empty search_path.
+    const restart = runMigrate(`${scratch.url()}?options=-c%20search_path%3D`);
 
     expect(restart.stderr).not.toContain('no schema has been selected');
     expect(restart.status).toBe(0);
     expect(restart.stdout).toContain('Migrations up to date.');
+  }, 60_000);
+});
+
+describe('migrate.mjs — recovers from a transient connection fault', () => {
+  const scratch = scratchDatabase('annie_migrate_retry_test');
+  let relay: Server;
+  let relayUrl: string;
+
+  beforeAll(async () => {
+    await scratch.create();
+
+    const target = new URL(scratch.url());
+    let refusedFirst = false;
+    relay = createServer((socket) => {
+      if (!refusedFirst) {
+        refusedFirst = true;
+        socket.destroy();
+        return;
+      }
+      const upstream = createConnection(Number(target.port || 5432), target.hostname);
+      socket.pipe(upstream).pipe(socket);
+      socket.on('error', () => upstream.destroy());
+      upstream.on('error', () => socket.destroy());
+    });
+    await new Promise<void>((resolve) => relay.listen(0, '127.0.0.1', resolve));
+
+    const relayed = new URL(scratch.url());
+    relayed.hostname = '127.0.0.1';
+    relayed.port = String((relay.address() as AddressInfo).port);
+    relayUrl = relayed.href;
+  }, 60_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => relay.close(() => resolve()));
+    await scratch.destroy();
+  }, 60_000);
+
+  it('migrates anyway after a first attempt loses its connection', async () => {
+    const result = await runMigrateAsync(relayUrl);
+
+    expect(result.stderr).toContain('Migration attempt 1/3 failed');
+    expect(result.stderr).not.toContain('Migration failed after 3 attempts');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/Applied \d+ migration\(s\)\./);
+  }, 60_000);
+});
+
+describe('migrate.mjs — a migration that fails partway through', () => {
+  const scratch = scratchDatabase('annie_migrate_partial_test');
+  let workDir: string;
+
+  beforeAll(async () => {
+    await scratch.create();
+
+    // migrate.mjs reads prisma/migrations relative to the working directory,
+    // so a throwaway one keeps this scenario out of the real migration set.
+    workDir = mkdtempSync(join(tmpdir(), 'annie-migrate-'));
+    const migrationDir = join(workDir, 'prisma', 'migrations', '00000000000000_partial');
+    mkdirSync(migrationDir, { recursive: true });
+    writeFileSync(
+      join(migrationDir, 'migration.sql'),
+      'CREATE TABLE first_step (id INT);\nCREATE TABLE second_step (id INT) INVALID SYNTAX;\n'
+    );
+  }, 60_000);
+
+  afterAll(async () => {
+    rmSync(workDir, { recursive: true, force: true });
+    await scratch.destroy();
+  }, 60_000);
+
+  it('aborts rather than replaying statements that already committed', async () => {
+    const result = runMigrate(scratch.url(), workDir);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('partially applied, not safe to retry');
+    expect(result.stderr).not.toContain('Migration attempt 2/3 failed');
+    expect(result.stdout.match(/apply 00000000000000_partial/g)).toHaveLength(1);
+
+    const check = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: scratch.url() }),
+    });
+    try {
+      const [{ committed }] = await check.$queryRawUnsafe<{ committed: boolean }[]>(
+        `SELECT to_regclass('public.first_step') IS NOT NULL AS committed`
+      );
+      expect(committed).toBe(true);
+    } finally {
+      await check.$disconnect();
+    }
   }, 60_000);
 });
