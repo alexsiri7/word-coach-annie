@@ -60,7 +60,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.8",
+    "dompurify": "^3.4.15",
     "epub-gen-memory": "^1.1.2",
     "google-auth-library": "^10.6.2",
     "googleapis": "^178.0.0",
