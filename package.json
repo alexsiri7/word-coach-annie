@@ -89,7 +89,7 @@
     "adm-zip": "^0.6.1"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.3.4",
+    "@next/bundle-analyzer": "^16.3.5",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/archiver": "^7.0.0",
