@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, type DbClient } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 
 // ── Provider ────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export class ContestSubmissionController {
             submissionUrl?: string;
             status?: string;
         },
-        client: Prisma.TransactionClient = prisma
+        client: DbClient = prisma
     ) {
         const project = await client.project.findUnique({
             where: { id: params.projectId },
