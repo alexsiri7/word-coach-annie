@@ -1,3 +1,4 @@
+import type { MappedError } from "@prisma/driver-adapter-utils";
 import { logger } from "@/lib/logger";
 
 /**
@@ -26,10 +27,13 @@ import { logger } from "@/lib/logger";
 const CONNECT_FAILURE = /failed to connect to database/i;
 
 /** Adapter error kinds raised before any statement is sent. */
-const RETRYABLE_ADAPTER_KINDS = new Set(["DatabaseNotReachable", "TlsConnectionError"]);
+const RETRYABLE_ADAPTER_KINDS: ReadonlySet<MappedError["kind"]> = new Set([
+  "DatabaseNotReachable",
+  "TlsConnectionError",
+]);
 
 /** Delay before each retry; total attempts = length + 1. */
-export const RETRY_DELAYS_MS: readonly number[] = [150, 600];
+const RETRY_DELAYS_MS: readonly number[] = [150, 600];
 
 /**
  * How many links of an error chain to inspect. Prisma surfaces an adapter
@@ -49,7 +53,7 @@ function isRetryableLink(link: object): boolean {
   if (name === "PrismaClientInitializationError") return true;
 
   if (name === "DriverAdapterError" && typeof cause === "object" && cause !== null) {
-    const payload = cause as { kind?: unknown; message?: unknown };
+    const payload = cause as { kind?: MappedError["kind"]; message?: unknown };
     if (typeof payload.kind !== "string") return false;
     if (RETRYABLE_ADAPTER_KINDS.has(payload.kind)) return true;
     return (
