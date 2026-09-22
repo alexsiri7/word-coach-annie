@@ -195,7 +195,7 @@ describe("the retry extension on a real client", () => {
             await expect(client.project.findMany()).rejects.toThrow(/Failed to connect to database/);
             expect(attempts).toHaveLength(3);
             expect(warn).toHaveBeenCalledTimes(2);
-            expect(warn.mock.calls[0][1]).toMatchObject({ model: "Project", operation: "findMany" });
+            expect(warn.mock.calls[0][1]).toEqual({ model: "Project", operation: "findMany", attempt: 1, delayMs: 150 });
         } finally {
             warn.mockRestore();
             await client.$disconnect();
@@ -214,9 +214,43 @@ describe("the retry extension on a real client", () => {
         try {
             await expect(client.project.findMany()).rejects.toThrow();
             expect(warn).toHaveBeenCalledTimes(2);
+            expect(warn.mock.calls[0][1]).toEqual({ model: "Project", operation: "findMany", attempt: 1, delayMs: 150 });
         } finally {
             warn.mockRestore();
             await client.$disconnect();
+        }
+    });
+
+    /**
+     * The exported `prisma` singleton, not a hand-extended client: this is the
+     * only test that fails if `createPrismaClient` stops applying the extension.
+     */
+    it("retries through the client every route imports", async () => {
+        const { server, attempts } = listenRefusingConnections(SUPAVISOR_NXDOMAIN);
+        await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+        const { port } = server.address() as net.AddressInfo;
+
+        // src/lib/db.ts caches the client on globalThis outside production, so the
+        // module-scope import above would otherwise be handed back unchanged.
+        const globalForPrisma = globalThis as unknown as { prisma?: unknown };
+        const cachedClient = globalForPrisma.prisma;
+        const databaseUrl = process.env.DATABASE_URL;
+        delete globalForPrisma.prisma;
+        process.env.DATABASE_URL = `postgresql://u:p@127.0.0.1:${port}/db`;
+        vi.resetModules();
+
+        let disconnect: (() => Promise<void>) | undefined;
+        try {
+            const { prisma } = await import("@/lib/db");
+            disconnect = () => prisma.$disconnect();
+            await expect(prisma.project.findMany()).rejects.toThrow(/Failed to connect to database/);
+            expect(attempts).toHaveLength(3);
+        } finally {
+            await disconnect?.();
+            globalForPrisma.prisma = cachedClient;
+            process.env.DATABASE_URL = databaseUrl;
+            vi.resetModules();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
         }
     });
 });
