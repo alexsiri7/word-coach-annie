@@ -19,14 +19,34 @@ export const connectionRetry = Prisma.defineExtension({
   },
 });
 
+/** The configured DATABASE_SCHEMA, or undefined to use the connection's default. */
+export function databaseSchema(): string | undefined {
+  const schema = process.env.DATABASE_SCHEMA?.trim();
+  if (!schema) return undefined;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+    throw new Error(`DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
+  }
+  return schema;
+}
+
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   // During next build (page data collection), DATABASE_URL may not be set.
   // Use a placeholder URL so PrismaClient can be constructed; it will fail on
   // first actual query, which is fine since builds don't query the database.
-  const adapter = new PrismaPg({
-    connectionString: connectionString || "postgresql://build:build@localhost:5432/build",
-  });
+  const adapter = new PrismaPg(
+    {
+      connectionString: connectionString || "postgresql://build:build@localhost:5432/build",
+      // Prod shares one Supabase database (and its pooler's connection budget)
+      // with other apps, so keep this process's footprint small.
+      max: 5,
+    },
+    // DATABASE_SCHEMA names the Postgres schema holding Annie's tables. Unset
+    // keeps the historical behaviour (unqualified names, i.e. `public` via the
+    // default search_path). The transaction pooler ignores startup
+    // search_path settings, so a non-public schema must be named explicitly here.
+    { schema: databaseSchema() },
+  );
   return new PrismaClient({ adapter }).$extends(connectionRetry);
 }
 

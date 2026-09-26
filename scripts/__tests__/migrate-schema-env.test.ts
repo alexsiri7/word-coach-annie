@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-// Kept apart from migrate.test.ts: that file drives the real runner against a
-// scratch database, and a module-level PrismaClient mock would hijack it.
+// Companion to migrate-schema-resolution.test.ts with DATABASE_SCHEMA set.
+// migrate.mjs runs on import, so each schema setting needs its own test file.
 const migrateMocks = vi.hoisted(() => {
   const executed: string[] = [];
   const queried: string[] = [];
@@ -42,10 +42,16 @@ vi.mock('@prisma/client', () => ({
 }));
 vi.mock('@prisma/adapter-pg', () => ({ PrismaPg: class {} }));
 
-describe('migrate.mjs — schema resolution', () => {
+describe('migrate.mjs — DATABASE_SCHEMA', () => {
   const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalSchema = process.env.DATABASE_SCHEMA;
 
   afterAll(() => {
+    if (originalSchema === undefined) {
+      delete process.env.DATABASE_SCHEMA;
+    } else {
+      process.env.DATABASE_SCHEMA = originalSchema;
+    }
     if (originalDatabaseUrl === undefined) {
       delete process.env.DATABASE_URL;
     } else {
@@ -53,7 +59,7 @@ describe('migrate.mjs — schema resolution', () => {
     }
   });
 
-  it('pins each migration to one connection and schema-qualifies every _prisma_migrations statement', async () => {
+  it('qualifies bookkeeping with, and scopes migrations to, the configured schema', async () => {
     const migrationsDir = join(__dirname, '../../prisma/migrations');
     const migrationDirs = readdirSync(migrationsDir, { withFileTypes: true })
       .filter((d) => d.isDirectory() && existsSync(join(migrationsDir, d.name, 'migration.sql')))
@@ -64,16 +70,17 @@ describe('migrate.mjs — schema resolution', () => {
       ...migrationDirs.slice(0, -1).map((migration_name) => ({ migration_name }))
     );
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/unused';
+    process.env.DATABASE_SCHEMA = 'annie';
 
     // Top-level await in migrate.mjs means the import resolves once the run finished.
     await import('../migrate.mjs');
 
-    expect(migrateMocks.executed[0]).toContain('CREATE TABLE IF NOT EXISTS public."_prisma_migrations"');
-    expect(migrateMocks.queried[0]).toContain('FROM public."_prisma_migrations"');
+    expect(migrateMocks.executed[0]).toContain('CREATE TABLE IF NOT EXISTS "annie"."_prisma_migrations"');
+    expect(migrateMocks.queried[0]).toContain('FROM "annie"."_prisma_migrations"');
     expect(migrateMocks.transactions).toHaveLength(1);
     for (const statements of migrateMocks.transactions) {
-      expect(statements[0]).toBe('SET LOCAL search_path TO public, extensions');
-      expect(statements.at(-1)).toContain('INSERT INTO public."_prisma_migrations"');
+      expect(statements[0]).toBe('SET LOCAL search_path TO "annie", extensions');
+      expect(statements.at(-1)).toContain('INSERT INTO "annie"."_prisma_migrations"');
       // The migration body runs between the SET LOCAL and the bookkeeping INSERT.
       expect(statements.length).toBeGreaterThan(2);
     }
@@ -82,7 +89,7 @@ describe('migrate.mjs — schema resolution', () => {
     const unqualified = [...migrateMocks.executed, ...migrateMocks.queried, ...migrateMocks.transactions.flat()]
       .map((sql) =>
         sql
-          .replaceAll('public."_prisma_migrations"', '')
+          .replaceAll('"annie"."_prisma_migrations"', '')
           .replaceAll('"_prisma_migrations_pkey"', '')
       )
       .filter((sql) => sql.includes('_prisma_migrations'));

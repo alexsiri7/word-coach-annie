@@ -24,6 +24,18 @@ if (!connectionString) {
   process.exit(0);
 }
 
+// DATABASE_SCHEMA names the schema holding the app's tables (and the
+// _prisma_migrations bookkeeping table). Defaults to `public`, which is what
+// staging and local development use. It is interpolated into SQL below, so it
+// must be a plain identifier.
+const schema = process.env.DATABASE_SCHEMA?.trim() || 'public';
+if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+  console.error(`Migration failed: DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
+  process.exit(1);
+}
+// `public` stays unquoted so the emitted SQL is unchanged for existing deploys.
+const qschema = schema === 'public' ? 'public' : `"${schema}"`;
+
 let PrismaClient, PrismaPg;
 try {
   ({ PrismaClient } = await import('@prisma/client'));
@@ -37,7 +49,7 @@ const MIGRATION_TIMEOUT_MS = 5 * 60 * 1000;
 
 async function ensureMigrationsTable(prisma) {
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS public."_prisma_migrations" (
+    CREATE TABLE IF NOT EXISTS ${qschema}."_prisma_migrations" (
       "id" VARCHAR(36) NOT NULL,
       "checksum" VARCHAR(64) NOT NULL,
       "finished_at" TIMESTAMPTZ,
@@ -55,7 +67,9 @@ async function migrate(prisma) {
   await ensureMigrationsTable(prisma);
 
   // Get applied migrations
-  const applied = await prisma.$queryRaw`SELECT migration_name FROM public."_prisma_migrations" WHERE rolled_back_at IS NULL`;
+  const applied = await prisma.$queryRawUnsafe(
+    `SELECT migration_name FROM ${qschema}."_prisma_migrations" WHERE rolled_back_at IS NULL`
+  );
   const appliedNames = new Set(applied.map((r) => r.migration_name));
 
   // Get migration directories (sorted)
@@ -93,7 +107,8 @@ async function migrate(prisma) {
     const destructivePatterns = /\b(DROP\s+TABLE|TRUNCATE|DROP\s+SCHEMA)\b/i;
     if (destructivePatterns.test(sql)) {
       const [{ count }] = await prisma.$queryRawUnsafe(
-        `SELECT COALESCE(SUM(n_tup_ins - n_tup_del), 0)::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public'`
+        `SELECT COALESCE(SUM(n_tup_ins - n_tup_del), 0)::bigint AS count FROM pg_stat_user_tables WHERE schemaname = $1`,
+        schema
       );
       if (count > 0) {
         console.error(`  ABORT ${dir} — contains destructive DDL (DROP/TRUNCATE) and database has ${count} live rows`);
@@ -120,7 +135,7 @@ async function migrate(prisma) {
     // unchanged. Prisma's 5s default transaction timeout is well below what a
     // cold-start migration can legitimately take.
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe('SET LOCAL search_path TO public, extensions');
+      await tx.$executeRawUnsafe(`SET LOCAL search_path TO ${qschema}, extensions`);
 
       for (const [i, stmt] of statements.entries()) {
         try {
@@ -135,7 +150,7 @@ async function migrate(prisma) {
       // Record in _prisma_migrations inside the same transaction, so a migration
       // is never recorded without its statements having committed.
       await tx.$executeRawUnsafe(
-        `INSERT INTO public."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
+        `INSERT INTO ${qschema}."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
         id,
         checksum,
         dir
@@ -162,7 +177,7 @@ const RETRY_DELAY_MS = 2000;
 // retry gets a fresh pooled connection rather than reusing the bad session.
 async function runMigrations() {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString, max: 2 }) });
     let failure = null;
     try {
       await migrate(prisma);
