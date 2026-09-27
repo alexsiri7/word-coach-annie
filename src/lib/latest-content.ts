@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type ContentVersion } from "@prisma/client";
 import { prisma, databaseSchema } from "@/lib/db";
 
 /**
@@ -14,7 +14,7 @@ export async function getLatestContent(nodeIds: string[]): Promise<Map<string, s
   // The adapter only qualifies Prisma-generated SQL (see src/lib/db.ts), not raw queries.
   const schema = databaseSchema();
   const table = Prisma.raw(schema ? `"${schema}"."ContentVersion"` : `"ContentVersion"`);
-  const rows = await prisma.$queryRaw<{ nodeId: string; content: string }[]>`
+  const rows = await prisma.$queryRaw<Pick<ContentVersion, "nodeId" | "content">[]>`
     SELECT DISTINCT ON ("nodeId") "nodeId", "content"
     FROM ${table}
     WHERE "nodeId" IN (${Prisma.join(nodeIds)})

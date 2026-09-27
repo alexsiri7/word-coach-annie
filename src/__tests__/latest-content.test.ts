@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 import { getLatestContent } from "@/lib/latest-content";
 import { ProjectsController } from "@/lib/controllers/projects";
+import { prisma } from "@/lib/db";
 import { testPrisma } from "./setup";
 
 function createScene(projectId: string, title: string) {
@@ -55,7 +57,17 @@ describe("getLatestContent", () => {
     });
 
     it("qualifies the table when DATABASE_SCHEMA is set", async () => {
-        process.env.DATABASE_SCHEMA = "public";
-        expectLatest(await getLatestContent([sceneA, sceneB, sceneC]));
+        // A non-default schema: "public" would resolve identically unqualified.
+        process.env.DATABASE_SCHEMA = "annie";
+        const queryRaw = vi.spyOn(prisma, "$queryRaw").mockResolvedValue([]);
+        try {
+            await getLatestContent([sceneA]);
+            const [strings, ...values] = queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+            const query = Prisma.sql(strings, ...values);
+            expect(query.sql).toContain('FROM "annie"."ContentVersion"');
+            expect(query.sql).not.toMatch(/FROM "ContentVersion"/);
+        } finally {
+            queryRaw.mockRestore();
+        }
     });
 });
