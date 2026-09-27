@@ -7,18 +7,9 @@ import {
   AlignmentType,
 } from "docx";
 import { prisma } from "@/lib/db";
+import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-
-interface OutlineNode {
-  id: string;
-  type: string;
-  title: string;
-  orderIndex: number;
-  parentId: string | null;
-  children: OutlineNode[];
-  content?: string;
-}
 
 function stripHtml(html: string): string {
   if (!html || html === "<p></p>") return "";
@@ -43,57 +34,6 @@ function stripHtml(html: string): string {
     .replace(/&mdash;/g, "\u2014")
     .replace(/&ndash;/g, "\u2013");
   return text.replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// NOTE: buildOutlineTree is duplicated from src/lib/outline-tree.ts (also in pdf/route.tsx,
-// epub/route.ts, and export/route.ts). The shared module exists but these routes haven't
-// been migrated to use it yet. If logic changes, update all copies.
-async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
-  const nodes = await prisma.structureNode.findMany({
-    where: { projectId },
-    orderBy: { orderIndex: "asc" },
-  });
-
-  const sceneIds = nodes
-    .filter((n) => n.type === "SCENE")
-    .map((n) => n.id);
-  const contentMap: Record<string, string> = {};
-
-  if (sceneIds.length > 0) {
-    const allVersions = await prisma.contentVersion.findMany({
-      where: { nodeId: { in: sceneIds } },
-      orderBy: { createdAt: "desc" },
-      select: { nodeId: true, content: true },
-    });
-
-    for (const v of allVersions) {
-      if (!(v.nodeId in contentMap)) {
-        contentMap[v.nodeId] = v.content;
-      }
-    }
-  }
-
-  const nodeMap = new Map<string, OutlineNode>();
-  const roots: OutlineNode[] = [];
-
-  for (const node of nodes) {
-    nodeMap.set(node.id, {
-      ...node,
-      children: [],
-      content: contentMap[node.id],
-    });
-  }
-
-  for (const node of nodes) {
-    const outlineNode = nodeMap.get(node.id)!;
-    if (node.parentId && nodeMap.has(node.parentId)) {
-      nodeMap.get(node.parentId)!.children.push(outlineNode);
-    } else {
-      roots.push(outlineNode);
-    }
-  }
-
-  return roots;
 }
 
 function headingParagraph(title: string, size: number): Paragraph {

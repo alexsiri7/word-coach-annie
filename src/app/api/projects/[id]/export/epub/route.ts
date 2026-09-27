@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import epub from "epub-gen-memory";
 import { prisma } from "@/lib/db";
+import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { escapeHtml } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
-
-interface OutlineNode {
-  id: string;
-  type: string;
-  title: string;
-  orderIndex: number;
-  parentId: string | null;
-  children: OutlineNode[];
-  content?: string;
-}
 
 function stripBeats(html: string): string {
   return html.replace(/<!--\s*beat:.*?-->/gi, "");
@@ -23,57 +14,6 @@ function isEmptyContent(content: string | undefined): boolean {
   if (!content) return true;
   const stripped = content.replace(/<p><\/p>/g, "").trim();
   return stripped.length === 0;
-}
-
-// NOTE: buildOutlineTree is duplicated in pdf/route.tsx and export/route.ts — intentionally
-// kept self-contained per-route. If logic changes, update all three copies.
-// TODO: Extract to src/lib/outline-tree.ts (see follow-up issue).
-async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
-  const nodes = await prisma.structureNode.findMany({
-    where: { projectId },
-    orderBy: { orderIndex: "asc" },
-  });
-
-  const sceneIds = nodes
-    .filter((n: { type: string }) => n.type === "SCENE")
-    .map((n: { id: string }) => n.id);
-  const contentMap: Record<string, string> = {};
-
-  if (sceneIds.length > 0) {
-    const allVersions = await prisma.contentVersion.findMany({
-      where: { nodeId: { in: sceneIds } },
-      orderBy: { createdAt: "desc" },
-      select: { nodeId: true, content: true },
-    });
-
-    for (const v of allVersions) {
-      if (!(v.nodeId in contentMap)) {
-        contentMap[v.nodeId] = v.content;
-      }
-    }
-  }
-
-  const nodeMap = new Map<string, OutlineNode>();
-  const roots: OutlineNode[] = [];
-
-  for (const node of nodes) {
-    nodeMap.set(node.id, {
-      ...node,
-      children: [],
-      content: contentMap[node.id],
-    });
-  }
-
-  for (const node of nodes) {
-    const outlineNode = nodeMap.get(node.id)!;
-    if (node.parentId && nodeMap.has(node.parentId)) {
-      nodeMap.get(node.parentId)!.children.push(outlineNode);
-    } else {
-      roots.push(outlineNode);
-    }
-  }
-
-  return roots;
 }
 
 interface EpubChapter {

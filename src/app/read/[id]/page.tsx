@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getLatestContent } from "@/lib/latest-content";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth";
@@ -34,26 +35,11 @@ async function getManuscriptData(projectId: string) {
     orderBy: { orderIndex: "asc" },
   });
 
-  // Batch: get latest content for all scenes in one query
   // Only include scenes that are DRAFT or above (exclude OUTLINE)
   const sceneIds = nodes
     .filter((n) => n.type === "SCENE" && n.status !== "OUTLINE")
     .map((n) => n.id);
-  const contentMap: Record<string, string> = {};
-
-  if (sceneIds.length > 0) {
-    const allVersions = await prisma.contentVersion.findMany({
-      where: { nodeId: { in: sceneIds } },
-      orderBy: { createdAt: "desc" },
-      select: { nodeId: true, content: true },
-    });
-
-    for (const v of allVersions) {
-      if (!(v.nodeId in contentMap)) {
-        contentMap[v.nodeId] = v.content;
-      }
-    }
-  }
+  const contentMap = await getLatestContent(sceneIds);
 
   // Build tree
   const nodeMap = new Map<string, OutlineNode>();
@@ -72,7 +58,7 @@ async function getManuscriptData(projectId: string) {
       orderIndex: node.orderIndex,
       parentId: node.parentId,
       children: [],
-      content: contentMap[node.id],
+      content: contentMap.get(node.id),
     });
   }
 

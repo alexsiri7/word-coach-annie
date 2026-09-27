@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getLatestContent } from "@/lib/latest-content";
 
 // ─── Plot Thread Status ─────────────────────────────────────────────────────
 
@@ -219,13 +220,6 @@ export async function getManuscriptContext(projectId: string) {
     prisma.structureNode.findMany({
       where: { projectId },
       orderBy: { orderIndex: "asc" },
-      include: {
-        contentVersions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { content: true, wordCount: true },
-        },
-      },
     }),
     prisma.storyObject.findMany({
       where: { projectId },
@@ -250,13 +244,14 @@ export async function getManuscriptContext(projectId: string) {
 
   const chapters = nodes.filter((n) => n.type === "CHAPTER");
   const scenes = nodes.filter((n) => n.type === "SCENE");
+  const contentByNode = await getLatestContent(scenes.map((s) => s.id));
 
   const outlineWithContent = chapters
     .map((ch) => {
       const chScenes = scenes
         .filter((s) => s.parentId === ch.id)
         .map((s) => {
-          const content = s.contentVersions[0]?.content || "";
+          const content = contentByNode.get(s.id) || "";
           const preview = content
             .replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
@@ -319,20 +314,12 @@ export async function getConsistencyContext(projectId: string, focusSceneId?: st
     ? [focusSceneId]
     : scenes.slice(0, 20).map((s) => s.id);
 
-  const allVersions = await prisma.contentVersion.findMany({
-    where: { nodeId: { in: targetSceneIds } },
-    orderBy: { createdAt: "desc" },
-    select: { nodeId: true, content: true },
-  });
-  const latestByNode: Record<string, string> = {};
-  for (const v of allVersions) {
-    if (!(v.nodeId in latestByNode)) latestByNode[v.nodeId] = v.content;
-  }
+  const latestByNode = await getLatestContent(targetSceneIds);
 
   const scenesWithContent: { id: string; title: string; content: string }[] = [];
   for (const sid of targetSceneIds) {
     const scene = scenes.find((s) => s.id === sid);
-    const content = latestByNode[sid];
+    const content = latestByNode.get(sid);
     if (scene && content) {
       const textContent = htmlToText(content, 800);
       if (textContent.length > 50) {
@@ -428,20 +415,12 @@ export async function getStoryBibleCrossReference(projectId: string, sceneId?: s
   }
 
   // Fetch scene content batched
-  const allVersions = await prisma.contentVersion.findMany({
-    where: { nodeId: { in: targetSceneIds } },
-    orderBy: { createdAt: "desc" },
-    select: { nodeId: true, content: true },
-  });
-  const latestByNode: Record<string, string> = {};
-  for (const v of allVersions) {
-    if (!(v.nodeId in latestByNode)) latestByNode[v.nodeId] = v.content;
-  }
+  const latestByNode = await getLatestContent(targetSceneIds);
 
   const scenesWithContent: CrossReferenceScene[] = [];
   for (const sid of targetSceneIds) {
     const scene = scenes.find((s) => s.id === sid);
-    const content = latestByNode[sid];
+    const content = latestByNode.get(sid);
     if (scene && content) {
       const textContent = htmlToText(content, 2000);
       if (textContent.length > 50) {

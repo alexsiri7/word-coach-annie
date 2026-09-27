@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getLatestContent } from "@/lib/latest-content";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 
@@ -73,24 +74,8 @@ export async function GET(
             select: { id: true, title: true, parentId: true },
         });
 
-        // Batch: get all content versions for all scenes in one query
         const sceneIds = scenes.map((s) => s.id);
-        const allVersions = sceneIds.length > 0
-            ? await prisma.contentVersion.findMany({
-                where: { nodeId: { in: sceneIds } },
-                orderBy: { createdAt: "desc" },
-                distinct: ["nodeId"],
-                select: { nodeId: true, content: true },
-            })
-            : [];
-
-        // Build map: nodeId -> latest content (first per nodeId due to orderBy desc)
-        const latestContentMap = new Map<string, string>();
-        for (const v of allVersions) {
-            if (!latestContentMap.has(v.nodeId)) {
-                latestContentMap.set(v.nodeId, v.content);
-            }
-        }
+        const latestContentMap = await getLatestContent(sceneIds);
 
         const sceneResults: {
             type: "scene";

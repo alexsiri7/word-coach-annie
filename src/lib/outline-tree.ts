@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getLatestContent } from "@/lib/latest-content";
 
 export interface OutlineNode {
     id: string;
@@ -19,22 +20,7 @@ export async function buildOutlineTree(projectId: string): Promise<OutlineNode[]
     });
 
     const sceneIds = nodes.filter((n: { type: string }) => n.type === "SCENE").map((n: { id: string }) => n.id);
-    const contentMap: Record<string, string> = {};
-
-    if (sceneIds.length > 0) {
-        const allVersions = await prisma.contentVersion.findMany({
-            where: { nodeId: { in: sceneIds } },
-            orderBy: { createdAt: "desc" },
-            select: { nodeId: true, content: true },
-        });
-
-        // First match per nodeId is latest due to orderBy desc
-        for (const v of allVersions) {
-            if (!(v.nodeId in contentMap)) {
-                contentMap[v.nodeId] = v.content;
-            }
-        }
-    }
+    const contentMap = await getLatestContent(sceneIds);
 
     const nodeMap = new Map<string, OutlineNode>();
     const roots: OutlineNode[] = [];
@@ -43,7 +29,7 @@ export async function buildOutlineTree(projectId: string): Promise<OutlineNode[]
         nodeMap.set(node.id, {
             ...node,
             children: [],
-            content: contentMap[node.id],
+            content: contentMap.get(node.id),
         });
     }
 
