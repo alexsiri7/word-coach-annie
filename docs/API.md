@@ -887,7 +887,7 @@ Import a project from a JSON export file.
 ### `GET /api/writing-tasks`
 List writing tasks for a project.
 
-**Query params**: `projectId` (required), `completed` (boolean), `energy`, `importance`, `size`
+**Query params**: `projectId` (required), `completed` (boolean), `energy`, `importance`, `size`, `kind`, `capacity`
 
 **Response**: `{ tasks: WritingTask[], total: number }`
 
@@ -898,7 +898,7 @@ List writing tasks for a project.
 ### `POST /api/writing-tasks`
 Create a new writing task.
 
-**Body**: `{ projectId: string, name: string, whatIsNeeded?: string, importance?: string, size?: string, energy?: string, sceneId?: string }`
+**Body**: `{ projectId: string, name: string, whatIsNeeded?: string, importance?: string, size?: string, energy?: string, sceneId?: string, kind?: string, capacity?: string, dueDate?: string }`
 
 **Response**: Created `WritingTask` object (status 201).
 
@@ -909,7 +909,7 @@ Create a new writing task.
 ### `PATCH /api/writing-tasks/:id`
 Update a writing task's fields.
 
-**Body**: Any subset of `{ name, whatIsNeeded, importance, size, energy, completed }`
+**Body**: Any subset of `{ name, whatIsNeeded, importance, size, energy, kind, capacity, dueDate, completed }` (`dueDate: null` clears it)
 
 **Response**: Updated `WritingTask` object.
 
