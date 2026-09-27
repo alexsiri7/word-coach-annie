@@ -1,8 +1,8 @@
 ---
 created: '2026-09-27'
-github_issue: null
+github_issue: 1148
 id: '032'
-status: draft
+status: idea
 title: Writing task dashboard across projects, matched to how the writer feels
 updated: '2026-09-27'
 ---
@@ -25,4 +25,8 @@ Writing tasks exist in Annie but are scoped to a single project, so neither Alex
 
 ## Issues
 
-_None yet._
+- #1148 — Extend writing task model: kind, capacity, due date, optional project
+- #1149 — Add cross-project get_task_dashboard MCP tool
+- #1150 — Suggestion ranking for 'suggested now'
+- #1151 — Dashboard page in Annie web UI
+- #1152 — Update Annie initial instructions: fetch dashboard at session start, capture tasks during coaching
