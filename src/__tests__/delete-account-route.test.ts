@@ -224,6 +224,22 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(await testPrisma.provider.findUnique({ where: { id: provider.id } })).toBeNull();
   });
 
+  it("deletes the user's project-less writing tasks along with account", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u10", email: "del10@test.com", googleId: "g-del10" },
+    });
+    const task = await testPrisma.writingTask.create({
+      data: { userId: user.id, name: "Practice" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "del10@test.com" }));
+    expect(res.status).toBe(200);
+
+    expect(await testPrisma.writingTask.findUnique({ where: { id: task.id } })).toBeNull();
+  });
+
   it("returns 400 for malformed email format", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u8", email: "del8@test.com", googleId: "g-del8" },
