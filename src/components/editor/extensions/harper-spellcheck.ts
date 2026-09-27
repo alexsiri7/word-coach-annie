@@ -183,11 +183,17 @@ export const HarperSpellcheck = Extension.create<
           let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
           const initLinter = async () => {
-            const [{ WorkerLinter }, { binary }] = await Promise.all([
-              import("harper.js"),
-              import("harper.js/binary"),
-            ]);
-            linter = new WorkerLinter({ binary });
+            const [{ WorkerLinter, createBinaryModuleFromUrl }, { binary }] =
+              await Promise.all([
+                import("harper.js"),
+                import("harper.js/binary"),
+              ]);
+            // The bundler rewrites the wasm URL to a root-relative path, which
+            // the linter's blob: worker has no base to resolve against.
+            const wasmUrl = new URL(binary.url, window.location.href).href;
+            linter = new WorkerLinter({
+              binary: createBinaryModuleFromUrl(wasmUrl, binary.glueFlavor),
+            });
             extension.storage.linter = linter;
             scheduleRun(view);
           };

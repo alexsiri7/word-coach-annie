@@ -282,6 +282,15 @@ describe("middleware", () => {
             expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
         });
 
+        it("allows the harper.js spell-check worker and WebAssembly without unsafe-eval", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            expect(csp).toMatch(/script-src[^;]*'wasm-unsafe-eval'/);
+            expect(csp).not.toMatch(/script-src[^;]*'unsafe-eval'/);
+            expect(csp).toMatch(/worker-src 'self' blob:(;|$)/);
+        });
+
         it("x-nonce request header matches nonce in Content-Security-Policy", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
             const res = await middleware(createRequest("/api/projects"));

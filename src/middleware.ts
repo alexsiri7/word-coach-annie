@@ -15,7 +15,10 @@ function buildCsp(nonce: string): string {
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
-        `script-src 'self' 'nonce-${nonce}'`,
+        // wasm-unsafe-eval: the harper.js spell-check compiles WebAssembly (#1158).
+        `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`,
+        // harper.js WorkerLinter spawns its worker from a blob: URL.
+        "worker-src 'self' blob:",
         // style-src: unsafe-inline retained — 22+ inline style= attributes require it (SEC-011 note).
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
