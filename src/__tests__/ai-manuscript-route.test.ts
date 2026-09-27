@@ -15,8 +15,8 @@ vi.mock("@/lib/db", () => ({
     },
     structureNode: {
       findMany: vi.fn().mockResolvedValue([
-        { id: "ch1", type: "CHAPTER", title: "Chapter One", parentId: null, status: "DRAFT", synopsis: "", orderIndex: 0, contentVersions: [] },
-        { id: "sc1", type: "SCENE", title: "Opening Scene", parentId: "ch1", status: "DRAFT", synopsis: "The beginning", orderIndex: 0, contentVersions: [{ content: "<p>Once upon a time...</p>", wordCount: 4 }] },
+        { id: "ch1", type: "CHAPTER", title: "Chapter One", parentId: null, status: "DRAFT", synopsis: "", orderIndex: 0 },
+        { id: "sc1", type: "SCENE", title: "Opening Scene", parentId: "ch1", status: "DRAFT", synopsis: "The beginning", orderIndex: 0 },
       ]),
     },
     storyObject: {
@@ -31,6 +31,10 @@ vi.mock("@/lib/db", () => ({
       ]),
     },
   },
+}));
+
+vi.mock("@/lib/latest-content", () => ({
+  getLatestContent: vi.fn().mockResolvedValue(new Map([["sc1", "<p>Once upon a time...</p>"]])),
 }));
 
 vi.mock("@/lib/ai/settings", () => ({

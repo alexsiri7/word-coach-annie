@@ -17,23 +17,21 @@ export async function GET(
     if (!access.authorized) return access.response;
     const node = await prisma.structureNode.findUnique({
       where: { id },
-      include: {
-        contentVersions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
     });
 
     if (!node) {
       return NextResponse.json({ error: "Node not found" }, { status: 404 });
     }
 
-    const { contentVersions, ...rest } = node;
-    const result: Record<string, unknown> = { ...rest };
+    const result: Record<string, unknown> = { ...node };
 
-    if (node.type === "SCENE" && contentVersions.length > 0) {
-      result.latestContent = contentVersions[0];
+    if (node.type === "SCENE") {
+      // A nested `take: 1` would load every version before trimming (#1156); findFirst is LIMIT 1.
+      const latestContent = await prisma.contentVersion.findFirst({
+        where: { nodeId: id },
+        orderBy: { createdAt: "desc" },
+      });
+      if (latestContent) result.latestContent = latestContent;
     }
 
     return NextResponse.json(result);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getLatestContent } from "@/lib/latest-content";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
@@ -58,25 +59,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       orderBy: { orderIndex: "asc" },
     });
 
-    // Get latest content for all scenes in one query
     // Only include scenes that are DRAFT or above (exclude OUTLINE)
     const sceneIds = nodes.filter((n) => n.type === "SCENE" && n.status !== "OUTLINE").map((n) => n.id);
-    const contentVersions =
-      sceneIds.length > 0
-        ? await prisma.contentVersion.findMany({
-            where: { nodeId: { in: sceneIds } },
-            orderBy: { createdAt: "desc" },
-            select: { nodeId: true, content: true },
-          })
-        : [];
-
-    // Map: nodeId -> latest content (first match is latest due to orderBy desc)
-    const latestContent = new Map<string, string>();
-    for (const cv of contentVersions) {
-      if (!latestContent.has(cv.nodeId)) {
-        latestContent.set(cv.nodeId, cv.content);
-      }
-    }
+    const latestContent = await getLatestContent(sceneIds);
 
     // Exclude OUTLINE scenes from the manuscript
     const visibleNodes = nodes.filter(
