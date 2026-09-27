@@ -419,6 +419,29 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect.poll(() => saveRequests.length, { timeout: 5_000 }).toBeGreaterThan(0)
   })
 
+  test('3b. Spell-check underlines a misspelling (harper worker + WASM pass the CSP)', async ({
+    page,
+  }) => {
+    await mockFocusModeApi(page)
+
+    const cspViolations: string[] = []
+    page.on('console', (msg) => {
+      if (/Content Security Policy/i.test(msg.text())) cspViolations.push(msg.text())
+    })
+
+    await page.goto('/project/proj-1/scene/sc-1/focus')
+    await page.waitForSelector('main', { timeout: 20_000 })
+
+    const editor = page.locator('.tiptap, .ProseMirror').first()
+    await editor.waitFor({ state: 'visible', timeout: 10_000 })
+    await editor.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' She recieved the mesage.')
+
+    await expect(page.locator('.harper-error').first()).toBeVisible({ timeout: 20_000 })
+    expect(cspViolations).toEqual([])
+  })
+
   test('4. Story objects panel – create a character and verify it appears', async ({
     page,
   }) => {

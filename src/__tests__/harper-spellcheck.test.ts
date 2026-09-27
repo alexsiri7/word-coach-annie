@@ -10,6 +10,10 @@ import { Node as PmNode, Schema } from "@tiptap/pm/model";
 
 const mockLint = vi.fn().mockResolvedValue([]);
 const mockDispose = vi.fn().mockResolvedValue(undefined);
+const mockCreateBinaryModuleFromUrl = vi.fn((url: string, glueFlavor?: string) => ({
+  url,
+  glueFlavor,
+}));
 
 vi.mock("harper.js", () => {
   const WorkerLinter = vi.fn().mockImplementation(function (this: {
@@ -19,11 +23,11 @@ vi.mock("harper.js", () => {
     this.lint = mockLint;
     this.dispose = mockDispose;
   });
-  return { WorkerLinter };
+  return { WorkerLinter, createBinaryModuleFromUrl: mockCreateBinaryModuleFromUrl };
 });
 
 vi.mock("harper.js/binary", () => ({
-  binary: { url: "mock-binary" },
+  binary: { url: "/_next/static/media/harper_wasm_bg.wasm", glueFlavor: "full" },
 }));
 
 const testSchema = new Schema({
@@ -143,6 +147,29 @@ describe("HarperSpellcheck — re-enable toggle (#reenable-fix)", () => {
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(mockLint).toHaveBeenCalled();
+    } finally {
+      editor.destroy();
+    }
+  });
+});
+
+describe("HarperSpellcheck — wasm URL (#1158)", () => {
+  beforeEach(() => {
+    mockCreateBinaryModuleFromUrl.mockClear();
+  });
+
+  it("hands the worker an absolute wasm URL, since a blob: worker cannot resolve a root-relative one", async () => {
+    const editor = new Editor({
+      extensions: [StarterKit, HarperSpellcheck],
+      content: "<p>Hello</p>",
+    });
+
+    try {
+      await vi.waitFor(() => expect(mockCreateBinaryModuleFromUrl).toHaveBeenCalled());
+      expect(mockCreateBinaryModuleFromUrl).toHaveBeenCalledWith(
+        `${window.location.origin}/_next/static/media/harper_wasm_bg.wasm`,
+        "full",
+      );
     } finally {
       editor.destroy();
     }
