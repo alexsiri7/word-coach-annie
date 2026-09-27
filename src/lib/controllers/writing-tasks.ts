@@ -15,6 +15,9 @@ function serializeTask(t: WritingTaskWithScene) {
         importance: t.importance,
         size: t.size,
         energy: t.energy,
+        kind: t.kind,
+        capacity: t.capacity,
+        dueDate: t.dueDate?.toISOString() ?? null,
         completed: t.completed,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
@@ -24,25 +27,36 @@ function serializeTask(t: WritingTaskWithScene) {
 
 export class WritingTaskController {
     static async listWritingTasks(params: {
-        projectId: string;
+        projectId?: string;
+        userId: string | null;
         completed?: boolean;
         importance?: string;
         size?: string;
         energy?: string;
+        kind?: string;
+        capacity?: string;
+        dueBefore?: string;
     }) {
-        const { projectId, completed, importance, size, energy } = params;
+        const { projectId, userId, completed, importance, size, energy, kind, capacity, dueBefore } = params;
 
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true },
-        });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
-
-        const where: Prisma.WritingTaskWhereInput = { projectId };
+        let where: Prisma.WritingTaskWhereInput;
+        if (projectId) {
+            const project = await prisma.project.findUnique({
+                where: { id: projectId },
+                select: { id: true },
+            });
+            if (!project) throw new Error(`Project not found: ${projectId}`);
+            where = { projectId };
+        } else {
+            where = { projectId: null, ...(userId ? { userId } : {}) };
+        }
         if (completed !== undefined) where.completed = completed;
         if (importance) where.importance = importance;
         if (size) where.size = size;
         if (energy) where.energy = energy;
+        if (kind) where.kind = kind;
+        if (capacity) where.capacity = capacity;
+        if (dueBefore) where.dueDate = { lte: new Date(dueBefore) };
 
         const rawTasks = await prisma.writingTask.findMany({
             where,
@@ -57,29 +71,43 @@ export class WritingTaskController {
     }
 
     static async createWritingTask(params: {
-        projectId: string;
+        projectId?: string;
+        userId: string | null;
         sceneId?: string;
         name: string;
         whatIsNeeded?: string;
         importance?: string;
         size?: string;
         energy?: string;
+        kind?: string;
+        capacity?: string;
+        dueDate?: string;
     }) {
-        const project = await prisma.project.findUnique({
-            where: { id: params.projectId },
-            select: { id: true },
-        });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (params.sceneId && !params.projectId) throw new Error("sceneId requires projectId");
+
+        let ownerId = params.userId;
+        if (params.projectId) {
+            const project = await prisma.project.findUnique({
+                where: { id: params.projectId },
+                select: { id: true, userId: true },
+            });
+            if (!project) throw new Error(`Project not found: ${params.projectId}`);
+            ownerId = project.userId;
+        }
 
         const task = await prisma.writingTask.create({
             data: {
-                projectId: params.projectId,
+                projectId: params.projectId ?? null,
+                userId: ownerId,
                 name: params.name.trim(),
                 sceneId: params.sceneId,
                 whatIsNeeded: params.whatIsNeeded,
                 importance: params.importance,
                 size: params.size,
                 energy: params.energy,
+                kind: params.kind,
+                capacity: params.capacity,
+                dueDate: params.dueDate ? new Date(params.dueDate) : undefined,
             },
             include: {
                 scene: { select: { id: true, title: true } },
@@ -101,6 +129,9 @@ export class WritingTaskController {
             importance?: string;
             size?: string;
             energy?: string;
+            kind?: string;
+            capacity?: string;
+            dueDate?: string | null;
             completed?: boolean;
         }
     ) {
@@ -118,6 +149,9 @@ export class WritingTaskController {
                 importance: data.importance,
                 size: data.size,
                 energy: data.energy,
+                kind: data.kind,
+                capacity: data.capacity,
+                dueDate: data.dueDate == null ? data.dueDate : new Date(data.dueDate),
                 completed: data.completed,
             },
             include: {

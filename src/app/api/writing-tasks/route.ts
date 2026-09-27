@@ -24,13 +24,18 @@ export async function GET(request: NextRequest) {
         const importance = searchParams.get("importance");
         const size = searchParams.get("size");
         const energy = searchParams.get("energy");
+        const kind = searchParams.get("kind");
+        const capacity = searchParams.get("capacity");
         const completed = searchParams.get("completed");
 
         const result = await WritingTaskController.listWritingTasks({
             projectId,
+            userId,
             ...(importance && { importance }),
             ...(size && { size }),
             ...(energy && { energy }),
+            ...(kind && { kind }),
+            ...(capacity && { capacity }),
             ...(completed !== null && { completed: completed === "true" }),
         });
 
@@ -65,6 +70,7 @@ export async function POST(request: NextRequest) {
 
         const task = await WritingTaskController.createWritingTask({
             ...parsed.data,
+            userId,
             name: sanitizeInput(parsed.data.name),
             whatIsNeeded: parsed.data.whatIsNeeded ? sanitizeInput(parsed.data.whatIsNeeded) : undefined,
         });

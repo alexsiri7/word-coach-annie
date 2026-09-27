@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
 import { WritingTaskUpdateSchema } from "@/schemas/writing-tasks";
-import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyWritingTaskWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
@@ -14,13 +14,12 @@ async function resolveTask(request: NextRequest, params: Promise<{ id: string }>
     const { id } = await params;
     const existing = await prisma.writingTask.findUnique({
         where: { id },
-        select: { id: true, projectId: true },
+        select: { id: true, projectId: true, userId: true },
     });
     if (!existing) {
         return { ok: false, response: NextResponse.json({ error: "Writing task not found" }, { status: 404 }) };
     }
-    const userId = getCurrentUserId(request);
-    const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
+    const access = await verifyWritingTaskWriteAccess(existing, getCurrentUserId(request), request.headers.get("x-user-email"));
     if (!access.authorized) return { ok: false, response: access.response };
     return { ok: true, id };
 }

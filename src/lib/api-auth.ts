@@ -205,6 +205,31 @@ export async function verifyProjectWriteAccess(
 }
 
 /**
+ * Verify that the current user may modify a writing task.
+ * Project tasks defer to project write access; project-less (practice) tasks
+ * are writable only by their owner. When userId is null (API_TOKEN/dev mode), all tasks are accessible.
+ */
+export async function verifyWritingTaskWriteAccess(
+    task: { projectId: string | null; userId: string | null },
+    userId: string | null,
+    userEmail?: string | null
+): Promise<{ authorized: true } | { authorized: false; response: NextResponse }> {
+    if (task.projectId) {
+        const access = await verifyProjectWriteAccess(task.projectId, userId, userEmail);
+        return access.authorized ? { authorized: true } : access;
+    }
+
+    if (userId && task.userId !== userId) {
+        return {
+            authorized: false,
+            response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+        };
+    }
+
+    return { authorized: true };
+}
+
+/**
  * Verify access to a resource via its parent project.
  * Looks up the resource's projectId, then checks project ownership.
  */

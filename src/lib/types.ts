@@ -164,19 +164,24 @@ import type {
   WritingTaskImportanceValue as WritingTaskImportance,
   WritingTaskSizeValue as WritingTaskSize,
   WritingTaskEnergyValue as WritingTaskEnergy,
+  WritingTaskKindValue as WritingTaskKind,
+  WritingTaskCapacityValue as WritingTaskCapacity,
 } from "@/schemas/writing-tasks";
 
-export type { WritingTaskImportance, WritingTaskSize, WritingTaskEnergy };
+export type { WritingTaskImportance, WritingTaskSize, WritingTaskEnergy, WritingTaskKind, WritingTaskCapacity };
 
 export interface WritingTask {
   id: string;
-  projectId: string;
+  projectId: string | null;
   sceneId?: string | null;
   name: string;
   whatIsNeeded: string;
   importance: WritingTaskImportance;
   size: WritingTaskSize;
   energy: WritingTaskEnergy;
+  kind: WritingTaskKind;
+  capacity: WritingTaskCapacity;
+  dueDate: string | null;
   completed: boolean;
   createdAt: string;
   updatedAt: string;
