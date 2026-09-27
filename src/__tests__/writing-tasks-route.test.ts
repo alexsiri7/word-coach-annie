@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/api-auth", () => ({
+vi.mock("@/lib/api-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api-auth")>()),
   getCurrentUserId: vi.fn(() => null),
   verifyProjectReadAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),

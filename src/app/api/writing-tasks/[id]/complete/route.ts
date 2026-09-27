@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
-import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyWritingTaskWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 export async function POST(
@@ -23,15 +23,8 @@ export async function POST(
             );
         }
 
-        const userId = getCurrentUserId(request);
-        if (!existing.projectId) {
-            if (userId && existing.userId !== userId) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-            }
-        } else {
-            const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
-            if (!access.authorized) return access.response;
-        }
+        const access = await verifyWritingTaskWriteAccess(existing, getCurrentUserId(request), request.headers.get("x-user-email"));
+        if (!access.authorized) return access.response;
 
         const task = await WritingTaskController.completeWritingTask(id);
 
