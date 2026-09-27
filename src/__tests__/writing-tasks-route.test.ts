@@ -10,7 +10,7 @@ vi.mock("@/lib/api-auth", () => ({
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
 }));
 
-import { verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 
 vi.mock("@/lib/sanitize-server", () => ({
   sanitizeInput: vi.fn((s: string) => s),
@@ -82,6 +82,40 @@ describe("Writing Tasks API", () => {
         makePostRequest("/api/writing-tasks", {
           name: "Some task",
         })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("accepts kind, capacity and dueDate", async () => {
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", {
+          projectId,
+          name: "Pitch letter",
+          kind: "Admin",
+          capacity: "Low",
+          dueDate: "2026-10-15",
+        })
+      );
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.kind).toBe("Admin");
+      expect(body.capacity).toBe("Low");
+      expect(body.dueDate).toBe("2026-10-15T00:00:00.000Z");
+    });
+
+    it("returns 400 for an unknown kind", async () => {
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", { projectId, name: "Task", kind: "Daydream" })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 for a malformed dueDate", async () => {
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", { projectId, name: "Task", dueDate: "next Tuesday" })
       );
       expect(res.status).toBe(400);
     });
@@ -228,6 +262,18 @@ describe("Writing Tasks API", () => {
       expect(body.tasks[0].name).toBe("Dramatic task");
     });
 
+    it("filters by kind", async () => {
+      await testPrisma.writingTask.create({ data: { projectId, name: "Reading", kind: "Read" } });
+      await testPrisma.writingTask.create({ data: { projectId, name: "Drafting" } });
+
+      const { GET } = await import("@/app/api/writing-tasks/route");
+      const res = await GET(makeGetRequest(`/api/writing-tasks?projectId=${projectId}&kind=Read`));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.tasks).toHaveLength(1);
+      expect(body.tasks[0].name).toBe("Reading");
+    });
+
     it("filters by completed=false (open tasks only)", async () => {
       await testPrisma.writingTask.create({ data: { projectId, name: "Open", completed: false } });
       await testPrisma.writingTask.create({ data: { projectId, name: "Done", completed: true } });
@@ -238,6 +284,53 @@ describe("Writing Tasks API", () => {
       const body = await res.json();
       expect(body.tasks).toHaveLength(1);
       expect(body.tasks[0].name).toBe("Open");
+    });
+  });
+
+  describe("Practice task (no project) access", () => {
+    let taskId: string;
+
+    beforeEach(async () => {
+      await testPrisma.user.create({ data: { id: "route-owner", email: "route-owner@test.com", googleId: "g-route-owner" } });
+      const task = await testPrisma.writingTask.create({
+        data: { userId: "route-owner", name: "Practice" },
+      });
+      taskId = task.id;
+    });
+
+    it("PATCH returns 403 for a user who does not own the task", async () => {
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("someone-else");
+      const { PATCH } = await import("@/app/api/writing-tasks/[id]/route");
+      const res = await PATCH(
+        makePatchRequest(`/api/writing-tasks/${taskId}`, { name: "Hijacked" }),
+        { params: Promise.resolve({ id: taskId }) }
+      );
+      expect(res.status).toBe(403);
+      const row = await testPrisma.writingTask.findUnique({ where: { id: taskId } });
+      expect(row?.name).toBe("Practice");
+    });
+
+    it("PATCH returns 200 for the owner", async () => {
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("route-owner");
+      const { PATCH } = await import("@/app/api/writing-tasks/[id]/route");
+      const res = await PATCH(
+        makePatchRequest(`/api/writing-tasks/${taskId}`, { dueDate: "2026-10-20T09:30:00Z" }),
+        { params: Promise.resolve({ id: taskId }) }
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.projectId).toBeNull();
+      expect(body.dueDate).toBe("2026-10-20T09:30:00.000Z");
+    });
+
+    it("complete returns 403 for a user who does not own the task", async () => {
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("someone-else");
+      const { POST } = await import("@/app/api/writing-tasks/[id]/complete/route");
+      const res = await POST(
+        makePostRequest(`/api/writing-tasks/${taskId}/complete`),
+        { params: Promise.resolve({ id: taskId }) }
+      );
+      expect(res.status).toBe(403);
     });
   });
 

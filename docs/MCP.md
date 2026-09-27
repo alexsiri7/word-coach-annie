@@ -798,33 +798,43 @@ Gather character profiles and scene dialogue for voice consistency analysis.
 
 ### Writing Tasks
 
+Tasks either belong to a project or are **practice tasks** with no project. Project tasks are authorized through their project (`verifyProjectOwnership`); practice tasks are owned by the user who created them. `update_writing_task` and `complete_writing_task` enforce the same ownership.
+
+A returned `WritingTask` carries `projectId` (`null` for a practice task), `sceneId`, `name`, `whatIsNeeded`, `importance`, `size`, `energy`, `kind`, `capacity`, `dueDate` (ISO 8601 or `null`), `completed`, `createdAt`, `updatedAt` and `scene`.
+
 #### `list_writing_tasks`
-List writing tasks for a project, with optional filtering.
+List writing tasks for a project, or — when `projectId` is omitted — the current user's practice tasks, with optional filtering.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `projectId` | string | The project to list tasks for |
+| `projectId` | string? | The project to list tasks for. Omit to list practice tasks that belong to no project |
 | `completed` | boolean? | Filter by completion status |
 | `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Filter by energy type — key dimension for mood-matched task selection |
 | `importance` | `"Critical" \| "High" \| "Medium"`? | Filter by importance |
 | `size` | `"Large" \| "Medium" \| "Small"`? | Filter by size |
+| `kind` | `"Draft" \| "Revise" \| "Read" \| "Gather" \| "Admin"`? | Filter by kind of work |
+| `capacity` | `"Low" \| "Medium" \| "Full"`? | Filter by the writer's state the task suits |
+| `dueBefore` | string? | ISO 8601 date or date-time — only tasks due on or before it (undated tasks are excluded) |
 
 Returns `{ tasks: WritingTask[], total: number }`.
 
 ---
 
 #### `create_writing_task`
-Create a new writing task for a project, optionally linked to a scene.
+Create a new writing task for a project (optionally linked to a scene), or a practice task that belongs to no project.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `projectId` | string | The project to attach the task to |
+| `projectId` | string? | The project to attach the task to. Omit for a practice task |
 | `name` | string | Task name (required, non-empty) |
 | `whatIsNeeded` | string? | Two sentences max — enough context to remember the idea |
 | `importance` | `"Critical" \| "High" \| "Medium"`? | Priority level (default `"Medium"`) |
 | `size` | `"Large" \| "Medium" \| "Small"`? | Effort size (default `"Medium"`) |
 | `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Energy type required (default `"Technical"`) |
-| `sceneId` | string? | Optional scene (StructureNode) to associate the task with |
+| `kind` | `"Draft" \| "Revise" \| "Read" \| "Gather" \| "Admin"`? | Kind of work (default `"Draft"`) |
+| `capacity` | `"Low" \| "Medium" \| "Full"`? | The writer's state the task suits — distinct from `energy` (default `"Full"`) |
+| `dueDate` | string? | ISO 8601 date (`2026-10-01`, stored as UTC midnight) or date-time |
+| `sceneId` | string? | Optional scene (StructureNode) to associate the task with. Requires `projectId` |
 
 Returns the created `WritingTask` object.
 
@@ -852,6 +862,9 @@ Update fields on an existing writing task. All fields except `taskId` are option
 | `importance` | `"Critical" \| "High" \| "Medium"`? | Updated priority level |
 | `size` | `"Small" \| "Medium" \| "Large"`? | Updated effort size |
 | `energy` | `"Introspective" \| "Dramatic" \| "Technical"`? | Updated energy type |
+| `kind` | `"Draft" \| "Revise" \| "Read" \| "Gather" \| "Admin"`? | Updated kind of work |
+| `capacity` | `"Low" \| "Medium" \| "Full"`? | Updated writer state the task suits |
+| `dueDate` | string \| null? | New ISO 8601 due date or date-time, or `null` to clear it |
 | `completed` | boolean? | Mark task complete (`true`) or incomplete (`false`) |
 
 Returns the updated `WritingTask` object.

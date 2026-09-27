@@ -52,6 +52,7 @@ import {
     completeWritingTask,
     updateWritingTask,
 } from "./tools/writing-tasks";
+import { WritingTaskCapacity, WritingTaskDueDate, WritingTaskKind } from "@/schemas/writing-tasks";
 import {
     listRelationships,
     createRelationship,
@@ -224,6 +225,17 @@ async function verifyProjectOwnership(projectId: string, uid: string | null): Pr
         select: { id: true },
     });
     if (!project) throw new Error("Project not found or access denied");
+}
+
+/** Verify userId may modify a writing task — via its project, or its own owner when it has none. No-op in single-user mode. */
+async function verifyWritingTaskAccess(taskId: string, uid: string | null): Promise<void> {
+    const task = await prisma.writingTask.findUnique({
+        where: { id: taskId },
+        select: { projectId: true, userId: true },
+    });
+    if (!task) throw new Error(`Writing task not found: ${taskId}`);
+    if (task.projectId) return verifyProjectOwnership(task.projectId, uid);
+    if (uid && task.userId !== uid) throw new Error("Writing task not found or access denied");
 }
 
 /** Look up the projectId that owns a structure node. */
@@ -764,37 +776,43 @@ server.tool(
 
 server.tool(
     "list_writing_tasks",
-    "List writing tasks for a project. Filter by importance (Critical/High/Medium), size (Small/Medium/Large), energy (Introspective/Dramatic/Technical), or completion status.",
+    "List writing tasks for a project, or — when projectId is omitted — the practice tasks that belong to no project. Filter by importance (Critical/High/Medium), size (Small/Medium/Large), energy (Introspective/Dramatic/Technical), kind (Draft/Revise/Read/Gather/Admin), capacity (Low/Medium/Full), due date, or completion status.",
     {
-        projectId: z.string().describe("The project ID"),
+        projectId: z.string().optional().describe("The project ID. Omit to list practice tasks that belong to no project"),
         completed: z.boolean().optional().describe("Filter by completion status (default: shows all)"),
         importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Filter by importance"),
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Filter by size"),
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Filter by energy type — key dimension for mood-matched task selection"),
+        kind: WritingTaskKind.optional().describe("Filter by kind of work"),
+        capacity: WritingTaskCapacity.optional().describe("Filter by the writer's state the task suits"),
+        dueBefore: WritingTaskDueDate.optional().describe("ISO 8601 date or date-time — only tasks due on or before it"),
     },
     async (params) =>
         mcpRun("list_writing_tasks", "Error listing writing tasks", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return listWritingTasks(params);
+            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
+            return listWritingTasks({ ...params, userId });
         })
 );
 
 server.tool(
     "create_writing_task",
-    "Create a new writing task for a project, optionally linked to a scene.",
+    "Create a new writing task for a project (optionally linked to a scene), or a practice task that belongs to no project.",
     {
-        projectId: z.string().describe("The project ID"),
-        sceneId: z.string().optional().describe("Optional scene/node ID to link the task to"),
+        projectId: z.string().optional().describe("The project ID. Omit for a practice task not tied to any project"),
+        sceneId: z.string().optional().describe("Optional scene/node ID to link the task to (requires projectId)"),
         name: z.string().describe("One-line task description"),
         whatIsNeeded: z.string().optional().describe("Two sentences max — enough context to remember the idea"),
         importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Task importance (default: Medium)"),
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Estimated writing size (default: Medium)"),
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Energy type required (default: Technical)"),
+        kind: WritingTaskKind.optional().describe("Kind of work (default: Draft)"),
+        capacity: WritingTaskCapacity.optional().describe("The writer's state the task suits — distinct from energy (default: Full)"),
+        dueDate: WritingTaskDueDate.optional().describe("Optional ISO 8601 due date or date-time"),
     },
     async (params) =>
         mcpRun("create_writing_task", "Error creating writing task", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return createWritingTask(params);
+            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
+            return createWritingTask({ ...params, userId });
         })
 );
 
@@ -805,7 +823,10 @@ server.tool(
         taskId: z.string().describe("The writing task ID to mark complete"),
     },
     async ({ taskId }) =>
-        mcpRun("complete_writing_task", "Error completing writing task", () => completeWritingTask(taskId))
+        mcpRun("complete_writing_task", "Error completing writing task", async () => {
+            await verifyWritingTaskAccess(taskId, userId);
+            return completeWritingTask(taskId);
+        })
 );
 
 server.tool(
@@ -818,10 +839,16 @@ server.tool(
         importance: z.enum(["Critical", "High", "Medium"]).optional().describe("Updated importance"),
         size: z.enum(["Small", "Medium", "Large"]).optional().describe("Updated size estimate"),
         energy: z.enum(["Introspective", "Dramatic", "Technical"]).optional().describe("Updated energy type"),
+        kind: WritingTaskKind.optional().describe("Updated kind of work"),
+        capacity: WritingTaskCapacity.optional().describe("Updated writer state the task suits"),
+        dueDate: WritingTaskDueDate.nullable().optional().describe("New ISO 8601 due date or date-time, or null to clear it"),
         completed: z.boolean().optional().describe("Mark task complete or incomplete"),
     },
     async (params) =>
-        mcpRun("update_writing_task", "Error updating writing task", () => updateWritingTask(params))
+        mcpRun("update_writing_task", "Error updating writing task", async () => {
+            await verifyWritingTaskAccess(params.taskId, userId);
+            return updateWritingTask(params);
+        })
 );
 
 server.tool(

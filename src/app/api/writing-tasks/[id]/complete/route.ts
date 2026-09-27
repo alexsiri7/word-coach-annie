@@ -13,7 +13,7 @@ export async function POST(
 
         const existing = await prisma.writingTask.findUnique({
             where: { id },
-            select: { id: true, projectId: true },
+            select: { id: true, projectId: true, userId: true },
         });
 
         if (!existing) {
@@ -24,8 +24,14 @@ export async function POST(
         }
 
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
-        if (!access.authorized) return access.response;
+        if (!existing.projectId) {
+            if (userId && existing.userId !== userId) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
+        } else {
+            const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
+            if (!access.authorized) return access.response;
+        }
 
         const task = await WritingTaskController.completeWritingTask(id);
 

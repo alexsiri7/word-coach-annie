@@ -14,12 +14,18 @@ async function resolveTask(request: NextRequest, params: Promise<{ id: string }>
     const { id } = await params;
     const existing = await prisma.writingTask.findUnique({
         where: { id },
-        select: { id: true, projectId: true },
+        select: { id: true, projectId: true, userId: true },
     });
     if (!existing) {
         return { ok: false, response: NextResponse.json({ error: "Writing task not found" }, { status: 404 }) };
     }
     const userId = getCurrentUserId(request);
+    if (!existing.projectId) {
+        if (userId && existing.userId !== userId) {
+            return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+        }
+        return { ok: true, id };
+    }
     const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return { ok: false, response: access.response };
     return { ok: true, id };

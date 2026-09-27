@@ -48,6 +48,7 @@ model User {
   consents          UserConsent[]
   providers         Provider[]
   opportunities     Opportunity[]
+  writingTasks      WritingTask[]
 }
 
 model UserConsent {
@@ -394,22 +395,29 @@ model HashnodeExport {
 
 model WritingTask {
   id           String         @id @default(cuid())
-  projectId    String
+  projectId    String?
+  // Owner of the task's scope: the project's owner for project tasks, the creator for practice tasks.
+  userId       String?
   sceneId      String?
   name         String
   whatIsNeeded String         @default("")
   importance   String         @default("Medium")
   size         String         @default("Medium")
   energy       String         @default("Technical")
+  kind         String         @default("Draft") // Draft, Revise, Read, Gather, Admin
+  capacity     String         @default("Full") // Low, Medium, Full — writer state the task suits; distinct from energy
+  dueDate      DateTime?
   completed    Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
-  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   scene        StructureNode? @relation(fields: [sceneId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
   @@index([sceneId])
   @@index([projectId, completed])
+  @@index([userId, completed])
 }
 
 model Provider {
