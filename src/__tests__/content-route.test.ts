@@ -65,6 +65,7 @@ describe("Content Route /api/nodes/[id]/content", () => {
             expect(res.status).toBe(200);
             const data = await res.json();
             expect(data.latest).toBeDefined();
+            expect(data.latest.contentHash).toBe(computeContentHash("<p>Hello</p>"));
             expect(data.history).toBeInstanceOf(Array);
         });
 
@@ -100,6 +101,51 @@ describe("Content Route /api/nodes/[id]/content", () => {
             });
             const res = await POST(req as any, mockParams({ id: nodeId }));
             expect(res.status).toBe(201);
+            const stored = await testPrisma.contentVersion.findFirstOrThrow({ where: { nodeId } });
+            const data = await res.json();
+            expect(data.contentHash).toBe(computeContentHash(stored.content));
+        });
+
+        it("returns 409 when contentHash is omitted and a version already exists", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Written by Annie</p>", wordCount: 3 },
+            });
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>Stale editor content</p>",
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(409);
+            const data = await res.json();
+            expect(data.conflict).toBe(true);
+            expect(data.content).toBe("<p>Written by Annie</p>");
+            expect(data.contentHash).toBe(computeContentHash("<p>Written by Annie</p>"));
+            expect(await testPrisma.contentVersion.count({ where: { nodeId } })).toBe(1);
+        });
+
+        it("accepts a missing contentHash when the latest version is empty", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "", wordCount: 0 },
+            });
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>First words</p>",
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(201);
+        });
+
+        it("returns 409 when contentHash is null and a version already exists", async () => {
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Written by Annie</p>", wordCount: 3 },
+            });
+            const { POST } = await import("@/app/api/nodes/[id]/content/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}/content`, {
+                content: "<p>Stale editor content</p>",
+                contentHash: null,
+            });
+            const res = await POST(req as any, mockParams({ id: nodeId }));
+            expect(res.status).toBe(409);
         });
 
         it("rejects missing content", async () => {

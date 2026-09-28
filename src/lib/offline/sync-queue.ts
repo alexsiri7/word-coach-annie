@@ -11,6 +11,7 @@ import {
   replayFetch,
   withReplayLock,
 } from "./replay-shared";
+import { computeOfflineContentHash } from "./content-hash";
 
 export { isFinallyFailed };
 
@@ -218,8 +219,28 @@ export async function replayPendingOps(): Promise<void> {
 }
 
 /**
+ * Re-bases a conflicted content save onto the server version it conflicted
+ * with, so replaying it deliberately overwrites that version instead of
+ * conflicting again. Any other op is returned unchanged.
+ */
+async function rebaseConflictOp(op: PendingOp): Promise<PendingOp> {
+  if (op.status !== "conflict" || typeof op.serverContent !== "string" || !op.body) return op;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(op.body);
+  } catch {
+    return op;
+  }
+  if (typeof parsed !== "object" || parsed === null || !("contentHash" in parsed)) return op;
+  const contentHash = await computeOfflineContentHash(op.serverContent);
+  return { ...op, body: JSON.stringify({ ...parsed, contentHash }) };
+}
+
+/**
  * Force-replay a single conflict or finally-failed op (used by "Keep my version"
- * resolution and by retrying a failed op).
+ * resolution and by retrying a failed op). A conflicted content save is
+ * re-based onto the server version first; if the server has moved on again,
+ * its newer content is stored on the op so the next attempt re-bases onto it.
  * Returns true if the op was successfully replayed and removed; false if it
  * failed (network error or non-2xx response) and stays in the queue.
  */
@@ -228,10 +249,16 @@ export async function forceReplayOp(id: number): Promise<boolean> {
   const op = ops.find((o) => o.id === id);
   if (!op) return false;
   try {
-    const res = await replayFetch(op, createSessionRefresher());
+    const res = await replayFetch(await rebaseConflictOp(op), createSessionRefresher());
     if (res.ok) {
       await removePendingOp(id);
       return true;
+    }
+    if (res.status === 409) {
+      const data = await res.json().catch(() => null);
+      if (typeof data?.content === "string") {
+        await updatePendingOp(id, { serverContent: data.content });
+      }
     }
     console.warn(`[sync] forceReplayOp HTTP ${res.status} for op ${id}`);
     return false;

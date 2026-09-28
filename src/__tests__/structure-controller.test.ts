@@ -250,6 +250,8 @@ describe("StructureController", () => {
                 await StructureController.writeSceneContent(scene.id, "Changed content");
                 const result = await StructureController.restoreSceneVersion(scene.id, originalId);
                 expect(result.restoredFromVersionId).toBe(originalId);
+                expect(result.content).toBe("Original content");
+                expect(result.contentHash).toBe(computeContentHash("Original content"));
 
                 const content = await StructureController.readSceneContent(scene.id);
                 expect(content.content).toBe("Original content");

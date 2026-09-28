@@ -37,6 +37,7 @@ import {
   offlineFetch,
   replayPendingOps,
   retryFailedOp,
+  forceReplayOp,
   isFinallyFailed,
   classifySyncOps,
   addSyncListener,
@@ -44,6 +45,7 @@ import {
 } from "@/lib/offline/sync-queue";
 import type { PendingOp } from "@/lib/offline/idb";
 import { queuePendingOp } from "@/lib/offline/idb";
+import { computeContentHash } from "@/mcp/content-hash";
 
 // Access internals for test management
 const idbMock = await vi.importMock<{ _ops: Array<Record<string, unknown>>; _reset: () => void }>("@/lib/offline/idb");
@@ -318,6 +320,52 @@ describe("sync-queue", () => {
       await retryFailedOp(1);
 
       expect(request).toHaveBeenCalledWith("annie-replay", expect.any(Function));
+    });
+  });
+
+  describe("forceReplayOp", () => {
+    const conflictOp = () => ({
+      id: 1,
+      url: "/api/nodes/x/content",
+      method: "POST",
+      body: JSON.stringify({ content: "<p>mine</p>", contentHash: null }),
+      timestamp: 100,
+      status: "conflict",
+      retries: 0,
+      serverContent: "<p>theirs</p>",
+    });
+    const sentBody = () => JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+
+    it("re-bases a conflicted content save onto the server version it conflicted with", async () => {
+      idbMock._ops.push(conflictOp());
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 201 })));
+
+      await expect(forceReplayOp(1)).resolves.toBe(true);
+
+      expect(sentBody()).toEqual({ content: "<p>mine</p>", contentHash: computeContentHash("<p>theirs</p>") });
+      expect(idbMock._ops).toHaveLength(0);
+    });
+
+    it("stores newer server content when the server has moved on again", async () => {
+      idbMock._ops.push(conflictOp());
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ conflict: true, content: "<p>newer</p>" }), { status: 409 })
+      ));
+
+      await expect(forceReplayOp(1)).resolves.toBe(false);
+
+      expect(idbMock._ops).toHaveLength(1);
+      expect(idbMock._ops[0].serverContent).toBe("<p>newer</p>");
+    });
+
+    it("sends an op without a contentHash with its original body", async () => {
+      const body = JSON.stringify({ status: "DRAFT" });
+      idbMock._ops.push({ ...conflictOp(), method: "PATCH", body });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+
+      await expect(forceReplayOp(1)).resolves.toBe(true);
+
+      expect(vi.mocked(fetch).mock.calls[0][1]!.body).toBe(body);
     });
   });
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController, ConflictError } from "@/lib/controllers/structure";
 import { computeContentHash } from "@/mcp/content-hash";
+import { testPrisma } from "./setup";
 
 // Note: The controllers use the global prisma instance. 
 // In the vitest setup, we set process.env.DATABASE_URL
@@ -149,15 +150,58 @@ describe("Controller Integrity Tests", () => {
             }
         });
 
-        it("treats null contentHash as unconditional write", async () => {
+        it("treats null contentHash as 'no version seen' and rejects when one exists", async () => {
             const scene = await StructureController.createNode({
                 projectId,
                 type: "SCENE",
                 title: "Null Hash Scene"
             });
             await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
-            const result = await StructureController.writeSceneContent(scene.id, "<p>Version 2</p>", null);
+            await expect(
+                StructureController.writeSceneContent(scene.id, "<p>Version 2</p>", null)
+            ).rejects.toThrow(ConflictError);
+        });
+
+        it("allows null contentHash when the scene has no content yet", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Null Hash First Write Scene"
+            });
+            const result = await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>", null);
             expect(result.wordCount).toBe(2);
+        });
+
+        it("returns the hash of the written content", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Returned Hash Scene"
+            });
+            const result = await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            expect(result.contentHash).toBe(computeContentHash("<p>Version 1</p>"));
+        });
+
+        it("lets only one of two concurrent writers based on the same version succeed", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Concurrent Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            const baseHash = computeContentHash("<p>Version 1</p>");
+            const versionsBefore = await testPrisma.contentVersion.count({ where: { nodeId: scene.id } });
+
+            const results = await Promise.allSettled([
+                StructureController.writeSceneContent(scene.id, "<p>Writer A</p>", baseHash),
+                StructureController.writeSceneContent(scene.id, "<p>Writer B</p>", baseHash),
+            ]);
+
+            expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+            const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+            expect(await testPrisma.contentVersion.count({ where: { nodeId: scene.id } })).toBe(versionsBefore + 1);
         });
     });
 });
