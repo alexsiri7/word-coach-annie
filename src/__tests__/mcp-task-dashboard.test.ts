@@ -96,7 +96,9 @@ describe("get_task_dashboard", () => {
         await createWritingTask({ userId, name: "High, due soon", importance: "High", dueDate: daysFromNow(2).toISOString() });
 
         const result = await dashboard(userId);
-        expect(result.suggestedNow.map((t: Named) => t.name)).toEqual(["High, due soon", "High, due later", "Medium"]);
+        const ranked = ["High, due soon", "High, due later", "Medium"];
+        expect(result.suggestedNow.map((t: Named) => t.name)).toEqual(ranked);
+        expect(result.openTasks.map((t: Named) => t.name)).toEqual(ranked);
     });
 
     it("merges task due dates and open opportunity close dates, soonest first", async () => {
@@ -119,6 +121,18 @@ describe("get_task_dashboard", () => {
             ["opportunity", "Contest in 3"],
             ["task", "Task due in 5"],
         ]);
+    });
+
+    it("narrows opportunity deadlines to those the project is a candidate for", async () => {
+        const provider = await prisma.provider.create({ data: { name: "Mag", userId } });
+        const contest = await prisma.opportunity.create({
+            data: { userId, providerId: provider.id, title: "Novel contest", closeDate: daysFromNow(3) },
+        });
+        await prisma.opportunityCandidate.create({ data: { opportunityId: contest.id, projectId: novelId } });
+
+        const titles = (result: { upcomingDeadlines: Deadline[] }) => result.upcomingDeadlines.map((d) => d.title);
+        expect(titles(await dashboard(userId, { projectId: novelId }))).toEqual(["Novel contest"]);
+        expect(titles(await dashboard(userId, { projectId: storyId }))).toEqual([]);
     });
 
     it("lists tasks completed in the last 7 days only", async () => {

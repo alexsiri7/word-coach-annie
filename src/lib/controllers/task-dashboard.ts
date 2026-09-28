@@ -3,7 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { fitsCapacity, pickSuggestedTasks, rankTasks } from "@/lib/writing-task-ranking";
 import {
     WritingTaskCapacity,
+    WritingTaskEnergy,
     WritingTaskImportance,
+    WritingTaskKind,
     WritingTaskSize,
     type WritingTaskCapacityValue,
     type WritingTaskKindValue,
@@ -25,11 +27,11 @@ function toDashboardTask(t: DashboardTaskRow) {
         id: t.id,
         name: t.name,
         whatIsNeeded: t.whatIsNeeded,
-        kind: t.kind,
+        kind: WritingTaskKind.parse(t.kind),
         capacity: WritingTaskCapacity.parse(t.capacity),
         importance: WritingTaskImportance.parse(t.importance),
         size: WritingTaskSize.parse(t.size),
-        energy: t.energy,
+        energy: WritingTaskEnergy.parse(t.energy),
         dueDate: t.dueDate?.toISOString() ?? null,
         deadline: t.dueDate,
         project: t.project,
