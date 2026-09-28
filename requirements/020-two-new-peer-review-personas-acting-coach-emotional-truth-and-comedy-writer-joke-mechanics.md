@@ -2,10 +2,10 @@
 created: '2026-05-29'
 github_issue: null
 id: '020'
-status: draft
+status: done
 title: 'Two new peer review personas: acting coach (emotional truth) and comedy writer
   (joke mechanics)'
-updated: '2026-05-29'
+updated: '2026-09-28'
 ---
 
 ## Why
