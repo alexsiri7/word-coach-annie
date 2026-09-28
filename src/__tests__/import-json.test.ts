@@ -133,6 +133,44 @@ describe("importProjectJson", () => {
     expect(cvs[0].wordCount).toBe(2);
   });
 
+  it("keeps only the latest 50 content versions per scene", async () => {
+    const data = {
+      ...minimalExport,
+      structureNodes: [
+        {
+          id: "sc1",
+          parentId: null,
+          type: "SCENE",
+          title: "Scene 1",
+          synopsis: "",
+          status: "DRAFT",
+          orderIndex: 0,
+        },
+      ],
+      // Export order: newest first
+      contentVersions: Array.from({ length: 60 }, (_, i) => ({
+        id: `cv${i}`,
+        nodeId: "sc1",
+        content: `<p>Version ${59 - i}</p>`,
+        wordCount: 2,
+      })),
+    };
+
+    const { projectId } = await importProjectJson(data);
+
+    const nodes = await testPrisma.structureNode.findMany({
+      where: { projectId },
+    });
+    const contents = (
+      await testPrisma.contentVersion.findMany({
+        where: { nodeId: nodes[0].id },
+      })
+    ).map((cv) => cv.content);
+    expect(contents).toHaveLength(50);
+    expect(contents).toContain("<p>Version 59</p>");
+    expect(contents).not.toContain("<p>Version 9</p>");
+  });
+
   it("imports story objects", async () => {
     const data = {
       ...minimalExport,

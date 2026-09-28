@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
+import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 
 interface ExportData {
   exportVersion: number;
@@ -118,10 +119,15 @@ export async function importProjectJson(
       });
     }
 
-    // 3. Create content versions
+    // 3. Create content versions. Exports list each node's versions newest
+    // first, so keeping the first MAX_SCENE_VERSIONS keeps the latest ones.
+    const versionsPerNode = new Map<string, number>();
     for (const cv of data.contentVersions) {
       const newNodeId = nodeIdMap.get(cv.nodeId);
       if (!newNodeId) continue;
+      const kept = versionsPerNode.get(newNodeId) ?? 0;
+      if (kept >= MAX_SCENE_VERSIONS) continue;
+      versionsPerNode.set(newNodeId, kept + 1);
       await tx.contentVersion.create({
         data: {
           nodeId: newNodeId,

@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, type DbClient } from "@/lib/db";
 import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
@@ -14,6 +14,23 @@ export class ConflictError extends Error {
 export const ANNOTATION_ERRORS = {
     CONTENT_REQUIRED: "Content is required",
 } as const;
+
+export const MAX_SCENE_VERSIONS = 50;
+
+async function pruneSceneVersions(tx: DbClient, nodeId: string) {
+    const allVersions = await tx.contentVersion.findMany({
+        where: { nodeId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+    });
+
+    if (allVersions.length > MAX_SCENE_VERSIONS) {
+        const idsToDelete = allVersions.slice(MAX_SCENE_VERSIONS).map((v: { id: string }) => v.id);
+        await tx.contentVersion.deleteMany({
+            where: { id: { in: idsToDelete } },
+        });
+    }
+}
 
 export interface OutlineNode {
     id: string;
@@ -458,19 +475,7 @@ export class StructureController {
                 }),
             ]);
 
-            // Prune old versions (keep latest 50)
-            const allVersions = await tx.contentVersion.findMany({
-                where: { nodeId },
-                orderBy: { createdAt: "desc" },
-                select: { id: true },
-            });
-
-            if (allVersions.length > 50) {
-                const idsToDelete = allVersions.slice(50).map((v: { id: string }) => v.id);
-                await tx.contentVersion.deleteMany({
-                    where: { id: { in: idsToDelete } },
-                });
-            }
+            await pruneSceneVersions(tx, nodeId);
 
             return newVersion;
         });
@@ -526,19 +531,25 @@ export class StructureController {
         });
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
-        const [newVersion] = await Promise.all([
-            prisma.contentVersion.create({
-                data: {
-                    nodeId,
-                    content: oldVersion.content,
-                    wordCount: oldVersion.wordCount,
-                },
-            }),
-            prisma.project.update({
-                where: { id: node.projectId },
-                data: { updatedAt: new Date() },
-            }),
-        ]);
+        const newVersion = await prisma.$transaction(async (tx) => {
+            const [created] = await Promise.all([
+                tx.contentVersion.create({
+                    data: {
+                        nodeId,
+                        content: oldVersion.content,
+                        wordCount: oldVersion.wordCount,
+                    },
+                }),
+                tx.project.update({
+                    where: { id: node.projectId },
+                    data: { updatedAt: new Date() },
+                }),
+            ]);
+
+            await pruneSceneVersions(tx, nodeId);
+
+            return created;
+        });
 
         return {
             nodeId,
