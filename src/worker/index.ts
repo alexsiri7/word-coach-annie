@@ -2,8 +2,8 @@
 
 import { openDB } from "idb";
 import {
-  MAX_REPLAY_RETRIES,
   createSessionRefresher,
+  isFinallyFailed,
   replayFetch,
   withReplayLock,
 } from "../lib/offline/replay-shared";
@@ -40,7 +40,7 @@ async function replayFromSW(): Promise<void> {
     const allOps: WorkerPendingOp[] = await db.getAll("pendingOps");
 
     const pending = allOps
-      .filter((op) => op.status !== "conflict" && (op.retries ?? 0) < MAX_REPLAY_RETRIES)
+      .filter((op) => op.status !== "conflict" && !isFinallyFailed(op))
       .sort((a, b) => a.timestamp - b.timestamp);
 
     const refreshSession = createSessionRefresher();

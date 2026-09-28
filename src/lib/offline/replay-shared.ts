@@ -4,6 +4,11 @@
 export const MAX_REPLAY_RETRIES = 3;
 export const REPLAY_LOCK_NAME = "annie-replay";
 
+/** An op that replay no longer attempts; only the user can retry or discard it. */
+export function isFinallyFailed(op: { status: string; retries?: number }): boolean {
+  return op.status !== "conflict" && (op.retries ?? 0) >= MAX_REPLAY_RETRIES;
+}
+
 /**
  * Runs `fn` while holding an origin-wide Web Lock shared by every tab and the
  * service worker, so only one context replays the queue at a time. Callers

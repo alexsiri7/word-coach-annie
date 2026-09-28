@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getPendingOps, type PendingOp } from "./idb";
-import { addSyncListener, isFinallyFailed } from "./sync-queue";
+import { addSyncListener, classifySyncOps } from "./sync-queue";
 import { useNetworkStatus } from "./use-network-status";
 
 export interface SyncStatus {
@@ -25,12 +25,10 @@ export function useSyncStatus(): SyncStatus {
 
   const refresh = useCallback(async () => {
     try {
-      const ops = await getPendingOps();
-      const conflicts = ops.filter((o) => o.status === "conflict");
-      const failed = ops.filter(isFinallyFailed);
-      setPendingCount(ops.length - conflicts.length - failed.length);
-      setConflictOps(conflicts);
-      setFailedOps(failed);
+      const queue = classifySyncOps(await getPendingOps());
+      setPendingCount(queue.pendingCount);
+      setConflictOps(queue.conflictOps);
+      setFailedOps(queue.failedOps);
     } catch (err) {
       // IndexedDB not available (SSR or error)
       if (typeof window !== "undefined") {

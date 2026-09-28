@@ -6,11 +6,13 @@ import {
   type PendingOp,
 } from "./idb";
 import {
-  MAX_REPLAY_RETRIES,
   createSessionRefresher,
+  isFinallyFailed,
   replayFetch,
   withReplayLock,
 } from "./replay-shared";
+
+export { isFinallyFailed };
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -98,9 +100,15 @@ export async function offlineFetch(
 
 let replaying = false;
 
-/** An op that replay no longer attempts; only the user can retry or discard it. */
-export function isFinallyFailed(op: PendingOp): boolean {
-  return op.status !== "conflict" && (op.retries ?? 0) >= MAX_REPLAY_RETRIES;
+/** Splits the queue into ops still awaiting replay, conflicts, and finally-failed ops. */
+export function classifySyncOps(ops: PendingOp[]): {
+  pendingCount: number;
+  conflictOps: PendingOp[];
+  failedOps: PendingOp[];
+} {
+  const conflictOps = ops.filter((o) => o.status === "conflict");
+  const failedOps = ops.filter(isFinallyFailed);
+  return { pendingCount: ops.length - conflictOps.length - failedOps.length, conflictOps, failedOps };
 }
 
 /**
@@ -210,7 +218,8 @@ export async function replayPendingOps(): Promise<void> {
 }
 
 /**
- * Force-replay a single conflict op (used by "Keep my version" resolution).
+ * Force-replay a single conflict or finally-failed op (used by "Keep my version"
+ * resolution and by retrying a failed op).
  * Returns true if the op was successfully replayed and removed; false if it
  * failed (network error or non-2xx response) and stays in the queue.
  */
@@ -234,10 +243,10 @@ export async function forceReplayOp(id: number): Promise<boolean> {
 }
 
 /**
- * Gives a finally-failed op a fresh retry budget and replays the queue. If a
- * replay is already running in this tab, the op stays pending for the next one.
+ * Re-sends one finally-failed op under the replay lock, so its session refresh
+ * cannot race another context's. Returns true if it synced; otherwise the op
+ * stays finally failed and visible to the user.
  */
-export async function retryFailedOp(id: number): Promise<void> {
-  await updatePendingOp(id, { status: "pending", retries: 0 });
-  await replayPendingOps();
+export function retryFailedOp(id: number): Promise<boolean> {
+  return withReplayLock(() => forceReplayOp(id));
 }

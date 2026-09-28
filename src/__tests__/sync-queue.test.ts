@@ -38,6 +38,7 @@ import {
   replayPendingOps,
   retryFailedOp,
   isFinallyFailed,
+  classifySyncOps,
   addSyncListener,
   type SyncEvent,
 } from "@/lib/offline/sync-queue";
@@ -286,16 +287,54 @@ describe("sync-queue", () => {
   });
 
   describe("retryFailedOp", () => {
-    it("resets a finally-failed op and replays it", async () => {
-      idbMock._ops.push(
-        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "failed", retries: 3 }
-      );
+    const failedOp = () => ({ id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "failed", retries: 3 });
+
+    it("re-sends a finally-failed op and removes it on success", async () => {
+      idbMock._ops.push(failedOp());
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
 
-      await retryFailedOp(1);
+      await expect(retryFailedOp(1)).resolves.toBe(true);
 
       expect(fetch).toHaveBeenCalledWith("/api/nodes/x", expect.anything());
       expect(idbMock._ops).toHaveLength(0);
+    });
+
+    it("reports failure and leaves the op finally failed when the re-send fails", async () => {
+      idbMock._ops.push(failedOp());
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+
+      await expect(retryFailedOp(1)).resolves.toBe(false);
+
+      expect(idbMock._ops).toHaveLength(1);
+      expect(isFinallyFailed(idbMock._ops[0] as unknown as PendingOp)).toBe(true);
+    });
+
+    it("runs under the replay lock", async () => {
+      idbMock._ops.push(failedOp());
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+      const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn());
+      navigatorStub.locks = { request };
+
+      await retryFailedOp(1);
+
+      expect(request).toHaveBeenCalledWith("annie-replay", expect.any(Function));
+    });
+  });
+
+  describe("classifySyncOps", () => {
+    it("separates pending, conflict, and finally-failed ops", () => {
+      const op = (id: number, status: PendingOp["status"], retries: number): PendingOp =>
+        ({ id, url: "/api/x", method: "PATCH", body: null, timestamp: id, status, retries });
+      const pending = op(1, "pending", 0);
+      const retriable = op(2, "failed", 1);
+      const conflict = op(3, "conflict", 3);
+      const failed = op(4, "failed", 3);
+
+      const result = classifySyncOps([pending, retriable, conflict, failed]);
+
+      expect(result.pendingCount).toBe(2);
+      expect(result.conflictOps).toEqual([conflict]);
+      expect(result.failedOps).toEqual([failed]);
     });
   });
 

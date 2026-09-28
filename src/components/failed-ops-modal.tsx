@@ -18,26 +18,35 @@ interface Props {
 }
 
 export function FailedOpsModal({ open, onOpenChange, failed, onResolved }: Props) {
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
 
   if (failed.length === 0) return null;
 
   const act = async (op: PendingOp, action: "retry" | "discard") => {
-    setBusyId(op.id!);
+    const id = op.id!;
+    setBusyIds((ids) => new Set(ids).add(id));
     setActionError(null);
     try {
       if (action === "retry") {
-        await retryFailedOp(op.id!);
+        const ok = await retryFailedOp(id);
+        if (!ok) {
+          setActionError("This change still couldn't sync. Check your connection and try again.");
+          return;
+        }
       } else {
-        await removePendingOp(op.id!);
+        await removePendingOp(id);
       }
       onResolved();
       if (failed.length <= 1) onOpenChange(false);
     } catch {
       setActionError("Something went wrong. Please try again.");
     } finally {
-      setBusyId(null);
+      setBusyIds((ids) => {
+        const next = new Set(ids);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -56,7 +65,7 @@ export function FailedOpsModal({ open, onOpenChange, failed, onResolved }: Props
 
         <ul className="max-h-[60vh] space-y-4 overflow-y-auto py-2">
           {failed.map((op) => {
-            const busy = busyId === op.id;
+            const busy = busyIds.has(op.id!);
             return (
               <li key={op.id} className="space-y-1.5">
                 <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">
