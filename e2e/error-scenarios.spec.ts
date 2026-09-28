@@ -453,3 +453,77 @@ test.describe('E2E error scenarios — save conflict', () => {
     await expect(editor).toContainText('My new sentence.')
   })
 })
+
+test.describe('E2E error scenarios — offline restore', () => {
+  test('a restore queued offline leaves the editor and version panel untouched', async ({
+    page,
+    context,
+  }) => {
+    const mockFocusContext = {
+      context: {
+        id: 'sc-1',
+        projectId: 'proj-1',
+        parentId: 'ch-1',
+        type: 'SCENE',
+        title: 'Test Scene',
+        synopsis: '',
+        status: 'DRAFT',
+        orderIndex: 0,
+        wordCount: 5,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-03-01T00:00:00Z',
+        chapterTitle: 'Chapter One',
+        prevScene: null,
+        nextScene: null,
+      },
+      related: { CHARACTER: [], LOCATION: [] },
+    }
+    const mockContent = {
+      latest: {
+        versionId: 'cv-2',
+        nodeId: 'sc-1',
+        content: '<p>Current scene content.</p>',
+        contentHash: 'h2',
+        wordCount: 3,
+      },
+      history: [
+        { id: 'cv-2', wordCount: 3, createdAt: '2026-03-01T00:00:00Z' },
+        { id: 'cv-1', wordCount: 3, createdAt: '2026-02-01T00:00:00Z' },
+      ],
+    }
+
+    await page.route('**/api/focus/sc-1', (route) =>
+      route.fulfill({ json: mockFocusContext, status: 200 }),
+    )
+    await page.route('**/api/projects/proj-1', (route) =>
+      route.fulfill({
+        json: { id: 'proj-1', title: 'Test Project', projectType: 'FICTION' },
+        status: 200,
+      }),
+    )
+    await page.route('**/api/nodes/sc-1/content', (route) =>
+      route.fulfill({ json: mockContent, status: 200 }),
+    )
+    await page.route('**/api/nodes/*/annotations', (route) =>
+      route.fulfill({ json: [], status: 200 }),
+    )
+
+    await page.goto('/project/proj-1/scene/sc-1/focus')
+
+    const editor = page.locator('.tiptap, .ProseMirror').first()
+    await expect(editor).toContainText('Current scene content.', { timeout: 20_000 })
+
+    await page.getByRole('button', { name: 'Version history' }).click()
+    const panel = page.getByText('Version History', { exact: true })
+    await expect(panel).toBeVisible()
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Restore', exact: true }).first().click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Restore' }).click()
+    await expect(page.getByRole('alertdialog')).toBeHidden()
+
+    await expect(panel).toBeVisible()
+    await expect(editor).toContainText('Current scene content.')
+    await expect(page.getByRole('button', { name: 'Saved' })).toHaveCount(0)
+  })
+})

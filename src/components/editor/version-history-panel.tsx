@@ -28,7 +28,7 @@ interface VersionHistoryPanelProps {
   nodeId: string;
   versionHistory: ContentVersion[];
   onClose: () => void;
-  onRestored: (restored: { content?: string; contentHash?: string; history: ContentVersion[] }) => void;
+  onRestored: (restored: { content: string; contentHash: string; history: ContentVersion[] }) => void;
 }
 
 export function VersionHistoryPanel({
@@ -78,6 +78,9 @@ export function VersionHistoryPanel({
 
       if (res.ok) {
         const restored = await res.json();
+        // Queued offline: nothing reached the server, so there is no new
+        // content, hash, or history to show yet.
+        if (restored.queued) return;
         // Reload version history
         const histRes = await fetch(`/api/nodes/${nodeId}/content`);
         const histData = await histRes.json();

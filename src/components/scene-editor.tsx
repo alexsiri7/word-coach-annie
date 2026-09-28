@@ -625,13 +625,12 @@ export function SceneEditor({
               onClose={() => setShowVersions(false)}
               onRestored={({ content, contentHash, history }) => {
                 cleanup();
-                // A restore queued while offline has no content to show yet.
-                if (editor && content !== undefined) {
+                if (editor) {
                   const converted = commentsToBeats(content);
                   editor.commands.setContent(converted);
                   contentRef.current = converted;
                 }
-                setBaseHash(contentHash ?? null);
+                setBaseHash(contentHash);
                 setSaveConflict(null);
                 setLastSaved(new Date().toLocaleTimeString());
                 setVersionHistory(history);
