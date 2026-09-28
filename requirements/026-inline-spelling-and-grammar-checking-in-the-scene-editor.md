@@ -2,9 +2,9 @@
 created: '2026-08-25'
 github_issue: 1000
 id: '026'
-status: idea
+status: done
 title: Inline spelling and grammar checking in the scene editor
-updated: '2026-08-25'
+updated: '2026-09-28'
 ---
 
 ## Why
