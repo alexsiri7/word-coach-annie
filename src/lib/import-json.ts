@@ -26,6 +26,7 @@ interface ExportData {
     nodeId: string;
     content: string;
     wordCount: number;
+    createdAt?: string;
   }>;
   storyObjects: Array<{
     id: string;
@@ -119,10 +120,17 @@ export async function importProjectJson(
       });
     }
 
-    // 3. Create content versions. Exports list each node's versions newest
-    // first, so keeping the first MAX_SCENE_VERSIONS keeps the latest ones.
+    // 3. Create content versions, keeping only each node's latest
+    // MAX_SCENE_VERSIONS. The payload may be hand-edited, so order by
+    // createdAt rather than trusting array position; versions without a
+    // parseable createdAt sort as oldest.
+    const createdAtMs = (cv: ExportData["contentVersions"][number]) =>
+      Date.parse(cv.createdAt ?? "") || 0;
+    const newestFirst = [...data.contentVersions].sort(
+      (a, b) => createdAtMs(b) - createdAtMs(a)
+    );
     const versionsPerNode = new Map<string, number>();
-    for (const cv of data.contentVersions) {
+    for (const cv of newestFirst) {
       const newNodeId = nodeIdMap.get(cv.nodeId);
       if (!newNodeId) continue;
       const kept = versionsPerNode.get(newNodeId) ?? 0;

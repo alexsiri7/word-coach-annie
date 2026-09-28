@@ -147,12 +147,14 @@ describe("importProjectJson", () => {
           orderIndex: 0,
         },
       ],
-      // Export order: newest first
+      // Deliberately oldest-first: survivors must be chosen by createdAt,
+      // not by array position.
       contentVersions: Array.from({ length: 60 }, (_, i) => ({
         id: `cv${i}`,
         nodeId: "sc1",
-        content: `<p>Version ${59 - i}</p>`,
+        content: `<p>Version ${i}</p>`,
         wordCount: 2,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(),
       })),
     };
 
@@ -168,6 +170,7 @@ describe("importProjectJson", () => {
     ).map((cv) => cv.content);
     expect(contents).toHaveLength(50);
     expect(contents).toContain("<p>Version 59</p>");
+    expect(contents).toContain("<p>Version 10</p>");
     expect(contents).not.toContain("<p>Version 9</p>");
   });
 
