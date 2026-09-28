@@ -135,6 +135,29 @@ describe("Content Versioning", () => {
     expect(remaining.length).toBe(50);
   });
 
+  it("prunes to at most 50 versions after restoreSceneVersion exceeds limit", async () => {
+    const versionIds: string[] = [];
+    for (let i = 0; i < 50; i++) {
+      const version = await testPrisma.contentVersion.create({
+        data: {
+          nodeId: sceneId,
+          content: `Version ${i}`,
+          wordCount: 2,
+          createdAt: new Date(Date.now() - 10000 + i * 100),
+        },
+      });
+      versionIds.push(version.id);
+    }
+    await StructureController.restoreSceneVersion(sceneId, versionIds[10]);
+    const remaining = await testPrisma.contentVersion.findMany({
+      where: { nodeId: sceneId },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(remaining).toHaveLength(50);
+    expect(remaining[0].content).toBe("Version 10");
+    expect(remaining.some((v) => v.id === versionIds[0])).toBe(false);
+  });
+
   it("calculates word count correctly", () => {
     // This tests the word count logic used in the API
     const testCases = [
