@@ -820,6 +820,26 @@ Returns `{ tasks: WritingTask[], total: number }`.
 
 ---
 
+#### `get_task_dashboard`
+The writer's tasks across every project in one call — open project and practice tasks, upcoming deadlines, a short "suggested now" list, and what was finished this week.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `capacity` | `"Low" \| "Medium" \| "Full"`? | Keep only tasks suited to this capacity or less (`Low` → Low; `Medium` → Low and Medium; `Full` → all). Also the capacity "suggested now" is picked for (default `Full`) |
+| `kind` | `"Draft" \| "Revise" \| "Read" \| "Gather" \| "Admin"`? | Keep only tasks of this kind |
+| `projectId` | string? | Keep only this project's tasks, and only opportunities it is a candidate for |
+
+Returns:
+
+- `suggestedNow` — up to 5 open tasks, ranked by importance, then soonest due date, then smallest size
+- `upcomingDeadlines` — up to 10 entries, soonest first: `{ type: "task", id, title, date, project }` for open tasks with a due date (overdue included) and `{ type: "opportunity", id, title, date, status }` for opportunities that are not `closed` and close today or later. `kind` and `capacity` apply to tasks only
+- `openTasks` — up to 50 open tasks in the same ranking; `openTaskTotal` counts them all
+- `completedThisWeek` — tasks completed in the last 7 days, most recent first: `{ id, name, kind, project, completedAt }`
+
+Each dashboard task carries `id`, `name`, `whatIsNeeded`, `kind`, `capacity`, `importance`, `size`, `energy`, `dueDate`, `project` (`{ id, title }` or `null` for a practice task) and `scene` (`{ id, title }` or `null`).
+
+---
+
 #### `create_writing_task`
 Create a new writing task for a project (optionally linked to a scene), or a practice task that belongs to no project.
 
