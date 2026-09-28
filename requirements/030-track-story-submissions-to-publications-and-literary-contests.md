@@ -2,9 +2,9 @@
 created: '2026-08-30'
 github_issue: null
 id: '030'
-status: draft
+status: done
 title: Track story submissions to publications and literary contests
-updated: '2026-08-30'
+updated: '2026-09-28'
 ---
 
 ## Why
