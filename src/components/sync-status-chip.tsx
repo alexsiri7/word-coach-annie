@@ -4,12 +4,17 @@ import { useState } from "react";
 import { WifiOff, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import { useSyncStatus } from "@/lib/offline/use-sync-status";
 import { ConflictResolverModal } from "./conflict-resolver-modal";
+import { FailedOpsModal } from "./failed-ops-modal";
 
 export function SyncStatusChip() {
-  const { isOnline, pendingCount, conflictCount, conflictOps, isSyncing, refresh } = useSyncStatus();
+  const {
+    isOnline, pendingCount, conflictCount, conflictOps, failedCount, failedOps, isSyncing, refresh,
+  } = useSyncStatus();
   const [conflictOpen, setConflictOpen] = useState(false);
+  const [failedOpen, setFailedOpen] = useState(false);
 
   const hasConflict = conflictCount > 0;
+  const hasFailed = failedCount > 0;
 
   let icon: React.ReactNode;
   let label: string;
@@ -18,6 +23,10 @@ export function SyncStatusChip() {
   if (hasConflict) {
     icon = <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />;
     label = conflictCount === 1 ? "1 conflict" : `${conflictCount} conflicts`;
+    chipClass = "bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30 cursor-pointer";
+  } else if (hasFailed) {
+    icon = <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />;
+    label = failedCount === 1 ? "1 change failed" : `${failedCount} changes failed`;
     chipClass = "bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30 cursor-pointer";
   } else if (isSyncing) {
     icon = <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />;
@@ -37,8 +46,8 @@ export function SyncStatusChip() {
     <>
       <button
         type="button"
-        disabled={!hasConflict}
-        onClick={() => setConflictOpen(true)}
+        disabled={!hasConflict && !hasFailed}
+        onClick={() => (hasConflict ? setConflictOpen(true) : setFailedOpen(true))}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${chipClass} disabled:cursor-default`}
       >
         <span role="status" aria-live="polite" className="flex items-center gap-1.5">
@@ -51,6 +60,13 @@ export function SyncStatusChip() {
         open={conflictOpen}
         onOpenChange={setConflictOpen}
         conflicts={conflictOps}
+        onResolved={refresh}
+      />
+
+      <FailedOpsModal
+        open={failedOpen}
+        onOpenChange={setFailedOpen}
+        failed={failedOps}
         onResolved={refresh}
       />
     </>

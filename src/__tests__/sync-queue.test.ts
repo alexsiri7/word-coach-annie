@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Stub navigator for Node.js test environment
-const navigatorStub = { onLine: true };
+const navigatorStub: { onLine: boolean; locks?: { request: (name: string, fn: () => Promise<unknown>) => Promise<unknown> } } = { onLine: true };
 vi.stubGlobal("navigator", navigatorStub);
 
 // Mock idb module before importing sync-queue
@@ -33,7 +33,15 @@ vi.mock("@/lib/offline/idb", () => {
   };
 });
 
-import { offlineFetch, replayPendingOps, addSyncListener, type SyncEvent } from "@/lib/offline/sync-queue";
+import {
+  offlineFetch,
+  replayPendingOps,
+  retryFailedOp,
+  isFinallyFailed,
+  addSyncListener,
+  type SyncEvent,
+} from "@/lib/offline/sync-queue";
+import type { PendingOp } from "@/lib/offline/idb";
 import { queuePendingOp } from "@/lib/offline/idb";
 
 // Access internals for test management
@@ -48,6 +56,7 @@ describe("sync-queue", () => {
 
   afterEach(() => {
     navigatorStub.onLine = true;
+    delete navigatorStub.locks;
   });
 
   describe("offlineFetch", () => {
@@ -215,6 +224,94 @@ describe("sync-queue", () => {
       await replayPendingOps();
 
       expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("refreshes the session on 401 and re-sends the op", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "pending", retries: 0 }
+      );
+
+      let opCalls = 0;
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => {
+        if (url === "/api/auth/refresh") return new Response("{}", { status: 200 });
+        opCalls++;
+        return new Response("{}", { status: opCalls === 1 ? 401 : 200 });
+      }));
+
+      const events: SyncEvent[] = [];
+      const unsub = addSyncListener((e) => events.push(e));
+
+      await replayPendingOps();
+      unsub();
+
+      expect(idbMock._ops).toHaveLength(0);
+      expect(events.find((e) => e.type === "replay-done")).toMatchObject({ succeeded: 1, failed: 0 });
+    });
+
+    it("marks ops failed and refreshes only once when the session can't be renewed", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "pending", retries: 0 },
+        { id: 2, url: "/api/nodes/y", method: "PATCH", body: '{}', timestamp: 200, status: "pending", retries: 0 }
+      );
+
+      const fetchMock = vi.fn().mockImplementation(async () => new Response("{}", { status: 401 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await replayPendingOps();
+
+      expect(idbMock._ops).toEqual([
+        expect.objectContaining({ id: 1, status: "failed", retries: 1 }),
+        expect.objectContaining({ id: 2, status: "failed", retries: 1 }),
+      ]);
+      expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh")).toHaveLength(1);
+    });
+
+    it("reads the queue only after acquiring the replay lock", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "pending", retries: 0 }
+      );
+      // Another context replays the op while this one waits for the lock.
+      navigatorStub.locks = {
+        request: async (_name, fn) => {
+          idbMock._ops.length = 0;
+          return fn();
+        },
+      };
+      vi.stubGlobal("fetch", vi.fn());
+
+      await replayPendingOps();
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("retryFailedOp", () => {
+    it("resets a finally-failed op and replays it", async () => {
+      idbMock._ops.push(
+        { id: 1, url: "/api/nodes/x", method: "PATCH", body: '{}', timestamp: 100, status: "failed", retries: 3 }
+      );
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+
+      await retryFailedOp(1);
+
+      expect(fetch).toHaveBeenCalledWith("/api/nodes/x", expect.anything());
+      expect(idbMock._ops).toHaveLength(0);
+    });
+  });
+
+  describe("isFinallyFailed", () => {
+    const base: PendingOp = { id: 1, url: "/api/x", method: "PATCH", body: null, timestamp: 0, status: "failed", retries: 3 };
+
+    it("is true once retries are exhausted", () => {
+      expect(isFinallyFailed(base)).toBe(true);
+    });
+
+    it("is false for conflicts", () => {
+      expect(isFinallyFailed({ ...base, status: "conflict" })).toBe(false);
+    });
+
+    it("is false while retries remain", () => {
+      expect(isFinallyFailed({ ...base, retries: 1 })).toBe(false);
     });
   });
 });

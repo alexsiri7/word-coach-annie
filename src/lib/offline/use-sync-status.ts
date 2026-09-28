@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getPendingOps, type PendingOp } from "./idb";
-import { addSyncListener } from "./sync-queue";
+import { addSyncListener, isFinallyFailed } from "./sync-queue";
 import { useNetworkStatus } from "./use-network-status";
 
 export interface SyncStatus {
@@ -10,6 +10,8 @@ export interface SyncStatus {
   pendingCount: number;
   conflictCount: number;
   conflictOps: PendingOp[];
+  failedCount: number;
+  failedOps: PendingOp[];
   isSyncing: boolean;
   refresh: () => void;
 }
@@ -18,14 +20,17 @@ export function useSyncStatus(): SyncStatus {
   const { isOnline } = useNetworkStatus();
   const [pendingCount, setPendingCount] = useState(0);
   const [conflictOps, setConflictOps] = useState<PendingOp[]>([]);
+  const [failedOps, setFailedOps] = useState<PendingOp[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const ops = await getPendingOps();
       const conflicts = ops.filter((o) => o.status === "conflict");
-      setPendingCount(ops.length - conflicts.length);
+      const failed = ops.filter(isFinallyFailed);
+      setPendingCount(ops.length - conflicts.length - failed.length);
       setConflictOps(conflicts);
+      setFailedOps(failed);
     } catch (err) {
       // IndexedDB not available (SSR or error)
       if (typeof window !== "undefined") {
@@ -47,7 +52,9 @@ export function useSyncStatus(): SyncStatus {
         setIsSyncing(false);
         refresh();
       }
-      if (event.type === "replay-success" || event.type === "replay-conflict") {
+      if (event.type === "replay-success" ||
+        event.type === "replay-conflict" ||
+        event.type === "replay-error") {
         refresh();
       }
     });
@@ -58,6 +65,8 @@ export function useSyncStatus(): SyncStatus {
     pendingCount,
     conflictCount: conflictOps.length,
     conflictOps,
+    failedCount: failedOps.length,
+    failedOps,
     isSyncing,
     refresh,
   };
