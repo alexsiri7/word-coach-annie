@@ -7,6 +7,9 @@ export async function register() {
     // Initialize OpenTelemetry + Phoenix tracing (gated by OTEL_ENABLED)
     const { initTelemetry } = await import("./lib/telemetry");
     initTelemetry();
+
+    const { startExpiredAuthCleanup } = await import("./lib/expired-auth-cleanup");
+    startExpiredAuthCleanup();
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {
