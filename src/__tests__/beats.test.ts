@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => {
         structureNode: {
             findUnique: vi.fn(),
             findMany: vi.fn(),
+            update: vi.fn(),
         },
         contentVersion: {
             create: vi.fn(),

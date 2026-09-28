@@ -32,6 +32,15 @@ async function pruneSceneVersions(tx: DbClient, nodeId: string) {
     }
 }
 
+// Row-locks the scene until the transaction commits, serializing every
+// version write to it so a hash check can't be overtaken before its insert.
+async function lockSceneNode(tx: DbClient, nodeId: string) {
+    await tx.structureNode.update({
+        where: { id: nodeId },
+        data: { updatedAt: new Date() },
+    });
+}
+
 export interface OutlineNode {
     id: string;
     type: string;
@@ -429,6 +438,13 @@ export class StructureController {
         };
     }
 
+    /**
+     * `contentHash` is the hash of the latest version the writer has seen:
+     * `undefined` writes unchecked. A string must match the latest stored
+     * version; `null` means "no content seen" and only matches a latest version
+     * that is empty (new scenes start with one). Either throws ConflictError on
+     * mismatch; a write with no stored version is always allowed.
+     */
     static async writeSceneContent(nodeId: string, content: string, contentHash?: string | null) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
@@ -436,21 +452,6 @@ export class StructureController {
         });
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
-
-        if (contentHash) {
-            const latest = await prisma.contentVersion.findFirst({
-                where: { nodeId },
-                orderBy: { createdAt: "desc" },
-                select: { content: true },
-            });
-            if (latest) {
-                const currentHash = computeContentHash(latest.content);
-                if (contentHash !== currentHash) {
-                    throw new ConflictError(latest.content);
-                }
-            }
-            // No latest version → first write → allow unconditionally
-        }
 
         StructureController.validateSceneContent(content);
 
@@ -465,6 +466,22 @@ export class StructureController {
         const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
 
         const version = await prisma.$transaction(async (tx) => {
+            await lockSceneNode(tx, nodeId);
+
+            if (contentHash !== undefined) {
+                const latest = await tx.contentVersion.findFirst({
+                    where: { nodeId },
+                    orderBy: { createdAt: "desc" },
+                    select: { content: true },
+                });
+                if (latest) {
+                    const seenLatest = contentHash === null
+                        ? latest.content === ""
+                        : computeContentHash(latest.content) === contentHash;
+                    if (!seenLatest) throw new ConflictError(latest.content);
+                }
+            }
+
             const [newVersion] = await Promise.all([
                 tx.contentVersion.create({
                     data: { nodeId, content, wordCount },
@@ -485,6 +502,7 @@ export class StructureController {
             title: node.title,
             versionId: version.id,
             wordCount,
+            contentHash: computeContentHash(content),
             createdAt: version.createdAt.toISOString(),
         };
     }
@@ -532,6 +550,8 @@ export class StructureController {
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
         const newVersion = await prisma.$transaction(async (tx) => {
+            await lockSceneNode(tx, nodeId);
+
             const [created] = await Promise.all([
                 tx.contentVersion.create({
                     data: {
@@ -557,6 +577,8 @@ export class StructureController {
             restoredFromVersionId: versionId,
             newVersionId: newVersion.id,
             wordCount: newVersion.wordCount,
+            content: oldVersion.content,
+            contentHash: computeContentHash(oldVersion.content),
             createdAt: newVersion.createdAt.toISOString(),
         };
     }
