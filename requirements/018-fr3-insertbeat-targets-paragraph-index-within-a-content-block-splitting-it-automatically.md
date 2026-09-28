@@ -2,10 +2,10 @@
 created: '2026-05-25'
 github_issue: null
 id: 018
-status: draft
+status: done
 title: 'FR3: insert_beat targets paragraph index within a CONTENT block, splitting
   it automatically'
-updated: '2026-05-25'
+updated: '2026-09-28'
 ---
 
 ## Why
