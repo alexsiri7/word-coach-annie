@@ -1,8 +1,8 @@
 ---
 created: '2026-09-28'
-github_issue: null
+github_issue: 1173
 id: '033'
-status: draft
+status: idea
 title: Adopt an OpenSpec specification as the statement of what Annie should be
 updated: '2026-09-28'
 ---
@@ -17,4 +17,4 @@ The repository holds Annie's specification in OpenSpec format under openspec/spe
 
 ## Issues
 
-_None yet._
+- #1173 — Add Annie's OpenSpec specification and validate it in CI
