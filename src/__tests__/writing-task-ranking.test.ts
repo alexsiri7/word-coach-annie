@@ -92,6 +92,20 @@ describe("pickSuggestedTasks", () => {
     expect(pickSuggestedTasks(tasks, "Full", 3)).toHaveLength(3);
   });
 
+  it("ranks the whole eligible pool before applying the limit", () => {
+    const tasks = [
+      task("medium", { importance: "Medium" }),
+      ...Array.from({ length: DEFAULT_SUGGESTION_LIMIT }, (_, i) =>
+        task(`critical${i}`, { importance: "Critical" }),
+      ),
+    ];
+
+    const suggested = pickSuggestedTasks(tasks, "Full");
+
+    expect(suggested).toHaveLength(DEFAULT_SUGGESTION_LIMIT);
+    expect(suggested.every((t) => t.importance === "Critical")).toBe(true);
+  });
+
   it("does not reorder the caller's array", () => {
     const tasks = [task("medium", { importance: "Medium" }), task("critical", { importance: "Critical" })];
 
