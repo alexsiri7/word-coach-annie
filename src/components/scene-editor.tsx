@@ -6,6 +6,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { cacheContentVersion, getCachedContent } from "@/lib/offline/cache-reads";
+import { computeOfflineContentHash } from "@/lib/offline/content-hash";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +79,7 @@ export function SceneEditor({
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [externalChangeDetected, setExternalChangeDetected] = useState(false);
+  const [saveConflict, setSaveConflict] = useState<{ content: string; contentHash: string | null } | null>(null);
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
   const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
@@ -97,7 +99,7 @@ export function SceneEditor({
 
   const session = useWritingSession({ projectId, nodeId: node.id });
 
-  const { scheduleSave, saveNow, saveContent, cleanup, contentRef } = useAutoSave({
+  const { scheduleSave, saveNow, saveContent, cleanup, contentRef, setBaseHash } = useAutoSave({
     nodeId: node.id,
     onSaveStart: () => setSaving(true),
     onSaveEnd: () => setSaving(false),
@@ -105,8 +107,14 @@ export function SceneEditor({
       setLatestVersionId(v.id);
       setLastSaved(new Date().toLocaleTimeString());
       setExternalChangeDetected(false);
+      setSaveConflict(null);
     },
     onNodeUpdated,
+    onSaveError: (err) => {
+      if (err.status !== 409) return;
+      const data = err.data as { content?: string; contentHash?: string } | null;
+      setSaveConflict({ content: data?.content ?? "", contentHash: data?.contentHash ?? null });
+    },
   });
 
   // Load initial content
@@ -116,6 +124,7 @@ export function SceneEditor({
         const res = await fetch(`/api/nodes/${node.id}/content`);
         const data = await res.json();
         setInitialContent(commentsToBeats(data.latest?.content || ""));
+        setBaseHash(data.latest?.contentHash ?? await computeOfflineContentHash(data.latest?.content ?? ""));
         setVersionHistory(data.history || []);
         if (data.latest) {
           setWordCount(data.latest.wordCount);
@@ -126,6 +135,7 @@ export function SceneEditor({
       } catch {
         // Network error — fall back to cached content
         const cached = await getCachedContent(node.id);
+        setBaseHash(cached ? await computeOfflineContentHash(cached.content ?? "") : null);
         if (cached) {
           setInitialContent(commentsToBeats(cached.content || ""));
           setWordCount(cached.wordCount);
@@ -146,7 +156,7 @@ export function SceneEditor({
       .catch(() => {
         // Annotations not available offline — ignore
       });
-  }, [node.id]);
+  }, [node.id, setBaseHash]);
 
   // Health check polling
   useEffect(() => {
@@ -391,6 +401,7 @@ export function SceneEditor({
   }, []);
 
   const handleExternalChange = useCallback(async () => {
+    cleanup();
     const res = await fetch(`/api/nodes/${node.id}/content`);
     const data = await res.json();
     if (data.latest) {
@@ -400,11 +411,19 @@ export function SceneEditor({
         editor.commands.setContent(converted);
         contentRef.current = converted;
       }
+      setBaseHash(data.latest.contentHash ?? await computeOfflineContentHash(data.latest.content));
       setLatestVersionId(data.latest.id);
       setExternalChangeDetected(false);
+      setSaveConflict(null);
       setLastSaved(new Date().toLocaleTimeString());
     }
-  }, [node.id, editor, contentRef]);
+  }, [node.id, editor, contentRef, cleanup, setBaseHash]);
+
+  const handleKeepMine = useCallback(async () => {
+    if (!editor || !saveConflict) return;
+    setBaseHash(saveConflict.contentHash ?? await computeOfflineContentHash(saveConflict.content));
+    await saveContent(editor.getHTML());
+  }, [editor, saveConflict, setBaseHash, saveContent]);
 
   const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus as SceneStatus);
@@ -490,7 +509,25 @@ export function SceneEditor({
   return (
     <div className="flex flex-col h-full bg-surface relative">
       {/* External Change Banner */}
-      {externalChangeDetected && (
+      {saveConflict && (
+        <div role="alert" className="bg-warning/20 border-b border-warning/30 px-4 py-2 flex items-center justify-between z-50 animate-slide-down">
+          <span className="text-sm text-warning flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            This scene was changed elsewhere (e.g. by Annie). Your latest edits are not saved.
+          </span>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 hover:bg-warning/20 text-warning" onClick={handleKeepMine}>
+              <Check className="h-3 w-3" />
+              Keep my version
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 hover:bg-warning/20 text-warning" onClick={handleExternalChange}>
+              <RefreshCw className="h-3 w-3" />
+              Load their version
+            </Button>
+          </div>
+        </div>
+      )}
+      {externalChangeDetected && !saveConflict && (
         <div role="alert" className="bg-warning/20 border-b border-warning/30 px-4 py-2 flex items-center justify-between z-50 animate-slide-down">
           <span className="text-sm text-warning flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
@@ -586,11 +623,16 @@ export function SceneEditor({
               nodeId={node.id}
               versionHistory={versionHistory}
               onClose={() => setShowVersions(false)}
-              onRestored={({ content, history }) => {
-                if (editor) {
-                  editor.commands.setContent(content);
-                  contentRef.current = content;
+              onRestored={({ content, contentHash, history }) => {
+                cleanup();
+                // A restore queued while offline has no content to show yet.
+                if (editor && content !== undefined) {
+                  const converted = commentsToBeats(content);
+                  editor.commands.setContent(converted);
+                  contentRef.current = converted;
                 }
+                setBaseHash(contentHash ?? null);
+                setSaveConflict(null);
                 setLastSaved(new Date().toLocaleTimeString());
                 setVersionHistory(history);
                 setShowVersions(false);

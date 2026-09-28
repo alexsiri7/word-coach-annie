@@ -28,7 +28,7 @@ interface VersionHistoryPanelProps {
   nodeId: string;
   versionHistory: ContentVersion[];
   onClose: () => void;
-  onRestored: (restored: { content: string; history: ContentVersion[] }) => void;
+  onRestored: (restored: { content?: string; contentHash?: string; history: ContentVersion[] }) => void;
 }
 
 export function VersionHistoryPanel({
@@ -84,6 +84,7 @@ export function VersionHistoryPanel({
 
         onRestored({
           content: restored.content,
+          contentHash: restored.contentHash,
           history: histData.history || [],
         });
 
