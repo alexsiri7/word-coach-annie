@@ -5,6 +5,14 @@ import {
   removePendingOp,
   type PendingOp,
 } from "./idb";
+import {
+  createSessionRefresher,
+  isFinallyFailed,
+  replayFetch,
+  withReplayLock,
+} from "./replay-shared";
+
+export { isFinallyFailed };
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -23,7 +31,6 @@ export type SyncListener = (event: SyncEvent) => void;
 // ─── Constants ─────────────────────────────────────────────────────────────
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const MAX_RETRIES = 3;
 
 // ─── Listener registry ────────────────────────────────────────────────────
 
@@ -93,9 +100,22 @@ export async function offlineFetch(
 
 let replaying = false;
 
+/** Splits the queue into ops still awaiting replay, conflicts, and finally-failed ops. */
+export function classifySyncOps(ops: PendingOp[]): {
+  pendingCount: number;
+  conflictOps: PendingOp[];
+  failedOps: PendingOp[];
+} {
+  const conflictOps = ops.filter((o) => o.status === "conflict");
+  const failedOps = ops.filter(isFinallyFailed);
+  return { pendingCount: ops.length - conflictOps.length - failedOps.length, conflictOps, failedOps };
+}
+
 /**
  * Replays all pending operations in order. Called when the browser comes
  * back online. Operations are replayed sequentially to preserve ordering.
+ * Runs under the replay lock shared with the service worker, so the two never
+ * send the same op. A 401 triggers one session refresh per run and a re-send.
  *
  * Conflict handling: if the server responds with 409, the op is marked as
  * `"conflict"` and the server's content is stored in `serverContent` for
@@ -107,59 +127,73 @@ export async function replayPendingOps(): Promise<void> {
   replaying = true;
 
   try {
-    const ops = await getPendingOps();
-    if (ops.length === 0) return;
+    await withReplayLock(async () => {
+      const ops = await getPendingOps();
+      if (ops.length === 0) return;
 
-    emit({ type: "replay-start", total: ops.length });
+      const refreshSession = createSessionRefresher();
 
-    let succeeded = 0;
-    let failed = 0;
-    let conflicts = 0;
+      emit({ type: "replay-start", total: ops.length });
 
-    for (let i = 0; i < ops.length; i++) {
-      const op = ops[i];
+      let succeeded = 0;
+      let failed = 0;
+      let conflicts = 0;
 
-      // Skip conflict ops — they need manual resolution
-      if (op.status === "conflict") continue;
+      for (let i = 0; i < ops.length; i++) {
+        const op = ops[i];
 
-      // Skip already-failed ops that exceeded retries
-      if (op.retries >= MAX_RETRIES) {
-        failed++;
-        continue;
-      }
+        // Skip conflict ops — they need manual resolution
+        if (op.status === "conflict") continue;
 
-      emit({ type: "replay-op", op, index: i, total: ops.length });
+        // Skip already-failed ops that exceeded retries
+        if (isFinallyFailed(op)) {
+          failed++;
+          continue;
+        }
 
-      await updatePendingOp(op.id!, { status: "in-flight" });
+        emit({ type: "replay-op", op, index: i, total: ops.length });
 
-      try {
-        const res = await fetch(op.url, {
-          method: op.method,
-          headers: { "Content-Type": "application/json" },
-          body: op.body,
-        });
+        await updatePendingOp(op.id!, { status: "in-flight" });
 
-        if (res.ok) {
-          await removePendingOp(op.id!);
-          succeeded++;
-          emit({ type: "replay-success", op, index: i, total: ops.length });
-        } else if (res.status === 409) {
-          // Conflict — store server version for manual resolution
-          let serverContent: string | null = null;
-          try {
-            const data = await res.json();
-            serverContent = typeof data.content === "string" ? data.content : JSON.stringify(data);
-          } catch (err) {
-            // response body not JSON
-            console.warn("[sync] 409 body not JSON", err);
+        try {
+          const res = await replayFetch(op, refreshSession);
+
+          if (res.ok) {
+            await removePendingOp(op.id!);
+            succeeded++;
+            emit({ type: "replay-success", op, index: i, total: ops.length });
+          } else if (res.status === 409) {
+            // Conflict — store server version for manual resolution
+            let serverContent: string | null = null;
+            try {
+              const data = await res.json();
+              serverContent = typeof data.content === "string" ? data.content : JSON.stringify(data);
+            } catch (err) {
+              // response body not JSON
+              console.warn("[sync] 409 body not JSON", err);
+            }
+            await updatePendingOp(op.id!, { status: "conflict", serverContent });
+            conflicts++;
+            emit({ type: "replay-conflict", op, index: i, total: ops.length });
+          } else {
+            // Server error — mark failed, increment retries
+            await updatePendingOp(op.id!, {
+              status: "failed",
+              retries: (op.retries || 0) + 1,
+            });
+            failed++;
+            emit({
+              type: "replay-error",
+              op,
+              index: i,
+              total: ops.length,
+              error: `HTTP ${res.status}`,
+            });
           }
-          await updatePendingOp(op.id!, { status: "conflict", serverContent });
-          conflicts++;
-          emit({ type: "replay-conflict", op, index: i, total: ops.length });
-        } else {
-          // Server error — mark failed, increment retries
+        } catch (err) {
+          // Network error during replay — stop replaying, we're probably offline again
           await updatePendingOp(op.id!, {
-            status: "failed",
+            status: "pending",
             retries: (op.retries || 0) + 1,
           });
           failed++;
@@ -168,37 +202,24 @@ export async function replayPendingOps(): Promise<void> {
             op,
             index: i,
             total: ops.length,
-            error: `HTTP ${res.status}`,
+            error: err instanceof Error ? err.message : "Network error",
           });
+
+          // If we lost connectivity mid-replay, bail out
+          if (!navigator.onLine) break;
         }
-      } catch (err) {
-        // Network error during replay — stop replaying, we're probably offline again
-        await updatePendingOp(op.id!, {
-          status: "pending",
-          retries: (op.retries || 0) + 1,
-        });
-        failed++;
-        emit({
-          type: "replay-error",
-          op,
-          index: i,
-          total: ops.length,
-          error: err instanceof Error ? err.message : "Network error",
-        });
-
-        // If we lost connectivity mid-replay, bail out
-        if (!navigator.onLine) break;
       }
-    }
 
-    emit({ type: "replay-done", succeeded, failed, conflicts });
+      emit({ type: "replay-done", succeeded, failed, conflicts });
+    });
   } finally {
     replaying = false;
   }
 }
 
 /**
- * Force-replay a single conflict op (used by "Keep my version" resolution).
+ * Force-replay a single conflict or finally-failed op (used by "Keep my version"
+ * resolution and by retrying a failed op).
  * Returns true if the op was successfully replayed and removed; false if it
  * failed (network error or non-2xx response) and stays in the queue.
  */
@@ -207,11 +228,7 @@ export async function forceReplayOp(id: number): Promise<boolean> {
   const op = ops.find((o) => o.id === id);
   if (!op) return false;
   try {
-    const res = await fetch(op.url, {
-      method: op.method,
-      headers: { "Content-Type": "application/json" },
-      body: op.body,
-    });
+    const res = await replayFetch(op, createSessionRefresher());
     if (res.ok) {
       await removePendingOp(id);
       return true;
@@ -223,4 +240,13 @@ export async function forceReplayOp(id: number): Promise<boolean> {
     console.warn("[sync] forceReplayOp network error", err);
     return false;
   }
+}
+
+/**
+ * Re-sends one finally-failed op under the replay lock, so its session refresh
+ * cannot race another context's. Returns true if it synced; otherwise the op
+ * stays finally failed and visible to the user.
+ */
+export function retryFailedOp(id: number): Promise<boolean> {
+  return withReplayLock(() => forceReplayOp(id));
 }
