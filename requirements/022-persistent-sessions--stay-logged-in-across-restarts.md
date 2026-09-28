@@ -2,9 +2,9 @@
 created: '2026-06-23'
 github_issue: null
 id: '022'
-status: draft
+status: done
 title: Persistent sessions — stay logged in across restarts
-updated: '2026-06-23'
+updated: '2026-09-28'
 ---
 
 ## Why
