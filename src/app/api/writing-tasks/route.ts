@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
 import { WritingTaskCreateSchema } from "@/schemas/writing-tasks";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
@@ -65,8 +66,12 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(parsed.data.projectId, userId, request.headers.get("x-user-email"));
-        if (!access.authorized) return access.response;
+        if (parsed.data.projectId) {
+            const access = await verifyProjectWriteAccess(parsed.data.projectId, userId, request.headers.get("x-user-email"));
+            if (!access.authorized) return access.response;
+        } else if (isGoogleAuthMode() && !userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         const task = await WritingTaskController.createWritingTask({
             ...parsed.data,

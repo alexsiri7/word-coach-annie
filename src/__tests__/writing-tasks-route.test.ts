@@ -13,6 +13,13 @@ vi.mock("@/lib/api-auth", async (importOriginal) => ({
 
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 
+vi.mock("@/lib/auth", async () => ({
+  ...(await vi.importActual("@/lib/auth")),
+  isGoogleAuthMode: vi.fn(() => false),
+}));
+
+import { isGoogleAuthMode } from "@/lib/auth";
+
 vi.mock("@/lib/sanitize-server", () => ({
   sanitizeInput: vi.fn((s: string) => s),
 }));
@@ -77,14 +84,36 @@ describe("Writing Tasks API", () => {
       expect(body.completed).toBe(false);
     });
 
-    it("returns 400 when projectId is missing", async () => {
+    it("creates a practice task when projectId is omitted", async () => {
+      await testPrisma.user.create({ data: { id: "route-owner", email: "route-owner@test.com", googleId: "g-route-owner" } });
+      vi.mocked(getCurrentUserId).mockReturnValueOnce("route-owner");
       const { POST } = await import("@/app/api/writing-tasks/route");
       const res = await POST(
-        makePostRequest("/api/writing-tasks", {
-          name: "Some task",
-        })
+        makePostRequest("/api/writing-tasks", { name: "Freewrite for ten minutes", capacity: "Low" })
+      );
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.projectId).toBeNull();
+      const row = await testPrisma.writingTask.findUnique({ where: { id: body.id } });
+      expect(row?.userId).toBe("route-owner");
+      expect(verifyProjectWriteAccess).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when sceneId is given without projectId", async () => {
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", { name: "Some task", sceneId: "scene-1" })
       );
       expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("sceneId requires projectId");
+    });
+
+    it("returns 401 for a practice task when Google auth is on and no user", async () => {
+      vi.mocked(isGoogleAuthMode).mockReturnValueOnce(true);
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(makePostRequest("/api/writing-tasks", { name: "Some task" }));
+      expect(res.status).toBe(401);
+      expect(await testPrisma.writingTask.count()).toBe(0);
     });
 
     it("accepts kind, capacity and dueDate", async () => {

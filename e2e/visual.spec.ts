@@ -725,6 +725,54 @@ async function mockPublishingApi(page: Page) {
   await page.route('**/api/publishing', route => route.fulfill({ json: MOCK_PUBLISHING, status: 200 }))
 }
 
+const AMBER = { id: 'proj-1', title: 'The Amber Throne' }
+const MARS = { id: 'proj-2', title: 'Echoes of Mars' }
+
+function dashboardTask(
+  id: string,
+  name: string,
+  fields: { kind: string; capacity: string; importance: string; project: typeof AMBER | null; whatIsNeeded?: string; dueDate?: string }
+) {
+  return {
+    id,
+    name,
+    whatIsNeeded: fields.whatIsNeeded ?? null,
+    kind: fields.kind,
+    capacity: fields.capacity,
+    importance: fields.importance,
+    size: 'Medium',
+    energy: 'Technical',
+    dueDate: fields.dueDate ?? null,
+    project: fields.project,
+    scene: null,
+  }
+}
+
+const DASHBOARD_TASKS = [
+  dashboardTask('wt-1', 'Draft the border skirmish', {
+    kind: 'Draft', capacity: 'Full', importance: 'Critical', project: AMBER,
+    whatIsNeeded: 'Mira sees the cost of war first-hand.', dueDate: '2026-06-05T00:00:00.000Z',
+  }),
+  dashboardTask('wt-2', 'Read two flash fiction winners', { kind: 'Read', capacity: 'Low', importance: 'High', project: null }),
+  dashboardTask('wt-3', 'Revise the landing scene', { kind: 'Revise', capacity: 'Medium', importance: 'High', project: MARS }),
+  dashboardTask('wt-4', 'Collect notes on Martian geology', { kind: 'Gather', capacity: 'Low', importance: 'Medium', project: MARS }),
+  dashboardTask('wt-5', 'Ten-minute freewrite', { kind: 'Draft', capacity: 'Low', importance: 'Medium', project: null }),
+]
+
+const MOCK_TASK_DASHBOARD = {
+  suggestedNow: DASHBOARD_TASKS.slice(0, 3),
+  upcomingDeadlines: [
+    { type: 'task', id: 'wt-1', title: 'Draft the border skirmish', date: '2026-06-05T00:00:00.000Z', project: AMBER },
+    { type: 'opportunity', id: 'opp-3', title: 'Coastal Fiction Prize', date: '2026-06-20T00:00:00.000Z', status: 'found' },
+  ],
+  openTasks: DASHBOARD_TASKS,
+  openTaskTotal: DASHBOARD_TASKS.length,
+  completedThisWeek: [
+    { id: 'wt-6', name: 'Outline chapter 4', kind: 'Draft', project: AMBER, completedAt: '2026-05-30T10:00:00.000Z' },
+    { id: 'wt-7', name: 'Send query to Harbour Review', kind: 'Admin', project: null, completedAt: '2026-05-29T10:00:00.000Z' },
+  ],
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Visual regression – Annie', () => {
@@ -936,6 +984,22 @@ test.describe('Visual regression – Annie', () => {
     await page.getByText('Back on the shelf').first().waitFor({ state: 'visible', timeout: 5_000 })
 
     await expect(page).toHaveScreenshot('publishing.png', {
+      animations: 'disabled',
+    })
+  })
+
+  test('task dashboard populated', async ({ page }) => {
+    await page.clock.setFixedTime(CONTESTS_NOW)
+    await mockDashboardApi(page)
+    await page.route('**/api/writing-tasks/dashboard*', route =>
+      route.fulfill({ json: MOCK_TASK_DASHBOARD, status: 200 })
+    )
+    await page.goto('/tasks')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await page.getByText('Suggested now').waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('task-dashboard.png', {
       animations: 'disabled',
     })
   })

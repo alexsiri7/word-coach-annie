@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronRight,
   Trophy,
+  ListTodo,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { cacheProjects, getCachedProjects } from "@/lib/offline/cache-reads";
@@ -447,7 +448,7 @@ export default function Dashboard() {
               {/* ── Publishing & contests ─────────────────── */}
               <button
                 onClick={() => router.push("/publishing")}
-                className="w-full mb-8 bg-surface-container-low p-4 flex items-center gap-3 border-l-2 border-transparent hover:border-primary transition-colors text-left"
+                className="w-full mb-2 bg-surface-container-low p-4 flex items-center gap-3 border-l-2 border-transparent hover:border-primary transition-colors text-left"
               >
                 <Trophy className="h-5 w-5 text-primary/40" />
                 <span className="font-label text-xs uppercase font-bold tracking-widest text-text-primary">
@@ -458,6 +459,15 @@ export default function Dashboard() {
                     {needsAttention} need{needsAttention === 1 ? "s" : ""} attention
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => router.push("/tasks")}
+                className="w-full mb-8 bg-surface-container-low p-4 flex items-center gap-3 border-l-2 border-transparent hover:border-primary transition-colors text-left"
+              >
+                <ListTodo className="h-5 w-5 text-primary/40" />
+                <span className="font-label text-xs uppercase font-bold tracking-widest text-text-primary">
+                  Writing tasks
+                </span>
               </button>
 
               {/* ── Hero: Current Manuscript ────────────────── */}
