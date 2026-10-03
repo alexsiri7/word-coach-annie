@@ -135,6 +135,7 @@ function NewTaskDialog({
   onCreated: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectOption[] | null>(null);
+  const [projectsError, setProjectsError] = useState(false);
   const [name, setName] = useState("");
   const [whatIsNeeded, setWhatIsNeeded] = useState("");
   const [projectId, setProjectId] = useState(PRACTICE);
@@ -152,12 +153,13 @@ function NewTaskDialog({
 
   useEffect(() => {
     if (!open || projects !== null) return;
+    setProjectsError(false);
     fetch("/api/projects?limit=200")
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Server responded ${res.status}`))))
       .then((data: { projects: ProjectOption[] }) => setProjects(data.projects))
       .catch((err) => {
         console.error("[tasks/page] loadProjects failed", err);
-        setProjects([]);
+        setProjectsError(true);
       });
   }, [open, projects]);
 
@@ -237,6 +239,9 @@ function NewTaskDialog({
                 ))}
               </SelectContent>
             </Select>
+            {projectsError && (
+              <p className="text-xs text-destructive mt-1">Couldn&apos;t load your projects — close and reopen to try again.</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <OptionSelect label="Kind" value={kind} options={WritingTaskKind.options} onChange={setKind} />
