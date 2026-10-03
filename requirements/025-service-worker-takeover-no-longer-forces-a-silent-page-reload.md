@@ -2,9 +2,9 @@
 created: '2026-08-25'
 github_issue: 997
 id: '025'
-status: in-progress
+status: done
 title: Service worker takeover no longer forces a silent page reload
-updated: '2026-09-29'
+updated: '2026-10-03'
 ---
 
 ## Why
