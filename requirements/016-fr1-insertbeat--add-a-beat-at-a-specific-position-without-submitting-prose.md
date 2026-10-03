@@ -2,9 +2,9 @@
 created: '2026-05-24'
 github_issue: null
 id: '016'
-status: draft
+status: done
 title: 'FR1: insert_beat — add a beat at a specific position without submitting prose'
-updated: '2026-05-24'
+updated: '2026-09-28'
 ---
 
 ## Why
