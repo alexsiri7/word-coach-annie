@@ -382,3 +382,12 @@ GHSA-qj8w-gfj5-8c6v
 GHSA-cqhc-2h57-wpxf
 GHSA-42r5-vhpq-m858
 GHSA-g5xc-5w98-jfvm
+#
+# Source: braces (via @ducanh2912/next-pwa -> fast-glob -> micromatch transitive chain)
+# Justification: stack-exhaustion DoS requires expanding attacker-controlled, deeply
+# nested brace patterns. next-pwa uses fast-glob only during `next build` to glob
+# service-worker precache files with developer-controlled patterns. The app does not
+# import braces/micromatch/fast-glob itself.
+# Upgrade path: no fixed version available (braces <=3.0.3 affected; 3.0.3 is latest).
+# App risk: LOW — build-time only; no runtime glob expansion of user input.
+GHSA-vfj7-8cjw-p6xm
