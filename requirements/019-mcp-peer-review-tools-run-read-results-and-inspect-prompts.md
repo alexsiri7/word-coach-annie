@@ -2,9 +2,9 @@
 created: '2026-05-28'
 github_issue: null
 id: 019
-status: draft
+status: done
 title: 'MCP peer review tools: run, read results, and inspect prompts'
-updated: '2026-05-28'
+updated: '2026-09-28'
 ---
 
 ## Why
