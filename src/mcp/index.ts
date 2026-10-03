@@ -51,6 +51,7 @@ import {
     createWritingTask,
     completeWritingTask,
     updateWritingTask,
+    getTaskDashboard,
 } from "./tools/writing-tasks";
 import { WritingTaskCapacity, WritingTaskDueDate, WritingTaskKind } from "@/schemas/writing-tasks";
 import {
@@ -791,6 +792,21 @@ server.tool(
         mcpRun("list_writing_tasks", "Error listing writing tasks", async () => {
             if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
             return listWritingTasks({ ...params, userId });
+        })
+);
+
+server.tool(
+    "get_task_dashboard",
+    "Get the writer's task dashboard across every project in one call: open tasks (including practice tasks with no project), upcoming deadlines (task due dates and open opportunity close dates, soonest first), a short 'suggested now' list ranked by importance, deadline and size, and tasks completed in the last 7 days. Capacity filters to tasks that fit the writer's state (Low shows only Low; Full shows everything).",
+    {
+        capacity: WritingTaskCapacity.optional().describe("How much the writer has in them today — keeps tasks suited to this capacity or less"),
+        kind: WritingTaskKind.optional().describe("Only tasks of this kind of work"),
+        projectId: z.string().optional().describe("Only this project's tasks and the opportunities it is a candidate for"),
+    },
+    async (params) =>
+        mcpRun("get_task_dashboard", "Error getting task dashboard", async () => {
+            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
+            return getTaskDashboard({ ...params, userId });
         })
 );
 

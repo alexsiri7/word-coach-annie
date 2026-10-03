@@ -1,5 +1,7 @@
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
+import { TaskDashboardController } from "@/lib/controllers/task-dashboard";
 import { mcpCache } from "@/lib/cache";
+import type { WritingTaskCapacityValue, WritingTaskKindValue } from "@/schemas/writing-tasks";
 
 // Writes invalidate every writingTasks: entry — practice-task lists are keyed by user, not project.
 const WRITING_TASKS_PREFIX = "writingTasks:";
@@ -63,4 +65,14 @@ export async function completeWritingTask(taskId: string) {
     const result = await WritingTaskController.completeWritingTask(taskId);
     mcpCache.invalidatePrefix(WRITING_TASKS_PREFIX);
     return result;
+}
+
+// Not cached: the dashboard also reads opportunities, whose writes do not invalidate writingTasks: entries.
+export async function getTaskDashboard(params: {
+    userId: string | null;
+    capacity?: WritingTaskCapacityValue;
+    kind?: WritingTaskKindValue;
+    projectId?: string;
+}) {
+    return TaskDashboardController.getTaskDashboard(params);
 }
