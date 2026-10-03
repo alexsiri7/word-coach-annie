@@ -2,9 +2,9 @@
 created: '2026-08-26'
 github_issue: 1011
 id: '027'
-status: idea
+status: done
 title: Fix Harper spell/grammar checker not loading under the Turbopack dev server
-updated: '2026-08-26'
+updated: '2026-09-28'
 ---
 
 ## Why
