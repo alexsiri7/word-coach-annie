@@ -25,12 +25,24 @@ function compareDeadlines(a: Date | null, b: Date | null): number {
   return 0;
 }
 
+export function fitsCapacity(
+  taskCapacity: WritingTaskCapacityValue,
+  capacity: WritingTaskCapacityValue,
+): boolean {
+  return CAPACITY_RANK[taskCapacity] <= CAPACITY_RANK[capacity];
+}
+
 function compareTasks(a: RankableWritingTask, b: RankableWritingTask): number {
   return (
     IMPORTANCE_RANK[a.importance] - IMPORTANCE_RANK[b.importance] ||
     compareDeadlines(a.deadline, b.deadline) ||
     SIZE_RANK[a.size] - SIZE_RANK[b.size]
   );
+}
+
+/** Orders tasks by importance, then soonest deadline, then smallest size. */
+export function rankTasks<T extends RankableWritingTask>(tasks: readonly T[]): T[] {
+  return [...tasks].sort(compareTasks);
 }
 
 /**
@@ -42,8 +54,5 @@ export function pickSuggestedTasks<T extends RankableWritingTask>(
   capacity: WritingTaskCapacityValue,
   limit: number = DEFAULT_SUGGESTION_LIMIT,
 ): T[] {
-  return tasks
-    .filter((task) => CAPACITY_RANK[task.capacity] <= CAPACITY_RANK[capacity])
-    .sort(compareTasks)
-    .slice(0, limit);
+  return rankTasks(tasks.filter((task) => fitsCapacity(task.capacity, capacity))).slice(0, limit);
 }
