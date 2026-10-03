@@ -2,9 +2,9 @@
 created: '2026-08-17'
 github_issue: null
 id: '024'
-status: draft
+status: done
 title: Add "Next Scene" action to scene context menu
-updated: '2026-08-17'
+updated: '2026-09-28'
 ---
 
 ## Why
