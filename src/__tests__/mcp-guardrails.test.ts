@@ -100,6 +100,24 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
     it("should include stale-write protection guidance", () => {
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("paragraphContentHash");
     });
+
+    it("should tell Claude to fetch the task dashboard at session start", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain(
+            "Call `get_task_dashboard` at the start of a session"
+        );
+    });
+
+    it("should tell Claude to offer to log follow-up work as a scene-linked task", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("create_writing_task");
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("setting `sceneId` to the scene");
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("Ask before creating it.");
+    });
+
+    it("should forbid writing prose or poetry to complete a writing task", () => {
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain(
+            "Never write prose or poetry to finish a writing task"
+        );
+    });
 });
 
 describe("update_paragraph intent field", () => {

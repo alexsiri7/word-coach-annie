@@ -732,6 +732,9 @@ Returns a markdown string covering:
 - Claude's role as a structural collaborator (not co-author)
 - When to default to beats, annotations, and editorial flags over prose
 - When to write prose (author's explicit request)
+- Calling `get_task_dashboard` at session start, alongside live outline data
+- Offering to log follow-up work surfaced during coaching via `create_writing_task`, linked to the scene by `sceneId`
+- Tasks are the author's to do — Claude captures them, never writes prose or poetry to complete them
 - Correct tool usage for beats and editorial corrections
 - Stale-write protection reminder
 
