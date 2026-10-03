@@ -10,7 +10,7 @@ export const WritingTaskDueDate = z.union([z.iso.date(), z.iso.datetime()], {
 });
 
 export const WritingTaskCreateSchema = z.object({
-  projectId: z.string().min(1, "projectId is required"),
+  projectId: z.string().min(1, "projectId must be non-empty").optional(),
   sceneId: z.string().optional(),
   name: z.string().min(1, "name is required"),
   whatIsNeeded: z.string().optional(),
@@ -20,6 +20,9 @@ export const WritingTaskCreateSchema = z.object({
   kind: WritingTaskKind.optional().default("Draft"),
   capacity: WritingTaskCapacity.optional().default("Full"),
   dueDate: WritingTaskDueDate.optional(),
+}).refine((d) => !d.sceneId || d.projectId, {
+  message: "sceneId requires projectId",
+  path: ["sceneId"],
 });
 
 export const WritingTaskUpdateSchema = z.object({
