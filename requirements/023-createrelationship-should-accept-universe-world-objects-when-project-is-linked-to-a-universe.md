@@ -2,10 +2,10 @@
 created: '2026-08-16'
 github_issue: null
 id: '023'
-status: draft
+status: done
 title: create_relationship should accept universe world objects when project is linked
   to a universe
-updated: '2026-08-16'
+updated: '2026-09-28'
 ---
 
 ## Why
