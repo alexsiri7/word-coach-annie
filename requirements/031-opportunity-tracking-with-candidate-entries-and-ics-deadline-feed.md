@@ -2,9 +2,9 @@
 created: '2026-09-07'
 github_issue: 1088
 id: '031'
-status: idea
+status: done
 title: Opportunity tracking with candidate entries and ICS deadline feed
-updated: '2026-09-07'
+updated: '2026-09-28'
 ---
 
 ## Why
