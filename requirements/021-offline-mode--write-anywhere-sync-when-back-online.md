@@ -2,9 +2,9 @@
 created: '2026-06-12'
 github_issue: null
 id: '021'
-status: draft
+status: done
 title: Offline mode — write anywhere, sync when back online
-updated: '2026-06-12'
+updated: '2026-09-28'
 ---
 
 ## Why
