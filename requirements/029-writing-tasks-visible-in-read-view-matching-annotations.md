@@ -2,9 +2,9 @@
 created: '2026-08-30'
 github_issue: null
 id: 029
-status: draft
+status: done
 title: Writing tasks visible in Read view, matching annotations
-updated: '2026-08-30'
+updated: '2026-09-28'
 ---
 
 ## Why
