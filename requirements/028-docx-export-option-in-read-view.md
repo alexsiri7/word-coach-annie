@@ -2,9 +2,9 @@
 created: '2026-08-26'
 github_issue: null
 id: 028
-status: draft
+status: done
 title: DOCX export option in Read view
-updated: '2026-08-26'
+updated: '2026-09-28'
 ---
 
 ## Why
