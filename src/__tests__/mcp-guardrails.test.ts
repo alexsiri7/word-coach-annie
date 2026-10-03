@@ -110,6 +110,7 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
     it("should tell Claude to offer to log follow-up work as a scene-linked task", () => {
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("create_writing_task");
         expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("setting `sceneId` to the scene");
+        expect(CLAUDE_COLLABORATION_INSTRUCTIONS).toContain("Ask before creating it.");
     });
 
     it("should forbid writing prose or poetry to complete a writing task", () => {
