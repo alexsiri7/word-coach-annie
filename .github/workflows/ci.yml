@@ -130,8 +130,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium
 
-      - name: Push database schema
-        run: npx prisma db push --accept-data-loss --url "$DATABASE_URL"
+      - name: Apply database migrations
+        run: node scripts/migrate.mjs
 
       - name: Build Next.js
         run: npm run build
