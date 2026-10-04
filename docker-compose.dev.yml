@@ -15,7 +15,7 @@ services:
       - NODE_ENV=development
       - OTEL_ENABLED=true
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
-    command: /app/scripts/start-docker.sh
+    command: sh -c "npx prisma generate && node scripts/migrate.mjs && npm run dev"
     depends_on:
       - phoenix
 

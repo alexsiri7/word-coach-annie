@@ -171,4 +171,34 @@ describe('migrate.mjs — migration bookkeeping ignores search_path', () => {
     expect(restart.status).toBe(0);
     expect(restart.stdout).toContain('Migrations up to date.');
   }, 60_000);
+
+  it('adopts migrations recorded by the retired run-migrations.ts instead of replaying them', async () => {
+    expect(runMigrate(scratchUrl).status).toBe(0);
+
+    const scratch = new PrismaClient({ adapter: new PrismaPg({ connectionString: scratchUrl }) });
+    try {
+      await scratch.$executeRawUnsafe(
+        `CREATE TABLE "_applied_migrations" ("name" TEXT NOT NULL PRIMARY KEY, "applied_at" TIMESTAMP NOT NULL DEFAULT NOW())`
+      );
+      await scratch.$executeRawUnsafe(
+        `INSERT INTO "_applied_migrations" ("name") SELECT migration_name FROM "_prisma_migrations"`
+      );
+      await scratch.$executeRawUnsafe(`DROP TABLE "_prisma_migrations"`);
+
+      const adopted = runMigrate(scratchUrl);
+
+      expect(adopted.stderr).not.toContain('already exists');
+      expect(adopted.status).toBe(0);
+      expect(adopted.stdout).toContain('adopt 00000000000000_init');
+      const [legacy, recorded] = await Promise.all([
+        scratch.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(*) AS n FROM "_applied_migrations"`),
+        scratch.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(*) AS n FROM "_prisma_migrations"`),
+      ]);
+      expect(recorded[0].n).toBe(legacy[0].n);
+
+      expect(runMigrate(scratchUrl).stdout).toContain('Migrations up to date.');
+    } finally {
+      await scratch.$disconnect();
+    }
+  }, 60_000);
 });
