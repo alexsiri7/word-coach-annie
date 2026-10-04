@@ -63,6 +63,19 @@ async function ensureMigrationsTable(prisma) {
   `);
 }
 
+// Databases migrated by the retired scripts/run-migrations.ts recorded their
+// migrations in _applied_migrations instead. Those must be adopted rather than
+// replayed, or the init migration's CREATE TABLE fails on the existing schema.
+async function legacyAppliedNames(prisma) {
+  const [{ present }] = await prisma.$queryRawUnsafe(
+    `SELECT to_regclass($1) IS NOT NULL AS present`,
+    `${qschema}."_applied_migrations"`
+  );
+  if (!present) return new Set();
+  const rows = await prisma.$queryRawUnsafe(`SELECT name FROM ${qschema}."_applied_migrations"`);
+  return new Set(rows.map((r) => r.name));
+}
+
 async function migrate(prisma) {
   await ensureMigrationsTable(prisma);
 
@@ -71,6 +84,7 @@ async function migrate(prisma) {
     `SELECT migration_name FROM ${qschema}."_prisma_migrations" WHERE rolled_back_at IS NULL`
   );
   const appliedNames = new Set(applied.map((r) => r.migration_name));
+  const legacyNames = await legacyAppliedNames(prisma);
 
   // Get migration directories (sorted)
   const migrationsDir = join(process.cwd(), 'prisma', 'migrations');
@@ -100,6 +114,17 @@ async function migrate(prisma) {
 
     const sql = readFileSync(sqlPath, 'utf-8');
     const checksum = createHash('sha256').update(sql).digest('hex');
+
+    if (legacyNames.has(dir)) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO ${qschema}."_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES ($1, $2, $3, NOW(), 1)`,
+        randomUUID(),
+        checksum,
+        dir
+      );
+      console.log(`  adopt ${dir} (recorded in _applied_migrations)`);
+      continue;
+    }
 
     // Safety check: refuse to run migrations that contain destructive DDL
     // if the database already has data. This prevents accidental data loss
