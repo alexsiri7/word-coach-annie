@@ -1,7 +1,7 @@
 # --- Stage 1: Install dependencies ---
-# Pinned to multi-arch manifest list digest for node:20-slim (2025-05-16).
-# To update: docker manifest inspect node:20-slim --verbose | jq '.[0].Descriptor.digest'
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS deps
+# Pinned to multi-arch manifest list digest for node:22-slim (2026-10-04).
+# To update: docker manifest inspect node:22-slim --verbose | jq '.[0].Descriptor.digest'
+FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS deps
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
@@ -11,7 +11,7 @@ COPY prisma ./prisma
 RUN npm ci
 
 # --- Stage 2: Build the application ---
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS builder
+FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS builder
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
@@ -26,7 +26,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- Stage 3: Production runtime ---
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runner
+FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS runner
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
