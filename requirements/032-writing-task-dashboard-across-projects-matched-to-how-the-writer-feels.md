@@ -2,9 +2,9 @@
 created: '2026-09-27'
 github_issue: 1148
 id: '032'
-status: in-progress
+status: done
 title: Writing task dashboard across projects, matched to how the writer feels
-updated: '2026-09-29'
+updated: '2026-10-05'
 ---
 
 ## Why
