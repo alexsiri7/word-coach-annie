@@ -8,12 +8,16 @@ Writing tasks capture what the author needs to do next — not only drafting but
 
 ### Requirement: Tasks describe the work and the writer it suits
 
-A writing task SHALL carry a name, what is needed, importance, size, energy, a kind (Draft, Revise, Read, Gather or Admin), a capacity (Low, Medium or Full — the writer state the task suits), a completion flag, and optionally a due date. A task SHALL belong to a project or to no project (a practice-level task), and MAY be linked to a scene. Tasks SHALL be creatable, editable, completable and deletable from the web UI and by an agent, and only by someone with access to their project or, for practice tasks, their creator.
+A writing task SHALL carry a name, what is needed, importance, size, energy, a kind (Draft, Revise, Read, Gather or Admin), a capacity (Low, Medium or Full — the writer state the task suits), a completion flag, and optionally a due date. A task SHALL belong to a project or to no project (a practice-level task), and MAY be linked to a scene.
 
 #### Scenario: Practice task without a project
 - GIVEN the author wants to "Read one Alice Munro story"
 - WHEN they create it with kind Read, capacity Low and no project
 - THEN the task exists and is visible only to them
+
+### Requirement: Tasks are managed only by those with access
+
+Writing tasks SHALL be creatable, editable, completable and deletable from the web UI and by an agent, and only by someone with access to their project or, for practice tasks, their creator.
 
 #### Scenario: Another user's task
 - GIVEN a task in a project the caller cannot access
