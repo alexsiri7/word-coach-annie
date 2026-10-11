@@ -69,12 +69,22 @@ Agents SHALL be able to snapshot the database, list snapshots and restore one, a
 
 ### Requirement: Coaching context and writing skills
 
-The server SHALL offer read-only coaching context for an agent — the author's voice, a scene's focus, plot-thread status, story-bible cross-references and consistency context — and SHALL publish curated writing skills (such as developmental edit, line edit, consistency check, plot structure analysis, character arc review, outline review and scene drafting) as MCP prompts, with their metadata listable. Review-style prompts SHALL carry Annie's coaching persona and choose the skill appropriate to the scene's status.
+The server SHALL offer read-only coaching context for an agent — the author's voice, a scene's focus, plot-thread status, story-bible cross-references and consistency context — and SHALL publish curated writing skills (such as developmental edit, line edit, consistency check, plot structure analysis, character arc review, outline review and scene drafting) as MCP prompts, with their metadata listable.
 
 #### Scenario: Plan beats for a scene
 - GIVEN a Draft scene in chapter 4
 - WHEN an agent requests the beat-planning prompt for it
 - THEN the prompt includes the scene's status, chapter and word count
+
+### Requirement: Review prompts carry Annie's persona and suit the scene
+
+Review-style MCP prompts SHALL carry Annie's coaching persona and choose the skill appropriate to the scene's status.
+
+#### Scenario: Review prompt for a scene
+- GIVEN a scene with a status
+- WHEN an agent requests a review-style prompt for it
+- THEN the prompt carries Annie's coaching persona
+- AND uses the skill appropriate to that scene's status
 
 ### Requirement: Remote clients authorise with OAuth
 

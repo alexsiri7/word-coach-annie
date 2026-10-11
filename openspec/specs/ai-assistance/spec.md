@@ -31,17 +31,30 @@ Inline AI actions on a selection (such as brainstorm, expand or summarise) and m
 
 ### Requirement: Peer review from five perspectives
 
-The author or an agent SHALL be able to run a peer review of a project in which five reviewer personas read it in parallel — an acquisitions editor, a fan reader, a peer author, an acting coach reading for emotional truth and earned feeling, and a comedy writer reading for whether jokes work — plus a consensus. Each run SHALL be stored and past reviews SHALL be viewable newest first. Starting a run while one is in progress SHALL return the pending run rather than start another. Every persona's lens SHALL be defined once and used identically by the web UI, the chat and agents.
+The author or an agent SHALL be able to run a peer review of a project in which five reviewer personas read it in parallel — an acquisitions editor, a fan reader, a peer author, an acting coach reading for emotional truth and earned feeling, and a comedy writer reading for whether jokes work — plus a consensus. Each run SHALL be stored and past reviews SHALL be viewable newest first.
 
 #### Scenario: Five reviews and a consensus
 - GIVEN a drafted project
 - WHEN the author runs a peer review
 - THEN the stored result holds one review from each of the five personas and a consensus
 
+### Requirement: A peer review in progress is not started twice
+
+Starting a peer review run while one is in progress SHALL return the pending run rather than start another.
+
 #### Scenario: Run already in progress
 - GIVEN a peer review is running for a project
 - WHEN another run is requested
 - THEN the in-progress run is returned
+
+### Requirement: Peer-review lenses are defined once
+
+Every peer-review persona's lens SHALL be defined once and used identically by the web UI, the chat and agents.
+
+#### Scenario: Same lens everywhere
+- GIVEN the fan reader persona
+- WHEN a peer review is run from the web UI, from the chat or by an agent
+- THEN the fan reader reviews with the same lens in each case
 
 ### Requirement: Author-controlled model settings
 

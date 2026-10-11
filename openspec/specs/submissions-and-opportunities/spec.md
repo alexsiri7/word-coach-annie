@@ -35,7 +35,16 @@ The author SHALL be able to record an opportunity with a title, provider, close 
 
 ### Requirement: Stories are candidates for opportunities
 
-The author SHALL be able to attach any number of projects to an opportunity as candidates, and a project SHALL be attachable to any number of opportunities, once each. Each candidate SHALL carry a state of candidate, chosen or dropped and free-text notes. More than one candidate MAY be chosen for the same opportunity. A chosen candidate SHALL be promotable to a contest submission that carries over the provider, title and dates already known, and the candidate SHALL stay linked to the resulting submission. Deleting an opportunity SHALL delete its candidates; deleting a project SHALL delete its candidacies but not the opportunities.
+The author SHALL be able to attach any number of projects to an opportunity as candidates, and a project SHALL be attachable to any number of opportunities, once each. Each candidate SHALL carry a state of candidate, chosen or dropped and free-text notes. More than one candidate MAY be chosen for the same opportunity.
+
+#### Scenario: Several chosen
+- GIVEN a contest allowing two entries
+- WHEN the author marks two candidates chosen
+- THEN both are accepted
+
+### Requirement: A chosen candidate becomes a submission without retyping
+
+A chosen candidate SHALL be promotable to a contest submission that carries over the provider, title and dates already known, and the candidate SHALL stay linked to the resulting submission.
 
 #### Scenario: Promote without retyping
 - GIVEN a chosen candidate on an opportunity with provider and close date set
@@ -43,28 +52,51 @@ The author SHALL be able to attach any number of projects to an opportunity as c
 - THEN a contest submission exists with that provider and contest name
 - AND the candidate links to it
 
-#### Scenario: Several chosen
-- GIVEN a contest allowing two entries
-- WHEN the author marks two candidates chosen
-- THEN both are accepted
+### Requirement: Deleting an opportunity or project removes its candidacies
+
+Deleting an opportunity SHALL delete its candidates; deleting a project SHALL delete its candidacies but not the opportunities.
+
+#### Scenario: Opportunity deleted
+- GIVEN an opportunity with two candidate projects
+- WHEN the author deletes the opportunity
+- THEN both candidacies are deleted
+
+#### Scenario: Project deleted
+- GIVEN a project that is a candidate for an opportunity
+- WHEN the project is deleted
+- THEN its candidacy is deleted and the opportunity remains
 
 ### Requirement: Each contest shows one readable state
 
-The contests list SHALL be sorted by close date, filterable by status, provider and project, and SHALL show planned and submitted contests together. Each row SHALL name the stories involved and show one state resolved from the opportunity, its candidates and any submission: no candidates yet, considering (names), chosen (names), submitted (names), accepted or rejected (names), or closed with nothing entered. A contest whose close date passed with nothing submitted SHALL be visibly distinct from open and entered contests.
+Each row of the contests list SHALL name the stories involved and show one state resolved from the opportunity, its candidates and any submission: no candidates yet, considering (names), chosen (names), submitted (names), accepted or rejected (names), or closed with nothing entered. A contest whose close date passed with nothing submitted SHALL be visibly distinct from open and entered contests.
 
 #### Scenario: Missed deadline
 - GIVEN an opportunity whose close date has passed and whose candidates were never promoted
 - WHEN the author views the contests list
 - THEN its row reads "Closed, nothing entered" and is highlighted
 
+### Requirement: The contests list is ordered and filterable
+
+The contests list SHALL be sorted by close date, filterable by status, provider and project, and SHALL show planned and submitted contests together.
+
+#### Scenario: Planned and submitted together
+- GIVEN one planned contest and one submitted contest
+- WHEN the author views the contests list
+- THEN both are listed, ordered by close date
+- AND the list can be filtered by status, provider and project
+
 ### Requirement: Each story shows where it is
 
-A Publishing and contests hub SHALL list every story with one state across both submission kinds and all candidacies: not out anywhere, shortlisted, chosen, out with a provider (with days waiting), accepted, or back on the shelf — last submission rejected and nothing sent since. Stories SHALL be ordered by what most needs action, a story in several places SHALL show all of them, and a story out with more than one provider at once SHALL be noted without anything being blocked. Each project SHALL also show the opportunities it is a candidate for.
+A Publishing and contests hub SHALL list every story with one state across both submission kinds and all candidacies: not out anywhere, shortlisted, chosen, out with a provider (with days waiting), accepted, or back on the shelf — last submission rejected and nothing sent since. Stories SHALL be ordered by what most needs action. Each project SHALL also show the opportunities it is a candidate for.
 
 #### Scenario: Back on the shelf
 - GIVEN a story whose only submission was rejected last month
 - WHEN the author opens the hub
 - THEN the story reads "Back on the shelf" and is listed first
+
+### Requirement: A story in several places shows all of them
+
+In the Publishing and contests hub, a story in several places SHALL show all of them, and a story out with more than one provider at once SHALL be noted without anything being blocked.
 
 #### Scenario: Simultaneous submissions noted
 - GIVEN a story out with two providers
@@ -82,7 +114,16 @@ The home dashboard SHALL link to the Publishing and contests hub with a count of
 
 ### Requirement: Deadlines reach the author's calendar
 
-The system SHALL publish a per-account calendar feed at an unguessable URL, needing no login, that the author can copy from settings and regenerate, invalidating the old URL. The feed SHALL contain one all-day event on the close date for every opportunity that is not closed, whether or not it has candidates, with the rules link, entry fee and limits in the description and a link back to Annie. Events SHALL keep a stable identity so a changed close date moves the event, the feed SHALL reflect current state on every fetch, and it SHALL NOT carry reminder alarms; reminders are set once in the author's calendar client.
+The system SHALL publish a per-account calendar feed at an unguessable URL, needing no login, that the author can copy from settings and regenerate, invalidating the old URL. The feed SHALL contain one all-day event on the close date for every opportunity that is not closed, whether or not it has candidates, with the rules link, entry fee and limits in the description and a link back to Annie.
+
+#### Scenario: Regenerated URL
+- GIVEN the author regenerates the feed URL
+- WHEN a calendar fetches the old URL
+- THEN it receives not found
+
+### Requirement: The calendar feed tracks current state
+
+Calendar feed events SHALL keep a stable identity so a changed close date moves the event, the feed SHALL reflect current state on every fetch, and it SHALL NOT carry reminder alarms; reminders are set once in the author's calendar client.
 
 #### Scenario: Date change moves the event
 - GIVEN a subscribed calendar showing an opportunity on 1 March
@@ -94,7 +135,7 @@ The system SHALL publish a per-account calendar feed at an unguessable URL, need
 - WHEN the author marks it closed
 - THEN it is absent from the next fetch
 
-#### Scenario: Regenerated URL
-- GIVEN the author regenerates the feed URL
-- WHEN a calendar fetches the old URL
-- THEN it receives not found
+#### Scenario: No reminder alarms
+- GIVEN an opportunity in the feed
+- WHEN a calendar fetches the feed
+- THEN its event carries no reminder alarm
