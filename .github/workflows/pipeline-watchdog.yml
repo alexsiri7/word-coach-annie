@@ -30,10 +30,12 @@ jobs:
           echo "Main HEAD: $MAIN_SHA"
           echo "main_sha=$MAIN_SHA" >> "$GITHUB_OUTPUT"
 
-          # Check if CI succeeded for this SHA
+          # Only a push-triggered CI success counts: a manually dispatched CI run
+          # (e.g. the daily build-drift check) must never deploy.
           CI_RUN=$(gh run list \
             --repo "$REPO" \
-            --workflow=ci.yml \
+            --workflow "CI" \
+            --event push \
             --branch main \
             --commit "$MAIN_SHA" \
             --status success \
