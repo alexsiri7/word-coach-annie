@@ -67,7 +67,7 @@
     "harper.js": "^2.10.0",
     "html-to-image": "^1.11.13",
     "idb": "^8.0.3",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "isomorphic-dompurify": "^4.2.0",
     "jose": "^6.2.12",
     "lucide-react": "^1.45.0",
