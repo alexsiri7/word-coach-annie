@@ -1,0 +1,334 @@
+meta:
+  generated: 2026-10-13
+  workflow: archon-requirements-audit
+  totals:
+    covered: 12
+    partial: 30
+    uncovered: 0
+    stale: 10
+    orphans: 21
+coverage:
+  - id: WCA-001
+    status: covered
+    code_paths: ["src/app/api/projects/route.ts", "src/app/api/projects/[id]/route.ts", "src/app/api/projects/[id]/archive/route.ts", "src/lib/controllers/projects.ts", "src/app/page.tsx"]
+    test_paths: ["e2e/integration.spec.ts", "src/__tests__/projects.test.ts", "src/__tests__/api-handlers.test.ts", "src/__tests__/api-routes.test.ts"]
+    notes: "Create/rename/archive/unarchive/delete asserted end to end; cascade delete and dashboard word count verified; delete additionally requires archived + confirmTitle (extra guard, not divergence)."
+  - id: WCA-002
+    status: partial
+    code_paths: ["src/schemas/projects.ts", "src/lib/constants.ts", "src/components/outline-tree.tsx", "src/app/project/[id]/page.tsx"]
+    test_paths: ["src/__tests__/constants-utils.test.ts"]
+    notes: "Enum and Chapter->Article / Scene->Section mapping implemented; no test creates an ARTICLE_COLLECTION/GENERAL project or asserts rendered labels; MCP controller path accepts any projectType string."
+  - id: WCA-003
+    status: partial
+    code_paths: ["src/lib/controllers/structure.ts", "src/app/api/projects/[id]/nodes/route.ts", "src/app/api/nodes/[id]/route.ts", "src/app/api/nodes/move/route.ts", "src/components/outline-tree.tsx"]
+    test_paths: ["src/__tests__/structure-controller.test.ts", "src/__tests__/api-handlers.test.ts", "src/__tests__/structure.test.ts", "e2e/integration.spec.ts"]
+    notes: "CRUD with parent/order preserved is tested; POST /api/nodes/move (within/cross-parent renumbering) has no test; color-coded status dots untested."
+  - id: WCA-004
+    status: partial
+    code_paths: ["src/components/outline-tree.tsx", "src/app/project/[id]/page.tsx", "src/lib/controllers/structure.ts", "src/schemas/nodes.ts"]
+    test_paths: ["src/__tests__/structure-controller.test.ts", "src/__tests__/nodes-route.test.ts"]
+    notes: "insertAfterIndex -> orderIndex+1 with sibling shift tested at controller level; new scene becoming the selected node has no test and no e2e exercises the Next Scene menu."
+  - id: WCA-005
+    status: partial
+    code_paths: ["src/components/editor/use-auto-save.ts", "src/components/scene-editor.tsx", "src/lib/controllers/structure.ts", "src/lib/controllers/projects.ts", "src/lib/sanitize-server.ts", "src/components/editor/editor-config.ts"]
+    test_paths: ["e2e/smoke.spec.ts", "src/__tests__/structure-controller.test.ts", "src/__tests__/content-route.test.ts", "src/__tests__/projects-controller.test.ts", "src/__tests__/api-routes.test.ts"]
+    notes: "2 s debounce save and scene word count tested; project total updating after a save only covered piecewise; bold/italic/heading/list round-trip through save/load has no test."
+  - id: WCA-006
+    status: covered
+    code_paths: ["src/lib/controllers/structure.ts", "src/app/api/nodes/[id]/content/route.ts", "src/components/editor/version-history-panel.tsx"]
+    test_paths: ["src/__tests__/content-versioning.test.ts", "src/__tests__/structure-controller.test.ts", "src/__tests__/content-route.test.ts"]
+    notes: "Version row per save, prune at exactly 50, and restore-as-new-head all directly asserted."
+  - id: WCA-007
+    status: stale
+    code_paths: ["src/components/editor/extensions/beat.tsx", "src/components/editor/editor-config.ts", "src/lib/html-to-markdown.ts", "src/app/api/projects/[id]/export/route.ts", "src/app/api/projects/[id]/export/pdf/route.tsx", "src/app/api/projects/[id]/export/epub/route.ts", "src/app/api/projects/[id]/export/docx/route.ts", "src/lib/export/google-docs-exporter.ts"]
+    test_paths: ["e2e/integration.spec.ts", "src/__tests__/beats.test.ts", "src/__tests__/export-pdf-epub.test.ts", "src/__tests__/google-docs-exporter.test.ts"]
+    notes: "Statement says every export strips beats, but Google Docs STORY_INTERNAL mode deliberately exports with beats (includeBeats true) and its test locks that in; DOCX stripping untested; only the comment form is stripped, not the div storage form."
+  - id: WCA-008
+    status: partial
+    code_paths: ["src/app/project/[id]/scene/[sceneId]/focus/page.tsx", "src/components/focus-mode/scene-info-sidebar.tsx", "src/components/focus-mode/related-elements-panel.tsx", "src/app/api/focus/[sceneId]/route.ts", "src/mcp/tools/coaching.ts", "src/components/outline-tree.tsx"]
+    test_paths: ["src/__tests__/focus-route.test.ts", "e2e/smoke.spec.ts", "e2e/visual.spec.ts"]
+    notes: "Focus route returning context/related/annotations tested; no test asserts the three panels or navigation from the project view; src/lib/controllers/focus.ts is dead code so focus-controller.test.ts does not cover the live path."
+  - id: WCA-009
+    status: partial
+    code_paths: ["src/lib/linting/harper-linter.ts", "src/components/editor/extensions/harper-spellcheck.ts", "src/components/editor/harper-suggestion-popover.tsx", "src/components/editor/editor-toolbar.tsx", "src/components/scene-editor.tsx", "next.config.ts", "src/middleware.ts"]
+    test_paths: ["e2e/smoke.spec.ts", "src/__tests__/harper-spellcheck.test.ts", "src/__tests__/harper-linter.test.ts", "src/__tests__/middleware.test.ts", "src/__tests__/harper-suggestion-popover.test.ts"]
+    notes: "Inline flags, toggle re-enable, absolute wasm URL, and CSP tested; click-to-suggest, no-network-manuscript-text, and dev/prod bundler parity have no tests."
+  - id: WCA-010
+    status: partial
+    code_paths: ["src/lib/controllers/story-objects.ts", "src/schemas/story-objects.ts", "src/app/api/projects/[id]/story-objects/route.ts", "src/app/api/story-objects/[id]/route.ts"]
+    test_paths: ["src/__tests__/story-objects-controller.test.ts", "src/__tests__/api-handlers.test.ts", "e2e/integration.spec.ts", "src/__tests__/story-objects.test.ts", "e2e/smoke.spec.ts"]
+    notes: "Five types, filter and search implemented; only CHARACTER/LOCATION exercised through API or controller (other types written directly via Prisma); no route-level test of the project-scoped collection endpoint or ?type/?search."
+  - id: WCA-011
+    status: stale
+    code_paths: ["src/app/api/projects/[id]/relationships/route.ts", "src/app/api/relationships/[id]/route.ts", "src/schemas/relationships.ts", "src/mcp/tools/relationships.ts", "src/components/story-object-panel.tsx"]
+    test_paths: ["src/__tests__/mcp-relationships.test.ts", "src/__tests__/relationships-route.test.ts", "src/__tests__/api-routes.test.ts"]
+    notes: "REST POST validates both ends against project story objects only and 404s on a linked universe world-object id; only the MCP tool supports world objects, yet the UI panel offers universe objects and POSTs to the REST route; MCP list returns world-object relationships unscoped."
+  - id: WCA-012
+    status: partial
+    code_paths: ["src/lib/controllers/universes.ts", "src/app/api/universes/route.ts", "src/app/api/universes/[id]/route.ts", "src/app/api/universes/[id]/world-objects/route.ts", "src/app/api/world-objects/[id]/route.ts", "src/app/api/world-objects/[id]/timeline/route.ts", "src/mcp/tools/universes.ts", "src/mcp/index.ts"]
+    test_paths: ["src/__tests__/universes.test.ts", "src/__tests__/mcp-tools.test.ts", "src/__tests__/timeline-post-route.test.ts", "src/__tests__/timeline-patch-route.test.ts", "src/__tests__/timeline-reorder-route.test.ts", "src/__tests__/timeline-route.test.ts", "src/__tests__/null-userid-guard.test.ts"]
+    notes: "Controller and MCP paths tested; universe and world-object REST routes untested beyond timeline sub-routes; project link/unlink has no REST path (ProjectUpdateSchema strips universeId), MCP-only."
+  - id: WCA-013
+    status: stale
+    code_paths: ["src/app/api/timeline/[projectId]/route.ts", "src/lib/controllers/timeline.ts", "src/components/timeline/timeline-view.tsx", "src/lib/timeline.ts"]
+    test_paths: ["src/__tests__/timeline-controller.test.ts", "src/__tests__/timeline.test.ts"]
+    notes: "Endpoint returns scenes, objects and raw relationship rows of any type (matrix assembled client-side, not filtered to APPEARS_IN) and is GET-only; the PATCH/reorder endpoints in criterion 2 belong to world-object timeline entries (WCA-012), not this view."
+  - id: WCA-014
+    status: partial
+    code_paths: ["src/app/api/projects/[id]/search/route.ts", "src/components/search-panel.tsx"]
+    test_paths: ["src/__tests__/search-route.test.ts", "src/__tests__/input-size-limits.test.ts"]
+    notes: "Scene and story-object hits plus 413 over 200 chars tested; snippet content and client-side highlight rendering have no assertion."
+  - id: WCA-015
+    status: partial
+    code_paths: ["src/app/api/nodes/[id]/annotations/route.ts", "src/app/api/annotations/[id]/route.ts", "src/app/api/annotations/route.ts", "src/lib/annotation-anchoring.ts", "src/app/read/[id]/reader-view.tsx", "src/components/scene-editor.tsx"]
+    test_paths: ["src/__tests__/annotations-route.test.ts", "src/__tests__/annotation-anchoring.test.ts"]
+    notes: "All three criteria implemented but none exercised: no popover/highlight/click-survival/resolve test; PATCH/DELETE annotation route untested."
+  - id: WCA-016
+    status: partial
+    code_paths: ["src/app/api/writing-tasks/route.ts", "src/app/api/writing-tasks/[id]/route.ts", "src/app/api/writing-tasks/[id]/complete/route.ts", "src/lib/controllers/writing-tasks.ts", "src/mcp/tools/writing-tasks.ts", "src/app/read/[id]/reader-view.tsx"]
+    test_paths: ["src/__tests__/writing-tasks-route.test.ts", "src/__tests__/mcp-writing-tasks.test.ts", "src/__tests__/mcp-writing-task-ownership.test.ts"]
+    notes: "REST and MCP CRUD thoroughly tested; Read-view tasks drawer and mark-complete UI have no component or e2e test."
+  - id: WCA-017
+    status: covered
+    code_paths: ["src/app/api/projects/[id]/manuscript/route.ts", "src/app/read/[id]/page.tsx"]
+    test_paths: ["src/__tests__/sharing.test.ts"]
+    notes: "OUTLINE exclusion, DRAFT/REVISED/FINAL inclusion in order, and chapter > scene rendering asserted against the manuscript route."
+  - id: WCA-018
+    status: covered
+    code_paths: ["src/app/api/projects/[id]/share/route.ts", "src/lib/api-auth.ts"]
+    test_paths: ["src/__tests__/sharing.test.ts", "src/__tests__/share-route-p2002.test.ts", "e2e/sharing.spec.ts"]
+    notes: "Default READER, 409 on duplicate (incl. P2002), non-owner 403, and shared-reader manuscript access all directly asserted."
+  - id: WCA-019
+    status: partial
+    code_paths: ["src/app/api/projects/[id]/export/route.ts", "src/lib/html-to-markdown.ts", "src/app/project/[id]/settings/page.tsx", "src/mcp/tools/export.ts"]
+    test_paths: ["e2e/integration.spec.ts", "src/__tests__/export.test.ts", "src/__tests__/mcp-export.test.ts", "src/__tests__/beats.test.ts"]
+    notes: "Front matter, chapter headings, numbering toggle and story bible tested via e2e; per-chapter export, includeSynopsis and includeSceneBreaks untested; MCP export_manuscript is a separate renderer ignoring the options."
+  - id: WCA-020
+    status: stale
+    code_paths: ["src/app/read/[id]/reader-view.tsx", "src/app/api/projects/[id]/export/pdf/route.tsx", "src/app/api/projects/[id]/export/docx/route.ts", "src/app/api/projects/[id]/export/epub/route.ts", "src/lib/outline-tree.ts"]
+    test_paths: ["src/__tests__/export-pdf-epub.test.ts"]
+    notes: "All three exports build from buildOutlineTree with no status filter, so OUTLINE scenes with content are included while the manuscript view excludes them; only comment-form beats stripped; Arial/LEFT asserted only on a scene-less project, download menu untested."
+  - id: WCA-021
+    status: covered
+    code_paths: ["src/lib/export/google-docs-exporter.ts", "src/lib/export/google-docs-comment-sync.ts", "src/lib/controllers/google-auth.ts", "src/app/api/auth/google-docs/route.ts", "prisma/schema.prisma"]
+    test_paths: ["src/__tests__/google-docs-exporter.test.ts", "src/__tests__/google-docs-comment-sync.test.ts", "src/__tests__/google-auth-controller.test.ts", "src/__tests__/google-docs-oauth-initiate.test.ts", "src/__tests__/google-docs-oauth-callback.test.ts"]
+    notes: "Idempotent export keyed on (projectId|universeId, exportMode), externalId comment dedupe, and separate per-user OAuth flow all asserted."
+  - id: WCA-022
+    status: stale
+    code_paths: ["src/mcp/tools/export.ts", "src/mcp/index.ts", "src/lib/controllers/hashnode-publish.ts", "src/lib/controllers/hashnode-auth.ts", "src/app/api/projects/[id]/publish-to-hashnode/route.ts"]
+    test_paths: ["src/__tests__/hashnode-publish-controller.test.ts", "src/__tests__/publish-to-hashnode-route.test.ts", "src/__tests__/mcp-export.test.ts"]
+    notes: "No Medium export exists (export route accepts only json/bible/chapters/full; the only front-matter Markdown generator is exportHashnode and its front matter is unasserted); Hashnode publishing with encrypted credential is implemented and tested."
+  - id: WCA-023
+    status: partial
+    code_paths: ["src/lib/export-json.ts", "src/lib/import-json.ts", "src/app/api/projects/import/route.ts", "src/app/api/projects/[id]/export/route.ts"]
+    test_paths: ["src/__tests__/input-size-limits.test.ts", "src/__tests__/project-import-route.test.ts", "src/__tests__/export-json.test.ts", "src/__tests__/import-json.test.ts"]
+    notes: "5 MB 413 tested and export/import each tested independently; no export->import round-trip comparison; size limit checks Content-Length only."
+  - id: WCA-024
+    status: partial
+    code_paths: ["src/app/api/chat/route.ts", "src/lib/ai/chat-compression.ts", "src/app/api/conversations/route.ts", "src/app/api/conversations/[id]/route.ts"]
+    test_paths: ["src/__tests__/chat-route.test.ts", "src/__tests__/chat-compression.test.ts", "src/__tests__/conversations-route.test.ts"]
+    notes: "SSE streaming, context injection, conversations and compression tested; client-disconnect handling exists but no test simulates a closed controller; only the user turn's persistence is asserted; current scene injected only when client passes sceneContext."
+  - id: WCA-025
+    status: stale
+    code_paths: ["src/app/api/ai-inline/route.ts", "src/app/api/ai-manuscript/route.ts"]
+    test_paths: ["src/__tests__/input-size-limits.test.ts", "src/__tests__/ai-inline-route.test.ts", "src/__tests__/ai-manuscript-route.test.ts"]
+    notes: "Route implements rewrite-tighter/vivid/simpler, continue, expand, voice-check, ask (no brainstorm or summarize); /api/ai-manuscript has no input size limit, contradicting criterion 2; never-auto-edits holds in code but is unasserted and the chat agent (adk-tools) does have write tools."
+  - id: WCA-026
+    status: stale
+    code_paths: ["src/lib/review-personas.ts", "src/lib/ai/peer-review-service.ts", "src/mcp/index.ts", "src/app/api/chat/route.ts", "src/app/api/projects/[id]/peer-review/route.ts"]
+    test_paths: ["src/__tests__/review-personas.test.ts", "src/__tests__/peer-review-service.test.ts", "src/__tests__/peer-review-route.test.ts", "src/__tests__/mcp-guardrails.test.ts"]
+    notes: "Five single-sourced personas tested, but no pending/in-progress return path exists for run_peer_review (always runs fresh) and MCP tool descriptions still say four reviewers."
+  - id: WCA-027
+    status: partial
+    code_paths: ["src/hooks/use-writing-session.ts", "src/components/scene-editor.tsx", "src/app/api/projects/[id]/sessions/route.ts", "src/lib/controllers/sessions.ts", "src/app/api/sessions/heatmap/route.ts", "src/app/api/projects/[id]/progress/route.ts", "src/lib/controllers/progress.ts", "src/app/project/[id]/progress/page.tsx"]
+    test_paths: ["src/__tests__/sessions-progress.test.ts", "src/__tests__/sessions-heatmap.test.ts", "src/__tests__/sessions-controller.test.ts"]
+    notes: "Session POST, progress and heatmap aggregation tested; auto-tracking hook untested; sessions recorded on inactivity/unmount/scene switch rather than on save and updateSession is never called from the client."
+  - id: WCA-028
+    status: partial
+    code_paths: ["src/mcp/index.ts", "src/mcp/tools/projects.ts", "src/mcp/tools/structure.ts", "src/mcp/tools/story-objects.ts", "src/mcp/tools/writing-tasks.ts", "src/mcp/tools/relationships.ts", "src/mcp/tools/submissions.ts", "src/mcp/tools/export.ts", "src/mcp/tools/snapshots.ts", "src/mcp/tools/universes.ts", "src/mcp/tools/coaching.ts", "src/app/api/mcp/route.ts"]
+    test_paths: ["src/__tests__/mcp-server.test.ts", "src/__tests__/mcp-tools.test.ts", "src/__tests__/mcp-route-auth.test.ts"]
+    notes: "All named categories registered (102 tools); no category registry exists to assert against and no test compares MCP-written state with the equivalent API route side by side."
+  - id: WCA-029
+    status: covered
+    code_paths: ["src/mcp/annie-voice.ts", "src/mcp/index.ts"]
+    test_paths: ["src/__tests__/mcp-guardrails.test.ts"]
+    notes: "All four criteria asserted (instructions delivery, ANNIE_HARD_RULE prepended, no CONTENT guard, intent enum present but not enforced) via source-text checks of the exact strings."
+  - id: WCA-030
+    status: covered
+    code_paths: ["src/mcp/tools/structure.ts", "src/mcp/index.ts"]
+    test_paths: ["src/__tests__/structure-controller.test.ts"]
+    notes: "Lone BEAT insert and intra-block split after first/middle/attributed paragraph asserted with exact left/right block contents whose concatenation equals the input."
+  - id: WCA-031
+    status: covered
+    code_paths: ["src/mcp/content-hash.ts", "src/mcp/tools/structure.ts", "src/mcp/tools/projects.ts", "src/mcp/tools/universes.ts", "src/mcp/index.ts", "src/mcp/annie-voice.ts"]
+    test_paths: ["src/__tests__/mcp-tools.test.ts", "src/__tests__/controllers.test.ts", "src/__tests__/content-hash.test.ts", "src/__tests__/mcp-guardrails.test.ts", "src/__tests__/offline-content-hash.test.ts"]
+    notes: "Mismatched hash rejected before any write (MCP layer) and content-unchanged asserted at the controller layer; instructions direct agents to read-then-write."
+  - id: WCA-032
+    status: covered
+    code_paths: ["src/mcp/index.ts", "src/lib/env.ts"]
+    test_paths: ["src/__tests__/mcp-destructive-gating.test.ts"]
+    notes: "Option true/false, env true, and unset-default-blocked cases all asserted; non-destructive tools unaffected."
+  - id: WCA-033
+    status: stale
+    code_paths: ["src/mcp/snapshot.ts", "src/mcp/tools/snapshots.ts", "src/mcp/index.ts"]
+    test_paths: ["src/__tests__/snapshot.test.ts", "src/__tests__/mcp-snapshots.test.ts"]
+    notes: "Since the Supabase migration snapshot.ts is a documented no-op: create returns hash n/a, list returns [], restore throws 'snapshots are disabled', autoSnapshot is empty and wired only to deletes; no shell is invoked so the escaping criterion is vacuous."
+  - id: WCA-034
+    status: partial
+    code_paths: ["src/mcp/skills.ts", "src/mcp/index.ts", ".skills"]
+    test_paths: ["src/__tests__/skills.test.ts", "src/__tests__/mcp-guardrails.test.ts"]
+    notes: "Skill loading and metadata parsing tested; no test lists the server's registered prompts or executes the plan_beats handler (coverage is source-text grep only)."
+  - id: WCA-035
+    status: partial
+    code_paths: ["src/lib/controllers/submissions.ts", "src/app/api/providers/route.ts", "src/app/api/providers/[id]/route.ts", "src/app/api/projects/[id]/submissions/publications/route.ts", "src/app/api/projects/[id]/submissions/contests/route.ts", "src/app/project/[id]/submissions/page.tsx", "src/components/submission-activity-summary.tsx", "src/mcp/tools/submissions.ts"]
+    test_paths: ["src/__tests__/mcp-submissions.test.ts", "e2e/visual.spec.ts"]
+    notes: "Only the MCP path is tested; submissions page, REST routes and dashboard summary have no tests; summary shows one active count plus next review date, not separate active/pending counts."
+  - id: WCA-036
+    status: partial
+    code_paths: ["src/lib/offline/sync-queue.ts", "src/lib/offline/replay-shared.ts", "src/worker/index.ts", "src/lib/offline/use-sync-status.ts", "src/components/sync-status-chip.tsx", "src/components/conflict-resolver-modal.tsx"]
+    test_paths: ["src/__tests__/sync-queue.test.ts", "src/__tests__/use-sync-status.test.ts", "src/__tests__/replay-shared.test.ts", "src/__tests__/next-config-sw-patterns.test.ts"]
+    notes: "All four queue/replay/409/skip bullets asserted at sync-queue level; conflict modal actions, header sync-state rendering and service-worker replay path untested."
+  - id: WCA-037
+    status: partial
+    code_paths: ["src/hooks/use-version-check.ts", "src/components/update-banner.tsx", "src/app/layout.tsx", "next.config.ts"]
+    test_paths: []
+    notes: "controllerchange only sets state and the banner refresh is the sole reload call in src, but neither criterion has a test; next-pwa reloadOnOnline is not set in next.config.ts and its default could not be verified (node_modules absent)."
+  - id: WCA-038
+    status: covered
+    code_paths: ["src/app/api/feedback/route.ts", "src/lib/rate-limit.ts", "src/middleware.ts"]
+    test_paths: ["src/__tests__/feedback-route.test.ts", "src/__tests__/middleware.test.ts", "src/__tests__/rate-limit.test.ts", "src/__tests__/input-size-limits.test.ts", "e2e/feedback.spec.ts"]
+    notes: "Issue creation, screenshot upload with fallback, 5/hour limit and size limits all asserted; token scope is a deployment property not enforceable in code."
+  - id: WCA-039
+    status: stale
+    code_paths: ["src/middleware.ts", "src/app/api/mcp/route.ts"]
+    test_paths: ["src/__tests__/middleware.test.ts", "src/__tests__/mcp-route-auth.test.ts"]
+    notes: "Enforcement and both criteria tested, but PUBLIC_PATHS also contains /api/calendar, /api/auth/google and /api/auth/me, which the statement's enumerated allowlist omits (spec drift in the list, not an enforcement gap)."
+  - id: WCA-040
+    status: partial
+    code_paths: ["src/lib/auth.ts", "src/lib/auth-server.ts", "src/lib/token-blocklist.ts", "src/app/api/auth/refresh/route.ts", "src/app/api/auth/logout/route.ts", "src/hooks/use-auth.ts", "src/lib/offline/replay-shared.ts"]
+    test_paths: ["src/__tests__/auth.test.ts", "src/__tests__/auth-refresh-route.test.ts", "src/__tests__/logout.test.ts", "src/__tests__/token-blocklist.test.ts", "src/__tests__/replay-shared.test.ts"]
+    notes: "1 h session / 30 d refresh, rotation and revocation tested; daily-user-never-reauths and autosave-survives-expiry have no test (45-minute silent renew hook untested)."
+  - id: WCA-041
+    status: partial
+    code_paths: ["src/app/api/auth/google/callback/route.ts", "src/lib/env.ts"]
+    test_paths: []
+    notes: "Case-insensitive, trimmed ALLOWED_EMAILS match with invite_only redirect before session issuance is implemented; the callback test sets ALLOWED_EMAILS undefined and nothing references invite_only."
+  - id: WCA-042
+    status: covered
+    code_paths: ["src/lib/api-auth.ts", "src/mcp/index.ts", "src/app/api/mcp/route.ts"]
+    test_paths: ["src/__tests__/mcp-destructive-gating.test.ts", "src/__tests__/api-auth.test.ts", "src/__tests__/sharing.test.ts", "src/__tests__/mcp-route-auth.test.ts"]
+    notes: "Non-owner rejection, null-userId bypass, and role-aware HTTP access (OWNER/READER/EDITOR, 403) all asserted; MCP uses an owner-only check without share roles."
+  - id: WCA-043
+    status: partial
+    code_paths: ["src/lib/rate-limit.ts", "src/middleware.ts"]
+    test_paths: ["src/__tests__/middleware.test.ts", "src/__tests__/rate-limit.test.ts"]
+    notes: "All six limits and 429 headers asserted (plus per-IP auth 5/min not in the statement); DISABLE_RATE_LIMIT-ignored-in-production has no test; middleware runs on Edge so Redis is never used for per-user limits."
+  - id: WCA-044
+    status: partial
+    code_paths: ["src/schemas", "src/app/api/chat/route.ts", "src/app/api/ai-inline/route.ts", "src/app/api/projects/import/route.ts", "src/app/api/feedback/route.ts", "src/app/api/projects/[id]/search/route.ts", "src/lib/sanitize-server.ts", "src/lib/sanitize.ts", "src/app/api/nodes/[id]/content/route.ts"]
+    test_paths: ["src/__tests__/input-size-limits.test.ts", "src/__tests__/sanitize-server.test.ts", "src/__tests__/sanitize.test.ts"]
+    notes: "413 limits fully tested; sanitization tested only as pure functions, with no test that the content route sanitizes before persisting or that a component strips on render."
+  - id: WCA-045
+    status: covered
+    code_paths: ["src/middleware.ts", "src/app/layout.tsx"]
+    test_paths: ["src/__tests__/middleware.test.ts", "e2e/smoke.spec.ts"]
+    notes: "Nonce-based script-src without unsafe-inline/unsafe-eval asserted on public and authenticated responses; focus-mode e2e asserts zero CSP violations with the Harper worker and WASM."
+  - id: WCA-046
+    status: partial
+    code_paths: ["src/lib/crypto.ts", "src/app/api/ai-settings/route.ts", "src/lib/controllers/hashnode-auth.ts", "src/app/api/integrations/hashnode/route.ts", "src/lib/sentry-scrub.ts", "sentry.client.config.ts", "sentry.server.config.ts", "sentry.edge.config.ts"]
+    test_paths: ["src/__tests__/crypto.test.ts", "src/__tests__/sentry-scrub.test.ts"]
+    notes: "Encryption round-trip and email/token scrubbing tested; no test asserts a GET returns a masked key, Hashnode integration route untested, and scrubber does not specifically remove scene text (no test asserts manuscript absence)."
+  - id: WCA-047
+    status: stale
+    code_paths: ["src/app/api/auth/export-data/route.ts", "src/app/api/auth/delete-account/route.ts", "src/app/api/account/consent/route.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/dmca/page.tsx", "src/middleware.ts"]
+    test_paths: ["src/__tests__/export-data-route.test.ts", "src/__tests__/delete-account-route.test.ts", "src/__tests__/consent-route.test.ts"]
+    notes: "Export, deletion with session revocation and consent are implemented and tested, but /dmca is absent from PUBLIC_PATHS so unauthenticated visitors are redirected to login, contradicting 'serve DMCA pages publicly'."
+  - id: WCA-048
+    status: partial
+    code_paths: ["src/app/api/health/route.ts", "src/lib/metrics.ts", "src/app/api/metrics/route.ts", "sentry.client.config.ts", "sentry.server.config.ts", "sentry.edge.config.ts", "src/instrumentation.ts", "src/middleware.ts"]
+    test_paths: ["src/__tests__/middleware.test.ts", "src/__tests__/health-route.test.ts", "src/__tests__/metrics-route.test.ts", "src/__tests__/metrics.test.ts", "src/__tests__/telemetry.test.ts"]
+    notes: "Unauthenticated health check tested; HTTP request counter and duration histogram are declared with a TODO and never incremented, so request-counter aggregation is neither implemented nor tested."
+  - id: WCA-049
+    status: partial
+    code_paths: ["Dockerfile"]
+    test_paths: []
+    notes: "Heap capped via NODE_OPTIONS --max-old-space-size=300 in the runtime image (inherited by the CMD), satisfying intent; no test asserts the cap and nothing checks the 90% alert threshold."
+  - id: WCA-050
+    status: partial
+    code_paths: ["scripts/migrate.mjs", "Dockerfile", "prisma/migrations", "CLAUDE.md"]
+    test_paths: ["scripts/__tests__/migrate.test.ts", "scripts/__tests__/migrate-schema-resolution.test.ts", "scripts/__tests__/migrate-schema-env.test.ts", "scripts/__tests__/ci-migrations.test.ts"]
+    notes: "Idempotent re-run and legacy adoption tested; destructive-DDL refusal on a populated DB is implemented but untested, and its live-data check relies on pg_stat_user_tables statistics (approximate)."
+  - id: WCA-051
+    status: partial
+    code_paths: ["src/app/.well-known/oauth-authorization-server/route.ts", "src/app/oauth/register/route.ts", "src/app/oauth/authorize/route.ts", "src/app/oauth/token/route.ts", "src/lib/oauth-tokens.ts", "src/lib/oauth-store.ts", "src/middleware.ts", "src/app/api/mcp/route.ts"]
+    test_paths: ["src/__tests__/oauth-register-route.test.ts", "src/__tests__/oauth-authorize-route.test.ts", "src/__tests__/oauth-token-route.test.ts", "src/__tests__/oauth-store.test.ts", "src/__tests__/oauth-tokens.test.ts", "src/__tests__/middleware.test.ts", "src/__tests__/mcp-route-auth.test.ts"]
+    notes: "Register/authorize/token with PKCE and refresh rotation tested; metadata document untested; no test shows a minted mcp_access token passing middleware with x-user-id set (middleware test mocks the verifier and checks only Sentry context)."
+  - id: WCA-052
+    status: partial
+    code_paths: ["package.json", "Dockerfile", "docker-compose.yml", "src/lib/env.ts", "src/lib/db.ts", "scripts/migrate.mjs", "src/lib/ai/settings.ts", "src/app/api/chat/route.ts", "src/app/api/auth/google/callback/route.ts", "src/lib/auth.ts", "README.md"]
+    test_paths: ["src/__tests__/ai-inline-route.test.ts", "src/__tests__/ai-manuscript-route.test.ts", "src/__tests__/auth.test.ts", "src/__tests__/feedback-route.test.ts", "scripts/__tests__/migrate.test.ts", "src/__tests__/ai-settings.test.ts"]
+    notes: "Graceful degradation without AI/Google vars tested; nothing exercises docker compose with only DATABASE_URL, and DATABASE_URL is not declared in the env schema (db.ts and migrate.mjs tolerate its absence rather than failing fast)."
+orphans:
+  - behavior: "Opportunity tracking with candidate entries (requirement doc 031 never ported to the yaml): record contest/publication opportunities with status found/considering/closed, attach projects as candidates, promote a chosen candidate into a contest submission."
+    code_paths: ["src/lib/controllers/opportunities.ts", "src/lib/opportunity-state.ts", "src/app/api/opportunities", "src/app/opportunities", "src/mcp/tools/opportunities.ts"]
+    suggested_requirement: "When the author records an opportunity, the system shall persist its provider, close date, optional review date, rules URL, entry fee, word/line limits, eligibility notes and a status of found/considering/closed, shall allow zero or more projects to be attached as candidates (candidate/chosen/dropped), and shall promote a chosen candidate into a contest submission without re-entering captured data, via web UI and equivalent MCP tools."
+  - behavior: "Publishing hub: one page showing each story's current placements alongside open opportunities, each resolved to a single readable state."
+    code_paths: ["src/lib/controllers/publishing.ts", "src/lib/story-placement.ts", "src/app/api/publishing/route.ts", "src/app/publishing/page.tsx"]
+    suggested_requirement: "When the author opens the publishing hub, the system shall show every open opportunity resolved to a single state (accepted/rejected/submitted/withdrawn/missed/chosen/considering/none) naming the candidate stories, and for each story its current placements across contests and publications."
+  - behavior: "ICS deadline calendar feed: per-user regenerable unguessable token serving an RFC 5545 feed of non-closed opportunity deadlines at a public path; unknown tokens return a bare 404."
+    code_paths: ["src/lib/controllers/calendar-feed.ts", "src/lib/ics.ts", "src/app/api/account/calendar-feed/route.ts", "src/app/api/calendar/opportunities/[token]/route.ts", "src/middleware.ts"]
+    suggested_requirement: "When a user requests their calendar feed, the system shall mint a 256-bit token and serve an unauthenticated iCalendar feed of their non-closed opportunity deadlines at a token-addressed URL, shall return 404 for unknown tokens without distinguishing them from malformed ones, and shall invalidate the previous URL when the token is regenerated."
+  - behavior: "Cross-project task dashboard with capacity matching (requirement doc 032 never ported): tasks carry kind/capacity/importance/size/energy/due date, dashboard filters by capacity, merges deadlines with opportunities, suggests up to 5 ranked tasks, exposed via get_task_dashboard MCP tool."
+    code_paths: ["src/lib/controllers/task-dashboard.ts", "src/lib/writing-task-ranking.ts", "src/app/api/writing-tasks/dashboard/route.ts", "src/app/tasks/page.tsx", "src/mcp/tools/writing-tasks.ts", "src/mcp/annie-voice.ts"]
+    suggested_requirement: "When the writer selects a capacity (Low/Medium/Full), the system shall show tasks across all projects that fit that capacity, an upcoming-deadlines strip merging task due dates and opportunity close dates soonest-first, and a suggested set ranked by importance, then nearest deadline, then smallest size, exposing the same view through a single MCP tool."
+  - behavior: "AI consistency check: analyses character profiles against scene content and returns typed alerts with severity; returns empty alerts with a warning when AI is unconfigured."
+    code_paths: ["src/app/api/projects/[id]/consistency-check/route.ts", "src/mcp/tools/coaching.ts"]
+    suggested_requirement: "When the author runs a consistency check, the system shall analyse character profiles against scene content and return alerts typed CHARACTER_ATTRIBUTE/PLOT_CONTRADICTION/TIMELINE/OTHER with severity and source scene, and shall return an empty result with a warning rather than fail when no AI key is configured."
+  - behavior: "Character voice check: per-character voice profiles plus AI-flagged off-voice passages with suggested rewrites; heuristic profiles only when AI is unconfigured."
+    code_paths: ["src/app/api/projects/[id]/voice-check/route.ts", "src/mcp/tools/coaching.ts"]
+    suggested_requirement: "When the author requests a voice check for a scene or selection, the system shall return a voice profile per character present and AI feedback identifying off-voice passages with a suggested voice, degrading to profiles only when AI is unconfigured."
+  - behavior: "Plot thread status indicators: non-AI computation of active/introduced/dormant plotlines per scene in story order, rendered in the outline."
+    code_paths: ["src/app/api/projects/[id]/plot-thread-status/route.ts", "src/mcp/tools/coaching.ts", "src/app/project/[id]/page.tsx"]
+    suggested_requirement: "While a project has plotlines linked to scenes, the system shall compute a per-scene plot thread status in story order and show it as indicators in the outline."
+  - behavior: "Status-aware review routing and persona-typed chat: scene status selects the review skill via a shared mapping in chat and MCP; chat conversations can adopt a reviewer persona; MCP exposes scene-coaching/review/per-persona prompts."
+    code_paths: ["src/lib/review-routing.ts", "src/app/api/chat/route.ts", "src/mcp/index.ts"]
+    suggested_requirement: "When a review is requested for a scene, the system shall select the review skill from the scene's status via a single shared mapping, and shall let a chat conversation adopt one of the reviewer personas as its lens."
+  - behavior: "Chat agent tool use: the chat assistant runs as an ADK agent with a dynamic toolset that can read and modify the project (including writing scene content, deleting nodes, exporting); tool interactions stored as a system message. In tension with WCA-025's never-auto-edits claim."
+    code_paths: ["src/lib/ai/adk-agent.ts", "src/lib/ai/adk-tools.ts", "src/app/api/chat/route.ts"]
+    suggested_requirement: "When the author asks the chat assistant to look up or change story data, the system shall let the assistant call project tools (read and write) on the author's behalf, expand its toolset on demand via load_toolset, and record tool use in the conversation; scene prose writes remain subject to the structural-collaborator guidelines (reconcile with WCA-025)."
+  - behavior: "Story graph visualisation: force-directed graph of structure nodes and story objects with typed relationship edges."
+    code_paths: ["src/app/api/projects/[id]/graph/route.ts", "src/components/story-graph.tsx", "src/app/project/[id]/graph/page.tsx"]
+    suggested_requirement: "When the author opens the graph view, the system shall render all structure nodes and story objects as a force-directed graph with relationships as typed, labelled edges."
+  - behavior: "Public content reporting: unauthenticated report of a project files a GitHub issue, rate-limited per IP, returning 201 even for unknown projects to prevent enumeration."
+    code_paths: ["src/app/api/projects/[id]/report/route.ts", "src/components/report-content-dialog.tsx", "src/app/read/[id]/reader-view.tsx", "src/lib/rate-limit.ts"]
+    suggested_requirement: "When any reader reports a project with a category of copyright/illegal/harassment/other, the system shall create a GitHub issue with escaped user fields, limit reports per IP, and respond 201 regardless of whether the project exists."
+  - behavior: "Sample project onboarding: a user with no projects gets a Sherlock sample project seeded automatically, with a partial unique index guaranteeing one sample per user under concurrent requests."
+    code_paths: ["src/app/api/onboarding/sample/route.ts", "src/data/sherlock-sample.json", "src/app/page.tsx", "prisma/schema.prisma"]
+    suggested_requirement: "When an authenticated user opens the dashboard with no projects, the system shall seed exactly one sample project marked isSample, tolerating concurrent requests without duplicates."
+  - behavior: "Per-user AI configuration and setup gating: users store their own encrypted key, model, custom instructions, coaching style, response length and compression settings overriding global settings; a setup wizard gates on key presence and lists available models."
+    code_paths: ["src/app/api/ai-settings/route.ts", "src/app/api/ai-settings/models/route.ts", "src/app/api/setup-status/route.ts", "src/components/setup-wizard.tsx", "src/lib/ai/settings.ts"]
+    suggested_requirement: "When a user saves AI settings, the system shall store a per-user encrypted API key, model, custom instructions, coaching style, response length and compression parameters that override global settings, and shall surface a setup wizard with a live model list until a key is present."
+  - behavior: "World object copy and story object transfer: copy a universe world object into a project as a story object, and transfer a project story object into a universe with an initial timeline entry, each transactionally."
+    code_paths: ["src/app/api/projects/[id]/copy-world-object/route.ts", "src/app/api/universes/transfer-object/route.ts", "src/lib/controllers/universes.ts", "src/mcp/tools/universes.ts"]
+    suggested_requirement: "When the author copies a world object into a linked project or transfers a story object into a universe, the system shall create the counterpart record (with an initial timeline entry on transfer) in a single transaction after verifying access to both source and target."
+  - behavior: "Universe export and project summary MCP tools: render a universe as Markdown and produce a structural project summary for agents."
+    code_paths: ["src/mcp/tools/export.ts", "src/mcp/index.ts"]
+    suggested_requirement: "When an agent calls export_universe or get_project_summary, the system shall return a Markdown universe bible or a structural summary of the project respectively."
+  - behavior: "Export all projects as ZIP: streams a ZIP of every owned project as JSON without buffering."
+    code_paths: ["src/app/api/projects/export-all/route.ts"]
+    suggested_requirement: "When the author requests export-all, the system shall stream a ZIP containing one JSON export per owned project."
+  - behavior: "CSRF header on sensitive mutations: five account and integration endpoints require an x-csrf-protection header and return 403 otherwise."
+    code_paths: ["src/lib/api-auth.ts", "src/app/api/auth/delete-account/route.ts", "src/app/api/account/consent/route.ts", "src/app/api/account/calendar-feed/route.ts", "src/app/api/integrations/hashnode/route.ts", "src/app/api/auth/google-docs/route.ts"]
+    suggested_requirement: "When a state-changing request reaches an account or integration endpoint, the system shall reject it with 403 unless it carries the CSRF protection header."
+  - behavior: "Database connection fault retry: queries are retried only on failures proving the statement never reached Postgres, with fixed short delays, to avoid duplicate writes."
+    code_paths: ["src/lib/db-retry.ts"]
+    suggested_requirement: "When a database call fails before the connection is established, the system shall retry it up to twice with short delays, and shall never retry failures where the statement may already have executed."
+  - behavior: "Expired auth row cleanup: hourly pruning of expired revoked tokens and OAuth auth codes."
+    code_paths: ["src/lib/expired-auth-cleanup.ts"]
+    suggested_requirement: "While the server runs, the system shall delete expired RevokedToken and OAuthAuthCode rows at startup and hourly."
+  - behavior: "Scheduled production monitoring: GitHub Actions poll uptime, check Supabase disk usage, monitor Railway resources, run staging smoke tests and re-dispatch dropped pipelines."
+    code_paths: [".github/workflows/uptime.yml", ".github/workflows/supabase-disk-monitor.yml", ".github/workflows/railway-resource-monitor.yml", ".github/workflows/pipeline-watchdog.yml", ".github/workflows/staging-smoke.yml"]
+    suggested_requirement: "The system shall be monitored by scheduled jobs that check production uptime, database disk usage and container resources, and raise alerts when thresholds are crossed."
+  - behavior: "Global keyboard shortcuts (Cmd/Ctrl+K search, Cmd/Ctrl+/ help, Escape close, suppressed in inputs) and a project-wide annotations list page."
+    code_paths: ["src/hooks/use-keyboard-shortcuts.ts", "src/app/project/[id]/annotations/page.tsx"]
+    suggested_requirement: "When the author presses Cmd/Ctrl+K, Cmd/Ctrl+/ or Escape outside a text input, the system shall open search, show shortcut help, or close the active overlay; and the project shall provide a page listing all annotations."
