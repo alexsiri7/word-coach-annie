@@ -13,13 +13,18 @@ import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 import { splitSqlStatements } from './sql-tokenizer.mjs';
 import { transportSecurityProblems } from './transport-security.mjs';
+import { authConfigurationProblems } from './auth-configuration.mjs';
 
 // This script is the container's startup gate (Dockerfile CMD runs it before
 // server.js) and the server inherits its environment, so refusing here keeps a
-// production server from ever talking to the database or Redis in plaintext.
-// It runs before the DATABASE_URL guard so the Redis rule holds even without one.
+// production server from ever talking to the database or Redis in plaintext, or
+// serving requests without authentication.
+// It runs before the DATABASE_URL guard so these rules hold even without one.
 if (process.env.NODE_ENV === 'production') {
-  const problems = transportSecurityProblems(process.env);
+  const problems = [
+    ...transportSecurityProblems(process.env),
+    ...authConfigurationProblems(process.env),
+  ];
   if (problems.length > 0) {
     for (const problem of problems) console.error(`Startup refused: ${problem}`);
     process.exit(1);
