@@ -60,7 +60,7 @@ Copy `.env.example` to `.env.local` and configure:
 
 | Variable | Description |
 |----------|-------------|
-| `API_TOKEN` | Strong random token for API authentication. **Required if the app is exposed to the internet.** Generate: `openssl rand -hex 32` |
+| `API_TOKEN` | Strong random token for API authentication. **Required if the app is exposed to the internet.** Production refuses to start unless `API_TOKEN` or `GOOGLE_CLIENT_ID` is set. Generate: `openssl rand -hex 32` |
 
 ### AI Chat (required for AI features)
 
