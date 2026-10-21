@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getCurrentUserId } from "@/lib/api-auth";
+import type { CoachingStyle, ResponseLength } from "@/lib/ai/settings";
+
+// Numeric bounds match the inputs on the settings page. chatWindowSize and
+// messagesUntilCompression size the chat route's history query and prompt.
+const AiSettingsUpdateSchema = z.object({
+  apiKey: z.string().max(500).optional(),
+  model: z.string().max(200).optional(),
+  customInstructions: z.string().optional(),
+  coachingStyle: z.enum(["gentle", "balanced", "direct"] satisfies CoachingStyle[]).optional(),
+  responseLength: z.enum(["concise", "moderate", "detailed"] satisfies ResponseLength[]).optional(),
+  chatWindowSize: z.number().int().min(3).max(20).optional(),
+  messagesUntilCompression: z.number().int().min(5).max(50).optional(),
+  compressionModel: z.string().max(200).optional(),
+});
 
 // GET /api/ai-settings — return current AI settings (user-level if authenticated, else global)
 export async function GET(request: NextRequest) {
@@ -56,17 +71,13 @@ export async function PUT(request: NextRequest) {
   try {
     const userId = getCurrentUserId(request);
     const body = await request.json();
+    const parsed = AiSettingsUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return NextResponse.json({ error: `Invalid ${issue.path.join(".") || "body"}: ${issue.message}` }, { status: 400 });
+    }
     const { apiKey, model, customInstructions, coachingStyle, responseLength,
-            chatWindowSize, messagesUntilCompression, compressionModel } = body as {
-      apiKey?: string;
-      model?: string;
-      customInstructions?: string;
-      coachingStyle?: string;
-      responseLength?: string;
-      chatWindowSize?: number;
-      messagesUntilCompression?: number;
-      compressionModel?: string;
-    };
+            chatWindowSize, messagesUntilCompression, compressionModel } = parsed.data;
 
     // Build update data — only include fields that were actually sent
     const data: Record<string, string | number> = {};
