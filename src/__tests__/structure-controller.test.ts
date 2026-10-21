@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { insertBeat } from "@/mcp/tools/structure";
@@ -255,6 +256,19 @@ describe("StructureController", () => {
 
                 const content = await StructureController.readSceneContent(scene.id);
                 expect(content.content).toBe("Original content");
+            });
+
+            it("sanitizes a version stored before writes were sanitized", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                const legacy = await prisma.contentVersion.create({
+                    data: { nodeId: scene.id, content: "<p>Old</p><script>alert(1)</script>", wordCount: 1 },
+                });
+
+                const result = await StructureController.restoreSceneVersion(scene.id, legacy.id);
+                expect(result.content).toBe("<p>Old</p>");
+                expect(result.contentHash).toBe(computeContentHash("<p>Old</p>"));
+                const content = await StructureController.readSceneContent(scene.id);
+                expect(content.content).toBe("<p>Old</p>");
             });
 
             it("throws for non-existent version", async () => {

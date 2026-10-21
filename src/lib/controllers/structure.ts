@@ -3,6 +3,7 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
+import { sanitizeHtml } from "@/lib/sanitize-server";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -445,7 +446,7 @@ export class StructureController {
      * that is empty (new scenes start with one). Either throws ConflictError on
      * mismatch; a write with no stored version is always allowed.
      */
-    static async writeSceneContent(nodeId: string, content: string, contentHash?: string | null) {
+    static async writeSceneContent(nodeId: string, rawContent: string, contentHash?: string | null) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
@@ -453,7 +454,8 @@ export class StructureController {
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
 
-        StructureController.validateSceneContent(content);
+        StructureController.validateSceneContent(rawContent);
+        const content = sanitizeHtml(rawContent);
 
         // Strip beat annotations in both storage formats:
         // 1. HTML comment format (normal save path via beatsToComments)
@@ -556,7 +558,8 @@ export class StructureController {
                 tx.contentVersion.create({
                     data: {
                         nodeId,
-                        content: oldVersion.content,
+                        // Versions stored before every write path sanitized may still carry unsafe markup.
+                        content: sanitizeHtml(oldVersion.content),
                         wordCount: oldVersion.wordCount,
                     },
                 }),
@@ -577,8 +580,8 @@ export class StructureController {
             restoredFromVersionId: versionId,
             newVersionId: newVersion.id,
             wordCount: newVersion.wordCount,
-            content: oldVersion.content,
-            contentHash: computeContentHash(oldVersion.content),
+            content: newVersion.content,
+            contentHash: computeContentHash(newVersion.content),
             createdAt: newVersion.createdAt.toISOString(),
         };
     }

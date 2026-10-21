@@ -5,7 +5,7 @@ import * as structureTools from "@/mcp/tools/structure";
 import * as projectTools from "@/mcp/tools/projects";
 import * as storyObjectTools from "@/mcp/tools/story-objects";
 import * as universeTools from "@/mcp/tools/universes";
-import { StaleWriteError } from "@/mcp/content-hash";
+import { computeContentHash, StaleWriteError } from "@/mcp/content-hash";
 import { prisma } from "@/lib/db";
 
 describe("MCP Structure Tools", () => {
@@ -207,6 +207,29 @@ describe("MCP Structure Tools", () => {
             { type: "CONTENT", content: "<p>More text</p>" }
         ], contentHash);
         expect(result.wordCount).toBeGreaterThan(0);
+    });
+
+    it("writeSceneContent sanitizes markup before storing it", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        const result = await structureTools.writeSceneContent(
+            scene.id,
+            '<p onclick="alert(1)">Hi</p><script>alert(2)</script><!-- beat: Keep me --><img src="x" onerror="alert(3)">'
+        );
+        const { content } = await structureTools.readSceneContent(scene.id);
+        expect(content).toBe('<p>Hi</p><!-- beat: Keep me --><img src="x">');
+        expect(result.contentHash).toBe(computeContentHash(content));
+    });
+
+    it("writeSceneContentFromBlocks sanitizes markup before storing it", async () => {
+        const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+        await structureTools.writeSceneContentFromBlocks(scene.id, [
+            { type: "CONTENT", content: "<p>Hi</p><script>alert(1)</script>" },
+            { type: "BEAT", content: "<img src=x onerror=alert(2)>Beat" },
+        ]);
+        const { content } = await structureTools.readSceneContent(scene.id);
+        expect(content).not.toMatch(/<script|onerror|<img/i);
+        expect(content).toContain("<p>Hi</p>");
+        expect(content).toContain("<!-- beat:");
     });
 
     it("getSceneVersions delegates to StructureController", async () => {

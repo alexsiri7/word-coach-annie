@@ -1,67 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import epub from "epub-gen-memory";
 import { prisma } from "@/lib/db";
-import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
+import { buildOutlineTree } from "@/lib/outline-tree";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
-import { escapeHtml } from "@/lib/sanitize-server";
+import { buildEpubChapters } from "@/lib/epub-chapters";
 import { logger } from "@/lib/logger";
-
-function stripBeats(html: string): string {
-  return html.replace(/<!--\s*beat:.*?-->/gi, "");
-}
-
-function isEmptyContent(content: string | undefined): boolean {
-  if (!content) return true;
-  const stripped = content.replace(/<p><\/p>/g, "").trim();
-  return stripped.length === 0;
-}
-
-interface EpubChapter {
-  title: string;
-  content: string;
-}
-
-function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
-  const chapters: EpubChapter[] = [];
-
-  function collectSceneHtml(node: OutlineNode): string {
-    let html = "";
-    for (const child of node.children) {
-      if (child.type === "SCENE" && !isEmptyContent(child.content)) {
-        html += stripBeats(child.content!);
-      }
-    }
-    return html;
-  }
-
-  function walk(node: OutlineNode) {
-    if (node.type === "PART") {
-      const partSceneHtml = collectSceneHtml(node);
-      chapters.push({
-        title: node.title,
-        content: `<h1>${escapeHtml(node.title)}</h1>${partSceneHtml}`,
-      });
-      for (const child of node.children) {
-        if (child.type !== "SCENE") walk(child);
-      }
-    } else if (node.type === "CHAPTER") {
-      const sceneHtml = collectSceneHtml(node);
-      chapters.push({
-        title: node.title,
-        content: `<h2>${escapeHtml(node.title)}</h2>${sceneHtml}`,
-      });
-    } else if (node.type === "SCENE" && !isEmptyContent(node.content)) {
-      // Top-level scene (no parent chapter)
-      chapters.push({
-        title: node.title,
-        content: stripBeats(node.content!),
-      });
-    }
-  }
-
-  for (const node of outline) walk(node);
-  return chapters;
-}
 
 export async function GET(
   request: NextRequest,
