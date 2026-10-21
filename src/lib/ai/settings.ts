@@ -8,8 +8,10 @@ export interface AiProviderConfig {
   model: string;
 }
 
-export type CoachingStyle = "gentle" | "balanced" | "direct";
-export type ResponseLength = "concise" | "moderate" | "detailed";
+export const COACHING_STYLES = ["gentle", "balanced", "direct"] as const;
+export const RESPONSE_LENGTHS = ["concise", "moderate", "detailed"] as const;
+export type CoachingStyle = (typeof COACHING_STYLES)[number];
+export type ResponseLength = (typeof RESPONSE_LENGTHS)[number];
 
 export interface AiPreferences {
   customInstructions: string;

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getCurrentUserId } from "@/lib/api-auth";
-import type { CoachingStyle, ResponseLength } from "@/lib/ai/settings";
+import { COACHING_STYLES, RESPONSE_LENGTHS } from "@/lib/ai/settings";
 
 // Numeric bounds match the inputs on the settings page. chatWindowSize and
 // messagesUntilCompression size the chat route's history query and prompt.
@@ -12,8 +12,8 @@ const AiSettingsUpdateSchema = z.object({
   apiKey: z.string().max(500).optional(),
   model: z.string().max(200).optional(),
   customInstructions: z.string().optional(),
-  coachingStyle: z.enum(["gentle", "balanced", "direct"] satisfies CoachingStyle[]).optional(),
-  responseLength: z.enum(["concise", "moderate", "detailed"] satisfies ResponseLength[]).optional(),
+  coachingStyle: z.enum(COACHING_STYLES).optional(),
+  responseLength: z.enum(RESPONSE_LENGTHS).optional(),
   chatWindowSize: z.number().int().min(3).max(20).optional(),
   messagesUntilCompression: z.number().int().min(5).max(50).optional(),
   compressionModel: z.string().max(200).optional(),
