@@ -72,10 +72,10 @@ Open [http://localhost:3000](http://localhost:3000).
 | `DATABASE_URL` | **Yes** | PostgreSQL connection string (Supabase or local PG); production requires `sslmode=require&uselibpqcompat=true` (see `.env.example`) |
 | `GEMINI_API_KEY` | For AI chat | Google AI API key (can also configure in Settings UI) |
 | `AI_MODEL` | No | Gemini model name (default: `gemini-2.0-flash-001`) |
-| `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |
+| `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID; also satisfies the production auth requirement (see `API_TOKEN`) |
 | `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |
-| `API_TOKEN` | Recommended | Bearer token for API/MCP access (32-byte hex) |
+| `API_TOKEN` | Recommended | Bearer token for API/MCP access (32-byte hex); production refuses to start unless `API_TOKEN` or `GOOGLE_CLIENT_ID` is set |
 | `JWT_SECRET` | No | JWT signing secret for Google OAuth sessions |
 | `ENCRYPTION_KEY` | No | Key for encrypting API keys at rest |
 | `ALLOWED_EMAILS` | No | Comma-separated list of allowed Google accounts |

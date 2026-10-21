@@ -164,13 +164,13 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 | Variable | Purpose | Required |
 |----------|---------|----------|
 | `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543); production requires `sslmode=require&uselibpqcompat=true` | Yes |
-| `GOOGLE_CLIENT_ID` | OAuth for Docs export | No |
+| `GOOGLE_CLIENT_ID` | OAuth for Docs export | No (production requires it unless `API_TOKEN` is set) |
 | `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback | No |
 | `GEMINI_API_KEY` | Google AI (Gemini) API key | No (configure in Settings UI) |
 | `AI_MODEL` | Gemini model name (default: `gemini-2.0-flash-001`) | No |
 | `ALLOWED_EMAILS` | Access control (comma-separated) | No |
-| `API_TOKEN` | Request authentication (32-byte hex) | Recommended |
+| `API_TOKEN` | Request authentication (32-byte hex) | Recommended (production requires it unless `GOOGLE_CLIENT_ID` is set) |
 | `JWT_SECRET` | OAuth session signing | No |
 | `ENCRYPTION_KEY` | Data-at-rest encryption | No |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Error tracking | No |

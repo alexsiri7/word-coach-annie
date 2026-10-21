@@ -56,6 +56,7 @@ COPY --from=builder /app/.skills ./.skills
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/scripts/sql-tokenizer.mjs ./scripts/sql-tokenizer.mjs
 COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-security.mjs
+COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
 
 USER nextjs

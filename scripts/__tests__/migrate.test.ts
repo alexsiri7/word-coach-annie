@@ -154,6 +154,42 @@ describe('migrate.mjs — production TLS gate', () => {
   });
 });
 
+describe('migrate.mjs — production auth gate', () => {
+  function runWithoutAuth(overrides: NodeJS.ProcessEnv) {
+    const env: NodeJS.ProcessEnv = { ...process.env, ...overrides };
+    for (const key of ['DATABASE_URL', 'REDIS_URL', 'API_TOKEN', 'GOOGLE_CLIENT_ID']) {
+      if (!(key in overrides)) delete env[key];
+    }
+    return spawnSync('node', [MIGRATE_SCRIPT], { env, encoding: 'utf-8' });
+  }
+
+  it('refuses to start in production when no auth is configured', () => {
+    const result = runWithoutAuth({ NODE_ENV: 'production' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Startup refused');
+    expect(result.stderr).toContain('API_TOKEN');
+    expect(result.stderr).not.toContain('skipping migrations');
+  });
+
+  it.each([
+    ['API_TOKEN', { API_TOKEN: 'tok' }],
+    ['GOOGLE_CLIENT_ID', { GOOGLE_CLIENT_ID: 'id.apps.googleusercontent.com' }],
+  ])('starts in production when %s is set', (_, auth) => {
+    const result = runWithoutAuth({ NODE_ENV: 'production', ...auth });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('Startup refused');
+  });
+
+  it('starts outside production without auth (local dev mode)', () => {
+    const result = runWithoutAuth({ NODE_ENV: 'development' });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('Startup refused');
+  });
+});
+
 // The runner stage copies scripts one by one; a module migrate.mjs imports but
 // the image lacks crashes the container before the server starts.
 describe('Dockerfile ships every module migrate.mjs imports', () => {
@@ -164,6 +200,7 @@ describe('Dockerfile ships every module migrate.mjs imports', () => {
 
   it('finds the local imports', () => {
     expect(imports).toContain('transport-security.mjs');
+    expect(imports).toContain('auth-configuration.mjs');
   });
 
   it.each(imports)('copies %s', (file) => {
