@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="text-sm text-text-muted mb-8">
-          Last updated: April 2026
+          Last updated: October 2026
         </p>
 
         <div className="space-y-8 text-sm text-text-secondary leading-relaxed">
@@ -47,8 +47,8 @@ export default function PrivacyPage() {
               What we store
             </h2>
             <p>
-              Your data is stored in a private SQLite database on the server that
-              hosts your instance. This includes:
+              Your data is stored in a PostgreSQL database on the server that hosts
+              your instance. This includes:
             </p>
             <ul className="list-disc pl-6 space-y-1">
               <li>Your account information (email address, display name)</li>
@@ -64,13 +64,17 @@ export default function PrivacyPage() {
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-text-primary">
-              No AI training on your work
+              AI-assisted features
             </h2>
             <p>
-              Your manuscripts and creative content are never used to train AI
-              models. If you use Annie&apos;s optional AI-assisted features (such as
-              brainstorming prompts), your content is sent to the AI provider only
-              for that specific request and is not retained for training purposes.
+              When you use Annie&apos;s AI-assisted features (chat, brainstorming,
+              peer review), the relevant text is sent to Google&apos;s Gemini API to
+              generate a response. For chat, this is the content you&apos;re
+              discussing; for peer review, it&apos;s up to the first 50,000
+              characters of your manuscript. This content is not used to train
+              Annie. Whether Google itself may use that content to improve its own
+              products depends on the type of API key your instance is configured
+              with — see Google&apos;s current Gemini API terms for details.
             </p>
           </section>
 
@@ -79,9 +83,9 @@ export default function PrivacyPage() {
               Data sharing
             </h2>
             <p>
-              We do not sell, share, or distribute your personal data or creative
-              work to third parties. The only external services that may receive
-              data are:
+              We do not sell your personal data or creative work. Data is shared
+              with external services only as needed to provide the features you
+              use:
             </p>
             <ul className="list-disc pl-6 space-y-1">
               <li>
@@ -89,10 +93,35 @@ export default function PrivacyPage() {
                 authentication
               </li>
               <li>
-                <strong>Sentry</strong> — anonymous error reports to help us fix
-                bugs (no manuscript content is included)
+                <strong>Google Gemini</strong> — the content you send to AI-assisted
+                features (see above)
+              </li>
+              <li>
+                <strong>GitHub</strong> — if you submit feedback or report content,
+                the report is filed as an issue in the tracker your instance&apos;s
+                administrator has configured (which may include a screenshot you
+                attach)
+              </li>
+              <li>
+                <strong>Google Docs</strong> and <strong>Hashnode</strong> — only
+                when you explicitly connect an account and export to them
+              </li>
+              <li>
+                <strong>Google Fonts</strong> — font files are loaded from Google&apos;s
+                servers on every page
+              </li>
+              <li>
+                <strong>Sentry</strong> — error reports tagged with your internal
+                account ID (not your email) to help us fix bugs; manuscript content
+                is scrubbed before sending. Session replay, if enabled, requires
+                your separate consent in Settings
               </li>
             </ul>
+            <p>
+              If your instance has telemetry enabled, trace data (tool usage,
+              timings — not manuscript content) is sent to a tracing service that
+              your administrator runs themselves, not a third party.
+            </p>
           </section>
 
           <section className="space-y-3">
@@ -106,17 +135,24 @@ export default function PrivacyPage() {
             <p>
               To delete your entire account and all associated data, go to{" "}
               <Link href="/settings" className="text-accent hover:underline">Settings → Privacy & Data → Delete account</Link>.
-              All data is removed immediately and permanently.
+              Your projects, universes, and connected-service credentials are
+              removed from the database immediately. Any offline copy of your
+              projects stored in your browser is not cleared automatically — clear
+              your browser storage for this site if you&apos;d like to remove it.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-text-primary">
-              Cookies
+              Cookies and local storage
             </h2>
             <p>
-              We use a single session cookie to keep you signed in. We do not use
-              tracking cookies or third-party analytics.
+              We use a session cookie and a longer-lived refresh cookie to keep you
+              signed in, plus short-lived cookies during the Google/Hashnode OAuth
+              connection flow. We do not use tracking cookies or third-party
+              analytics. The app also stores a few preference flags and, for
+              offline use, a local copy of your projects in your browser&apos;s
+              storage (IndexedDB) — this data stays on your device.
             </p>
           </section>
 
