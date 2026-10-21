@@ -1,16 +1,17 @@
 import type { Opportunity, Provider, WritingTask } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { serializeGoogleDocExport, serializeRelationship } from "@/lib/export-json";
 
 // Account data for the GDPR export only. Kept out of exportProjectJson, whose
 // output also feeds the single-project download, export-all and import — share
 // rows carry other people's email addresses and don't belong in those.
 
-export async function exportProjectAccountData(projectId: string) {
+export async function exportProjectAccountData(project: { id: string; universeId: string | null }) {
+  const projectId = project.id;
   const [
-    project, shares, peerReviews, writingTasks,
+    shares, peerReviews, writingTasks,
     contestSubmissions, publicationSubmissions, opportunityCandidates,
   ] = await Promise.all([
-    prisma.project.findUnique({ where: { id: projectId }, select: { universeId: true } }),
     prisma.projectShare.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
     prisma.peerReview.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
     prisma.writingTask.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
@@ -18,7 +19,6 @@ export async function exportProjectAccountData(projectId: string) {
     prisma.publicationSubmission.findMany({ where: { projectId }, orderBy: { submissionDate: "asc" } }),
     prisma.opportunityCandidate.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
   ]);
-  if (!project) throw new Error(`Project not found: ${projectId}`);
 
   return {
     universeId: project.universeId,
@@ -117,25 +117,11 @@ export async function exportUniverseJson(universeId: string) {
       })),
     })),
     relationships: relationships.map((r) => ({
-      id: r.id,
-      type: r.type,
-      label: r.label,
-      fromNodeId: r.fromNodeId,
-      fromObjectId: r.fromObjectId,
+      ...serializeRelationship(r),
       fromWorldObjectId: r.fromWorldObjectId,
-      toNodeId: r.toNodeId,
-      toObjectId: r.toObjectId,
       toWorldObjectId: r.toWorldObjectId,
-      createdAt: r.createdAt.toISOString(),
     })),
-    googleDocExports: googleDocExports.map((e) => ({
-      id: e.id,
-      exportMode: e.exportMode,
-      googleDocId: e.googleDocId,
-      googleDocUrl: e.googleDocUrl,
-      lastSyncedAt: e.lastSyncedAt.toISOString(),
-      createdAt: e.createdAt.toISOString(),
-    })),
+    googleDocExports: googleDocExports.map(serializeGoogleDocExport),
   };
 }
 

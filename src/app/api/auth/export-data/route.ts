@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const [projects, universes, providers, opportunities, practiceTasks, aiSettings, consents] = await Promise.all([
       prisma.project.findMany({
         where: ownedBy,
-        select: { id: true, title: true },
+        select: { id: true, title: true, universeId: true },
         orderBy: { title: "asc" },
       }),
       prisma.universe.findMany({
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       for (const project of projects) {
         const data = {
           ...(await exportProjectJson(project.id)),
-          ...(await exportProjectAccountData(project.id)),
+          ...(await exportProjectAccountData(project)),
         };
         archive.append(JSON.stringify(data, null, 2), {
           name: `projects/${safeFilename(project.title)}-${project.id}.json`,

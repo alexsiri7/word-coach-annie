@@ -11,7 +11,8 @@ vi.mock("@/lib/api-auth", () => ({
 vi.mock("@/lib/auth", () => ({
   isGoogleAuthMode: vi.fn(() => true),
 }));
-vi.mock("@/lib/export-json", () => ({
+vi.mock("@/lib/export-json", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/export-json")>()),
   exportProjectJson: vi.fn(async (id: string) => ({
     exportVersion: 1,
     project: { id, title: "Test" },

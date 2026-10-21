@@ -1,3 +1,4 @@
+import type { GoogleDocExport, Relationship } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export async function exportProjectJson(projectId: string) {
@@ -129,16 +130,7 @@ export async function exportProjectJson(projectId: string) {
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     })),
-    relationships: projectRelationships.map((r) => ({
-      id: r.id,
-      type: r.type,
-      label: r.label,
-      fromNodeId: r.fromNodeId,
-      fromObjectId: r.fromObjectId,
-      toNodeId: r.toNodeId,
-      toObjectId: r.toObjectId,
-      createdAt: r.createdAt.toISOString(),
-    })),
+    relationships: projectRelationships.map(serializeRelationship),
     chatHistory: chatMessages.map((m) => ({
       id: m.id,
       role: m.role,
@@ -163,14 +155,7 @@ export async function exportProjectJson(projectId: string) {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     })),
-    googleDocExports: googleDocExports.map((e) => ({
-      id: e.id,
-      exportMode: e.exportMode,
-      googleDocId: e.googleDocId,
-      googleDocUrl: e.googleDocUrl,
-      lastSyncedAt: e.lastSyncedAt.toISOString(),
-      createdAt: e.createdAt.toISOString(),
-    })),
+    googleDocExports: googleDocExports.map(serializeGoogleDocExport),
     hashnodeExports: hashnodeExports.map((e) => ({
       id: e.id,
       nodeId: e.nodeId,
@@ -182,5 +167,29 @@ export async function exportProjectJson(projectId: string) {
       updatedAt: e.updatedAt.toISOString(),
       // credentialId intentionally excluded — points to raw OAuth token, metadata-only export
     })),
+  };
+}
+
+export function serializeRelationship(r: Relationship) {
+  return {
+    id: r.id,
+    type: r.type,
+    label: r.label,
+    fromNodeId: r.fromNodeId,
+    fromObjectId: r.fromObjectId,
+    toNodeId: r.toNodeId,
+    toObjectId: r.toObjectId,
+    createdAt: r.createdAt.toISOString(),
+  };
+}
+
+export function serializeGoogleDocExport(e: GoogleDocExport) {
+  return {
+    id: e.id,
+    exportMode: e.exportMode,
+    googleDocId: e.googleDocId,
+    googleDocUrl: e.googleDocUrl,
+    lastSyncedAt: e.lastSyncedAt.toISOString(),
+    createdAt: e.createdAt.toISOString(),
   };
 }
