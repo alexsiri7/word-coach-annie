@@ -1,4 +1,8 @@
-import { filterAuditVulnerabilities } from '../audit-filter.mjs';
+import { spawnSync } from 'child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { filterAuditVulnerabilities, findStaleAllowlistEntries } from '../audit-filter.mjs';
 
 describe('filterAuditVulnerabilities()', () => {
   it('flags moderate vulnerabilities not in the allowlist', () => {
@@ -124,5 +128,72 @@ describe('filterAuditVulnerabilities()', () => {
     };
     const novel = filterAuditVulnerabilities(audit, ['111', '333']);
     expect(novel).toEqual(['222']);
+  });
+});
+
+describe('findStaleAllowlistEntries()', () => {
+  const audit = {
+    vulnerabilities: {
+      'pkg-a': { via: [{ url: 'https://github.com/advisories/GHSA-mod', severity: 'moderate' }] },
+      'pkg-b': { via: [{ url: 'https://github.com/advisories/GHSA-low', severity: 'low' }] },
+    },
+  };
+
+  it('returns allowlisted advisories absent from the report', () => {
+    expect(findStaleAllowlistEntries(audit, ['GHSA-mod', 'GHSA-gone'])).toEqual(['GHSA-gone']);
+  });
+
+  it('does not return an advisory still reported at moderate', () => {
+    expect(findStaleAllowlistEntries(audit, ['GHSA-mod'])).toEqual([]);
+  });
+
+  it('does not return an advisory still reported below moderate', () => {
+    expect(findStaleAllowlistEntries(audit, ['GHSA-low'])).toEqual([]);
+  });
+
+  it('returns nothing for an empty allowlist', () => {
+    expect(findStaleAllowlistEntries(audit, [])).toEqual([]);
+  });
+});
+
+describe('audit-filter CLI', () => {
+  const SCRIPT = join(__dirname, '../audit-filter.mjs');
+  const AUDIT = JSON.stringify({
+    vulnerabilities: {
+      'pkg-a': { via: [{ url: 'https://github.com/advisories/GHSA-live', severity: 'high' }] },
+    },
+  });
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'audit-filter-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function runFilter(allowlist: string[], input: string) {
+    const allowlistPath = join(dir, 'allowlist');
+    writeFileSync(allowlistPath, ['# comment', ...allowlist].join('\n') + '\n');
+    return spawnSync('node', [SCRIPT, allowlistPath], { input, encoding: 'utf-8' });
+  }
+
+  it('fails and names allowlist entries npm audit no longer reports', () => {
+    const result = runFilter(['GHSA-live', 'GHSA-gone'], AUDIT);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('GHSA-gone');
+    expect(result.stderr).not.toContain('GHSA-live');
+  });
+
+  it('fails when npm audit returns an error instead of a report', () => {
+    const result = runFilter(['GHSA-live'], JSON.stringify({ message: 'x', error: {} }));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('did not return a vulnerability report');
+  });
+
+  it('passes when the allowlist matches the report', () => {
+    const result = runFilter(['GHSA-live'], AUDIT);
+    expect(result.status).toBe(0);
   });
 });
