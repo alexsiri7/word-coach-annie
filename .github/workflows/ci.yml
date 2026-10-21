@@ -40,7 +40,7 @@ jobs:
 
       - name: Audit
         run: ./scripts/gates.sh audit
-        # Fails only on advisories not in .audit-allowlist — known @google/adk transitive vulns are allowlisted
+        # Fails on moderate+ advisories not in .audit-allowlist, on allowlist entries npm audit no longer reports, and when npm audit returns no report
 
   test:
     name: Test

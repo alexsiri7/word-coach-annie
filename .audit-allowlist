@@ -1,142 +1,17 @@
 # Vulnerability Allowlist
 #
 # Format: one GHSA ID per line. Lines starting with '#' are comments and are ignored.
-# Run: npm audit --json | node scripts/audit-filter.mjs
+# Run: npm audit --json | node scripts/audit-filter.mjs .audit-allowlist
 #
 # QUARTERLY REVIEW: Each entry should be re-evaluated when:
 #   1. The source dependency ships a new major version
 #   2. The vulnerability CVSS score changes
 #   3. The app's exposure changes (e.g. network-accessible deployment)
 #
-# To check for stale entries: compare this list against `npm audit --json`
-# and remove any GHSAs that no longer appear in audit output.
+# Stale entries: scripts/audit-filter.mjs fails the gate on any entry that
+# `npm audit` no longer reports. Delete such entries rather than keeping them.
 #
-# Last reviewed: 2026-08-16
-#
-# Source: tar (via node-gyp -> sqlite3 -> @google/adk transitive chain)
-# Justification: tar is a transitive dependency of @google/adk via sqlite3/node-gyp.
-# Upgrade path: requires @google/adk to drop sqlite3 dependency (breaking major).
-# App risk: MEDIUM — tar is invoked only during npm install (build time), not at runtime.
-# The app does not unpack untrusted archives at runtime.
-GHSA-34x7-hfp2-rc4v
-GHSA-8qq5-rm4j-mr97
-GHSA-83g3-92jg-28cx
-GHSA-qffp-2rhf-9h96
-GHSA-9ppj-qmqm-q256
-GHSA-vmf3-w455-68vh
-GHSA-r6q2-hw4h-h46w
-#
-# Source: protobufjs (via @google/genai -> @grpc/proto-loader transitive chain)
-# Justification: protobufjs is pulled in by @google/genai. The vulnerabilities
-# (code injection, DoS) require an attacker to supply crafted .proto files or JSON
-# descriptors. This app does not load user-supplied protobuf definitions at runtime.
-# Upgrade path: blocked by @google/adk@^1.1.0 transitive dependency.
-# App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
-GHSA-xq3m-2v4x-88gg
-GHSA-66ff-xgx4-vchm
-GHSA-75px-5xx7-5xc7
-GHSA-jvwf-75h9-cwgg
-GHSA-685m-2w69-288q
-#
-# Source: @babel/plugin-transform-modules-systemjs (transitive)
-# Justification: transitive build-time dependency. The vulnerability requires
-# compiling malicious source code — not possible in this app's build pipeline.
-# Upgrade path: auto-fixable but requires verifying no build regression.
-# App risk: LOW — only invoked during `next build`, not at runtime.
-GHSA-fv7c-fp4j-7gwp
-#
-# Source: @mikro-orm/knex SQL injection via runtime-controlled identifiers
-# Justification: @mikro-orm/knex is a transitive dep via @google/adk -> @mikro-orm/postgresql
-# (and other @mikro-orm/* adapters). The SQL injection requires runtime-controlled
-# identifier values (table/column names), which this app does not pass from user input.
-# This app uses Prisma's typed query builder exclusively for its own queries.
-# Upgrade path: auto-fixable within semver. Consider running `npm audit fix`.
-# App risk: LOW — attack vector requires controlling schema identifiers, not data values.
-GHSA-cfw5-68c4-ffqp
-#
-# Source: fast-uri path traversal and host confusion vulnerabilities
-# Justification: fast-uri is a transitive dep (via various packages). Path traversal
-# requires the app to use fast-uri to process user-controlled URI strings for file access.
-# This app does not use fast-uri directly; it's an indirect dep of build tooling.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no direct usage; build-tooling context only.
-GHSA-q3j6-qgpj-74h6
-GHSA-v39h-62p7-jpjc
-#
-# Source: fast-xml-builder attribute value escaping
-# Justification: fast-xml-builder attribute escaping is a transitive dep via google-cloud libs.
-# This app does not generate XML documents from user input.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no XML generation in app code.
-GHSA-5wm8-gmm8-39j9
-#
-# Source: hono (via @modelcontextprotocol/sdk and prisma transitive chain)
-# Justification: hono vulnerabilities (routing bypass, JSX injection, JWT, etc.) are
-# transitive via @modelcontextprotocol/sdk and prisma. This app does not use hono
-# directly for request routing — Next.js is the HTTP layer. The MCP SDK's internal
-# use of hono is sandboxed to the MCP transport layer.
-# Upgrade path: auto-fixable for hono. Consider running `npm audit fix`.
-# App risk: LOW-MEDIUM — only the MCP endpoint is exposed, which requires local access.
-GHSA-92pp-h63x-v22m
-GHSA-458j-xx4x-4375
-GHSA-qp7p-654g-cw7p
-GHSA-p77w-8qqv-26rm
-GHSA-9vqf-7f2p-gf9v
-GHSA-69xw-7hcm-h432
-GHSA-xrhx-7g5j-rcj5
-GHSA-3hrh-pfw6-9m5x
-GHSA-f577-qrjj-4474
-GHSA-2gcr-mfcq-wcc3
-#
-# Source: protobufjs / @protobufjs/utf8 (via @google/genai transitive chain)
-# Justification: protobufjs is pulled in by @google/genai. These entries cover
-# @protobufjs/utf8 UTF-8 codec vulnerabilities (distinct from the proto-loader entries
-# above). The vulnerabilities (code injection, DoS) require an attacker to supply
-# crafted .proto files or JSON descriptors. This app does not load user-supplied
-# protobuf definitions at runtime.
-# Upgrade path: blocked by @google/adk@^1.1.0 transitive dependency.
-# App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
-GHSA-q6x5-8v7m-xcrf
-GHSA-2pr8-phx7-x9h3
-GHSA-fx83-v9x8-x52w
-GHSA-jggg-4jg4-v7c6
-#
-# Source: brace-expansion (via workbox-build and tooling transitive chain)
-# Justification: brace-expansion large numeric range DoS requires passing attacker-
-# controlled strings to brace-expansion's expand() function. workbox-build uses this
-# only at build time for file globbing with developer-controlled patterns.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — build-time only, no runtime exposure.
-GHSA-jxxr-4gwj-5jf2
-#
-# Source: fast-xml-parser (via @google-cloud/storage -> @google/adk transitive chain)
-# Justification: fast-xml-parser XML injection is transitive via @google-cloud/storage.
-# This app does not parse user-supplied XML via this library.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — library is used internally by Google Cloud storage SDK only.
-GHSA-gh4j-gqv2-49f6
-#
-# Source: ip-address (via socks -> node-gyp -> @google/adk transitive chain)
-# Justification: ip-address XSS in Address6 HTML-emitting methods. This app does not
-# use ip-address HTML methods directly. Only triggered if rendering IPv6 addresses as HTML.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no user-facing IPv6 address rendering.
-GHSA-v2v4-37r5-5v8g
-#
-# Source: postcss (via next.js tooling transitive chain)
-# Justification: postcss XSS is via unescaped </style> in CSS stringify output.
-# Exploitable only if the app uses postcss to process user-supplied CSS at runtime.
-# This app uses postcss only at build time (Tailwind compilation).
-# Upgrade path: fix available via next semver-major upgrade (blocked by migration cost).
-# App risk: LOW — build-time only; no runtime CSS processing of user input.
-GHSA-qx2v-qp2m-jg93
-#
-# Source: qs (via express -> @google/adk transitive chain)
-# Justification: qs DoS requires calling qs.stringify() with comma-format arrays and
-# encodeValuesOnly=true on attacker-controlled input. This app does not use qs directly.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no direct qs usage; transitive via @google/adk.
-GHSA-q8mj-m7cp-5q26
+# Last reviewed: 2026-10-21
 #
 # Source: uuid (via gaxios -> @google/adk transitive chain)
 # Justification: uuid buffer bounds check missing in v3/v5/v6 when caller passes a buf
@@ -144,31 +19,6 @@ GHSA-q8mj-m7cp-5q26
 # Upgrade path: blocked by @google/adk major version pin.
 # App risk: LOW — vulnerability requires using the uuid API in an atypical way.
 GHSA-w5hq-g745-h8pq
-#
-# Source: ws (via @google/genai -> @google/adk transitive chain)
-# Justification: ws uninitialized memory disclosure is a transitive dep via @google/genai.
-# This app uses WebSockets only for Next.js HMR (dev) — the ws version in prod is not
-# the vulnerable transitive copy.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — the vulnerable ws copy is deep in the @google/adk transitive tree.
-GHSA-58qx-3vcg-4xpx
-#
-# Source: esbuild (Deno-only binary integrity issue — not exploitable in Node.js/Next.js)
-# Justification: esbuild vulnerability is specific to Deno module binary integrity
-# verification. This app runs on Node.js/Next.js and does not use Deno.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: NONE — Deno-only attack vector; not applicable to Node.js runtime.
-GHSA-gv7w-rqvm-qjhr
-#
-# Source: @grpc/grpc-js (via @google/genai -> @google/adk transitive chain)
-# Justification: @grpc/grpc-js DoS vulnerabilities (malformed request/compressed message)
-# require a gRPC server to be exposed to attackers. This app is a Next.js HTTP server —
-# it does not expose any gRPC endpoints. @grpc/grpc-js is used only as a client
-# internally by the @google/adk and @google/genai SDKs for communicating with Google APIs.
-# Upgrade path: 1.14.4 available but blocked by @google/adk major version pin.
-# App risk: LOW — no exposed gRPC server; only used as gRPC client in transitive SDK code.
-GHSA-5375-pq7m-f5r2
-GHSA-99f4-grh7-6pcq
 #
 # Source: @opentelemetry/core (via @sentry/nextjs -> @opentelemetry/* transitive chain)
 # Justification: @opentelemetry/core unbounded memory allocation in W3C Baggage propagation
@@ -181,75 +31,14 @@ GHSA-99f4-grh7-6pcq
 GHSA-8988-4f7v-96qf
 #
 # Source: @hono/node-server (transitive via @modelcontextprotocol/sdk)
-# Justification: Path traversal via encoded backslash is Windows-only. This app runs on
-# Linux in Docker. No Windows deployment.
+# Justification: Path traversal via encoded backslash in serve-static, which is
+# Windows-only. This app runs on Linux in Docker, and it never runs serve-static:
+# /api/mcp is an internet-facing Next.js API route, guarded by the auth in
+# src/middleware.ts, that uses the SDK's WebStandardStreamableHTTPServerTransport
+# rather than @hono/node-server.
 # Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: NONE — Windows-only attack vector; app runs on Linux.
+# App risk: NONE — vulnerable code path is never run, and is Windows-only.
 GHSA-frvp-7c67-39w9
-#
-# Source: @opentelemetry/propagator-jaeger (via @sentry/nextjs transitive chain)
-# Justification: DoS via unhandled exception on malformed Jaeger header. Requires
-# sending crafted HTTP headers to the Sentry-instrumented endpoint. Low impact in practice.
-# Upgrade path: blocked by @sentry/nextjs version pin.
-# App risk: LOW — requires targeted header manipulation; Sentry telemetry layer only.
-GHSA-45rx-2jwx-cxfr
-#
-# Source: brace-expansion (via workbox-build and tooling transitive chain — new CVEs)
-# Justification: DoS via exponential/unbounded expansion requires passing attacker-
-# controlled strings to expand(). workbox-build uses this only at build time with
-# developer-controlled glob patterns. No runtime exposure.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — build-time only, no runtime exposure.
-GHSA-3jxr-9vmj-r5cp
-GHSA-mh99-v99m-4gvg
-GHSA-rgw5-rvv9-x895
-#
-# Source: dompurify (transitive via various packages)
-# Justification: XSS via IN_PLACE hook removal. This app does not use DOMPurify's
-# in-place sanitization hooks. Any DOMPurify usage is through standard sanitize() calls.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — the vulnerable hook API is not used by this app.
-GHSA-55q2-fjhq-7xh7
-#
-# Source: fast-uri (additional host confusion CVEs beyond previously allowlisted entries)
-# Justification: Host confusion via backslash authority delimiters and failed IDN
-# canonicalization. fast-uri is a transitive dep of build tooling; this app does not
-# process user-controlled URIs via fast-uri at runtime.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no direct usage; build-tooling context only.
-GHSA-v2hh-gcrm-f6hx
-GHSA-7p8r-x3mc-p8w7
-GHSA-4c8g-83qw-93j6
-#
-# Source: hono (additional CVEs via @modelcontextprotocol/sdk transitive chain)
-# Justification: Various hono issues (header de-duplication, JSX context isolation,
-# XSS in cx(), CORS ReDoS, memo SSR cross-request, language middleware DoS). This app
-# does not use hono directly. The MCP SDK's internal hono use is sandboxed to the MCP
-# transport layer accessible only locally.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — only the MCP endpoint is exposed, which requires local access.
-GHSA-xgm2-5f3f-mvvc
-GHSA-hvrm-45r6-mjfj
-GHSA-w62v-xxxg-mg59
-GHSA-8j4g-w8fx-2239
-GHSA-f23p-vx2j-j53r
-GHSA-54fx-42gc-7vw4
-# 2026-09-09: toSSG() path escape (unused — no static site generation), parseBody()
-# dot-notation nesting memory exhaustion, and query-parser URL-fragment differential.
-# Same exposure as above: hono only serves the locally-reachable MCP transport.
-GHSA-gqvv-2mrq-wpjv
-GHSA-g6gw-c38x-mqfc
-GHSA-crvj-82cr-hjcx
-#
-# Source: ip-address (additional SSRF/trust-boundary CVEs beyond GHSA-v2v4-37r5-5v8g)
-# Justification: SSRF bypass via octal/CIDR/IPv4-mapped address misclassification.
-# ip-address is transitive via socks/node-gyp. This app does not perform IP address
-# classification for SSRF or trust-boundary checks.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no SSRF filtering or trust boundary based on IP address parsing.
-GHSA-mwp4-54f8-5fhr
-GHSA-4xrf-jv44-h6hh
-GHSA-22jq-vg5j-6vgg
 #
 # Source: js-yaml (via various transitive chains)
 # Justification: Quadratic CPU DoS via merge-key chains and !!omap resolution.
@@ -262,94 +51,12 @@ GHSA-5p4m-2wfm-xmqj
 # Same exposure: js-yaml is transitive via @google/adk; no attacker-controlled YAML is parsed.
 GHSA-2883-xcg3-v3hh
 #
-# Source: nanoid (via various transitive chains)
-# Justification: Non-secure generators loop indefinitely with negative/zero size.
-# Requires calling nanoid() with a custom generator that returns negative/zero sizes.
-# This app uses nanoid() with default parameters only.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — default nanoid() usage only; no custom size arguments.
-GHSA-28wg-ghj8-5hjv
-GHSA-2v37-7h3g-55p8
-#
-# Source: next (via direct dependency — new CVEs since last review)
-# Justification: Multiple Next.js CVEs (Turbopack middleware bypass, Server Actions DoS/SSRF,
-# cache confusion, Edge runtime payload, image optimization DoS, internal endpoint disclosure).
-# These require specific configurations (Turbopack, single locale, custom servers, etc.)
-# or require attackers to reach specific endpoints.
-# Upgrade path: upgrade Next.js to latest patch version. Evaluate before next quarterly review.
-# App risk: MEDIUM — Next.js is the primary HTTP layer; some CVEs may be directly applicable.
-# Mitigated by: app runs behind authentication for most routes; image optimization is
-# limited to trusted sources; Server Actions are used with authenticated session checks.
-GHSA-6gpp-xcg3-4w24
-GHSA-m99w-x7hq-7vfj
-GHSA-89xv-2m56-2m9x
-GHSA-68g3-v927-f742
-GHSA-4633-3j49-mh5q
-GHSA-4c39-4ccg-62r3
-GHSA-p9j2-gv94-2wf4
-GHSA-q8wf-6r8g-63ch
-GHSA-955p-x3mx-jcvp
-#
-# Source: postcss (additional CVEs — arbitrary file read via sourceMappingURL)
-# Justification: Arbitrary .map file read via attacker-controlled sourceMappingURL in CSS.
-# This app uses postcss only at build time (Tailwind compilation) with developer-controlled
-# CSS. No runtime CSS processing of user-supplied content.
-# Upgrade path: blocked by Next.js version pin. Evaluate with Next.js upgrade.
-# App risk: LOW — build-time only; no runtime CSS processing of user input.
-GHSA-6g55-p6wh-862q
-GHSA-fxqj-rqcc-2cmp
-GHSA-r28c-9q8g-f849
-#
 # Source: protobufjs (additional DoS CVE — infinite loop in .proto option parsing)
 # Justification: DoS via infinite loop requires parsing attacker-controlled .proto files.
 # This app does not load user-supplied protobuf definitions at runtime.
 # Upgrade path: blocked by @google/adk transitive dependency.
 # App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
 GHSA-j3f2-48v5-ccww
-#
-# Source: sharp (via direct/transitive dependency — libvips CVEs)
-# Justification: sharp inherited vulnerabilities via libvips (CVE-2026-33327, CVE-2026-33328,
-# CVE-2026-35590, CVE-2026-35591). These affect image processing of untrusted images.
-# This app uses sharp for image optimization but only processes user-uploaded images from
-# authenticated users, not arbitrary external images.
-# Upgrade path: upgrade sharp to latest version. Evaluate before next quarterly review.
-# App risk: MEDIUM — processes user images, but limited to authenticated users only.
-GHSA-f88m-g3jw-g9cj
-#
-# Source: tar (additional CVEs beyond previously allowlisted entries)
-# Justification: Additional tar vulnerabilities (PAX path type confusion, decompression DoS,
-# negative size infinite loop, NUL byte DoS, recursion stack-overflow DoS).
-# tar is a transitive dependency via @google/adk (sqlite3/node-gyp). Not used at runtime
-# for untrusted archive extraction.
-# Upgrade path: requires @google/adk to drop sqlite3 dependency (breaking major).
-# App risk: MEDIUM — tar is invoked only during npm install (build time), not at runtime.
-GHSA-w8wr-v893-vjvp
-GHSA-23hp-3jrh-7fpw
-GHSA-8x88-c5mf-7j5w
-GHSA-gvwx-54wh-qm9j
-GHSA-r292-9mhp-454m
-#
-# Source: undici (via node built-in fetch / Next.js transitive chain)
-# Justification: Various undici vulnerabilities (retry desync, cache directive parse crash,
-# CRLF injection via blob type, cache-control cross-user disclosure, cookie attribute injection).
-# undici is the underlying HTTP client for Node.js built-in fetch. The CRLF/cookie injection
-# requires this app to make outbound requests with attacker-controlled blob types or cookie
-# domains, which it does not do.
-# Upgrade path: tied to Node.js version. Update Node.js to include patched undici.
-# App risk: LOW — no user-controlled outbound request parameters via undici.
-GHSA-8xcm-r25x-g524
-GHSA-4cwx-7wf7-3272
-GHSA-m8rv-5g2x-5cg5
-GHSA-jr45-8vmc-qm54
-GHSA-v3r7-h72x-cjcm
-#
-# Source: valibot (transitive via various packages)
-# Justification: record() issue paths cause flatten() to throw for inherited Object
-# property names. Requires using valibot's record() type with property names that are
-# inherited Object properties. This app does not use valibot directly.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — transitive dep; no direct valibot usage in app code.
-GHSA-5qjj-4xww-7phc
 #
 # Source: deepmerge-ts (via @prisma/config transitive chain)
 # Justification: deepmerge-ts stack exhaustion requires merging recursive object graphs
@@ -369,19 +76,6 @@ GHSA-ggr8-5vv4-36mx
 # App risk: LOW — build-time only; no runtime deserialization of untrusted input.
 GHSA-5c6j-r48x-rmvq
 GHSA-qj8w-gfj5-8c6v
-#
-# Source: mariadb (via @google/adk -> @mikro-orm/mariadb transitive chain)
-# Justification: mariadb connector CVEs (SSL MitM credential leak, cleartext transmission,
-# SQL injection via big5/gbk/sjis/cp932/gb18030 charset escaping). These vulnerabilities
-# require establishing a MariaDB database connection. This app uses PostgreSQL exclusively
-# (via Prisma); mariadb is a transitive dep of @google/adk's @mikro-orm/mariadb adapter
-# and is never instantiated or connected to at runtime.
-# Upgrade path: fixed in mariadb >=3.4.6/3.5.x. Blocked by @mikro-orm/mariadb pinning
-# mariadb@3.4.5 exactly — requires upstream @mikro-orm release.
-# App risk: NONE — no MariaDB connections in this app; PostgreSQL only.
-GHSA-cqhc-2h57-wpxf
-GHSA-42r5-vhpq-m858
-GHSA-g5xc-5w98-jfvm
 #
 # Source: braces (via @ducanh2912/next-pwa -> fast-glob -> micromatch transitive chain)
 # Justification: stack-exhaustion DoS requires expanding attacker-controlled, deeply
