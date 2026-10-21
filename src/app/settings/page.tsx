@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2, CalendarClock, Copy, RefreshCw } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { clearClientData } from "@/lib/offline/clear-client-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AiModelSelect } from "@/components/ai-model-select";
@@ -296,6 +297,7 @@ export default function SettingsPage() {
         setDeleteError(data.error || "Deletion failed. Please try again.");
         return;
       }
+      await clearClientData();
       window.location.href = "/";
     } catch (err) {
       console.error("Failed to delete account:", err);
