@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { GoogleDocsApi } from "../google-api";
 import { logger } from "@/lib/logger";
+import { sanitizeInput } from "@/lib/sanitize-server";
 
 export interface CommentSyncResult {
     imported: number;
@@ -130,11 +131,11 @@ export class GoogleDocsCommentSync {
             }
 
             // Format content: include author name and any replies
-            let content = `[${authorName}]: ${comment.content}`;
+            let content = `[${sanitizeInput(authorName)}]: ${sanitizeInput(comment.content)}`;
             if (comment.replies && comment.replies.length > 0) {
                 const replyLines = comment.replies
                     .filter((r) => r.content)
-                    .map((r) => `  ↳ [${r.author?.displayName ?? "Reply"}]: ${r.content}`)
+                    .map((r) => `  ↳ [${sanitizeInput(r.author?.displayName ?? "Reply")}]: ${sanitizeInput(r.content!)}`)
                     .join("\n");
                 if (replyLines) content += "\n" + replyLines;
             }
@@ -146,7 +147,7 @@ export class GoogleDocsCommentSync {
                         nodeId: match.nodeId,
                         content,
                         range: String(match.offset),
-                        selectedText: anchorText.slice(0, 500), // cap length
+                        selectedText: sanitizeInput(anchorText).slice(0, 500), // cap length
                         externalId,
                         resolved: comment.resolved === true,
                         updatedAt: new Date(),

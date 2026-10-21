@@ -95,6 +95,57 @@ describe("GoogleDocsCommentSync", () => {
             expect(updatedExport?.lastCommentSyncAt).not.toBeNull();
         });
 
+        it("strips HTML from imported comment, author, reply and selected text", async () => {
+            const project = await ProjectsController.createProject({ title: "Sanitize Test" });
+            const chapter = await StructureController.createNode({
+                projectId: project.id,
+                type: "CHAPTER",
+                title: "Chapter 1",
+            });
+            const scene = await StructureController.createNode({
+                projectId: project.id,
+                type: "SCENE",
+                title: "Scene 1",
+                parentId: chapter.id,
+            });
+            await prisma.contentVersion.create({
+                data: {
+                    nodeId: scene.id,
+                    content: "Once upon a time, a hero was born.",
+                    wordCount: 8,
+                },
+            });
+            await prisma.googleDocExport.create({
+                data: {
+                    projectId: project.id,
+                    exportMode: "STORY_READER",
+                    googleDocId: "doc-sanitize",
+                    googleDocUrl: "https://docs.google.com/document/d/doc-sanitize/edit",
+                    lastSyncedAt: new Date(),
+                },
+            });
+
+            vi.mocked(GoogleDocsApi.fetchComments).mockResolvedValue([
+                {
+                    id: "comment-html",
+                    content: "Nice <img src=x onerror=alert(1)>line",
+                    quotedFileContent: { value: "a hero was born" },
+                    author: { displayName: "<b>Eve</b>" },
+                    resolved: false,
+                    replies: [{ content: "<script>x</script>ok", author: { displayName: "Bob" } }],
+                },
+            ]);
+
+            const result = await GoogleDocsCommentSync.syncComments(project.id);
+
+            expect(result.imported).toBe(1);
+            const [annotation] = await prisma.annotation.findMany({ where: { nodeId: scene.id } });
+            expect(annotation.content).not.toContain("<");
+            expect(annotation.content).toContain("[Eve]:");
+            expect(annotation.content).toContain("ok");
+            expect(annotation.selectedText).toBe("a hero was born");
+        });
+
         it("skips already-imported comments on second sync", async () => {
             const project = await ProjectsController.createProject({ title: "Dedup Test" });
             const chapter = await StructureController.createNode({
