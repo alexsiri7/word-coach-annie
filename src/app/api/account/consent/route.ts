@@ -5,7 +5,7 @@ import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
 const ConsentUpdateSchema = z.object({
-  feature: z.enum(["sentry_replay", "claude_api"], { message: "Unknown feature" }),
+  feature: z.enum(["sentry_replay"], { message: "Unknown feature" }),
   consentGiven: z.boolean({ message: "Invalid body" }),
 });
 

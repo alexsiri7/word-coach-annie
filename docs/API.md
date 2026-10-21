@@ -132,7 +132,7 @@ Returns the current user's consent preferences.
   {
     "id": "string",
     "userId": "string",
-    "feature": "sentry_replay | claude_api",
+    "feature": "sentry_replay",
     "consentGiven": true,
     "updatedAt": "ISO timestamp"
   }
@@ -155,7 +155,7 @@ Update the authenticated user's consent preference for a specific feature.
 **Body**:
 ```json
 {
-  "feature": "sentry_replay | claude_api",
+  "feature": "sentry_replay",
   "consentGiven": true | false
 }
 ```
