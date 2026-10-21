@@ -10,6 +10,7 @@
 import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { authConfigurationProblems } from "../../scripts/auth-configuration.mjs";
 
 const SESSION_COOKIE_NAME = "annie_session";
 const REFRESH_COOKIE_NAME = "annie_refresh";
@@ -152,7 +153,7 @@ export function safeEqual(a: string, b: string): boolean {
 
 /** Check if auth is configured at all (any auth mode). */
 export function isAuthEnabled(): boolean {
-    return !!(env.API_TOKEN || env.GOOGLE_CLIENT_ID);
+    return authConfigurationProblems(env).length === 0;
 }
 
 /** Returns true when Google OAuth is the active auth mode (multi-user deployments where every request must carry a user identity). */
