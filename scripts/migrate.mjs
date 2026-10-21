@@ -12,6 +12,19 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { join } from 'path';
 import { splitSqlStatements } from './sql-tokenizer.mjs';
+import { transportSecurityProblems } from './transport-security.mjs';
+
+// This script is the container's startup gate (Dockerfile CMD runs it before
+// server.js) and the server inherits its environment, so refusing here keeps a
+// production server from ever talking to the database or Redis in plaintext.
+// It runs before the DATABASE_URL guard so the Redis rule holds even without one.
+if (process.env.NODE_ENV === 'production') {
+  const problems = transportSecurityProblems(process.env);
+  if (problems.length > 0) {
+    for (const problem of problems) console.error(`Startup refused: ${problem}`);
+    process.exit(1);
+  }
+}
 
 // Use DATABASE_URL (pooler) — our script splits SQL into single statements
 // which work fine through PgBouncer transaction mode.

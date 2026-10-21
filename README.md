@@ -69,7 +69,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | **Yes** | PostgreSQL connection string (Supabase or local PG) |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string (Supabase or local PG); production requires `sslmode=require` (see `.env.example`) |
 | `GEMINI_API_KEY` | For AI chat | Google AI API key (can also configure in Settings UI) |
 | `AI_MODEL` | No | Gemini model name (default: `gemini-2.0-flash-001`) |
 | `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID |

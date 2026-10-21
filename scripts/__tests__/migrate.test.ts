@@ -1,4 +1,5 @@
 import { spawnSync } from 'child_process';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -121,6 +122,41 @@ describe('migrate.mjs — DATABASE_URL guard', () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toContain('DATABASE_URL is not set');
     expect(result.stderr).toContain('skipping migrations');
+  });
+});
+
+describe('migrate.mjs — production TLS gate', () => {
+  it('refuses to start in production before connecting to a plaintext database', () => {
+    const result = spawnSync('node', [MIGRATE_SCRIPT], {
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:1/annie_test',
+      },
+      encoding: 'utf-8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Startup refused');
+    expect(result.stderr).toContain('sslmode');
+    expect(result.stderr).not.toContain('Migration attempt');
+  });
+});
+
+// The runner stage copies scripts one by one; a module migrate.mjs imports but
+// the image lacks crashes the container before the server starts.
+describe('Dockerfile ships every module migrate.mjs imports', () => {
+  const dockerfile = readFileSync(join(__dirname, '../../Dockerfile'), 'utf-8');
+  const imports = [...readFileSync(MIGRATE_SCRIPT, 'utf-8').matchAll(/from '\.\/([\w-]+\.mjs)'/g)].map(
+    (m) => m[1],
+  );
+
+  it('finds the local imports', () => {
+    expect(imports).toContain('transport-security.mjs');
+  });
+
+  it.each(imports)('copies %s', (file) => {
+    expect(dockerfile).toContain(`COPY --from=builder /app/scripts/${file}`);
   });
 });
 
