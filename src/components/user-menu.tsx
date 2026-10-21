@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { SyncStatusChip } from "@/components/sync-status-chip";
-import { countUnsyncedOps } from "@/lib/offline/clear-client-data";
+import { countUnsyncedOps, hasUnsyncedWork } from "@/lib/offline/clear-client-data";
 
 export function UserMenu() {
     const router = useRouter();
@@ -39,7 +39,7 @@ export function UserMenu() {
 
     const handleSignOut = async () => {
         const count = await countUnsyncedOps();
-        if (count === null || count > 0) {
+        if (hasUnsyncedWork(count)) {
             setUnsyncedCount(count);
             setSignOutConfirmOpen(true);
         } else {

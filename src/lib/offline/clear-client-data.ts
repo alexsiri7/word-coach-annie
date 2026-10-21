@@ -56,3 +56,8 @@ export async function countUnsyncedOps(): Promise<number | null> {
         return null;
     }
 }
+
+/** An unreadable queue (null) counts as unsynced work: the user must be warned. */
+export function hasUnsyncedWork(count: number | null): boolean {
+    return count === null || count > 0;
+}

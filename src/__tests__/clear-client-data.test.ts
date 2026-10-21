@@ -13,7 +13,7 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
-import { clearClientData, countUnsyncedOps } from "@/lib/offline/clear-client-data";
+import { clearClientData, countUnsyncedOps, hasUnsyncedWork } from "@/lib/offline/clear-client-data";
 import { clearOfflineData, getPendingOps, type PendingOp } from "@/lib/offline/idb";
 import { replayPendingOps } from "@/lib/offline/sync-queue";
 import { logger } from "@/lib/logger";
@@ -122,5 +122,16 @@ describe("countUnsyncedOps", () => {
     vi.mocked(getPendingOps).mockRejectedValueOnce(new Error("idb unavailable"));
 
     expect(await countUnsyncedOps()).toBeNull();
+  });
+});
+
+describe("hasUnsyncedWork", () => {
+  it("treats an unreadable queue as unsynced work", () => {
+    expect(hasUnsyncedWork(null)).toBe(true);
+  });
+
+  it("is true only when ops are queued", () => {
+    expect(hasUnsyncedWork(0)).toBe(false);
+    expect(hasUnsyncedWork(3)).toBe(true);
   });
 });
