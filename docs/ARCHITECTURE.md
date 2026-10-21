@@ -198,6 +198,8 @@ Google OAuth uses a two-token model:
 
 On logout, both tokens' `jti` claims are written to the `RevokedToken` table via `src/lib/token-blocklist.ts`. The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
 
+Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
+
 **Module split**: Edge-safe functions (JWT create/verify without DB) live in `src/lib/auth.ts`. Node.js-only functions (blocklist-aware verification, refresh token operations) live in `src/lib/auth-server.ts`. Do not import `auth-server.ts` or `token-blocklist.ts` from middleware or any Edge-compatible module.
 
 - In Node.js API routes, use `verifySessionTokenNode` (from `auth-server.ts`) instead of `verifySessionToken` to ensure revoked sessions are rejected.

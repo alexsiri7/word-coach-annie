@@ -9,6 +9,7 @@ import {
 } from "@/lib/oauth-tokens";
 import { logger } from "@/lib/logger";
 import { claimToken } from "@/lib/token-blocklist";
+import { getActiveUser } from "@/lib/auth-server";
 
 /**
  * Parse the request body. Supports both application/x-www-form-urlencoded
@@ -164,6 +165,18 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
+  let user;
+  try {
+    user = await getActiveUser(tokenData.userId);
+  } catch (err) {
+    logger.error("OAuth refresh: user lookup failed", err);
+    return errorResponse("server_error", "Internal server error", 500);
+  }
+  if (!user) {
+    logger.warn("OAuth refresh rejected — user deleted or no longer allowed", { userId: tokenData.userId });
+    return errorResponse("invalid_grant", "User is no longer authorized");
+  }
+
   // Single-use enforcement: atomically claim the jti BEFORE issuing new tokens.
   // This eliminates the TOCTOU race — only the first request to claim the slot
   // proceeds; a concurrent replay attempt will receive a P2002 and be rejected.
@@ -175,7 +188,12 @@ async function handleRefreshToken(body: Record<string, string>) {
     });
   } else {
     const expiresAt = tokenData.exp ? new Date(tokenData.exp * 1000) : new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
-    const claimed = await claimToken(tokenData.jti, tokenData.userId, expiresAt);
+    let claimed;
+    try {
+      claimed = await claimToken(tokenData.jti, tokenData.userId, expiresAt);
+    } catch {
+      return errorResponse("server_error", "Internal server error", 500);
+    }
     if (!claimed) {
       logger.warn("OAuth refresh token reuse detected — concurrent or replayed use", {
         jti: tokenData.jti,
@@ -188,11 +206,11 @@ async function handleRefreshToken(body: Record<string, string>) {
 
   // Issue new tokens
   const accessToken = await createMcpToken(
-    { userId: tokenData.userId, email: tokenData.email, type: "mcp_access", clientId: tokenData.clientId },
+    { userId: user.userId, email: user.email, type: "mcp_access", clientId: tokenData.clientId },
     ACCESS_TOKEN_TTL
   );
   const newRefreshToken = await createMcpToken(
-    { userId: tokenData.userId, email: tokenData.email, type: "mcp_refresh", clientId: tokenData.clientId },
+    { userId: user.userId, email: user.email, type: "mcp_refresh", clientId: tokenData.clientId },
     REFRESH_TOKEN_TTL
   );
 

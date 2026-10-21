@@ -198,10 +198,9 @@ describe("verifySessionTokenNode — blocklist integration", () => {
     });
 
     it("returns null if isTokenRevoked throws unexpectedly", async () => {
-        // Note: the real isTokenRevoked catches DB errors and returns false (fail-open behavior).
-        // That fail-open is tested in token-blocklist.test.ts.
+        // The real isTokenRevoked rethrows DB errors (see token-blocklist.test.ts).
         // verifySessionTokenNode wraps the blocklist check in a try-catch: unexpected errors
-        // are logged and treated as null (fail-safe) rather than propagated to callers.
+        // are logged and treated as null (fail closed) rather than propagated to callers.
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Unexpected"));
 
@@ -275,6 +274,14 @@ describe("refresh token functions", () => {
         const result = await verifyRefreshToken(token);
         expect(result).toBeNull();
         expect(isTokenRevoked).toHaveBeenCalled();
+    });
+
+    it("returns null if isTokenRevoked throws (fail closed)", async () => {
+        const { isTokenRevoked } = await import("@/lib/token-blocklist");
+        (isTokenRevoked as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Connection refused"));
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
+        await expect(verifyRefreshToken(token)).resolves.toBeNull();
     });
 
     it("returns null for a tampered token", async () => {
