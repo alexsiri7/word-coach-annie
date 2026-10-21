@@ -613,7 +613,7 @@ describe("middleware", () => {
 
         it("returns 429 when /api/auth/refresh is called more than 5 times per minute from the same IP", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
-            const headers = { "x-forwarded-for": "1.2.3.4" };
+            const headers = { "x-real-ip": "1.2.3.4" };
 
             for (let i = 0; i < 5; i++) {
                 await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
@@ -622,6 +622,21 @@ describe("middleware", () => {
             const res = await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
+        it("ignores a spoofed x-forwarded-for when keying the auth rate limit", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const refresh = (i: number) => createRequest("/api/auth/refresh", {
+                method: "POST",
+                headers: { "x-real-ip": "5.6.7.8", "x-forwarded-for": `10.0.0.${i}` },
+            });
+
+            for (let i = 0; i < 5; i++) {
+                await middleware(refresh(i));
+            }
+
+            const res = await middleware(refresh(5));
+            expect(res.status).toBe(429);
         });
 
         it("does not rate limit when auth is disabled", async () => {

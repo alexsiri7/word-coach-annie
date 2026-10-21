@@ -9,6 +9,7 @@ import {
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
 
 /**
@@ -19,7 +20,7 @@ import { logger } from "@/lib/logger";
  */
 export async function POST(request: NextRequest) {
   // Per-IP throttle to limit client registration abuse
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+  const ip = getClientIp(request.headers);
   if (process.env.DISABLE_RATE_LIMIT !== "true") {
     const rl = await checkRateLimit(`oauth-register:${ip}`, { limit: 5, windowMs: 3_600_000 });
     if (!rl.allowed) {

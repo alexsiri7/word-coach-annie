@@ -158,4 +158,12 @@ describe("POST /api/projects/[id]/report", () => {
     expect(res.status).toBe(429);
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("keys the rate limit on x-real-ip, not a spoofed x-forwarded-for", async () => {
+    await POST(
+      makeRequest({ category: "other" }, { "x-real-ip": "9.9.9.9", "x-forwarded-for": "6.6.6.6" }),
+      { params: Promise.resolve({ id: "proj1" }) }
+    );
+    expect(checkRateLimit).toHaveBeenCalledWith("report:9.9.9.9", expect.anything());
+  });
 });

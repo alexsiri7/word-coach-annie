@@ -10,6 +10,7 @@ import {
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 
 function buildCsp(nonce: string): string {
     return [
@@ -159,7 +160,7 @@ export async function middleware(request: NextRequest) {
     // This prevents credential-stuffing/brute-force on /api/auth/login and /api/auth/refresh.
     const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
     if ((pathname === "/api/auth/login" || pathname === "/api/auth/refresh") && !rateLimitBypassed) {
-        const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+        const ip = getClientIp(request.headers);
         const result = await checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {
             return makeRateLimitResponse(RATE_LIMITS.auth, result.retryAfterMs!, result.resetMs);

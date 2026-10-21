@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 
 const VALID_CATEGORIES = ["copyright", "illegal", "harassment", "other"] as const;
 
@@ -22,7 +23,7 @@ export async function POST(
 
   // IP-based rate limit to prevent enumeration and report spam
   if (process.env.DISABLE_RATE_LIMIT !== "true") {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+    const ip = getClientIp(request.headers);
     const rl = await checkRateLimit(`report:${ip}`, RATE_LIMITS.report);
     if (!rl.allowed) {
       const retryAfterSec = Math.ceil((rl.retryAfterMs ?? RATE_LIMITS.report.windowMs) / 1000);
