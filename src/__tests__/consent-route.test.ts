@@ -147,7 +147,7 @@ describe("PUT /api/account/consent", () => {
     expect(row?.consentGiven).toBe(false);
   });
 
-  it("upserts consent record for valid claude_api request", async () => {
+  it("rejects the retired claude_api feature without persisting it", async () => {
     const user = await testPrisma.user.create({
       data: { id: "u7", email: "g@test.com", googleId: "g7" },
     });
@@ -155,12 +155,13 @@ describe("PUT /api/account/consent", () => {
 
     const { PUT } = await import("@/app/api/account/consent/route");
     const res = await PUT(makePutRequest({ feature: "claude_api", consentGiven: true }));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/Unknown feature/);
 
     const row = await testPrisma.userConsent.findUnique({
       where: { userId_feature: { userId: user.id, feature: "claude_api" } },
     });
-    expect(row?.consentGiven).toBe(true);
+    expect(row).toBeNull();
   });
 
   it("second PUT updates existing record (upsert semantics)", async () => {
