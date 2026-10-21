@@ -915,14 +915,12 @@ function toAdkTool(def: ToolDefinition, executor: (args: Args) => Promise<unknow
         try {
           span.setAttribute("tool.name", def.name);
           span.setAttribute("tool.category", def.category);
-          const inputStr = JSON.stringify(input);
-          // Cap at 4KB to avoid bloating traces
-          span.setAttribute("tool.input", inputStr.slice(0, 4096));
+          // Lengths only: tool args/results carry manuscript text, which must not leave the app in traces (SEC-09)
+          span.setAttribute("tool.input_length", JSON.stringify(input).length);
 
           const result = await executor(input as Record<string, unknown>);
 
-          const resultStr = JSON.stringify(result);
-          span.setAttribute("tool.output", resultStr.slice(0, 4096));
+          span.setAttribute("tool.output_length", JSON.stringify(result).length);
           span.setStatus({ code: SpanStatusCode.OK });
           return result;
         } catch (err) {

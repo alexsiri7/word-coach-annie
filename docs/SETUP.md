@@ -23,6 +23,8 @@ cd word-coach-annie
 # 2. Configure environment
 cp .env.example .env.local
 # Edit .env.local — at minimum set API_TOKEN and AI_API_KEY
+# Phoenix tracing secrets, read by Docker Compose from .env (see "Tracing (Phoenix)")
+printf 'PHOENIX_SECRET=%s\nPHOENIX_ADMIN_SECRET=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
 
 # 3. Start
 docker compose up -d
@@ -116,6 +118,8 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 |----------|-------------|
 | `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for public access |
+| `PHOENIX_SECRET` | Signs Phoenix auth tokens. Required when running `docker-compose.yml`; generate with `openssl rand -hex 32` |
+| `PHOENIX_ADMIN_SECRET` | Bearer token the app sends to Phoenix on trace export. Required when running `docker-compose.yml`; generate separately from `PHOENIX_SECRET` |
 | `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive MCP tools (delete, restore_snapshot). Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
@@ -131,6 +135,18 @@ The app binds only to `127.0.0.1:3000` by default. For secure public access with
 3. Configure the tunnel to route to `http://localhost:3000`
 
 The `tunnel` service in `docker-compose.yml` starts automatically alongside the app.
+
+---
+
+## Tracing (Phoenix)
+
+The `phoenix` service in `docker-compose.yml` collects OpenTelemetry traces with auth enabled:
+
+- The app authenticates its trace export with `PHOENIX_ADMIN_SECRET`; Phoenix signs sessions with `PHOENIX_SECRET`. Compose refuses to start until both are set.
+- Both come from Docker Compose variable interpolation: your shell environment, a `.env` file beside `docker-compose.yml`, or `docker compose --env-file .env.local`. They are not read from the app's `env_file`.
+- The UI is at `http://127.0.0.1:6006`. The default login is `admin@localhost` / `admin`; Phoenix makes you change the password at first login.
+- Phoenix sits on a private `telemetry` network shared only with the app, so the tunnel container cannot reach it.
+- Tool-call spans record tool name, category, status, and input/output lengths — never tool content.
 
 ---
 

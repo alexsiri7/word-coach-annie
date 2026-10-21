@@ -114,7 +114,7 @@ then starts the app (`node server.js`). The migration runner refuses
 destructive DDL (DROP/TRUNCATE) if the database has live data.
 
 Docker Compose adds:
-- **Phoenix** (arizephoenix/phoenix:6006) — OpenTelemetry tracing
+- **Phoenix** (arizephoenix/phoenix:6006) — OpenTelemetry tracing, auth enabled, on an isolated `telemetry` network
 - **Cloudflare Tunnel** — Public access for local dev
 
 ### CI/CD (GitHub Actions)
@@ -192,7 +192,7 @@ See `.env.example` for the full list.
 | Medium | Story publishing | Self-issued integration token |
 | Sentry | Error tracking | Auth token |
 | Cloudflare Tunnel | Local dev public access | Tunnel token |
-| Phoenix | OpenTelemetry tracing (local) | N/A |
+| Phoenix | OpenTelemetry tracing (local) | `PHOENIX_SECRET` / `PHOENIX_ADMIN_SECRET` (bearer token) |
 
 ## Database Safety Rules
 
