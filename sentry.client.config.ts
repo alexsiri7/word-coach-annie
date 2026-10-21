@@ -1,9 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
+import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
 import { beforeSend } from "@/lib/sentry-scrub";
 
 const replayConsented =
   typeof window === "undefined" ||
-  localStorage.getItem("consent:sentry_replay") === "true";
+  localStorage.getItem(SENTRY_REPLAY_CONSENT_KEY) === "true";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,

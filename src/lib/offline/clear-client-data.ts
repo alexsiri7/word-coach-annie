@@ -1,12 +1,11 @@
 import { DISMISSED_KEY } from "@/components/setup-wizard";
+import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { clearOfflineData, getPendingOps } from "./idb";
 import { replayPendingOps } from "./sync-queue";
 
-// "consent:sentry_replay" is written by src/app/settings/page.tsx and read by
-// sentry.client.config.ts. The next-themes `theme` key is a device preference
-// and stays.
-const APP_LOCAL_STORAGE_KEYS = ["consent:sentry_replay", DISMISSED_KEY];
+// The next-themes `theme` key is a device preference and stays.
+const APP_LOCAL_STORAGE_KEYS = [SENTRY_REPLAY_CONSENT_KEY, DISMISSED_KEY];
 
 // The precache holds only build assets and the /offline fallback; deleting it
 // breaks offline fallback until the service worker reinstalls.
