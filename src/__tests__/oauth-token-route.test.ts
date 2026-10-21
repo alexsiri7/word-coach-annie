@@ -20,9 +20,14 @@ vi.mock("@/lib/token-blocklist", () => ({
   claimToken: vi.fn(async () => true),
 }));
 
+vi.mock("@/lib/auth-server", () => ({
+  getActiveUser: vi.fn(),
+}));
+
 import { consumeAuthCode, getClient } from "@/lib/oauth-store";
 import { createMcpToken, verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
 import { claimToken } from "@/lib/token-blocklist";
+import { getActiveUser } from "@/lib/auth-server";
 import { POST } from "@/app/oauth/token/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -59,6 +64,8 @@ const mockAuthCode = {
 describe("POST /oauth/token", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getActiveUser).mockResolvedValue({ userId: "user-1", email: "user@test.com", name: "", picture: undefined });
+    vi.mocked(claimToken).mockResolvedValue(true);
   });
 
   it("authorization_code grant with valid params returns tokens", async () => {
@@ -251,22 +258,80 @@ describe("POST /oauth/token", () => {
     expect(vi.mocked(claimToken)).toHaveBeenCalledWith("jti-no-exp", "user-1", expect.any(Date));
   });
 
-  it("refresh_token grant succeeds (fail-open) when claimToken throws unexpectedly", async () => {
+  it("refresh_token grant returns 500 server_error when claimToken throws", async () => {
     vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
     vi.mocked(verifyMcpToken).mockResolvedValue({
       userId: "user-1", email: "user@test.com", clientId: "client-1",
       jti: "jti-db-fail", exp: Math.floor(Date.now() / 1000) + 2592000,
     });
-    // claimToken is fail-open internally — it returns true on unexpected DB errors.
-    // This test confirms the route still issues tokens when claimToken returns true.
-    vi.mocked(claimToken).mockResolvedValue(true);
+    vi.mocked(claimToken).mockRejectedValue(new Error("Connection refused"));
 
     const res = await POST(makeTokenRequest({
       grant_type: "refresh_token",
       refresh_token: "refresh-db-fail",
       client_id: "client-1",
     }));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("server_error");
+    expect(vi.mocked(createMcpToken)).not.toHaveBeenCalled();
+  });
+
+  it("refresh_token grant rejects with invalid_grant when the user is deleted or no longer allowed", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "user@test.com", clientId: "client-1",
+      jti: "jti-gone", exp: Math.floor(Date.now() / 1000) + 2592000,
+    });
+    vi.mocked(getActiveUser).mockResolvedValue(null);
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "refresh-gone",
+      client_id: "client-1",
+    }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_grant");
+    expect(vi.mocked(claimToken)).not.toHaveBeenCalled();
+    expect(vi.mocked(createMcpToken)).not.toHaveBeenCalled();
+  });
+
+  it("refresh_token grant returns 500 server_error when the user lookup throws", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "user@test.com", clientId: "client-1",
+      jti: "jti-lookup-fail", exp: Math.floor(Date.now() / 1000) + 2592000,
+    });
+    vi.mocked(getActiveUser).mockRejectedValue(new Error("Connection refused"));
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "refresh-lookup-fail",
+      client_id: "client-1",
+    }));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("server_error");
+    expect(vi.mocked(claimToken)).not.toHaveBeenCalled();
+  });
+
+  it("refresh_token grant issues tokens with the current email from the user row", async () => {
+    vi.mocked(getClient).mockResolvedValue({ client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: [], registered_at: 0 });
+    vi.mocked(verifyMcpToken).mockResolvedValue({
+      userId: "user-1", email: "old@test.com", clientId: "client-1",
+      jti: "jti-new-email", exp: Math.floor(Date.now() / 1000) + 2592000,
+    });
+    vi.mocked(getActiveUser).mockResolvedValue({ userId: "user-1", email: "new@test.com", name: "", picture: undefined });
+
+    const res = await POST(makeTokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: "refresh-new-email",
+      client_id: "client-1",
+    }));
     expect(res.status).toBe(200);
-    expect((await res.json()).access_token).toBe("mock-token");
+    expect(vi.mocked(createMcpToken)).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "new@test.com", type: "mcp_access" }), 3600
+    );
+    expect(vi.mocked(createMcpToken)).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "new@test.com", type: "mcp_refresh" }), 2592000
+    );
   });
 });

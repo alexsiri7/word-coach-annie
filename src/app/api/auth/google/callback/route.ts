@@ -12,6 +12,7 @@ import {
     resolveJwtSecret,
     safeEqual,
 } from "@/lib/auth";
+import { createRefreshToken, isEmailAllowed } from "@/lib/auth-server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -106,15 +107,10 @@ export async function GET(request: NextRequest) {
         }
 
         // Enforce invite-only allowlist (when configured)
-        if (env.ALLOWED_EMAILS) {
-            const allowed = env.ALLOWED_EMAILS.split(",").map((e) =>
-                e.trim().toLowerCase()
+        if (!isEmailAllowed(userInfo.email)) {
+            return NextResponse.redirect(
+                new URL("/login?error=invite_only", baseUrl)
             );
-            if (!allowed.includes(userInfo.email.toLowerCase())) {
-                return NextResponse.redirect(
-                    new URL("/login?error=invite_only", baseUrl)
-                );
-            }
         }
 
         // Upsert user in database
@@ -144,7 +140,6 @@ export async function GET(request: NextRequest) {
         // Issue long-lived refresh token alongside session cookie (non-fatal: login proceeds even if this fails)
         let refreshJwt: string | null = null;
         try {
-            const { createRefreshToken } = await import("@/lib/auth-server");
             refreshJwt = await createRefreshToken({
                 userId: user.id,
                 email: user.email,

@@ -8,6 +8,8 @@
  * Edge-safe functions (JWT creation/verification without DB) live in auth.ts.
  */
 import { isTokenRevoked } from "@/lib/token-blocklist";
+import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
 import {
     verifySessionToken,
     getJwtKey,
@@ -27,6 +29,32 @@ export interface RefreshPayload {
     name: string;
     picture?: string;
     jti?: string;
+}
+
+/** True when ALLOWED_EMAILS is unset or lists `email` (case-insensitive). */
+export function isEmailAllowed(email: string): boolean {
+    if (!env.ALLOWED_EMAILS) return true;
+    const allowed = env.ALLOWED_EMAILS.split(",").map((e) => e.trim().toLowerCase());
+    return allowed.includes(email.toLowerCase());
+}
+
+/**
+ * Re-load a token subject from the User table before issuing new credentials.
+ * Returns null when the account is gone or no longer passes ALLOWED_EMAILS.
+ * DB errors propagate so callers fail closed with a server error.
+ */
+export async function getActiveUser(userId: string): Promise<RefreshPayload | null> {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, picture: true },
+    });
+    if (!user || !isEmailAllowed(user.email)) return null;
+    return {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture ?? undefined,
+    };
 }
 
 export async function createRefreshToken(payload: RefreshPayload): Promise<string> {

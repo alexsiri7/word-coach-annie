@@ -10,8 +10,9 @@ import {
     verifyRefreshToken,
     createSessionToken,
     createRefreshToken,
+    getActiveUser,
 } from "@/lib/auth-server";
-import { revokeToken } from "@/lib/token-blocklist";
+import { claimToken } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -36,21 +37,23 @@ function setRefreshCookie(response: NextResponse, jwt: string): void {
     });
 }
 
+function unauthorized(): NextResponse {
+    return NextResponse.json({ error: "Session expired or revoked" }, { status: 401 });
+}
+
 export async function POST(request: NextRequest) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
     // Path 1: existing session still valid — re-issue it to reset the 1h clock.
+    // Every path re-issues from the User row, so deleted or de-invited users are cut off.
     if (sessionCookie) {
         const session = await verifySessionTokenNode(sessionCookie);
         if (session) {
             try {
-                const freshJwt = await createSessionToken({
-                    userId: session.userId,
-                    email: session.email,
-                    name: session.name,
-                    picture: session.picture,
-                });
+                const user = await getActiveUser(session.userId);
+                if (!user) return unauthorized();
+                const freshJwt = await createSessionToken(user);
                 const response = NextResponse.json({ ok: true });
                 setSessionCookie(response, freshJwt);
                 return response;
@@ -66,20 +69,19 @@ export async function POST(request: NextRequest) {
         const refresh = await verifyRefreshToken(refreshCookie);
         if (refresh) {
             try {
-                // Rotate the refresh token: revoke old jti before issuing new one.
-                // This limits leaked refresh token exposure to ~45 min (next legitimate use invalidates it).
+                const user = await getActiveUser(refresh.userId);
+                if (!user) return unauthorized();
+                // Rotate the refresh token: atomically claim the old jti before issuing a new one,
+                // so only one of two concurrent uses of the same token succeeds.
                 if (refresh.jti) {
                     const expiresAt = new Date(Date.now() + REFRESH_MAX_AGE * 1000);
-                    await revokeToken(refresh.jti, refresh.userId, expiresAt);
+                    if (!(await claimToken(refresh.jti, refresh.userId, expiresAt))) {
+                        logger.warn("POST /api/auth/refresh: refresh token reuse detected", { userId: refresh.userId });
+                        return unauthorized();
+                    }
                 }
-                const userInfo = {
-                    userId: refresh.userId,
-                    email: refresh.email,
-                    name: refresh.name,
-                    picture: refresh.picture,
-                };
-                const freshJwt = await createSessionToken(userInfo);
-                const freshRefreshJwt = await createRefreshToken(userInfo);
+                const freshJwt = await createSessionToken(user);
+                const freshRefreshJwt = await createRefreshToken(user);
                 const response = NextResponse.json({ ok: true });
                 setSessionCookie(response, freshJwt);
                 setRefreshCookie(response, freshRefreshJwt);
@@ -91,5 +93,5 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    return NextResponse.json({ error: "Session expired or revoked" }, { status: 401 });
+    return unauthorized();
 }

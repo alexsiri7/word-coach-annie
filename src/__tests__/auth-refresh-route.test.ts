@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockVerifySessionTokenNode, mockVerifyRefreshToken, mockCreateSessionToken, mockCreateRefreshToken } = vi.hoisted(() => ({
+const { mockVerifySessionTokenNode, mockVerifyRefreshToken, mockCreateSessionToken, mockCreateRefreshToken, mockGetActiveUser } = vi.hoisted(() => ({
     mockVerifySessionTokenNode: vi.fn(),
     mockVerifyRefreshToken: vi.fn(),
     mockCreateSessionToken: vi.fn(),
     mockCreateRefreshToken: vi.fn(),
+    mockGetActiveUser: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -20,18 +21,19 @@ vi.mock("@/lib/auth-server", () => ({
     verifyRefreshToken: mockVerifyRefreshToken,
     createSessionToken: mockCreateSessionToken,
     createRefreshToken: mockCreateRefreshToken,
+    getActiveUser: mockGetActiveUser,
 }));
 
 vi.mock("@/lib/token-blocklist", () => ({
-    revokeToken: vi.fn(),
+    claimToken: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
 import { POST } from "@/app/api/auth/refresh/route";
-import { revokeToken } from "@/lib/token-blocklist";
+import { claimToken } from "@/lib/token-blocklist";
 
 function makeRequest(opts: { sessionCookie?: string; refreshCookie?: string } = {}) {
     const cookies: string[] = [];
@@ -48,7 +50,15 @@ function makeRequest(opts: { sessionCookie?: string; refreshCookie?: string } = 
 describe("POST /api/auth/refresh", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(claimToken).mockResolvedValue(true);
     });
+
+    /** Verify `payload` as the presented token and return the same identity from the User row. */
+    function activeUser(verify: typeof mockVerifySessionTokenNode, payload: { userId: string; email: string; name: string; picture?: string; jti?: string }) {
+        verify.mockResolvedValueOnce(payload);
+        const { userId, email, name, picture } = payload;
+        mockGetActiveUser.mockResolvedValueOnce({ userId, email, name, picture });
+    }
 
     describe("no cookies present", () => {
         it("returns 401 when neither session nor refresh cookie is present", async () => {
@@ -64,8 +74,7 @@ describe("POST /api/auth/refresh", () => {
 
     describe("path 1: active session renewal", () => {
         it("re-issues session cookie when the session cookie is still valid", async () => {
-            const session = { userId: "u1", email: "u@test.com", name: "U", picture: undefined };
-            mockVerifySessionTokenNode.mockResolvedValueOnce(session);
+            activeUser(mockVerifySessionTokenNode, { userId: "u1", email: "u@test.com", name: "U", picture: undefined });
             mockCreateSessionToken.mockResolvedValueOnce("fresh-session-jwt");
 
             const req = makeRequest({ sessionCookie: "valid-session-token" });
@@ -89,8 +98,19 @@ describe("POST /api/auth/refresh", () => {
             expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
         });
 
+        it("returns 401 when the session's user is deleted or no longer allowed", async () => {
+            mockVerifySessionTokenNode.mockResolvedValueOnce({ userId: "gone", email: "g@test.com", name: "G" });
+            mockGetActiveUser.mockResolvedValueOnce(null);
+
+            const res = await POST(makeRequest({ sessionCookie: "valid-session-token" }));
+
+            expect(res.status).toBe(401);
+            expect(mockCreateSessionToken).not.toHaveBeenCalled();
+            expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
+        });
+
         it("returns 500 if session is valid but createSessionToken throws", async () => {
-            mockVerifySessionTokenNode.mockResolvedValueOnce({ userId: "u1", email: "u@test.com", name: "U" });
+            activeUser(mockVerifySessionTokenNode, { userId: "u1", email: "u@test.com", name: "U" });
             mockCreateSessionToken.mockRejectedValueOnce(new Error("crypto fail"));
 
             const req = makeRequest({ sessionCookie: "valid-session-token" });
@@ -102,7 +122,7 @@ describe("POST /api/auth/refresh", () => {
     describe("path 2: cold-return via refresh cookie", () => {
         it("issues a new session and rotated refresh cookie from a valid refresh cookie when session is missing", async () => {
             const refresh = { userId: "u2", email: "u2@test.com", name: "User Two", picture: undefined, jti: "old-jti-2" };
-            mockVerifyRefreshToken.mockResolvedValueOnce(refresh);
+            activeUser(mockVerifyRefreshToken, refresh);
             mockCreateSessionToken.mockResolvedValueOnce("fresh-session-from-refresh");
             mockCreateRefreshToken.mockResolvedValueOnce("fresh-refresh-token");
 
@@ -117,8 +137,8 @@ describe("POST /api/auth/refresh", () => {
                 name: "User Two",
                 picture: undefined,
             });
-            // Old refresh jti should be revoked (rotation)
-            expect(revokeToken).toHaveBeenCalledWith("old-jti-2", "u2", expect.any(Date));
+            // Old refresh jti is atomically claimed (rotation)
+            expect(claimToken).toHaveBeenCalledWith("old-jti-2", "u2", expect.any(Date));
             // New refresh token should be issued
             expect(mockCreateRefreshToken).toHaveBeenCalledWith({
                 userId: "u2",
@@ -139,7 +159,7 @@ describe("POST /api/auth/refresh", () => {
         it("issues a new session cookie from a valid refresh cookie when session is expired", async () => {
             mockVerifySessionTokenNode.mockResolvedValueOnce(null); // expired
             const refresh = { userId: "u3", email: "u3@test.com", name: "U3", picture: undefined, jti: "old-jti-3" };
-            mockVerifyRefreshToken.mockResolvedValueOnce(refresh);
+            activeUser(mockVerifyRefreshToken, refresh);
             mockCreateSessionToken.mockResolvedValueOnce("fresh-session-from-refresh-v2");
             mockCreateRefreshToken.mockResolvedValueOnce("fresh-refresh-v2");
 
@@ -164,7 +184,7 @@ describe("POST /api/auth/refresh", () => {
         });
 
         it("returns 500 if refresh is valid but createSessionToken throws", async () => {
-            mockVerifyRefreshToken.mockResolvedValueOnce({ userId: "u1", email: "u@test.com", name: "U", jti: "jti-err" });
+            activeUser(mockVerifyRefreshToken, { userId: "u1", email: "u@test.com", name: "U", jti: "jti-err" });
             mockCreateSessionToken.mockRejectedValueOnce(new Error("crypto fail"));
 
             const req = makeRequest({ refreshCookie: "valid-refresh-token" });
@@ -180,7 +200,7 @@ describe("POST /api/auth/refresh", () => {
                 picture: "https://example.com/pic.jpg",
                 jti: "jti-pic",
             };
-            mockVerifyRefreshToken.mockResolvedValueOnce(refresh);
+            activeUser(mockVerifyRefreshToken, refresh);
             mockCreateSessionToken.mockResolvedValueOnce("jwt");
             mockCreateRefreshToken.mockResolvedValueOnce("refresh-jwt");
 
@@ -195,10 +215,9 @@ describe("POST /api/auth/refresh", () => {
             });
         });
 
-        it("skips revokeToken when refresh payload has no jti", async () => {
+        it("skips claimToken when refresh payload has no jti", async () => {
             const refresh = { userId: "u5", email: "u5@test.com", name: "U5", picture: undefined };
-            // No jti field — should not call revokeToken
-            mockVerifyRefreshToken.mockResolvedValueOnce(refresh);
+            activeUser(mockVerifyRefreshToken, refresh);
             mockCreateSessionToken.mockResolvedValueOnce("jwt-5");
             mockCreateRefreshToken.mockResolvedValueOnce("refresh-jwt-5");
 
@@ -206,7 +225,64 @@ describe("POST /api/auth/refresh", () => {
             const res = await POST(req);
 
             expect(res.status).toBe(200);
-            expect(revokeToken).not.toHaveBeenCalled();
+            expect(claimToken).not.toHaveBeenCalled();
+        });
+
+        it("returns 401 without claiming or minting when the user is deleted or no longer allowed", async () => {
+            mockVerifyRefreshToken.mockResolvedValueOnce({ userId: "gone", email: "g@test.com", name: "G", jti: "jti-gone" });
+            mockGetActiveUser.mockResolvedValueOnce(null);
+
+            const res = await POST(makeRequest({ refreshCookie: "valid-refresh-token" }));
+
+            expect(res.status).toBe(401);
+            expect(claimToken).not.toHaveBeenCalled();
+            expect(mockCreateSessionToken).not.toHaveBeenCalled();
+            expect(mockCreateRefreshToken).not.toHaveBeenCalled();
+        });
+
+        it("returns 401 without minting when the refresh jti was already claimed (reuse)", async () => {
+            activeUser(mockVerifyRefreshToken, { userId: "u6", email: "u6@test.com", name: "U6", jti: "jti-reused" });
+            vi.mocked(claimToken).mockResolvedValueOnce(false);
+
+            const res = await POST(makeRequest({ refreshCookie: "valid-refresh-token" }));
+
+            expect(res.status).toBe(401);
+            expect(mockCreateSessionToken).not.toHaveBeenCalled();
+            expect(mockCreateRefreshToken).not.toHaveBeenCalled();
+        });
+
+        it("returns 500 without minting when claimToken throws", async () => {
+            activeUser(mockVerifyRefreshToken, { userId: "u7", email: "u7@test.com", name: "U7", jti: "jti-db" });
+            vi.mocked(claimToken).mockRejectedValueOnce(new Error("Connection refused"));
+
+            const res = await POST(makeRequest({ refreshCookie: "valid-refresh-token" }));
+
+            expect(res.status).toBe(500);
+            expect(mockCreateSessionToken).not.toHaveBeenCalled();
+        });
+
+        it("returns 500 when the user lookup throws", async () => {
+            mockVerifyRefreshToken.mockResolvedValueOnce({ userId: "u8", email: "u8@test.com", name: "U8", jti: "jti-8" });
+            mockGetActiveUser.mockRejectedValueOnce(new Error("Connection refused"));
+
+            const res = await POST(makeRequest({ refreshCookie: "valid-refresh-token" }));
+
+            expect(res.status).toBe(500);
+            expect(claimToken).not.toHaveBeenCalled();
+        });
+
+        it("mints tokens from the current user row, not the stale token claims", async () => {
+            mockVerifyRefreshToken.mockResolvedValueOnce({ userId: "u9", email: "old@test.com", name: "Old", jti: "jti-9" });
+            const current = { userId: "u9", email: "new@test.com", name: "New", picture: "https://example.com/new.jpg" };
+            mockGetActiveUser.mockResolvedValueOnce(current);
+            mockCreateSessionToken.mockResolvedValueOnce("jwt-9");
+            mockCreateRefreshToken.mockResolvedValueOnce("refresh-jwt-9");
+
+            const res = await POST(makeRequest({ refreshCookie: "valid-refresh-token" }));
+
+            expect(res.status).toBe(200);
+            expect(mockCreateSessionToken).toHaveBeenCalledWith(current);
+            expect(mockCreateRefreshToken).toHaveBeenCalledWith(current);
         });
     });
 });

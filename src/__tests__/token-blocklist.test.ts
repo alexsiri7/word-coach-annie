@@ -11,7 +11,7 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
-import { revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
+import { claimToken, revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -57,6 +57,32 @@ describe("token-blocklist", () => {
         });
     });
 
+    describe("claimToken", () => {
+        it("returns true when the jti is newly claimed", async () => {
+            const exp = new Date();
+            expect(await claimToken("jti-1", "user-1", exp)).toBe(true);
+            expect(prisma.revokedToken.create).toHaveBeenCalledWith({
+                data: { jti: "jti-1", userId: "user-1", expiresAt: exp },
+            });
+        });
+
+        it("returns false when the jti was already claimed (P2002)", async () => {
+            const p2002 = new Prisma.PrismaClientKnownRequestError(
+                "Unique constraint failed on the constraint: `RevokedToken_jti_key`",
+                { code: "P2002", clientVersion: "5.0.0", meta: {} }
+            );
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(p2002);
+            expect(await claimToken("jti-1", "user-1", new Date())).toBe(false);
+        });
+
+        it("fails closed (rejects and logs) on other DB errors", async () => {
+            const dbErr = new Error("Connection refused");
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(dbErr);
+            await expect(claimToken("jti-1", "user-1", new Date())).rejects.toBe(dbErr);
+            expect(logger.error).toHaveBeenCalledWith("[token-blocklist] Failed to claim token:", dbErr);
+        });
+    });
+
     describe("isTokenRevoked", () => {
         it("returns true when record found", async () => {
             (prisma.revokedToken.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -70,11 +96,10 @@ describe("token-blocklist", () => {
             expect(await isTokenRevoked("jti-1")).toBe(false);
         });
 
-        it("fails open (returns false) when DB throws", async () => {
-            (prisma.revokedToken.findUnique as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-                new Error("Connection refused")
-            );
-            expect(await isTokenRevoked("jti-1")).toBe(false);
+        it("fails closed (rejects) when DB throws", async () => {
+            const dbErr = new Error("Connection refused");
+            (prisma.revokedToken.findUnique as ReturnType<typeof vi.fn>).mockRejectedValueOnce(dbErr);
+            await expect(isTokenRevoked("jti-1")).rejects.toBe(dbErr);
         });
 
         it("returns false in Edge runtime without DB call", async () => {

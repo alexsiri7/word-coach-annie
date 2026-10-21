@@ -56,6 +56,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/auth-server", () => ({
     createRefreshToken: vi.fn().mockResolvedValue("mock-refresh-token"),
+    isEmailAllowed: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock("@/lib/logger", () => ({
