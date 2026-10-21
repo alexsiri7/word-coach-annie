@@ -367,6 +367,6 @@ export async function batchDeleteNodes(nodeIds: string[]) {
     return result;
 }
 
-export async function getOpenAnnotations(projectId?: string) {
-    return StructureController.getOpenAnnotations(projectId);
+export async function getOpenAnnotations(projectId?: string, userId?: string | null) {
+    return StructureController.getOpenAnnotations(projectId, userId);
 }

@@ -124,6 +124,13 @@ import {
 } from "./tools/coaching";
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
+import {
+    assertUniverseOwner as verifyUniverseOwnership,
+    assertRelationshipOwner,
+    projectIdForAnnotation,
+    universeIdForWorldObject,
+    universeIdForTimelineEntry,
+} from "@/lib/ownership";
 
 // Initialize snapshot repo on startup
 try {
@@ -341,6 +348,7 @@ server.tool(
         orderedIds: z.array(z.string()),
     },
     async ({ worldObjectId, orderedIds }: { worldObjectId: string; orderedIds: string[] }) => {
+        await verifyUniverseOwnership(await universeIdForWorldObject(worldObjectId), userId);
         const result = await reorderTimelineEntries(worldObjectId, orderedIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -354,6 +362,8 @@ server.tool(
         universeId: z.string(),
     },
     async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
+        await verifyProjectOwnership(await getProjectIdForStoryObject(storyObjectId), userId);
+        await verifyUniverseOwnership(universeId, userId);
         const result = await transferStoryObjectToUniverse(storyObjectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -368,6 +378,7 @@ server.tool(
     },
     async ({ projectId, universeId }) => {
         await verifyProjectOwnership(projectId, userId);
+        await verifyUniverseOwnership(universeId, userId);
         const result = await linkProjectToUniverse(projectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -586,6 +597,7 @@ server.tool(
         resolved: z.boolean().optional(),
     },
     async ({ annotationId, ...data }) => {
+        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
         const result = await updateAnnotation(annotationId, data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -599,6 +611,7 @@ server.tool(
     },
     async ({ annotationId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
         const result = await deleteAnnotation(annotationId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -612,6 +625,7 @@ server.tool(
         resolved: z.boolean(),
     },
     async ({ annotationId, resolved }) => {
+        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
         const result = await resolveAnnotation(annotationId, resolved);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -621,11 +635,11 @@ server.tool(
     "get_open_annotations",
     "Get all unresolved annotations across the project (or filtered by project ID). Useful as an inbox of tasks.",
     {
-        projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns all open annotations in the database."),
+        projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns the caller's open annotations across all their projects."),
     },
     async ({ projectId }) => {
         if (projectId) await verifyProjectOwnership(projectId, userId);
-        const result = await getOpenAnnotations(projectId);
+        const result = await getOpenAnnotations(projectId, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -965,6 +979,7 @@ server.tool(
     },
     async ({ relationshipId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await assertRelationshipOwner(relationshipId, userId);
         const result = await deleteRelationship(relationshipId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1400,7 +1415,7 @@ server.tool(
     "List all universes",
     {},
     async () => {
-        const result = await listUniverses();
+        const result = await listUniverses(userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -1412,6 +1427,7 @@ server.tool(
         universeId: z.string().describe("The universe ID"),
     },
     async ({ universeId }) => {
+        await verifyUniverseOwnership(universeId, userId);
         const result = await getUniverse(universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1425,7 +1441,7 @@ server.tool(
         description: z.string().optional().describe("Universe description"),
     },
     async (params) => {
-        const result = await createUniverse(params);
+        const result = await createUniverse(params, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );
@@ -1440,8 +1456,10 @@ server.tool(
         description: z.string().optional().describe("New description"),
     },
     async ({ universeId, contentHash, ...data }) =>
-        mcpRun("update_universe", "Error updating universe", () =>
-            updateUniverse(universeId, data, contentHash))
+        mcpRun("update_universe", "Error updating universe", async () => {
+            await verifyUniverseOwnership(universeId, userId);
+            return updateUniverse(universeId, data, contentHash);
+        })
 );
 
 server.tool(
@@ -1452,6 +1470,7 @@ server.tool(
     },
     async ({ universeId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyUniverseOwnership(universeId, userId);
         const result = await deleteUniverse(universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1465,6 +1484,7 @@ server.tool(
         type: z.string().optional().describe("Filter by type (CHARACTER, LOCATION, WORLD_ELEMENT)"),
     },
     async ({ universeId, type }) => {
+        await verifyUniverseOwnership(universeId, userId);
         const result = await listWorldObjects(universeId, type);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1477,6 +1497,7 @@ server.tool(
         objectId: z.string().describe("The world object ID"),
     },
     async ({ objectId }) => {
+        await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
         const result = await getWorldObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1494,6 +1515,7 @@ server.tool(
         tags: z.string().optional().describe("Comma-separated tags"),
     },
     async (params) => {
+        await verifyUniverseOwnership(params.universeId, userId);
         const result = await createWorldObject(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1512,8 +1534,10 @@ server.tool(
         type: z.string().optional().describe("New type"),
     },
     async ({ objectId, contentHash, ...data }) =>
-        mcpRun("update_world_object", "Error updating world object", () =>
-            updateWorldObject(objectId, data, contentHash))
+        mcpRun("update_world_object", "Error updating world object", async () => {
+            await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
+            return updateWorldObject(objectId, data, contentHash);
+        })
 );
 
 server.tool(
@@ -1524,6 +1548,7 @@ server.tool(
     },
     async ({ objectId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
         const result = await deleteWorldObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1541,6 +1566,8 @@ server.tool(
         orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
     },
     async (params) => {
+        await verifyUniverseOwnership(await universeIdForWorldObject(params.worldObjectId), userId);
+        if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
         const result = await addTimelineEntry(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1558,8 +1585,10 @@ server.tool(
         orderIndex: z.number().optional().describe("New order index"),
     },
     async ({ entryId, contentHash, ...data }) =>
-        mcpRun("update_timeline_entry", "Error updating timeline entry", () =>
-            updateTimelineEntry(entryId, data, contentHash))
+        mcpRun("update_timeline_entry", "Error updating timeline entry", async () => {
+            await verifyUniverseOwnership(await universeIdForTimelineEntry(entryId), userId);
+            return updateTimelineEntry(entryId, data, contentHash);
+        })
 );
 
 server.tool(
@@ -1570,6 +1599,7 @@ server.tool(
     },
     async ({ entryId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
+        await verifyUniverseOwnership(await universeIdForTimelineEntry(entryId), userId);
         const result = await deleteTimelineEntry(entryId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1582,7 +1612,7 @@ server.tool(
     "Check if Google credentials are configured and valid",
     {},
     async () => {
-        const status = await GoogleAuthController.getStatus();
+        const status = await GoogleAuthController.getStatus(userId);
         return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }] };
     }
 );
@@ -1611,7 +1641,7 @@ server.tool(
     },
     async ({ code }) => {
         try {
-            await GoogleAuthController.handleCallback(code, env.GOOGLE_REDIRECT_URI ?? '');
+            await GoogleAuthController.handleCallback(code, env.GOOGLE_REDIRECT_URI ?? '', userId);
             return { content: [{ type: "text", text: "Successfully connected to Google!" }] };
         } catch (e) {
             logger.error("google_auth_callback: failed to complete OAuth flow", e);
@@ -1627,7 +1657,7 @@ server.tool(
     {},
     async () => {
         const guard = destructiveGuard(); if (guard) return guard;
-        await GoogleAuthController.disconnect();
+        await GoogleAuthController.disconnect(userId);
         return { content: [{ type: "text", text: "Disconnected from Google." }] };
     }
 );
@@ -1652,8 +1682,13 @@ server.tool(
         }
 
         try {
+            if (exportMode === 'UNIVERSE') {
+                await verifyUniverseOwnership(universeId!, userId);
+            } else {
+                await verifyProjectOwnership(projectId!, userId);
+            }
             const entityId = exportMode === 'UNIVERSE' ? universeId! : projectId!;
-            const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER");
+            const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER", userId);
             return { content: [{ type: "text", text: `Export successful! Document: ${result.googleDocUrl}` }] };
         } catch (e) {
             logger.error("export_to_google_docs: export failed", e);
