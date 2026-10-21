@@ -163,7 +163,7 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543) | Yes |
+| `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543); production requires `sslmode=require&uselibpqcompat=true` | Yes |
 | `GOOGLE_CLIENT_ID` | OAuth for Docs export | No |
 | `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback | No |
