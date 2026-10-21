@@ -330,21 +330,50 @@ describe("GET /api/auth/export-data", () => {
     await testPrisma.writingTask.create({
       data: { projectId: project.id, userId: userA.id, name: "Project task" },
     });
+    const storyObject = await testPrisma.storyObject.create({
+      data: { projectId: project.id, type: "CHARACTER", name: "Frodo (story)" },
+    });
+    const toFrodo = await testPrisma.relationship.create({
+      data: { type: "same_as", fromObjectId: storyObject.id, toWorldObjectId: worldObject.id },
+    });
+    const fromFrodo = await testPrisma.relationship.create({
+      data: { type: "same_as", fromWorldObjectId: worldObject.id, toObjectId: storyObject.id },
+    });
     const otherUniverse = await testPrisma.universe.create({
       data: { title: "Other", userId: userB.id },
     });
-    await testPrisma.provider.create({ data: { name: "B Provider", userId: userB.id } });
+    const [gollum, smeagol] = await Promise.all(
+      ["Gollum", "Smeagol"].map((name) =>
+        testPrisma.worldObject.create({
+          data: { universeId: otherUniverse.id, type: "CHARACTER", name },
+        }),
+      ),
+    );
+    await testPrisma.relationship.create({
+      data: { type: "same_as", fromWorldObjectId: gollum.id, toWorldObjectId: smeagol.id },
+    });
+    const providerB = await testPrisma.provider.create({
+      data: { name: "B Provider", userId: userB.id },
+    });
+    await testPrisma.opportunity.create({
+      data: { title: "B Opp", providerId: providerB.id, userId: userB.id, closeDate: new Date() },
+    });
+    await testPrisma.writingTask.create({ data: { userId: userB.id, name: "B Practice" } });
 
     const zip = await exportZip(userA.id);
 
     const universeData = await readJson(zip, `universes/Middle_Earth-${universe.id}.json`);
     expect(universeData.worldObjects).toHaveLength(1);
     expect(universeData.worldObjects[0].timeline).toHaveLength(1);
+    expect(universeData.relationships.map((r: { id: string }) => r.id).sort()).toEqual(
+      [toFrodo.id, fromFrodo.id].sort(),
+    );
     expect(zip.file(`universes/Other-${otherUniverse.id}.json`)).toBeNull();
 
     const providers = await readJson(zip, "providers.json");
     expect(providers.map((p: { name: string }) => p.name)).toEqual(["A Provider"]);
-    expect(await readJson(zip, "opportunities.json")).toHaveLength(1);
+    const opportunities = await readJson(zip, "opportunities.json");
+    expect(opportunities.map((o: { title: string }) => o.title)).toEqual(["A Opp"]);
     const tasks = await readJson(zip, "writing-tasks.json");
     expect(tasks.map((t: { name: string }) => t.name)).toEqual(["Practice"]);
   });
