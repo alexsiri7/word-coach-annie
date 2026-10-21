@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleDocsExporter, ExportMode } from '@/lib/export/google-docs-exporter';
-import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
+import { getCurrentUserId, verifyProjectAccess } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 
 const VALID_MODES: ExportMode[] = ['STORY_READER', 'STORY_INTERNAL'];
@@ -9,6 +9,7 @@ const VALID_MODES: ExportMode[] = ['STORY_READER', 'STORY_INTERNAL'];
  * POST /api/integrations/google-docs/export
  * Body: { projectId: string; exportMode: 'STORY_READER' | 'STORY_INTERNAL' }
  * Creates or updates a Google Doc for the project and returns the doc URL.
+ * Owner-only: the export mapping is shared by all collaborators, so only the owner may create or redirect it (SEC-19).
  */
 export async function POST(request: NextRequest) {
     try {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(projectId, userId, request.headers.get('x-user-email'));
+        const access = await verifyProjectAccess(projectId, userId);
         if (!access.authorized) return access.response;
 
         const result = await GoogleDocsExporter.exportToGoogleDocs(projectId, exportMode as ExportMode, userId);
