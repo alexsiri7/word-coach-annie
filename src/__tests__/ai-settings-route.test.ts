@@ -154,4 +154,42 @@ describe("PUT /api/ai-settings", () => {
     expect(data.scope).toBe("global");
     expect(prisma.userAiSettings.upsert).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["chatWindowSize above the cap", { chatWindowSize: 100000 }],
+    ["chatWindowSize below the floor", { chatWindowSize: 0 }],
+    ["non-integer chatWindowSize", { chatWindowSize: 5.5 }],
+    ["string chatWindowSize", { chatWindowSize: "5" }],
+    ["messagesUntilCompression above the cap", { messagesUntilCompression: 100000 }],
+    ["negative messagesUntilCompression", { messagesUntilCompression: -1 }],
+    ["unknown coachingStyle", { coachingStyle: "brutal" }],
+    ["unknown responseLength", { responseLength: "endless" }],
+    ["oversized model", { model: "m".repeat(201) }],
+    ["oversized compressionModel", { compressionModel: "m".repeat(201) }],
+    ["non-string apiKey", { apiKey: 123 }],
+  ])("rejects %s with 400 and writes nothing", async (_label, body) => {
+    for (const userId of ["user-123", undefined]) {
+      const res = await PUT(makePutRequest(body, userId));
+      expect(res.status).toBe(400);
+    }
+    expect(prisma.userAiSettings.upsert).not.toHaveBeenCalled();
+    expect(prisma.aiSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("accepts the boundary values the settings page allows", async () => {
+    vi.mocked(prisma.userAiSettings.upsert).mockResolvedValue({
+      userId: "user-123",
+      apiKey: "",
+      model: "",
+    } as never);
+
+    for (const body of [
+      { chatWindowSize: 3, messagesUntilCompression: 5, coachingStyle: "gentle", responseLength: "concise" },
+      { chatWindowSize: 20, messagesUntilCompression: 50, coachingStyle: "direct", responseLength: "detailed" },
+    ]) {
+      const res = await PUT(makePutRequest(body, "user-123"));
+      expect(res.status).toBe(200);
+    }
+    expect(prisma.userAiSettings.upsert).toHaveBeenCalledTimes(2);
+  });
 });

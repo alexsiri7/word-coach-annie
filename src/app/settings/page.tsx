@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"user" | "global">("global");
   // AI behavior preferences
@@ -324,6 +325,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
     const body: Record<string, string | number> = {
       model,
       customInstructions,
@@ -356,7 +358,12 @@ export default function SettingsPage() {
         setCompressionModel(data.compressionModel ?? "");
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+      } else {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        setSaveError(data.error ?? "Save failed. Please try again.");
       }
+    } catch {
+      setSaveError("Save failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -741,6 +748,7 @@ export default function SettingsPage() {
               )}
               {saving ? "Saving..." : saved ? "Saved!" : "Save"}
             </Button>
+            {saveError && <p className="text-xs text-red-500">{saveError}</p>}
           </div>
         )}
 
