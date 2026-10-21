@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { testPrisma } from "./setup";
+import { buildEpubChapters, isEmptyContent } from "@/lib/epub-chapters";
+import { stripBeats } from "@/lib/scene-text";
+import type { OutlineNode } from "@/lib/outline-tree";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -213,76 +216,12 @@ describe("stripHtml (PDF export utility)", () => {
 
 // ─── Unit Tests: EPUB utilities ───────────────────────────────────────────────
 
-interface OutlineNode {
-  id: string;
-  type: string;
-  title: string;
-  orderIndex: number;
-  parentId: string | null;
-  children: OutlineNode[];
-  content?: string;
-}
-
-interface EpubChapter {
-  title: string;
-  content: string;
-}
-
-function stripBeats(html: string): string {
-  return html.replace(/<!--\s*beat:.*?-->/gi, "");
-}
-
-function isEmptyContent(content: string | undefined): boolean {
-  if (!content) return true;
-  const stripped = content.replace(/<p><\/p>/g, "").trim();
-  return stripped.length === 0;
-}
-
-function buildEpubChapters(outline: OutlineNode[]): EpubChapter[] {
-  const chapters: EpubChapter[] = [];
-
-  function collectSceneHtml(node: OutlineNode): string {
-    let html = "";
-    for (const child of node.children) {
-      if (child.type === "SCENE" && !isEmptyContent(child.content)) {
-        html += stripBeats(child.content!);
-      }
-    }
-    return html;
-  }
-
-  function walk(node: OutlineNode) {
-    if (node.type === "PART") {
-      const partSceneHtml = collectSceneHtml(node);
-      chapters.push({
-        title: node.title,
-        content: `<h1>${node.title}</h1>${partSceneHtml}`,
-      });
-      for (const child of node.children) {
-        if (child.type !== "SCENE") walk(child);
-      }
-    } else if (node.type === "CHAPTER") {
-      const sceneHtml = collectSceneHtml(node);
-      chapters.push({
-        title: node.title,
-        content: `<h2>${node.title}</h2>${sceneHtml}`,
-      });
-    } else if (node.type === "SCENE" && !isEmptyContent(node.content)) {
-      chapters.push({
-        title: node.title,
-        content: stripBeats(node.content!),
-      });
-    }
-  }
-
-  for (const node of outline) walk(node);
-  return chapters;
-}
-
 function makeNode(
   overrides: Partial<OutlineNode> & { id: string; type: string; title: string }
 ): OutlineNode {
   return {
+    synopsis: "",
+    status: "DRAFT",
     orderIndex: 0,
     parentId: null,
     children: [],
@@ -290,7 +229,7 @@ function makeNode(
   };
 }
 
-describe("stripBeats (EPUB utility)", () => {
+describe("stripBeats", () => {
   it("removes beat annotation comments", () => {
     expect(stripBeats("<!-- beat: Hero enters -->text")).toBe("text");
     expect(stripBeats("before<!-- beat: x -->after")).toBe("beforeafter");
@@ -299,6 +238,12 @@ describe("stripBeats (EPUB utility)", () => {
 
   it("handles case-insensitive beat comments", () => {
     expect(stripBeats("<!-- BEAT: TEST -->text")).toBe("text");
+  });
+
+  it("removes beat annotation divs", () => {
+    expect(
+      stripBeats('<p>In.</p><div data-type="beat-annotation">killer is the butler</div><p>Out.</p>')
+    ).toBe("<p>In.</p><p>Out.</p>");
   });
 });
 
@@ -447,6 +392,46 @@ describe("buildEpubChapters", () => {
     const chapters = buildEpubChapters([scene]);
     expect(chapters[0].content).not.toContain("beat:");
     expect(chapters[0].content).toContain("Story text");
+  });
+
+  it("strips div-format beats from scene content", () => {
+    const scene = makeNode({
+      id: "s1",
+      type: "SCENE",
+      title: "Scene",
+      content: '<p>Story text</p><div data-type="beat-annotation">killer is the butler</div>',
+    });
+    const chapters = buildEpubChapters([scene]);
+    expect(chapters[0].content).not.toContain("butler");
+    expect(chapters[0].content).toContain("Story text");
+  });
+
+  it("sanitizes stored scene HTML before it reaches the chapter", () => {
+    const chapter = makeNode({
+      id: "c1",
+      type: "CHAPTER",
+      title: "Ch",
+      children: [
+        makeNode({
+          id: "s1",
+          type: "SCENE",
+          title: "Scene",
+          content: '<p>Kept</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
+        }),
+      ],
+    });
+    const orphan = makeNode({
+      id: "s2",
+      type: "SCENE",
+      title: "Orphan",
+      content: "<p>Also kept</p><scr<!-- beat: x -->ipt>alert(3)</script>",
+    });
+    const chapters = buildEpubChapters([chapter, orphan]);
+    for (const { content } of chapters) {
+      expect(content).not.toMatch(/<script|onerror/i);
+    }
+    expect(chapters[0].content).toContain("<p>Kept</p>");
+    expect(chapters[1].content).toContain("<p>Also kept</p>");
   });
 });
 

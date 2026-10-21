@@ -3,6 +3,8 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
+import { sanitizeHtml } from "@/lib/sanitize-server";
+import { countSceneWords } from "@/lib/scene-text";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -445,7 +447,7 @@ export class StructureController {
      * that is empty (new scenes start with one). Either throws ConflictError on
      * mismatch; a write with no stored version is always allowed.
      */
-    static async writeSceneContent(nodeId: string, content: string, contentHash?: string | null) {
+    static async writeSceneContent(nodeId: string, rawContent: string, contentHash?: string | null) {
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
@@ -453,17 +455,10 @@ export class StructureController {
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
 
-        StructureController.validateSceneContent(content);
+        StructureController.validateSceneContent(rawContent);
+        const content = sanitizeHtml(rawContent);
 
-        // Strip beat annotations in both storage formats:
-        // 1. HTML comment format (normal save path via beatsToComments)
-        // 2. HTML div format (MCP or direct writes without conversion)
-        const stripped = content
-            .replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, "")
-            .replace(/(<!-- beat:[\s\S]*?-->)/g, "");
-        // Strip HTML tags (replace with space so adjacent tags don't merge words)
-        const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
-        const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
+        const wordCount = countSceneWords(content);
 
         const version = await prisma.$transaction(async (tx) => {
             await lockSceneNode(tx, nodeId);
@@ -549,16 +544,15 @@ export class StructureController {
         });
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
+        // Versions stored before every write path sanitized may still carry unsafe markup.
+        const content = sanitizeHtml(oldVersion.content);
+
         const newVersion = await prisma.$transaction(async (tx) => {
             await lockSceneNode(tx, nodeId);
 
             const [created] = await Promise.all([
                 tx.contentVersion.create({
-                    data: {
-                        nodeId,
-                        content: oldVersion.content,
-                        wordCount: oldVersion.wordCount,
-                    },
+                    data: { nodeId, content, wordCount: countSceneWords(content) },
                 }),
                 tx.project.update({
                     where: { id: node.projectId },
@@ -577,8 +571,8 @@ export class StructureController {
             restoredFromVersionId: versionId,
             newVersionId: newVersion.id,
             wordCount: newVersion.wordCount,
-            content: oldVersion.content,
-            contentHash: computeContentHash(oldVersion.content),
+            content: newVersion.content,
+            contentHash: computeContentHash(newVersion.content),
             createdAt: newVersion.createdAt.toISOString(),
         };
     }

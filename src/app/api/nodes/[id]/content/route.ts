@@ -3,7 +3,6 @@ import { prisma } from "@/lib/db";
 import { StructureController, ConflictError } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-import { sanitizeHtml } from "@/lib/sanitize-server";
 import { computeContentHash } from "@/mcp/content-hash";
 
 export async function GET(
@@ -80,11 +79,10 @@ export async function POST(
       );
     }
 
-    const sanitizedContent = sanitizeHtml(content);
     // The editor always saves against the version it last saw; a missing hash
     // means "none seen", so it can never silently overwrite an existing version.
     const baseHash = typeof contentHash === "string" ? contentHash : null;
-    const result = await StructureController.writeSceneContent(nodeId, sanitizedContent, baseHash);
+    const result = await StructureController.writeSceneContent(nodeId, content, baseHash);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof ConflictError) {
