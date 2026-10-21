@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { testPrisma } from "./setup";
-import { buildEpubChapters, isEmptyContent, stripBeats } from "@/lib/epub-chapters";
+import { buildEpubChapters, isEmptyContent } from "@/lib/epub-chapters";
+import { stripBeats } from "@/lib/scene-text";
 import type { OutlineNode } from "@/lib/outline-tree";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ function makeNode(
   };
 }
 
-describe("stripBeats (EPUB utility)", () => {
+describe("stripBeats", () => {
   it("removes beat annotation comments", () => {
     expect(stripBeats("<!-- beat: Hero enters -->text")).toBe("text");
     expect(stripBeats("before<!-- beat: x -->after")).toBe("beforeafter");
@@ -237,6 +238,12 @@ describe("stripBeats (EPUB utility)", () => {
 
   it("handles case-insensitive beat comments", () => {
     expect(stripBeats("<!-- BEAT: TEST -->text")).toBe("text");
+  });
+
+  it("removes beat annotation divs", () => {
+    expect(
+      stripBeats('<p>In.</p><div data-type="beat-annotation">killer is the butler</div><p>Out.</p>')
+    ).toBe("<p>In.</p><p>Out.</p>");
   });
 });
 
@@ -384,6 +391,18 @@ describe("buildEpubChapters", () => {
     });
     const chapters = buildEpubChapters([scene]);
     expect(chapters[0].content).not.toContain("beat:");
+    expect(chapters[0].content).toContain("Story text");
+  });
+
+  it("strips div-format beats from scene content", () => {
+    const scene = makeNode({
+      id: "s1",
+      type: "SCENE",
+      title: "Scene",
+      content: '<p>Story text</p><div data-type="beat-annotation">killer is the butler</div>',
+    });
+    const chapters = buildEpubChapters([scene]);
+    expect(chapters[0].content).not.toContain("butler");
     expect(chapters[0].content).toContain("Story text");
   });
 

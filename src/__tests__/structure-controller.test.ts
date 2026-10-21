@@ -261,12 +261,13 @@ describe("StructureController", () => {
             it("sanitizes a version stored before writes were sanitized", async () => {
                 const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
                 const legacy = await prisma.contentVersion.create({
-                    data: { nodeId: scene.id, content: "<p>Old</p><script>alert(1)</script>", wordCount: 1 },
+                    data: { nodeId: scene.id, content: "<p>Old</p><script>alert(1); one two</script>", wordCount: 4 },
                 });
 
                 const result = await StructureController.restoreSceneVersion(scene.id, legacy.id);
                 expect(result.content).toBe("<p>Old</p>");
                 expect(result.contentHash).toBe(computeContentHash("<p>Old</p>"));
+                expect(result.wordCount).toBe(1);
                 const content = await StructureController.readSceneContent(scene.id);
                 expect(content.content).toBe("<p>Old</p>");
             });

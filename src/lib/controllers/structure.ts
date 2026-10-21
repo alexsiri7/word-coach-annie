@@ -4,6 +4,7 @@ import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml } from "@/lib/sanitize-server";
+import { countSceneWords } from "@/lib/scene-text";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -457,15 +458,7 @@ export class StructureController {
         StructureController.validateSceneContent(rawContent);
         const content = sanitizeHtml(rawContent);
 
-        // Strip beat annotations in both storage formats:
-        // 1. HTML comment format (normal save path via beatsToComments)
-        // 2. HTML div format (MCP or direct writes without conversion)
-        const stripped = content
-            .replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, "")
-            .replace(/(<!-- beat:[\s\S]*?-->)/g, "");
-        // Strip HTML tags (replace with space so adjacent tags don't merge words)
-        const prose = stripped.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
-        const wordCount = prose === "" ? 0 : prose.split(/\s+/).length;
+        const wordCount = countSceneWords(content);
 
         const version = await prisma.$transaction(async (tx) => {
             await lockSceneNode(tx, nodeId);
@@ -551,17 +544,15 @@ export class StructureController {
         });
         if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
 
+        // Versions stored before every write path sanitized may still carry unsafe markup.
+        const content = sanitizeHtml(oldVersion.content);
+
         const newVersion = await prisma.$transaction(async (tx) => {
             await lockSceneNode(tx, nodeId);
 
             const [created] = await Promise.all([
                 tx.contentVersion.create({
-                    data: {
-                        nodeId,
-                        // Versions stored before every write path sanitized may still carry unsafe markup.
-                        content: sanitizeHtml(oldVersion.content),
-                        wordCount: oldVersion.wordCount,
-                    },
+                    data: { nodeId, content, wordCount: countSceneWords(content) },
                 }),
                 tx.project.update({
                     where: { id: node.projectId },

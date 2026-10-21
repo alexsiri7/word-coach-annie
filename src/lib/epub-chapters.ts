@@ -1,9 +1,6 @@
 import type { OutlineNode } from "@/lib/outline-tree";
 import { escapeHtml, sanitizeHtml } from "@/lib/sanitize-server";
-
-export function stripBeats(html: string): string {
-  return html.replace(/<!--\s*beat:.*?-->/gi, "");
-}
+import { stripBeats } from "@/lib/scene-text";
 
 export function isEmptyContent(content: string | undefined): boolean {
   if (!content) return true;
