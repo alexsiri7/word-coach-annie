@@ -17,7 +17,7 @@ import {
 } from "@google/adk";
 import type { Content } from "@google/genai";
 import { DynamicToolset } from "./adk-tools";
-import type { ToolCategory } from "./adk-tools";
+import type { ToolCategory, ToolContext } from "./adk-tools";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -101,6 +101,7 @@ export async function runChatAgent(params: {
   chatHistory: { role: string; content: string }[];
   userMessage: string;
   aiConfig: { apiKey: string; model: string };
+  toolContext: ToolContext;
 }): Promise<ChatAgentResult> {
   const tracer = getTracer();
 
@@ -119,7 +120,7 @@ export async function runChatAgent(params: {
         apiKey: params.aiConfig.apiKey,
       });
 
-      const toolset = new DynamicToolset();
+      const toolset = new DynamicToolset(params.toolContext);
 
       const agent = new LlmAgent({
         name: AGENT_NAME,

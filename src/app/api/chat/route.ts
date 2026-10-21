@@ -380,6 +380,12 @@ export async function POST(request: NextRequest) {
       chatHistory: windowMessages.map((m) => ({ role: m.role, content: m.content })),
       userMessage: sanitizedMessage,
       aiConfig,
+      toolContext: {
+        userId,
+        userEmail: request.headers.get("x-user-email"),
+        projectId: conversation.projectId,
+        role: access.role,
+      },
     });
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`AI request timed out (model: ${aiConfig.model})`)), 60_000)

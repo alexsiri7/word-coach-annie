@@ -126,6 +126,28 @@ describe("POST /api/chat", () => {
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
   });
 
+  it("passes a toolContext pinned to the conversation's project and caller identity", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue("user-1");
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true, role: "OWNER" } as never);
+
+    const { POST } = await import("@/app/api/chat/route");
+    const req = new NextRequest("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-email": "user1@example.com" },
+      body: JSON.stringify({ conversationId, message: "hi" }),
+    });
+    await POST(req);
+
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    const conversation = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversationId } });
+    expect(call.toolContext).toEqual({
+      userId: "user-1",
+      userEmail: "user1@example.com",
+      projectId: conversation.projectId,
+      role: "OWNER",
+    });
+  });
+
   it("sanitizes user message before saving", async () => {
     const { POST } = await import("@/app/api/chat/route");
     await POST(makePostRequest({ conversationId, message: "<script>alert('xss')</script>Hello" }));
