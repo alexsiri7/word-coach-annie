@@ -616,7 +616,7 @@ export function getAllTools(): ToolDefinition[] {
 
 // ─── Import all tool handler implementations ─────────────────────────────────
 
-import { listProjects, getProject, createProject, updateProject } from "@/mcp/tools/projects";
+import { getProject, createProject, updateProject } from "@/mcp/tools/projects";
 import {
   getOutline,
   createNode,
@@ -652,11 +652,6 @@ import {
   getProjectSummary,
 } from "@/mcp/tools/export";
 import {
-  snapshotDatabase,
-  listDatabaseSnapshots,
-  restoreDatabaseSnapshot,
-} from "@/mcp/tools/snapshots";
-import {
   listUniverses,
   getUniverse,
   createUniverse,
@@ -683,149 +678,232 @@ import {
   getConsistencyContext,
   getVoiceContext,
 } from "@/mcp/tools/coaching";
-import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
-import { env } from "@/lib/env";
+import { prisma } from "@/lib/db";
+import {
+  assertUniverseOwner,
+  projectIdForNode,
+  projectIdForStoryObject,
+  projectIdForAnnotation,
+  universeIdForWorldObject,
+  universeIdForTimelineEntry,
+  relationshipOwner,
+} from "@/lib/ownership";
+
+// ─── Chat tool scoping (SEC-01) ───────────────────────────────────────────────
+
+/** Identity and scope for one chat turn. Every tool is pinned to `projectId`. */
+export interface ToolContext {
+  userId: string | null;
+  userEmail: string | null;
+  projectId: string;
+  role: "OWNER" | "EDITOR" | null;
+}
+
+/** Tools that must never be reachable from the web chat (credentials, DB snapshot/restore). */
+const CHAT_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
+  "snapshot_database", "list_snapshots", "restore_snapshot",
+  "google_auth_status", "google_auth_connect", "google_auth_callback", "google_auth_disconnect",
+]);
+
+export function isChatExcludedTool(name: string): boolean {
+  return CHAT_EXCLUDED_TOOLS.has(name);
+}
 
 // ─── Handler dispatch map ────────────────────────────────────────────────────
 // Maps tool name → execute function for ADK's execute signature
 
 type Args = Record<string, unknown>;
 
-const toolExecutors: Record<string, (args: Args) => Promise<unknown>> = {
-  // Core
-  list_projects: async (a) => listProjects(null, a.limit as number, a.offset as number),
-  get_project: async (a) => getProject(null, a.projectId as string),
-  get_outline: async (a) => getOutline(a.projectId as string),
-  read_scene_content: async (a) => readSceneContent(a.nodeId as string),
-  list_story_objects: async (a) => listStoryObjects(a as Parameters<typeof listStoryObjects>[0]),
-  get_project_summary: async (a) => getProjectSummary(a.projectId as string),
-  get_open_annotations: async (a) => getOpenAnnotations(a.projectId as string | undefined),
-  list_skills: async () => listSkills(),
-  get_plot_thread_status: async (a) => getPlotThreadStatus(a.projectId as string),
-  get_scene_focus: async (a) => getSceneFocus(a.sceneId as string),
-  get_manuscript_context: async (a) => getManuscriptContext(a.projectId as string),
-  get_consistency_context: async (a) => getConsistencyContext(a.projectId as string, a.sceneId as string | undefined),
-  get_voice_context: async (a) => getVoiceContext(a.projectId as string, a.sceneId as string),
+/**
+ * Builds the tool executors for one chat turn, pinned to `ctx.projectId`.
+ * A `projectId` argument that differs from the pin is rejected; node/object/
+ * annotation/relationship IDs are resolved to their owning project and compared.
+ * Universe tools are allowed only for the project's own linked universe or a
+ * universe `ctx.userId` owns directly.
+ */
+function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Promise<unknown>> {
+  const forbidden = (what: string) => new Error(`Forbidden: ${what} is outside the current project`);
 
-  // Structure
-  create_node: async (a) => createNode(a as Parameters<typeof createNode>[0]),
-  update_node: async (a) => {
-    const { nodeId, ...data } = a;
-    return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1]);
-  },
-  delete_node: async (a) => deleteNode(a.nodeId as string),
-  write_scene_content: async (a) => {
-    if (a.blocks) {
-      return writeSceneContentFromBlocks(
-        a.nodeId as string,
-        a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
-      );
-    }
-    return writeSceneContent(a.nodeId as string, a.content as string);
-  },
-  get_scene_versions: async (a) => getSceneVersions(a.nodeId as string, a.limit as number),
-  restore_scene_version: async (a) => restoreSceneVersion(a.nodeId as string, a.versionId as string),
-  add_annotation: async (a) =>
-    addAnnotation(a.nodeId as string, a.content as string, a.range as string, a.selectedText as string | null),
-  update_annotation: async (a) => {
-    const { annotationId, ...data } = a;
-    return updateAnnotation(annotationId as string, data as Parameters<typeof updateAnnotation>[1]);
-  },
-  delete_annotation: async (a) => deleteAnnotation(a.annotationId as string),
-  resolve_annotation: async (a) => resolveAnnotation(a.annotationId as string, a.resolved as boolean),
+  const requireProject = (projectId: unknown): void => {
+    if (projectId !== ctx.projectId) throw forbidden("project");
+  };
+  const requireNode = async (nodeId: string) => requireProject(await projectIdForNode(nodeId));
+  const requireStoryObject = async (objectId: string) => requireProject(await projectIdForStoryObject(objectId));
+  const requireAnnotation = async (id: string) => requireProject(await projectIdForAnnotation(id));
+  const requireUniverse = async (universeId: string) => {
+    const project = await prisma.project.findUnique({ where: { id: ctx.projectId }, select: { universeId: true } });
+    if (project?.universeId === universeId) return; // the project's own linked universe
+    await assertUniverseOwner(universeId, ctx.userId); // or one the caller owns (no-op when userId is null)
+  };
+  const requireWorldObject = async (objectId: string) => requireUniverse(await universeIdForWorldObject(objectId));
+  const requireTimelineEntry = async (entryId: string) => requireUniverse(await universeIdForTimelineEntry(entryId));
+  const requireRelationship = async (relationshipId: string) => {
+    const owner = await relationshipOwner(relationshipId);
+    if (owner.projectId) return requireProject(owner.projectId);
+    if (owner.universeId) return requireUniverse(owner.universeId);
+    throw forbidden("relationship");
+  };
+  const requireOwnerRole = () => {
+    if (ctx.userId && ctx.role !== "OWNER") throw new Error("Forbidden: only the project owner may do this");
+  };
+  const pid = ctx.projectId;
 
-  // Characters / Story Objects
-  get_story_object: async (a) => getStoryObject(a.objectId as string),
-  create_story_object: async (a) => createStoryObject(a as Parameters<typeof createStoryObject>[0]),
-  update_story_object: async (a) => {
-    const { objectId, ...data } = a;
-    return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1]);
-  },
-  delete_story_object: async (a) => deleteStoryObject(a.objectId as string),
-  list_relationships: async (a) => listRelationships(a.projectId as string),
-  create_relationship: async (a) => createRelationship(a as Parameters<typeof createRelationship>[0]),
-  delete_relationship: async (a) => deleteRelationship(a.relationshipId as string),
+  return {
+    // Core — chat is scoped to one project, so listing returns only that project.
+    list_projects: async () => ({ projects: [await getProject(null, pid)], total: 1 }),
+    get_project: async (a) => { requireProject(a.projectId); return getProject(null, pid); },
+    get_outline: async (a) => { requireProject(a.projectId); return getOutline(pid); },
+    read_scene_content: async (a) => { await requireNode(a.nodeId as string); return readSceneContent(a.nodeId as string); },
+    list_story_objects: async (a) => { requireProject(a.projectId); return listStoryObjects(a as Parameters<typeof listStoryObjects>[0]); },
+    get_project_summary: async () => getProjectSummary(pid),
+    get_open_annotations: async () => getOpenAnnotations(pid), // never cross-project from chat
+    list_skills: async () => listSkills(),
+    get_plot_thread_status: async (a) => { requireProject(a.projectId); return getPlotThreadStatus(pid); },
+    get_scene_focus: async (a) => { await requireNode(a.sceneId as string); return getSceneFocus(a.sceneId as string); },
+    get_manuscript_context: async (a) => { requireProject(a.projectId); return getManuscriptContext(pid); },
+    get_consistency_context: async (a) => {
+      requireProject(a.projectId);
+      if (a.sceneId) await requireNode(a.sceneId as string);
+      return getConsistencyContext(pid, a.sceneId as string | undefined);
+    },
+    get_voice_context: async (a) => { requireProject(a.projectId); await requireNode(a.sceneId as string); return getVoiceContext(pid, a.sceneId as string); },
 
-  // World Building
-  list_universes: async () => listUniverses(),
-  get_universe: async (a) => getUniverse(a.universeId as string),
-  create_universe: async (a) => createUniverse(a as Parameters<typeof createUniverse>[0]),
-  update_universe: async (a) => {
-    const { universeId, ...data } = a;
-    return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1]);
-  },
-  delete_universe: async (a) => deleteUniverse(a.universeId as string),
-  list_world_objects: async (a) => listWorldObjects(a.universeId as string, a.type as string | undefined),
-  get_world_object: async (a) => getWorldObject(a.objectId as string),
-  create_world_object: async (a) => createWorldObject(a as Parameters<typeof createWorldObject>[0]),
-  update_world_object: async (a) => {
-    const { objectId, ...data } = a;
-    return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1]);
-  },
-  delete_world_object: async (a) => deleteWorldObject(a.objectId as string),
-  add_timeline_entry: async (a) => addTimelineEntry(a as Parameters<typeof addTimelineEntry>[0]),
-  update_timeline_entry: async (a) => {
-    const { entryId, ...data } = a;
-    return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1]);
-  },
-  delete_timeline_entry: async (a) => deleteTimelineEntry(a.entryId as string),
-  reorder_timeline_entries: async (a) =>
-    reorderTimelineEntries(a.worldObjectId as string, a.orderedIds as string[]),
-  transfer_story_object_to_universe: async (a) =>
-    transferStoryObjectToUniverse(a.storyObjectId as string, a.universeId as string),
-  link_project_to_universe: async (a) =>
-    linkProjectToUniverse(a.projectId as string, a.universeId as string),
-  unlink_project_from_universe: async (a) =>
-    unlinkProjectFromUniverse(a.projectId as string),
+    // Structure
+    create_node: async (a) => {
+      requireProject(a.projectId);
+      if (a.parentId) await requireNode(a.parentId as string);
+      return createNode(a as Parameters<typeof createNode>[0]);
+    },
+    update_node: async (a) => {
+      const { nodeId, ...data } = a;
+      await requireNode(nodeId as string);
+      if (data.parentId) await requireNode(data.parentId as string);
+      return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1]);
+    },
+    delete_node: async (a) => { await requireNode(a.nodeId as string); return deleteNode(a.nodeId as string); },
+    write_scene_content: async (a) => {
+      await requireNode(a.nodeId as string);
+      if (a.blocks) {
+        return writeSceneContentFromBlocks(
+          a.nodeId as string,
+          a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
+        );
+      }
+      return writeSceneContent(a.nodeId as string, a.content as string);
+    },
+    get_scene_versions: async (a) => { await requireNode(a.nodeId as string); return getSceneVersions(a.nodeId as string, a.limit as number); },
+    restore_scene_version: async (a) => { await requireNode(a.nodeId as string); return restoreSceneVersion(a.nodeId as string, a.versionId as string); },
+    add_annotation: async (a) => {
+      await requireNode(a.nodeId as string);
+      return addAnnotation(a.nodeId as string, a.content as string, a.range as string, a.selectedText as string | null);
+    },
+    update_annotation: async (a) => {
+      const { annotationId, ...data } = a;
+      await requireAnnotation(annotationId as string);
+      return updateAnnotation(annotationId as string, data as Parameters<typeof updateAnnotation>[1]);
+    },
+    delete_annotation: async (a) => { await requireAnnotation(a.annotationId as string); return deleteAnnotation(a.annotationId as string); },
+    resolve_annotation: async (a) => { await requireAnnotation(a.annotationId as string); return resolveAnnotation(a.annotationId as string, a.resolved as boolean); },
 
-  // Export
-  export_manuscript: async (a) => exportManuscript(a.projectId as string),
-  export_story_bible: async (a) => exportStoryBible(a.projectId as string),
-  export_hashnode: async (a) => exportHashnode(a.projectId as string, a.nodeId as string | undefined),
-  export_to_google_docs: async (a) => {
-    const { projectId, universeId, exportMode } = a as {
-      projectId?: string;
-      universeId?: string;
-      exportMode: "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER";
-    };
-    if (!projectId && !universeId) {
-      throw new Error("Either projectId or universeId must be provided");
-    }
-    const entityId = exportMode === "UNIVERSE" ? universeId! : projectId!;
-    return GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode);
-  },
+    // Characters / Story Objects
+    get_story_object: async (a) => { await requireStoryObject(a.objectId as string); return getStoryObject(a.objectId as string); },
+    create_story_object: async (a) => { requireProject(a.projectId); return createStoryObject(a as Parameters<typeof createStoryObject>[0]); },
+    update_story_object: async (a) => {
+      const { objectId, ...data } = a;
+      await requireStoryObject(objectId as string);
+      return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1]);
+    },
+    delete_story_object: async (a) => { await requireStoryObject(a.objectId as string); return deleteStoryObject(a.objectId as string); },
+    list_relationships: async (a) => { requireProject(a.projectId); return listRelationships(pid); },
+    create_relationship: async (a) => {
+      requireProject(a.projectId);
+      for (const k of ["fromNodeId", "toNodeId"] as const) if (a[k]) await requireNode(a[k] as string);
+      for (const k of ["fromObjectId", "toObjectId"] as const) if (a[k]) await requireStoryObject(a[k] as string);
+      return createRelationship(a as Parameters<typeof createRelationship>[0]);
+    },
+    delete_relationship: async (a) => { await requireRelationship(a.relationshipId as string); return deleteRelationship(a.relationshipId as string); },
 
-  // Admin
-  create_project: async (a) => createProject(a as Parameters<typeof createProject>[0]),
-  update_project: async (a) => {
-    const { projectId, contentHash, ...data } = a;
-    return updateProject(null, projectId as string, data as Parameters<typeof updateProject>[2], contentHash as string | undefined);
-  },
-  snapshot_database: async (a) => snapshotDatabase(a.message as string),
-  list_snapshots: async (a) => listDatabaseSnapshots(a.limit as number),
-  restore_snapshot: async (a) => restoreDatabaseSnapshot(a.commitHash as string),
-  google_auth_status: async () => GoogleAuthController.getStatus(),
-  google_auth_connect: async () => ({ authUrl: GoogleAuthController.getAuthUrl(env.GOOGLE_REDIRECT_URI ?? '') }),
-  google_auth_callback: async (a) => {
-    await GoogleAuthController.handleCallback(a.code as string, env.GOOGLE_REDIRECT_URI ?? '');
-    return { success: true };
-  },
-  google_auth_disconnect: async () => {
-    await GoogleAuthController.disconnect();
-    return { success: true };
-  },
-};
+    // World Building
+    list_universes: async () => listUniverses(ctx.userId),
+    get_universe: async (a) => { await requireUniverse(a.universeId as string); return getUniverse(a.universeId as string); },
+    create_universe: async (a) => createUniverse(a as Parameters<typeof createUniverse>[0], ctx.userId),
+    update_universe: async (a) => {
+      const { universeId, ...data } = a;
+      await requireUniverse(universeId as string);
+      return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1]);
+    },
+    delete_universe: async (a) => { await requireUniverse(a.universeId as string); return deleteUniverse(a.universeId as string); },
+    list_world_objects: async (a) => { await requireUniverse(a.universeId as string); return listWorldObjects(a.universeId as string, a.type as string | undefined); },
+    get_world_object: async (a) => { await requireWorldObject(a.objectId as string); return getWorldObject(a.objectId as string); },
+    create_world_object: async (a) => { await requireUniverse(a.universeId as string); return createWorldObject(a as Parameters<typeof createWorldObject>[0]); },
+    update_world_object: async (a) => {
+      const { objectId, ...data } = a;
+      await requireWorldObject(objectId as string);
+      return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1]);
+    },
+    delete_world_object: async (a) => { await requireWorldObject(a.objectId as string); return deleteWorldObject(a.objectId as string); },
+    add_timeline_entry: async (a) => {
+      await requireWorldObject(a.worldObjectId as string);
+      if (a.projectId) requireProject(a.projectId);
+      return addTimelineEntry(a as Parameters<typeof addTimelineEntry>[0]);
+    },
+    update_timeline_entry: async (a) => {
+      const { entryId, ...data } = a;
+      await requireTimelineEntry(entryId as string);
+      return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1]);
+    },
+    delete_timeline_entry: async (a) => { await requireTimelineEntry(a.entryId as string); return deleteTimelineEntry(a.entryId as string); },
+    reorder_timeline_entries: async (a) => {
+      await requireWorldObject(a.worldObjectId as string);
+      return reorderTimelineEntries(a.worldObjectId as string, a.orderedIds as string[]);
+    },
+    transfer_story_object_to_universe: async (a) => {
+      await requireStoryObject(a.storyObjectId as string);
+      await requireUniverse(a.universeId as string);
+      return transferStoryObjectToUniverse(a.storyObjectId as string, a.universeId as string);
+    },
+    link_project_to_universe: async (a) => {
+      requireProject(a.projectId);
+      await assertUniverseOwner(a.universeId as string, ctx.userId);
+      return linkProjectToUniverse(pid, a.universeId as string);
+    },
+    unlink_project_from_universe: async (a) => { requireProject(a.projectId); return unlinkProjectFromUniverse(pid); },
+
+    // Export
+    export_manuscript: async (a) => { requireProject(a.projectId); return exportManuscript(pid); },
+    export_story_bible: async (a) => { requireProject(a.projectId); return exportStoryBible(pid); },
+    export_hashnode: async (a) => {
+      requireProject(a.projectId);
+      if (a.nodeId) await requireNode(a.nodeId as string);
+      return exportHashnode(pid, a.nodeId as string | undefined);
+    },
+    export_to_google_docs: async (a) => {
+      const { projectId, universeId, exportMode } = a as { projectId?: string; universeId?: string; exportMode: "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER" };
+      requireOwnerRole();
+      if (exportMode === "UNIVERSE") {
+        if (!universeId) throw new Error("universeId is required for UNIVERSE mode");
+        await requireUniverse(universeId);
+        return GoogleDocsExporter.exportToGoogleDocs(universeId, exportMode, ctx.userId);
+      }
+      requireProject(projectId);
+      return GoogleDocsExporter.exportToGoogleDocs(pid, exportMode, ctx.userId);
+    },
+
+    // Admin (project-level only; credential + snapshot tools are excluded from chat)
+    create_project: async (a) => createProject({ ...(a as Parameters<typeof createProject>[0]), userId: ctx.userId }),
+    update_project: async (a) => {
+      const { projectId, contentHash, ...data } = a;
+      requireProject(projectId);
+      return updateProject(null, pid, data as Parameters<typeof updateProject>[2], contentHash as string | undefined);
+    },
+  };
+}
 
 // ─── Build ADK FunctionTool instances ────────────────────────────────────────
 
 /** Convert a ToolDefinition + executor into an ADK FunctionTool */
-function toAdkTool(def: ToolDefinition): FunctionTool {
-  const executor = toolExecutors[def.name];
-  if (!executor) {
-    throw new Error(`No executor found for tool: ${def.name}`);
-  }
-
+function toAdkTool(def: ToolDefinition, executor: (args: Args) => Promise<unknown>): FunctionTool {
   return new FunctionTool({
     name: def.name,
     description: def.description,
@@ -861,23 +939,25 @@ function toAdkTool(def: ToolDefinition): FunctionTool {
   });
 }
 
-/** All ADK FunctionTool instances, indexed by name */
-const adkToolMap = new Map<string, FunctionTool>();
-
-/** All ADK FunctionTool instances, indexed by category */
-const adkToolsByCategory = new Map<ToolCategory, FunctionTool[]>();
-
-// Build the maps on module load
-for (const def of getAllTools()) {
-  const tool = toAdkTool(def);
-  adkToolMap.set(def.name, tool);
-
-  let categoryTools = adkToolsByCategory.get(def.category);
-  if (!categoryTools) {
-    categoryTools = [];
-    adkToolsByCategory.set(def.category, categoryTools);
+/** Builds the ADK FunctionTool instances for one chat turn, indexed by name and by category. */
+function buildAdkToolMaps(ctx: ToolContext): {
+  byName: Map<string, FunctionTool>;
+  byCategory: Map<ToolCategory, FunctionTool[]>;
+} {
+  const executors = buildToolExecutors(ctx);
+  const byName = new Map<string, FunctionTool>();
+  const byCategory = new Map<ToolCategory, FunctionTool[]>();
+  for (const def of getAllTools()) {
+    if (CHAT_EXCLUDED_TOOLS.has(def.name)) continue;
+    const executor = executors[def.name];
+    if (!executor) throw new Error(`No executor found for tool: ${def.name}`);
+    const tool = toAdkTool(def, executor);
+    byName.set(def.name, tool);
+    const list = byCategory.get(def.category) ?? [];
+    list.push(tool);
+    byCategory.set(def.category, list);
   }
-  categoryTools.push(tool);
+  return { byName, byCategory };
 }
 
 // ─── load_toolset as an ADK FunctionTool ─────────────────────────────────────
@@ -903,45 +983,43 @@ export const loadToolsetTool = new FunctionTool({
   execute: async (input) => {
     const { category } = input as { category: string };
     const cat = category as ToolCategory;
-    const tools = adkToolsByCategory.get(cat) ?? [];
+    const names = getAllTools().filter((t) => t.category === cat && !CHAT_EXCLUDED_TOOLS.has(t.name)).map((t) => t.name);
     return {
       loaded: cat,
-      toolCount: tools.length,
-      tools: tools.map((t) => t.name),
+      toolCount: names.length,
+      tools: names,
     };
   },
 });
 
 // ─── Public API ──────────────────────────────────────────────────────────────
+// Every function below is context-bound: tools are built fresh per chat turn,
+// pinned to ctx.projectId, rather than cached at module load (SEC-01).
 
-/** Get all ADK FunctionTool instances */
-export function getAllAdkTools(): FunctionTool[] {
-  return Array.from(adkToolMap.values());
+/** Get all ADK FunctionTool instances for one chat turn */
+export function getAllAdkTools(ctx: ToolContext): FunctionTool[] {
+  return Array.from(buildAdkToolMaps(ctx).byName.values());
 }
 
 /** Get ADK FunctionTool instances for the given categories */
-export function getAdkTools(categories: ToolCategory[]): FunctionTool[] {
-  const result: FunctionTool[] = [];
-  for (const cat of categories) {
-    const tools = adkToolsByCategory.get(cat);
-    if (tools) result.push(...tools);
-  }
-  return result;
+export function getAdkTools(ctx: ToolContext, categories: ToolCategory[]): FunctionTool[] {
+  const { byCategory } = buildAdkToolMaps(ctx);
+  return categories.flatMap((c) => byCategory.get(c) ?? []);
 }
 
 /** Get the core tools + load_toolset meta-tool as ADK FunctionTool instances */
-export function getCoreAdkTools(): FunctionTool[] {
-  return [...getAdkTools(["core"]), loadToolsetTool];
+export function getCoreAdkTools(ctx: ToolContext): FunctionTool[] {
+  return [...getAdkTools(ctx, ["core"]), loadToolsetTool];
 }
 
 /** Look up an ADK FunctionTool by name */
-export function getAdkToolByName(name: string): FunctionTool | undefined {
-  return adkToolMap.get(name);
+export function getAdkToolByName(ctx: ToolContext, name: string): FunctionTool | undefined {
+  return buildAdkToolMaps(ctx).byName.get(name);
 }
 
 /** Get the list of tool categories */
 export function getAdkCategories(): ToolCategory[] {
-  return Array.from(adkToolsByCategory.keys());
+  return Array.from(new Set(getAllTools().map((t) => t.category)));
 }
 
 // ─── DynamicToolset: ADK BaseToolset for load_toolset pattern ────────────────
@@ -950,8 +1028,11 @@ export function getAdkCategories(): ToolCategory[] {
  * A toolset that starts with core tools + load_toolset, and expands when the
  * LLM calls load_toolset. Use this as a tool source for an ADK LlmAgent.
  *
+ * Every tool built for this toolset is pinned to `ctx.projectId` (SEC-01) —
+ * construct a fresh instance per chat turn, never cache across requests.
+ *
  * Usage:
- *   const toolset = new DynamicToolset();
+ *   const toolset = new DynamicToolset(ctx);
  *   const agent = new LlmAgent({ tools: [toolset], ... });
  *
  * When the agent calls load_toolset, the execute function updates
@@ -960,9 +1041,11 @@ export function getAdkCategories(): ToolCategory[] {
  */
 export class DynamicToolset extends BaseToolset {
   private loadedCategories: Set<ToolCategory> = new Set(["core"]);
+  private readonly byCategory: Map<ToolCategory, FunctionTool[]>;
 
-  constructor(filter?: ToolPredicate | string[]) {
+  constructor(ctx: ToolContext, filter?: ToolPredicate | string[]) {
     super(filter ?? (() => true));
+    this.byCategory = buildAdkToolMaps(ctx).byCategory;
   }
 
   /** Load a category (called externally or by load_toolset's afterTool callback) */
@@ -985,7 +1068,7 @@ export class DynamicToolset extends BaseToolset {
 
     // Add tools for all loaded categories
     for (const cat of this.loadedCategories) {
-      const catTools = adkToolsByCategory.get(cat);
+      const catTools = this.byCategory.get(cat);
       if (catTools) tools.push(...catTools);
     }
 

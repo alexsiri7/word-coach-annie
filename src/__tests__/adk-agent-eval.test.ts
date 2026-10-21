@@ -16,6 +16,7 @@ import {
 } from "@google/adk";
 import type { Content } from "@google/genai";
 import { runChatAgent, type ChatAgentResult } from "@/lib/ai/adk-agent";
+import type { ToolContext } from "@/lib/ai/adk-tools";
 
 // ─── Scripted Mock LLM ──────────────────────────────────────────────────────
 //
@@ -212,7 +213,28 @@ vi.mock("@/lib/export/google-docs-exporter", () => ({
   },
 }));
 
+// These eval tests exercise the agent loop and tool selection, not the ownership
+// boundary (that's covered by the "chat tool scoping" tests in adk-tools.test.ts).
+// Every fixture ID here belongs to the default toolContext's pinned project/universe.
+vi.mock("@/lib/ownership", () => ({
+  assertProjectOwner: vi.fn(async () => {}),
+  assertUniverseOwner: vi.fn(async () => {}),
+  projectIdForNode: vi.fn(async () => "proj-1"),
+  projectIdForStoryObject: vi.fn(async () => "proj-1"),
+  projectIdForAnnotation: vi.fn(async () => "proj-1"),
+  universeIdForWorldObject: vi.fn(async () => "u-1"),
+  universeIdForTimelineEntry: vi.fn(async () => "u-1"),
+  relationshipOwner: vi.fn(async () => ({ projectId: "proj-1" })),
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const defaultToolContext: ToolContext = {
+  userId: null,
+  userEmail: null,
+  projectId: "proj-1",
+  role: null,
+};
 
 const defaultConfig = {
   baseUrl: "https://test.example.com/v1",
@@ -226,6 +248,7 @@ async function runWithScript(
     userMessage?: string;
     systemPrompt?: string;
     chatHistory?: { role: string; content: string }[];
+    toolContext?: ToolContext;
   } = {},
 ): Promise<ChatAgentResult> {
   const llm = new ScriptedLlm(turns);
@@ -236,6 +259,7 @@ async function runWithScript(
     chatHistory: opts.chatHistory ?? [],
     userMessage: opts.userMessage ?? "Hello",
     aiConfig: defaultConfig,
+    toolContext: opts.toolContext ?? defaultToolContext,
   });
 
   activeLlm = null;
@@ -276,24 +300,24 @@ describe("Agent eval: basic responses", () => {
 
 describe("Agent eval: single tool use", () => {
   it("calls a core tool and captures the result in toolLog", async () => {
+    // Chat is scoped to one project (SEC-01) — list_projects returns only the
+    // conversation's pinned project, not every project in the system.
     const result = await runWithScript([
       {
         toolCalls: [
           { id: "call_1", name: "list_projects", args: {} },
         ],
       },
-      { text: "You have 2 projects: Test Novel and Short Stories.", done: true },
+      { text: "You have 1 project: Test Novel.", done: true },
     ]);
 
     expect(result.toolLog).toHaveLength(1);
     expect(result.toolLog[0].tool).toBe("list_projects");
     expect(JSON.parse(result.toolLog[0].result)).toEqual({
-      results: [
-        { id: "proj-1", title: "Test Novel" },
-        { id: "proj-2", title: "Short Stories" },
-      ],
+      projects: [{ id: "proj-1", title: "Test Novel", genre: "Fantasy" }],
+      total: 1,
     });
-    expect(result.finalContent).toContain("2 projects");
+    expect(result.finalContent).toContain("1 project");
   });
 
   it("passes tool arguments correctly", async () => {
@@ -535,6 +559,7 @@ describe("Agent eval: chat history", () => {
       ],
       userMessage: "Can you remind me?",
       aiConfig: defaultConfig,
+      toolContext: defaultToolContext,
     });
 
     expect(result.finalContent).toContain("Fantasy");
@@ -567,6 +592,7 @@ describe("Agent eval: chat history", () => {
       ],
       userMessage: "Help me write",
       aiConfig: defaultConfig,
+      toolContext: defaultToolContext,
     });
 
     // The system message should be filtered out
@@ -634,7 +660,10 @@ describe("Agent eval: export workflow", () => {
 });
 
 describe("Agent eval: admin tools", () => {
-  it("loads admin category and creates a snapshot", async () => {
+  // snapshot_database/restore_snapshot and the google_auth_* tools are excluded
+  // from the chat toolset entirely (SEC-01) — only project-level admin tools
+  // (create_project/update_project) remain reachable from the "admin" category.
+  it("loads admin category and updates the project", async () => {
     const result = await runWithScript([
       {
         toolCalls: [
@@ -645,18 +674,18 @@ describe("Agent eval: admin tools", () => {
         toolCalls: [
           {
             id: "call_2",
-            name: "snapshot_database",
-            args: { message: "Before major edit" },
+            name: "update_project",
+            args: { projectId: "proj-1", contentHash: "h1", title: "Renamed Novel" },
           },
         ],
       },
-      { text: "Database snapshot created.", done: true },
+      { text: "Project renamed.", done: true },
     ]);
 
     expect(result.toolLog).toHaveLength(2);
-    expect(result.toolLog[1].tool).toBe("snapshot_database");
-    const snapResult = JSON.parse(result.toolLog[1].result);
-    expect(snapResult.hash).toBe("abc123");
+    expect(result.toolLog[1].tool).toBe("update_project");
+    const updateResult = JSON.parse(result.toolLog[1].result);
+    expect(updateResult.id).toBe("proj-1");
   });
 });
 

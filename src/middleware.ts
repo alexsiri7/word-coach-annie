@@ -125,13 +125,23 @@ async function applyRateLimit(
     return tryLimit(`${isRead ? "read" : "write"}:${userKey}`, config);
 }
 
+/** Request headers that only the middleware may set. Anything the client sent is dropped. */
+const IDENTITY_HEADERS = ["x-user-id", "x-user-email"] as const;
+
 export async function middleware(request: NextRequest) {
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
     const csp = buildCsp(nonce);
 
-    // Helper: NextResponse.next() with nonce injected into request headers + CSP on response
-    function nextWithNonce(extraHeaders?: Headers): NextResponse {
-        const reqHeaders = new Headers(extraHeaders ?? request.headers);
+    // Helper: NextResponse.next() with nonce injected into request headers + CSP on response.
+    // Identity headers are never forwarded from the client; they are set here only from a
+    // verified JWT/MCP session (SEC-03).
+    function nextWithNonce(identity?: { userId: string; email: string }): NextResponse {
+        const reqHeaders = new Headers(request.headers);
+        for (const h of IDENTITY_HEADERS) reqHeaders.delete(h);
+        if (identity) {
+            reqHeaders.set("x-user-id", identity.userId);
+            reqHeaders.set("x-user-email", identity.email);
+        }
         reqHeaders.set("x-nonce", nonce);
         const res = NextResponse.next({ request: { headers: reqHeaders } });
         res.headers.set("Content-Security-Policy", csp);
@@ -188,10 +198,7 @@ export async function middleware(request: NextRequest) {
                     id: mcpSession.userId,
                 });
 
-                const requestHeaders = new Headers(request.headers);
-                requestHeaders.set("x-user-id", mcpSession.userId);
-                requestHeaders.set("x-user-email", mcpSession.email);
-                return nextWithNonce(requestHeaders);
+                return nextWithNonce({ userId: mcpSession.userId, email: mcpSession.email });
             }
         }
 
@@ -220,10 +227,7 @@ export async function middleware(request: NextRequest) {
             });
 
             // Forward userId to route handlers via request headers
-            const requestHeaders = new Headers(request.headers);
-            requestHeaders.set("x-user-id", session.userId);
-            requestHeaders.set("x-user-email", session.email);
-            return nextWithNonce(requestHeaders);
+            return nextWithNonce({ userId: session.userId, email: session.email });
         }
 
         // Fall back to legacy API_TOKEN session cookie

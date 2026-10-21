@@ -2,8 +2,9 @@ import { prisma } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class UniversesController {
-    static async listUniverses() {
+    static async listUniverses(userId?: string | null) {
         const universes = await prisma.universe.findMany({
+            where: userId ? { userId } : {},
             orderBy: { updatedAt: "desc" },
             include: {
                 _count: {
@@ -53,13 +54,14 @@ export class UniversesController {
         };
     }
 
-    static async createUniverse(data: { title: string; description?: string }) {
+    static async createUniverse(data: { title: string; description?: string }, userId?: string | null) {
         if (!data.title?.trim()) throw new Error("Title is required");
 
         const universe = await prisma.universe.create({
             data: {
                 title: sanitizeInput(data.title.trim()),
                 description: data.description ? sanitizeInput(data.description.trim()) : "",
+                userId: userId ?? undefined,
             },
         });
 

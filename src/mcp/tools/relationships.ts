@@ -51,7 +51,7 @@ export async function listRelationships(projectId: string) {
         async () => {
             const project = await prisma.project.findUnique({
                 where: { id: projectId },
-                select: { id: true },
+                select: { id: true, universeId: true },
             });
             if (!project) throw new Error(`Project not found: ${projectId}`);
 
@@ -76,8 +76,12 @@ export async function listRelationships(projectId: string) {
                         { fromObjectId: { in: objectIds } },
                         { toNodeId: { in: nodeIds } },
                         { toObjectId: { in: objectIds } },
-                        { fromWorldObjectId: { not: null } },
-                        { toWorldObjectId: { not: null } },
+                        ...(project.universeId
+                            ? [
+                                { fromWorldObject: { universeId: project.universeId } },
+                                { toWorldObject: { universeId: project.universeId } },
+                              ]
+                            : []),
                     ],
                 },
                 include: {

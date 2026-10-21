@@ -709,10 +709,13 @@ export class StructureController {
         return { deleted: results, errors, totalDeleted: results.length, totalErrors: errors.length };
     }
 
-    static async getOpenAnnotations(projectId?: string) {
+    static async getOpenAnnotations(projectId?: string, userId?: string | null) {
         const where: Record<string, unknown> = { resolved: false };
         if (projectId) {
             where.node = { projectId };
+        } else if (userId) {
+            // Never return other tenants' annotations when no projectId is given.
+            where.node = { project: { userId } };
         }
 
         const annotations = await prisma.annotation.findMany({

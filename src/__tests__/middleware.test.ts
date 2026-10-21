@@ -253,6 +253,82 @@ describe("middleware", () => {
         );
     });
 
+    describe("identity header stripping (SEC-03)", () => {
+        it("drops client-supplied x-user-id on the API_TOKEN bearer branch", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            process.env.API_TOKEN = "valid-token";
+            const req = createRequest("/api/projects", {
+                headers: {
+                    authorization: "Bearer valid-token",
+                    "x-user-id": "victim-id",
+                    "x-user-email": "victim@example.com",
+                },
+            });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+            expect(res.headers.get("x-middleware-request-x-user-email")).toBeNull();
+        });
+
+        it("drops client-supplied x-user-id on public paths", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const req = createRequest("/oauth/register", { headers: { "x-user-id": "victim-id" } });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("drops client-supplied x-user-id when auth is disabled", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const req = createRequest("/api/projects", { headers: { "x-user-id": "victim-id" } });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("drops client-supplied x-user-id on the legacy API_TOKEN cookie branch", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+            vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
+            process.env.API_TOKEN = "my-token";
+            const req = createRequest("/api/projects", {
+                headers: { "x-user-id": "victim-id" },
+                cookies: { annie_session: "hashed_my-token" },
+            });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("overrides client-supplied x-user-id with the verified JWT identity", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const req = createRequest("/api/projects", {
+                headers: { "x-user-id": "victim-id", "x-user-email": "victim@example.com" },
+                cookies: { annie_session: "valid-jwt-token" },
+            });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
+            expect(res.headers.get("x-middleware-request-x-user-email")).toBe("test@example.com");
+        });
+
+        it("overrides client-supplied x-user-id with the verified MCP identity", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifyMcpToken).mockResolvedValue({
+                userId: "mcp-user",
+                email: "mcp@example.com",
+                clientId: "test-client",
+                jti: "mcp-jti-2",
+                exp: Math.floor(Date.now() / 1000) + 3600,
+            });
+            const req = createRequest("/api/projects", {
+                headers: { authorization: "Bearer mcp-token", "x-user-id": "victim-id" },
+            });
+            const res = await middleware(req);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("mcp-user");
+        });
+    });
+
     describe("CSP nonce injection", () => {
         it("sets Content-Security-Policy header on all passing responses", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);

@@ -23,8 +23,8 @@ function timelineEntryContentHash(entry: {
     return computeContentHash(entry.label, entry.description, entry.attributes);
 }
 
-export async function listUniverses() {
-    return UniversesController.listUniverses();
+export async function listUniverses(userId?: string | null) {
+    return UniversesController.listUniverses(userId);
 }
 
 export async function getUniverse(id: string) {
@@ -35,8 +35,8 @@ export async function getUniverse(id: string) {
     };
 }
 
-export async function createUniverse(data: { title: string; description?: string }) {
-    return UniversesController.createUniverse(data);
+export async function createUniverse(data: { title: string; description?: string }, userId?: string | null) {
+    return UniversesController.createUniverse(data, userId);
 }
 
 export async function updateUniverse(id: string, data: { title?: string; description?: string }, contentHash?: string) {
