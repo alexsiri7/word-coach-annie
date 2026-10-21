@@ -13,16 +13,39 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Moon, Sun, Monitor, User, MessageSquarePlus, Plug, Settings } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { SyncStatusChip } from "@/components/sync-status-chip";
+import { countUnsyncedOps, hasUnsyncedWork } from "@/lib/offline/clear-client-data";
 
 export function UserMenu() {
     const router = useRouter();
     const { authenticated, user, loading, logout } = useAuth();
     const { setTheme, theme } = useTheme();
     const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [unsyncedCount, setUnsyncedCount] = useState<number | null>(0);
+    const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
     if (loading || !authenticated) return null;
+
+    const handleSignOut = async () => {
+        const count = await countUnsyncedOps();
+        if (hasUnsyncedWork(count)) {
+            setUnsyncedCount(count);
+            setSignOutConfirmOpen(true);
+        } else {
+            await logout();
+        }
+    };
 
     return (
         <>
@@ -80,7 +103,7 @@ export function UserMenu() {
                         {theme === "system" && <span className="ml-auto text-accent">&#10003;</span>}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="text-destructive cursor-pointer">
+                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive cursor-pointer">
                         <LogOut className="h-4 w-4 mr-2" />
                         Sign out
                     </DropdownMenuItem>
@@ -91,6 +114,34 @@ export function UserMenu() {
                 onOpenChange={setFeedbackOpen}
                 userEmail={user?.email}
             />
+            <AlertDialog open={signOutConfirmOpen} onOpenChange={setSignOutConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Unsynced changes</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {unsyncedCount === null ? (
+                                <>
+                                    This device&apos;s offline changes couldn&apos;t be checked. Signing out
+                                    clears this device&apos;s offline data, so any changes that haven&apos;t
+                                    synced yet will be lost.
+                                </>
+                            ) : (
+                                <>
+                                    You have {unsyncedCount} {unsyncedCount === 1 ? "change" : "changes"} that
+                                    haven&apos;t synced yet. Signing out clears this device&apos;s offline data,
+                                    so {unsyncedCount === 1 ? "this change" : "these changes"} will be lost.
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={logout} className="bg-danger hover:bg-danger-hover">
+                            Sign out anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

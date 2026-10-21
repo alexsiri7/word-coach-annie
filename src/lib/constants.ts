@@ -55,3 +55,6 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, Record<string, string>> = 
         NOTE: "Note",
     },
 };
+
+/** localStorage flag recording this browser's Sentry session-replay consent. */
+export const SENTRY_REPLAY_CONSENT_KEY = "consent:sentry_replay";

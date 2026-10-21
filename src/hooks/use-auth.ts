@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { clearClientData } from "@/lib/offline/clear-client-data";
 
 export interface AuthUser {
     userId: string;
@@ -67,6 +68,7 @@ export function useAuth(): AuthState {
     const logout = useCallback(async () => {
         clearRenewTimer();
         await fetch("/api/auth/logout", { method: "POST" });
+        await clearClientData();
         setAuthenticated(false);
         setUser(null);
         window.location.href = "/login";

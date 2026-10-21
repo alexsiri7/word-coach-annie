@@ -218,6 +218,18 @@ export async function idbClear<S extends StoreName>(store: S): Promise<void> {
     return db.clear(store);
 }
 
+/**
+ * Clear every store in one transaction (logout / account deletion).
+ * Clears instead of deleteDatabase: a delete stays blocked while any tab or
+ * the service worker holds an open connection, and those are never closed.
+ */
+export async function clearOfflineData(): Promise<void> {
+    const db = await getDB();
+    const names = [...db.objectStoreNames];
+    const tx = db.transaction(names, "readwrite");
+    await Promise.all([...names.map((s) => tx.objectStore(s).clear()), tx.done]);
+}
+
 // ─── Pending Ops Helpers ────────────────────────────────────────────────────
 
 /** Queue a pending operation for later sync. */

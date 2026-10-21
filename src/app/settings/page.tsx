@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Check, Eye, EyeOff, Settings, Sparkles, MessageSquare, Link2, Link2Off, Loader2, Shield, Download, Trash2, CalendarClock, Copy, RefreshCw } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { clearClientData } from "@/lib/offline/clear-client-data";
+import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AiModelSelect } from "@/components/ai-model-select";
@@ -236,7 +238,7 @@ export default function SettingsPage() {
   const handleReplayToggle = async (allowed: boolean) => {
     const previous = replayAllowed;
     setReplayAllowed(allowed);
-    localStorage.setItem("consent:sentry_replay", String(allowed));
+    localStorage.setItem(SENTRY_REPLAY_CONSENT_KEY, String(allowed));
     try {
       const res = await fetch("/api/account/consent", {
         method: "PUT",
@@ -247,7 +249,7 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Failed to save consent preference", err);
       setReplayAllowed(previous);
-      localStorage.setItem("consent:sentry_replay", String(previous));
+      localStorage.setItem(SENTRY_REPLAY_CONSENT_KEY, String(previous));
     }
   };
 
@@ -296,6 +298,7 @@ export default function SettingsPage() {
         setDeleteError(data.error || "Deletion failed. Please try again.");
         return;
       }
+      await clearClientData();
       window.location.href = "/";
     } catch (err) {
       console.error("Failed to delete account:", err);
