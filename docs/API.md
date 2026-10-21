@@ -820,6 +820,8 @@ Get Google Docs export status and records for a project.
 ### `POST /api/integrations/google-docs/export`
 Export or sync a project to Google Docs.
 
+**Auth**: Project owner only.
+
 **Body**: `{ projectId: string, exportMode: "STORY_READER" | "STORY_INTERNAL" }`
 
 **Response**: `{ googleDocUrl: string, docId: string }`

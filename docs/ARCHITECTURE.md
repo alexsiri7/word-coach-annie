@@ -231,7 +231,7 @@ Handled by `ProjectsController` — templates assembled from structure nodes and
 All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`).
 
 ### Google Docs
-`src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document. Export (creating or redirecting the mapped doc) is owner-only (`verifyProjectAccess`); editors may view export links and sync comments, and imported comment text is sanitized with `sanitizeInput` like every other annotation write.
+`src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document. Export (creating or redirecting the mapped doc) is owner-only (`verifyProjectAccess`); editors may view export links and sync comments, and imported comment text (author, body, replies, quoted selection) is sanitized with `sanitizeInput` before it is stored as an annotation.
 
 Three export modes: `UNIVERSE` (world-building bible), `STORY_INTERNAL` (full manuscript with beats/synopsis), `STORY_READER` (clean reader version).
 

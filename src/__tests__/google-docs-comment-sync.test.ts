@@ -129,7 +129,7 @@ describe("GoogleDocsCommentSync", () => {
                 {
                     id: "comment-html",
                     content: "Nice <img src=x onerror=alert(1)>line",
-                    quotedFileContent: { value: "a hero was born" },
+                    quotedFileContent: { value: "a <b>hero</b> was born" },
                     author: { displayName: "<b>Eve</b>" },
                     resolved: false,
                     replies: [{ content: "<script>x</script>ok", author: { displayName: "Bob" } }],
