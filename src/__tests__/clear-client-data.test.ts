@@ -9,9 +9,14 @@ vi.mock("@/lib/offline/sync-queue", () => ({
   replayPendingOps: vi.fn(async () => {}),
 }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
 import { clearClientData, countUnsyncedOps } from "@/lib/offline/clear-client-data";
 import { clearOfflineData, getPendingOps, type PendingOp } from "@/lib/offline/idb";
 import { replayPendingOps } from "@/lib/offline/sync-queue";
+import { logger } from "@/lib/logger";
 
 const store = new Map<string, string>();
 const localStorageStub = {
@@ -62,14 +67,24 @@ describe("clearClientData", () => {
     expect([...cacheNames]).toEqual(["workbox-precache-v2-https://example.test/"]);
   });
 
-  it("still clears localStorage and caches when IndexedDB fails", async () => {
-    vi.mocked(clearOfflineData).mockRejectedValueOnce(new Error("idb unavailable"));
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reports an IndexedDB failure and still clears localStorage and caches", async () => {
+    const err = new Error("idb unavailable");
+    vi.mocked(clearOfflineData).mockRejectedValueOnce(err);
 
     await clearClientData();
 
+    expect(logger.error).toHaveBeenCalledWith("[logout] Failed to clear offline data", err);
     expect(store.has("consent:sentry_replay")).toBe(false);
     expect(cacheNames.has("app-shell")).toBe(false);
+  });
+
+  it("reports a Cache API failure", async () => {
+    const err = new Error("caches unavailable");
+    cachesStub.keys.mockRejectedValueOnce(err);
+
+    await clearClientData();
+
+    expect(logger.error).toHaveBeenCalledWith("[logout] Failed to clear service-worker caches", err);
   });
 
   it("does not throw when the Cache API is unavailable", async () => {
@@ -102,10 +117,10 @@ describe("countUnsyncedOps", () => {
     expect(replayPendingOps).not.toHaveBeenCalled();
   });
 
-  it("returns 0 when the queue cannot be read", async () => {
+  it("returns null, not 0, when the queue cannot be read", async () => {
     navigatorStub.onLine = false;
     vi.mocked(getPendingOps).mockRejectedValueOnce(new Error("idb unavailable"));
 
-    expect(await countUnsyncedOps()).toBe(0);
+    expect(await countUnsyncedOps()).toBeNull();
   });
 });

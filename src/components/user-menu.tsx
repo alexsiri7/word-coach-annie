@@ -32,14 +32,14 @@ export function UserMenu() {
     const { authenticated, user, loading, logout } = useAuth();
     const { setTheme, theme } = useTheme();
     const [feedbackOpen, setFeedbackOpen] = useState(false);
-    const [unsyncedCount, setUnsyncedCount] = useState(0);
+    const [unsyncedCount, setUnsyncedCount] = useState<number | null>(0);
     const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
     if (loading || !authenticated) return null;
 
     const handleSignOut = async () => {
         const count = await countUnsyncedOps();
-        if (count > 0) {
+        if (count === null || count > 0) {
             setUnsyncedCount(count);
             setSignOutConfirmOpen(true);
         } else {
@@ -119,9 +119,19 @@ export function UserMenu() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Unsynced changes</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You have {unsyncedCount} {unsyncedCount === 1 ? "change" : "changes"} that
-                            haven&apos;t synced yet. Signing out clears this device&apos;s offline data,
-                            so {unsyncedCount === 1 ? "this change" : "these changes"} will be lost.
+                            {unsyncedCount === null ? (
+                                <>
+                                    This device&apos;s offline changes couldn&apos;t be checked. Signing out
+                                    clears this device&apos;s offline data, so any changes that haven&apos;t
+                                    synced yet will be lost.
+                                </>
+                            ) : (
+                                <>
+                                    You have {unsyncedCount} {unsyncedCount === 1 ? "change" : "changes"} that
+                                    haven&apos;t synced yet. Signing out clears this device&apos;s offline data,
+                                    so {unsyncedCount === 1 ? "this change" : "these changes"} will be lost.
+                                </>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

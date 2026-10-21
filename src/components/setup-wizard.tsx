@@ -26,7 +26,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-const DISMISSED_KEY = "setup-wizard-dismissed";
+export const DISMISSED_KEY = "setup-wizard-dismissed";
 
 const FEATURES = [
   {

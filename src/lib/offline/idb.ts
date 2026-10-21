@@ -153,8 +153,6 @@ export function getDB(): Promise<IDBPDatabase<AnnieDBSchema>> {
 
 type StoreName = "projects" | "structureNodes" | "contentVersions" | "storyObjects" | "annotations" | "pendingOps";
 
-const STORE_NAMES: StoreName[] = ["projects", "structureNodes", "contentVersions", "storyObjects", "annotations", "pendingOps"];
-
 /** Get a single record by key. */
 export async function idbGet<S extends StoreName>(
     store: S,
@@ -227,8 +225,9 @@ export async function idbClear<S extends StoreName>(store: S): Promise<void> {
  */
 export async function clearOfflineData(): Promise<void> {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAMES, "readwrite");
-    await Promise.all([...STORE_NAMES.map((s) => tx.objectStore(s).clear()), tx.done]);
+    const names = [...db.objectStoreNames];
+    const tx = db.transaction(names, "readwrite");
+    await Promise.all([...names.map((s) => tx.objectStore(s).clear()), tx.done]);
 }
 
 // ─── Pending Ops Helpers ────────────────────────────────────────────────────
