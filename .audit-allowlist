@@ -13,59 +13,6 @@
 #
 # Last reviewed: 2026-10-21
 #
-# Source: uuid (via gaxios -> @google/adk transitive chain)
-# Justification: uuid buffer bounds check missing in v3/v5/v6 when caller passes a buf
-# argument. This app does not call uuid() with a custom buffer argument.
-# Upgrade path: blocked by @google/adk major version pin.
-# App risk: LOW — vulnerability requires using the uuid API in an atypical way.
-GHSA-w5hq-g745-h8pq
-#
-# Source: @opentelemetry/core (via @sentry/nextjs -> @opentelemetry/* transitive chain)
-# Justification: @opentelemetry/core unbounded memory allocation in W3C Baggage propagation
-# requires an attacker to send crafted HTTP headers with very large baggage values.
-# This app is behind standard Next.js HTTP handling; malicious baggage headers would
-# require reaching the OpenTelemetry instrumentation layer (Sentry).
-# Upgrade path: fix requires @opentelemetry/exporter-trace-otlp-proto major version bump.
-# App risk: LOW — moderate severity, requires targeted header manipulation; Sentry is
-# the only consumer of the OpenTelemetry SDK in this app.
-GHSA-8988-4f7v-96qf
-#
-# Source: @hono/node-server (transitive via @modelcontextprotocol/sdk)
-# Justification: Path traversal via encoded backslash in serve-static, which is
-# Windows-only. This app runs on Linux in Docker, and it never runs serve-static:
-# /api/mcp is an internet-facing Next.js API route, guarded by the auth in
-# src/middleware.ts, that uses the SDK's WebStandardStreamableHTTPServerTransport
-# rather than @hono/node-server.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: NONE — vulnerable code path is never run, and is Windows-only.
-GHSA-frvp-7c67-39w9
-#
-# Source: js-yaml (via various transitive chains)
-# Justification: Quadratic CPU DoS via merge-key chains and !!omap resolution.
-# Requires parsing attacker-controlled YAML. This app does not parse user-supplied YAML.
-# Upgrade path: auto-fixable. Consider running `npm audit fix`.
-# App risk: LOW — no user-supplied YAML parsing at runtime.
-GHSA-52cp-r559-cp3m
-GHSA-5p4m-2wfm-xmqj
-# 2026-09-09: maxTotalMergeKeys does not bound CPU for empty merge sources (js-yaml <4.3.2).
-# Same exposure: js-yaml is transitive via @google/adk; no attacker-controlled YAML is parsed.
-GHSA-2883-xcg3-v3hh
-#
-# Source: protobufjs (additional DoS CVE — infinite loop in .proto option parsing)
-# Justification: DoS via infinite loop requires parsing attacker-controlled .proto files.
-# This app does not load user-supplied protobuf definitions at runtime.
-# Upgrade path: blocked by @google/adk transitive dependency.
-# App risk: LOW — protobuf schemas are compiled at build time, not loaded dynamically.
-GHSA-j3f2-48v5-ccww
-#
-# Source: deepmerge-ts (via @prisma/config transitive chain)
-# Justification: deepmerge-ts stack exhaustion requires merging recursive object graphs
-# with attacker-controlled input. This app does not pass user-controlled objects to
-# deepmerge-ts; it is used internally by @prisma/config for merging Prisma configuration.
-# Upgrade path: fix available (deepmerge-ts >=8.0.0). Consider running `npm audit fix`.
-# App risk: LOW — no user-controlled input reaches deepmerge-ts; config merging only.
-GHSA-ggr8-5vv4-36mx
-#
 # Source: serialize-javascript (via @ducanh2912/next-pwa -> workbox-build -> @rollup/plugin-terser)
 # Justification: serialize-javascript RCE (via RegExp.flags/Date.toISOString) and DoS
 # (via crafted array-like objects) require the app to deserialize attacker-controlled
