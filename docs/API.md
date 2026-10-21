@@ -86,12 +86,17 @@ Export all personal data for the authenticated user as a ZIP archive (GDPR Artic
   - `profile.json` — user profile fields (`id`, `email`, `name`, `picture`, `createdAt`, `updatedAt`)
   - `ai-settings.json` — AI preferences (API key is **omitted** for security)
   - `consents.json` — consent preferences (`feature`, `consentGiven`, `updatedAt` per entry)
-  - `projects/<title>.json` — full project JSON for each project, including:
+  - `providers.json` — contest/publication providers
+  - `opportunities.json` — tracked opportunities
+  - `writing-tasks.json` — practice tasks not tied to a project
+  - `projects/<title>-<id>.json` — full project JSON for each project (the id keeps titles that sanitize alike from colliding), including:
     - structure nodes, story objects, chat messages, annotations, relationships
     - `writingSessions` — word count and duration records per scene
     - `conversations` — AI chat threads (title, type, summary; messages excluded)
     - `googleDocExports` — Google Docs sync records (credential tokens **omitted**)
     - `hashnodeExports` — Hashnode publish records (`credentialId` **omitted** for security)
+    - `universeId`, `shares`, `peerReviews`, `writingTasks`, `contestSubmissions`, `publicationSubmissions`, `opportunityCandidates`
+  - `universes/<title>-<id>.json` — each universe with its `worldObjects` (and their `timeline`), world-object `relationships` and `googleDocExports` (credential tokens **omitted**)
 - `401 Unauthorized` — not authenticated
 - `500 Internal Server Error` — export generation failed
 

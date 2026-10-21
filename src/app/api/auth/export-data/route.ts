@@ -5,6 +5,13 @@ import { isGoogleAuthMode } from "@/lib/auth";
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import { exportProjectJson } from "@/lib/export-json";
+import {
+  exportProjectAccountData,
+  exportUniverseJson,
+  serializeOpportunity,
+  serializeProvider,
+  serializeWritingTask,
+} from "@/lib/export-account-data";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
@@ -25,11 +32,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [projects, aiSettings, consents] = await Promise.all([
+    const ownedBy = userId ? { userId } : {};
+    const [projects, universes, providers, opportunities, practiceTasks, aiSettings, consents] = await Promise.all([
       prisma.project.findMany({
-        where: userId ? { userId } : {},
+        where: ownedBy,
+        select: { id: true, title: true, universeId: true },
+        orderBy: { title: "asc" },
+      }),
+      prisma.universe.findMany({
+        where: ownedBy,
         select: { id: true, title: true },
         orderBy: { title: "asc" },
+      }),
+      prisma.provider.findMany({ where: ownedBy, orderBy: { name: "asc" } }),
+      prisma.opportunity.findMany({ where: ownedBy, orderBy: { closeDate: "asc" } }),
+      prisma.writingTask.findMany({
+        where: { projectId: null, ...ownedBy },
+        orderBy: { createdAt: "asc" },
       }),
       userId
         ? prisma.userAiSettings.findUnique({ where: { userId } })
@@ -106,11 +125,30 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      archive.append(JSON.stringify(providers.map(serializeProvider), null, 2), {
+        name: "providers.json",
+      });
+      archive.append(JSON.stringify(opportunities.map(serializeOpportunity), null, 2), {
+        name: "opportunities.json",
+      });
+      archive.append(JSON.stringify(practiceTasks.map(serializeWritingTask), null, 2), {
+        name: "writing-tasks.json",
+      });
+
+      // The id suffix keeps titles that sanitize alike from overwriting each other.
       for (const project of projects) {
-        const data = await exportProjectJson(project.id);
-        const safeTitle = project.title.replace(/[^a-zA-Z0-9]/g, "_");
+        const data = {
+          ...(await exportProjectJson(project.id)),
+          ...(await exportProjectAccountData(project)),
+        };
         archive.append(JSON.stringify(data, null, 2), {
-          name: `projects/${safeTitle}.json`,
+          name: `projects/${safeFilename(project.title)}-${project.id}.json`,
+        });
+      }
+      for (const universe of universes) {
+        const data = await exportUniverseJson(universe.id);
+        archive.append(JSON.stringify(data, null, 2), {
+          name: `universes/${safeFilename(universe.title)}-${universe.id}.json`,
         });
       }
       await archive.finalize();
@@ -174,4 +212,8 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function safeFilename(title: string) {
+  return title.replace(/[^a-zA-Z0-9]/g, "_");
 }
