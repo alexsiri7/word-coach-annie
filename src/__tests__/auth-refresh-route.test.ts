@@ -109,6 +109,19 @@ describe("POST /api/auth/refresh", () => {
             expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
         });
 
+        it("mints the session from the current user row, not the stale session claims", async () => {
+            mockVerifySessionTokenNode.mockResolvedValueOnce({ userId: "u3", email: "old@test.com", name: "Old" });
+            const current = { userId: "u3", email: "new@test.com", name: "New", picture: "https://example.com/new.jpg" };
+            mockGetActiveUser.mockResolvedValueOnce(current);
+            mockCreateSessionToken.mockResolvedValueOnce("jwt-3");
+
+            const res = await POST(makeRequest({ sessionCookie: "valid-session-token" }));
+
+            expect(res.status).toBe(200);
+            expect(mockGetActiveUser).toHaveBeenCalledWith("u3");
+            expect(mockCreateSessionToken).toHaveBeenCalledWith(current);
+        });
+
         it("returns 500 if session is valid but createSessionToken throws", async () => {
             activeUser(mockVerifySessionTokenNode, { userId: "u1", email: "u@test.com", name: "U" });
             mockCreateSessionToken.mockRejectedValueOnce(new Error("crypto fail"));

@@ -25,7 +25,6 @@ vi.mock("@/lib/env", () => ({
         GOOGLE_CLIENT_ID: "test-client-id",
         GOOGLE_CLIENT_SECRET: "test-client-secret",
         GOOGLE_REDIRECT_URI: "http://localhost:3000/api/auth/google/callback",
-        ALLOWED_EMAILS: undefined,
     },
 }));
 
@@ -181,6 +180,32 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(refreshCookie?.toLowerCase()).toContain("httponly");
         expect(refreshCookie?.toLowerCase()).toContain("path=/api/auth/");
         expect(refreshCookie?.toLowerCase()).toContain("samesite=lax");
+    });
+
+    it("should redirect to /login?error=invite_only when the email is not allowed", async () => {
+        mockUserinfoGet.mockResolvedValue({
+            data: {
+                email: "outsider@example.com",
+                id: "google-999",
+                verified_email: true,
+                name: "Outsider",
+                picture: null,
+            },
+        });
+        const { isEmailAllowed, createRefreshToken } = await import("@/lib/auth-server");
+        vi.mocked(isEmailAllowed).mockReturnValueOnce(false);
+
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { prisma } = await import("@/lib/db");
+        const { createSessionToken } = await import("@/lib/auth");
+        const response = await GET(makeRequest());
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location") ?? "").toContain("/login?error=invite_only");
+        expect(isEmailAllowed).toHaveBeenCalledWith("outsider@example.com");
+        expect(prisma.user.upsert).not.toHaveBeenCalled();
+        expect(createSessionToken).not.toHaveBeenCalled();
+        expect(createRefreshToken).not.toHaveBeenCalled();
     });
 
     it("should redirect to /login?error=invalid_state when state HMAC is tampered", async () => {
