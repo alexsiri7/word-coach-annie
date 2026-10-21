@@ -27,7 +27,7 @@ import { POST } from "@/app/oauth/register/route";
 function makeRegisterRequest(body: Record<string, unknown>, ip = "1.2.3.4"): NextRequest {
   return new NextRequest("http://localhost/oauth/register", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    headers: { "content-type": "application/json", "x-real-ip": ip },
     body: JSON.stringify(body),
   });
 }
@@ -79,6 +79,21 @@ describe("POST /oauth/register", () => {
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body.error).toBe("server_error");
+  });
+
+  it("keys the per-IP limits on x-real-ip, not a spoofed x-forwarded-for", async () => {
+    const req = new NextRequest("http://localhost/oauth/register", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-real-ip": "9.9.9.9",
+        "x-forwarded-for": "6.6.6.6",
+      },
+      body: JSON.stringify(validBody),
+    });
+    await POST(req);
+    expect(checkRateLimit).toHaveBeenCalledWith("oauth-register:9.9.9.9", expect.anything());
+    expect(countClientsByIpInWindow).toHaveBeenCalledWith("9.9.9.9");
   });
 
   it("returns 400 when redirect_uris missing", async () => {
