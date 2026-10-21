@@ -141,6 +141,17 @@ describe('migrate.mjs — production TLS gate', () => {
     expect(result.stderr).toContain('sslmode');
     expect(result.stderr).not.toContain('Migration attempt');
   });
+
+  it('refuses a plaintext Redis URL even when DATABASE_URL is unset', () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', REDIS_URL: 'redis://localhost:6379' };
+    delete env.DATABASE_URL;
+    const result = spawnSync('node', [MIGRATE_SCRIPT], { env, encoding: 'utf-8' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Startup refused');
+    expect(result.stderr).toContain('rediss');
+    expect(result.stderr).not.toContain('skipping migrations');
+  });
 });
 
 // The runner stage copies scripts one by one; a module migrate.mjs imports but

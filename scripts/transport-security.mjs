@@ -19,9 +19,12 @@ export function transportSecurityProblems(env) {
   const problems = [];
 
   if (env.DATABASE_URL) {
-    const queryStart = env.DATABASE_URL.indexOf('?');
-    const query = queryStart === -1 ? '' : env.DATABASE_URL.slice(queryStart + 1);
-    const sslmode = new URLSearchParams(query).get('sslmode')?.toLowerCase();
+    // Read sslmode the way pg does: the fragment is not part of the query, and
+    // a repeated parameter takes its last value.
+    const [beforeFragment] = env.DATABASE_URL.split('#');
+    const queryStart = beforeFragment.indexOf('?');
+    const query = queryStart === -1 ? '' : beforeFragment.slice(queryStart + 1);
+    const sslmode = new URLSearchParams(query).getAll('sslmode').at(-1)?.toLowerCase();
     if (!DB_TLS_MODES.has(sslmode)) {
       const found = sslmode === undefined ? 'has no sslmode' : `has sslmode=${sslmode}`;
       problems.push(
@@ -31,7 +34,8 @@ export function transportSecurityProblems(env) {
     }
   }
 
-  const redisUrl = env.REDIS_URL?.trim();
+  // "Set" means what src/lib/rate-limit.ts means by it: any non-empty value.
+  const redisUrl = env.REDIS_URL;
   if (redisUrl && !/^rediss:\/\//i.test(redisUrl)) {
     const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(redisUrl)?.[1];
     const found = scheme === undefined ? 'has no scheme' : `uses ${scheme}://`;
