@@ -12,6 +12,19 @@ import {
   type ToolContext,
 } from "@/lib/ai/adk-tools";
 
+const spanAttributes = vi.hoisted(() => [] as Array<[string, unknown]>);
+
+vi.mock("@/lib/telemetry", () => ({
+  getTracer: () => ({
+    startActiveSpan: (_name: string, fn: (span: unknown) => unknown) =>
+      fn({
+        setAttribute: (key: string, value: unknown) => spanAttributes.push([key, value]),
+        setStatus: vi.fn(),
+        end: vi.fn(),
+      }),
+  }),
+}));
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     project: { findUnique: vi.fn(async () => null) },
@@ -120,6 +133,7 @@ function callTool(tool: { runAsync: (req: { args: Record<string, unknown>; toolC
 describe("ADK tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    spanAttributes.length = 0;
   });
 
   describe("tool coverage", () => {
@@ -329,6 +343,29 @@ describe("ADK tools", () => {
     it("allows OWNER to export_to_google_docs the pinned project", async () => {
       const tool = getAdkToolByName(ctx, "export_to_google_docs")!;
       await expect(callTool(tool, { projectId: "P", exportMode: "STORY_READER" })).resolves.toBeDefined();
+    });
+  });
+
+  describe("tool span attributes (SEC-09)", () => {
+    it("records input/output lengths, never tool content", async () => {
+      const { readSceneContent } = await import("@/mcp/tools/structure");
+      const scene = { content: "<p>SECRET MANUSCRIPT TEXT</p>" };
+      vi.mocked(readSceneContent).mockResolvedValueOnce(scene as never);
+      const tool = getAdkToolByName(ctx, "read_scene_content")!;
+
+      await callTool(tool, { nodeId: "node-in-P" });
+
+      const attrs = new Map(spanAttributes);
+      expect(attrs.has("tool.input")).toBe(false);
+      expect(attrs.has("tool.output")).toBe(false);
+      for (const [, value] of spanAttributes) {
+        if (typeof value === "string") {
+          expect(value).not.toContain("SECRET MANUSCRIPT");
+          expect(value).not.toContain("node-in-P");
+        }
+      }
+      expect(attrs.get("tool.output_length")).toBe(JSON.stringify(scene).length);
+      expect(attrs.get("tool.input_length")).toBeGreaterThan(0);
     });
   });
 });
