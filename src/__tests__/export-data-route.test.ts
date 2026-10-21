@@ -204,7 +204,7 @@ describe("GET /api/auth/export-data", () => {
     const user = await testPrisma.user.create({
       data: { id: "u4", email: "w@test.com", googleId: "g4" },
     });
-    await testPrisma.project.create({
+    const project = await testPrisma.project.create({
       data: { title: "My Project: Draft #1!", author: "Author", userId: user.id },
     });
     vi.mocked(getCurrentUserId).mockReturnValue(user.id);
@@ -218,6 +218,134 @@ describe("GET /api/auth/export-data", () => {
     const projectFiles = entries.filter((n) => n.startsWith("projects/"));
     expect(projectFiles.length).toBeGreaterThan(0);
     // Title should have special chars replaced with underscores
-    expect(projectFiles[0]).toMatch(/^projects\/My_Project__Draft__1_\.json$/);
+    expect(projectFiles[0]).toBe(`projects/My_Project__Draft__1_-${project.id}.json`);
+  });
+
+  async function exportZip(userId: string) {
+    vi.mocked(getCurrentUserId).mockReturnValue(userId);
+    const { GET } = await import("@/app/api/auth/export-data/route");
+    const res = await GET(makeRequest());
+    return JSZip.loadAsync(Buffer.from(await res.arrayBuffer()));
+  }
+
+  async function readJson(zip: JSZip, name: string) {
+    const file = zip.file(name);
+    expect(file, name).not.toBeNull();
+    return JSON.parse(await file!.async("string"));
+  }
+
+  it("keeps both projects when sanitized titles collide", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "u-collide", email: "c@test.com", googleId: "g-collide" },
+    });
+    const a = await testPrisma.project.create({ data: { title: "Draft 1", userId: user.id } });
+    const b = await testPrisma.project.create({ data: { title: "Draft-1", userId: user.id } });
+
+    const zip = await exportZip(user.id);
+
+    const projectFiles = Object.keys(zip.files).filter((n) => n.startsWith("projects/"));
+    expect(projectFiles.sort()).toEqual(
+      [`projects/Draft_1-${a.id}.json`, `projects/Draft_1-${b.id}.json`].sort()
+    );
+  });
+
+  it("includes project-scoped account data in each project entry", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "u-acct", email: "acct@test.com", googleId: "g-acct" },
+    });
+    const universe = await testPrisma.universe.create({
+      data: { title: "World", userId: user.id },
+    });
+    const project = await testPrisma.project.create({
+      data: { title: "Novel", userId: user.id, universeId: universe.id },
+    });
+    const provider = await testPrisma.provider.create({
+      data: { name: "Lit Mag", userId: user.id },
+    });
+    const opportunity = await testPrisma.opportunity.create({
+      data: { title: "Contest", providerId: provider.id, userId: user.id, closeDate: new Date() },
+    });
+    await testPrisma.projectShare.create({
+      data: { projectId: project.id, email: "friend@test.com" },
+    });
+    await testPrisma.peerReview.create({
+      data: { projectId: project.id, publisher: {}, reader: {}, writer: {}, consensus: {} },
+    });
+    await testPrisma.writingTask.create({
+      data: { projectId: project.id, userId: user.id, name: "Revise ch. 1" },
+    });
+    await testPrisma.contestSubmission.create({
+      data: {
+        projectId: project.id,
+        providerId: provider.id,
+        contestName: "Contest",
+        submissionDate: new Date(),
+      },
+    });
+    await testPrisma.publicationSubmission.create({
+      data: { projectId: project.id, venueName: "Venue", submissionDate: new Date() },
+    });
+    await testPrisma.opportunityCandidate.create({
+      data: { projectId: project.id, opportunityId: opportunity.id },
+    });
+
+    const zip = await exportZip(user.id);
+    const data = await readJson(zip, `projects/Novel-${project.id}.json`);
+
+    expect(data.universeId).toBe(universe.id);
+    expect(data.shares).toHaveLength(1);
+    expect(data.peerReviews).toHaveLength(1);
+    expect(data.writingTasks).toHaveLength(1);
+    expect(data.contestSubmissions).toHaveLength(1);
+    expect(data.publicationSubmissions).toHaveLength(1);
+    expect(data.opportunityCandidates).toHaveLength(1);
+  });
+
+  it("exports user-scoped data once at the top level, scoped to the user", async () => {
+    const userA = await testPrisma.user.create({
+      data: { id: "u-a", email: "a@test.com", googleId: "g-a" },
+    });
+    const userB = await testPrisma.user.create({
+      data: { id: "u-b", email: "b@test.com", googleId: "g-b" },
+    });
+    const universe = await testPrisma.universe.create({
+      data: { title: "Middle Earth", userId: userA.id },
+    });
+    const worldObject = await testPrisma.worldObject.create({
+      data: { universeId: universe.id, type: "CHARACTER", name: "Frodo" },
+    });
+    await testPrisma.worldObjectTimelineEntry.create({
+      data: { worldObjectId: worldObject.id, label: "Young" },
+    });
+    const provider = await testPrisma.provider.create({
+      data: { name: "A Provider", userId: userA.id },
+    });
+    await testPrisma.opportunity.create({
+      data: { title: "A Opp", providerId: provider.id, userId: userA.id, closeDate: new Date() },
+    });
+    await testPrisma.writingTask.create({
+      data: { userId: userA.id, name: "Practice" },
+    });
+    const project = await testPrisma.project.create({ data: { title: "P", userId: userA.id } });
+    await testPrisma.writingTask.create({
+      data: { projectId: project.id, userId: userA.id, name: "Project task" },
+    });
+    const otherUniverse = await testPrisma.universe.create({
+      data: { title: "Other", userId: userB.id },
+    });
+    await testPrisma.provider.create({ data: { name: "B Provider", userId: userB.id } });
+
+    const zip = await exportZip(userA.id);
+
+    const universeData = await readJson(zip, `universes/Middle_Earth-${universe.id}.json`);
+    expect(universeData.worldObjects).toHaveLength(1);
+    expect(universeData.worldObjects[0].timeline).toHaveLength(1);
+    expect(zip.file(`universes/Other-${otherUniverse.id}.json`)).toBeNull();
+
+    const providers = await readJson(zip, "providers.json");
+    expect(providers.map((p: { name: string }) => p.name)).toEqual(["A Provider"]);
+    expect(await readJson(zip, "opportunities.json")).toHaveLength(1);
+    const tasks = await readJson(zip, "writing-tasks.json");
+    expect(tasks.map((t: { name: string }) => t.name)).toEqual(["Practice"]);
   });
 });
