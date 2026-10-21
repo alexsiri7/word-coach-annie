@@ -192,7 +192,7 @@ See `.env.example` for the full list.
 | Medium | Story publishing | Self-issued integration token |
 | Sentry | Error tracking | Auth token |
 | Cloudflare Tunnel | Local dev public access | Tunnel token |
-| Phoenix | OpenTelemetry tracing (local) | N/A |
+| Phoenix | OpenTelemetry tracing (local) | `PHOENIX_SECRET` / `PHOENIX_ADMIN_SECRET` (bearer token) |
 
 ## Database Safety Rules
 
