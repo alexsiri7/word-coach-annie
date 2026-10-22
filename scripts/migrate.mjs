@@ -44,8 +44,8 @@ if (!connectionString) {
 
 // DATABASE_SCHEMA names the schema holding the app's tables (and the
 // _prisma_migrations bookkeeping table). Defaults to `public`, which is what
-// staging and local development use. It is interpolated into SQL below, so it
-// must be a plain identifier.
+// local development uses; production and staging each set their own. It is
+// interpolated into SQL below, so it must be a plain identifier.
 const schema = process.env.DATABASE_SCHEMA?.trim() || 'public';
 if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
   console.error(`Migration failed: DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
@@ -92,6 +92,28 @@ async function legacyAppliedNames(prisma) {
   if (!present) return new Set();
   const rows = await prisma.$queryRawUnsafe(`SELECT name FROM ${qschema}."_applied_migrations"`);
   return new Set(rows.map((r) => r.name));
+}
+
+// Postgres checks database-level CREATE before honouring IF NOT EXISTS, and the
+// init migration creates `public`. A role that only owns its own schema (as
+// staging's does) would fail on that no-op, so it is skipped when the schema
+// already exists.
+const CREATE_SCHEMA_IF_NOT_EXISTS = /^CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_]*)$/i;
+
+async function withoutExistingSchemaCreation(prisma, statements) {
+  const kept = [];
+  for (const stmt of statements) {
+    const match = CREATE_SCHEMA_IF_NOT_EXISTS.exec(stmt);
+    if (match) {
+      const [{ present }] = await prisma.$queryRawUnsafe(
+        `SELECT to_regnamespace($1) IS NOT NULL AS present`,
+        match[1]
+      );
+      if (present) continue;
+    }
+    kept.push(stmt);
+  }
+  return kept;
 }
 
 async function migrate(prisma) {
@@ -166,7 +188,7 @@ async function migrate(prisma) {
     // which only supports single statements at a time.
     // Uses a context-aware tokenizer to handle dollar-quoted strings ($$...$$)
     // and single-quoted strings that may contain semicolons.
-    const statements = splitSqlStatements(sql);
+    const statements = await withoutExistingSchemaCreation(prisma, splitSqlStatements(sql));
     const id = randomUUID();
 
     // One transaction per migration, so every statement below runs on the same
