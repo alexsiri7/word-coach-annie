@@ -202,6 +202,41 @@ docker compose exec app sqlite3 data/word-coach-annie.db < migration.sql
 docker compose exec app npx prisma generate
 ```
 
+### Staging database role
+
+Staging runs as the `annie_staging` role in the `annie_staging` schema, like its siblings
+`reli_staging` and `filmduel_staging` on the same database. Its tables are not in `public`.
+
+Provision it once, as the database admin in `psql`. This is not idempotent; it is meant to
+run a single time:
+
+```sql
+CREATE ROLE annie_staging LOGIN;
+\password annie_staging
+-- lets a non-superuser admin (e.g. Supabase's postgres) create a schema owned by the role
+GRANT annie_staging TO CURRENT_USER;
+CREATE SCHEMA annie_staging AUTHORIZATION annie_staging;
+```
+
+Generate the password with `openssl rand -hex 32` (hex, so it needs no URL encoding) and
+enter it at the `\password` prompt.
+
+Then, in a single change to the Railway staging service:
+
+- set `DATABASE_SCHEMA=annie_staging`;
+- set `DATABASE_URL` to the current URL with only the user and password replaced. Keep the
+  host, port and query parameters: production startup refuses a URL without an encrypting
+  `sslmode`. On the Supabase pooler the user is `annie_staging.<project-ref>`;
+- remove `DIRECT_DATABASE_URL` if it is set.
+
+The staging deploy must already run a `scripts/migrate.mjs` that skips `CREATE SCHEMA IF
+NOT EXISTS` for an existing schema; otherwise the first boot fails on the init migration
+with `permission denied for database`. That boot applies every migration into
+`annie_staging`. Until it holds data, `/api/health` reports `degraded` (HTTP 503), which the
+staging monitors tolerate.
+
+The old staging tables stay in `public`, owned by the admin, and can be dropped later.
+
 ### Backups
 
 The database is backed up automatically every 6 hours:

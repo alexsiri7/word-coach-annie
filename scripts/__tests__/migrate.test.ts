@@ -7,9 +7,9 @@ import { splitSqlStatements } from '../sql-tokenizer.mjs';
 
 const MIGRATE_SCRIPT = join(__dirname, '../migrate.mjs');
 
-function runMigrate(databaseUrl: string) {
+function runMigrate(databaseUrl: string, extraEnv: NodeJS.ProcessEnv = {}) {
   return spawnSync('node', [MIGRATE_SCRIPT], {
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: { ...process.env, DATABASE_URL: databaseUrl, ...extraEnv },
     encoding: 'utf-8',
   });
 }
@@ -284,5 +284,62 @@ describe('migrate.mjs — migration bookkeeping ignores search_path', () => {
     } finally {
       await scratch.$disconnect();
     }
+  }, 60_000);
+});
+
+describe('migrate.mjs — first run as a role that only owns its schema', () => {
+  // Database, role and schema share one name, as staging's annie_staging does.
+  const NAME = 'annie_migrate_owned_schema_test';
+  let admin: PrismaClient;
+  let scratchAdmin: PrismaClient;
+  let roleUrl: string;
+
+  const dropScratch = () =>
+    admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${NAME} WITH (FORCE)`);
+
+  beforeAll(async () => {
+    const base = new URL(process.env.TEST_DATABASE_URL as string);
+    admin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
+    await dropScratch();
+    await admin.$executeRawUnsafe(`DROP ROLE IF EXISTS ${NAME}`);
+    await admin.$executeRawUnsafe(`CREATE ROLE ${NAME} LOGIN PASSWORD 'owned-schema-test'`);
+    await admin.$executeRawUnsafe(`CREATE DATABASE ${NAME}`);
+
+    base.pathname = `/${NAME}`;
+    scratchAdmin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
+    await scratchAdmin.$executeRawUnsafe(`CREATE SCHEMA ${NAME} AUTHORIZATION ${NAME}`);
+
+    base.username = NAME;
+    base.password = 'owned-schema-test';
+    roleUrl = base.href;
+  }, 60_000);
+
+  afterAll(async () => {
+    await scratchAdmin.$disconnect();
+    await dropScratch();
+    await admin.$executeRawUnsafe(`DROP ROLE IF EXISTS ${NAME}`);
+    await admin.$disconnect();
+  }, 60_000);
+
+  it('applies every migration into its own schema without database-level CREATE', async () => {
+    const first = runMigrate(roleUrl, { DATABASE_SCHEMA: NAME });
+
+    expect(first.stderr).not.toContain('permission denied');
+    expect(first.status).toBe(0);
+    expect(first.stdout).toContain('apply 00000000000000_init');
+    expect(runMigrate(roleUrl, { DATABASE_SCHEMA: NAME }).stdout).toContain('Migrations up to date.');
+
+    const [owned, inPublic] = await Promise.all([
+      scratchAdmin.$queryRawUnsafe<{ n: bigint }[]>(
+        `SELECT count(*) AS n FROM pg_tables WHERE schemaname = $1 AND tableowner = $1`,
+        NAME
+      ),
+      scratchAdmin.$queryRawUnsafe<{ n: bigint }[]>(
+        `SELECT count(*) AS n FROM pg_tables WHERE schemaname = 'public' AND tableowner = $1`,
+        NAME
+      ),
+    ]);
+    expect(owned[0].n).toBeGreaterThan(0n);
+    expect(inPublic[0].n).toBe(0n);
   }, 60_000);
 });
