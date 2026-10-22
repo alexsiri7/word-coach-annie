@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { encrypt, decrypt, isEncrypted, readEncrypted } from "@/lib/crypto";
+import { readFileSync, readdirSync } from "fs";
+import { join, relative } from "path";
+import { encrypt, decrypt, isEncrypted, isUndecryptable, readEncrypted } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
+
+const SRC = join(__dirname, "..");
+
+function productionSources(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === "__tests__" ? [] : productionSources(path);
+        return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+}
 
 describe("crypto", () => {
     let origEncKey: string | undefined;
@@ -163,7 +175,7 @@ describe("crypto", () => {
 
             expect(decrypt(stored)).toBe("sk-rotate-me");
             const rewrite = vi.fn(async (_reencrypted: string) => {});
-            await expect(readEncrypted(stored, { field: "T.col", rewrite })).resolves.toBe("sk-rotate-me");
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-rotate-me");
 
             expect(rewrite).toHaveBeenCalledTimes(1);
             const rewritten = rewrite.mock.calls[0][0];
@@ -175,7 +187,7 @@ describe("crypto", () => {
             process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
             const rewrite = vi.fn(async () => {});
 
-            await expect(readEncrypted(stored, { field: "T.col", rewrite })).resolves.toBe("sk-current");
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-current");
             expect(rewrite).not.toHaveBeenCalled();
         });
 
@@ -185,7 +197,7 @@ describe("crypto", () => {
             const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
             const rewrite = vi.fn(async () => {});
 
-            await expect(readEncrypted(stored, { field: "T.col", rewrite })).resolves.toBeNull();
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBeNull();
             expect(rewrite).not.toHaveBeenCalled();
             expect(warn).toHaveBeenCalledTimes(1);
             expect(JSON.stringify(warn.mock.calls)).not.toContain(stored.slice("enc:v1:".length));
@@ -196,7 +208,7 @@ describe("crypto", () => {
         it("reads a malformed value as null", async () => {
             process.env.ENCRYPTION_KEY = KEY_B;
             const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
-            await expect(readEncrypted("enc:v1:only-one-part", { field: "T.col" })).resolves.toBeNull();
+            await expect(readEncrypted("enc:v1:only-one-part", { field: "AiSettings.apiKey" })).resolves.toBeNull();
             warn.mockRestore();
         });
 
@@ -206,7 +218,7 @@ describe("crypto", () => {
             process.env.ENCRYPTION_KEY_PREVIOUS = ` , ${KEY_A} ,`;
 
             expect(decrypt(stored)).toBe("sk-spaced");
-            await expect(readEncrypted(stored, { field: "T.col" })).resolves.toBe("sk-spaced");
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey" })).resolves.toBe("sk-spaced");
         });
 
         it("still returns the plaintext when the rewrite fails", async () => {
@@ -216,9 +228,40 @@ describe("crypto", () => {
             const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
             const rewrite = vi.fn(async () => { throw new Error("db down"); });
-            await expect(readEncrypted(stored, { field: "T.col", rewrite })).resolves.toBe("sk-rewrite-fails");
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-rewrite-fails");
             expect(warn).toHaveBeenCalledTimes(1);
             warn.mockRestore();
+        });
+
+        it("reports only values no configured key decrypts as undecryptable, without logging them", () => {
+            const underA = encryptUnder(KEY_A, "sk-a");
+            const lost = encryptUnder("rotation-key-lost", "sk-lost");
+            process.env.ENCRYPTION_KEY = KEY_B;
+            process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
+            const underB = encrypt("sk-b");
+            const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+            expect(isUndecryptable(underA, "AiSettings.apiKey")).toBe(false);
+            expect(isUndecryptable(underB, "AiSettings.apiKey")).toBe(false);
+            expect(isUndecryptable("sk-legacy-plaintext", "AiSettings.apiKey")).toBe(false);
+            expect(isUndecryptable("", "AiSettings.apiKey")).toBe(false);
+            expect(warn).not.toHaveBeenCalled();
+
+            expect(isUndecryptable(lost, "AiSettings.apiKey")).toBe(true);
+            expect(isUndecryptable("enc:v1:only-one-part", "AiSettings.apiKey")).toBe(true);
+            expect(warn).toHaveBeenCalledTimes(2);
+            expect(JSON.stringify(warn.mock.calls)).not.toContain(lost.slice("enc:v1:".length));
+            warn.mockRestore();
+        });
+
+        // Reads that bypass readEncrypted() are not tied to ENCRYPTED_COLUMNS by
+        // the EncryptedField type, so reencrypt.mjs could miss their column.
+        it("routes every production read of a stored secret through readEncrypted()", () => {
+            const decryptCallers = productionSources(SRC)
+                .filter((file) => !file.endsWith(join("lib", "crypto.ts")))
+                .filter((file) => /\bdecrypt\(/.test(readFileSync(file, "utf-8")))
+                .map((file) => relative(SRC, file));
+            expect(decryptCallers).toEqual([]);
         });
 
         describe("with ENCRYPTION_KEY unset", () => {
@@ -236,7 +279,8 @@ describe("crypto", () => {
                 const stored = "enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff";
                 expect(() => encrypt("sk-x")).toThrow("ENCRYPTION_KEY must be set");
                 expect(() => decrypt(stored)).toThrow("ENCRYPTION_KEY must be set");
-                await expect(readEncrypted(stored, { field: "T.col" })).rejects.toThrow("ENCRYPTION_KEY must be set");
+                await expect(readEncrypted(stored, { field: "AiSettings.apiKey" })).rejects.toThrow("ENCRYPTION_KEY must be set");
+                expect(isUndecryptable(stored, "AiSettings.apiKey")).toBe(false);
             });
 
             it("still passes values through when ALLOW_PLAINTEXT_STORAGE=true", async () => {
@@ -247,7 +291,7 @@ describe("crypto", () => {
 
                 expect(encrypt("sk-plain")).toBe("sk-plain");
                 expect(decrypt(stored)).toBe(stored);
-                await expect(readEncrypted(stored, { field: "T.col" })).resolves.toBe(stored);
+                await expect(readEncrypted(stored, { field: "AiSettings.apiKey" })).resolves.toBe(stored);
             });
         });
     });

@@ -20,6 +20,7 @@ import {
   encryptWithKey,
   keySources,
 } from './encryption-keyring.mjs';
+import { quotedDatabaseSchema } from './database-schema.mjs';
 
 /**
  * Sweep every column in ENCRYPTED_COLUMNS and rewrite values decrypted with a
@@ -76,12 +77,7 @@ async function main() {
     console.warn('reencrypt: DATABASE_URL is not set — skipping.');
     return;
   }
-  // Same DATABASE_SCHEMA rules as migrate.mjs.
-  const schema = process.env.DATABASE_SCHEMA?.trim() || 'public';
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
-    throw new Error(`DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
-  }
-  const qschema = schema === 'public' ? 'public' : `"${schema}"`;
+  const qschema = quotedDatabaseSchema(process.env);
 
   const { PrismaClient } = await import('@prisma/client');
   const { PrismaPg } = await import('@prisma/adapter-pg');

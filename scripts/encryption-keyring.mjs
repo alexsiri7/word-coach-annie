@@ -23,16 +23,16 @@ export const ENCRYPTED_PREFIX = 'enc:v1:';
 /**
  * Every column written with encrypt() must be listed here, or
  * scripts/reencrypt.mjs will not rotate it. Table and column names are the
- * Postgres identifiers from prisma/schema.prisma.
- *
- * @type {ReadonlyArray<{ table: string, columns: readonly string[] }>}
+ * Postgres identifiers from prisma/schema.prisma. src/lib/crypto.ts derives the
+ * `field` its readers must name from this list, so a column read back without
+ * being listed here does not type-check.
  */
-export const ENCRYPTED_COLUMNS = [
+export const ENCRYPTED_COLUMNS = /** @type {const} */ ([
   { table: 'GoogleCredential', columns: ['accessToken', 'refreshToken'] },
   { table: 'HashnodeCredential', columns: ['accessToken'] },
   { table: 'UserAiSettings', columns: ['apiKey'] },
   { table: 'AiSettings', columns: ['apiKey'] },
-];
+]);
 
 /**
  * Derive a 256-bit key from a configured key string.

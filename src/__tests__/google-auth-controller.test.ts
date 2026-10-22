@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { testPrisma } from "./setup";
 
@@ -321,6 +322,36 @@ describe("GoogleAuthController", () => {
             const cred = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
             expect(decrypt(cred.accessToken)).toBe("access-under-a");
             expect(decrypt(cred.refreshToken)).toBe("refresh-under-a");
+        });
+
+        it("does not overwrite a token refreshed between the read and the rewrite", async () => {
+            const stale = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
+            process.env.ENCRYPTION_KEY = KEY_B;
+            process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
+            const refreshed = encrypt("access-refreshed-meanwhile");
+            await testPrisma.googleCredential.update({ where: { userId: "local" }, data: { accessToken: refreshed } });
+
+            const staleRead = vi.spyOn(prisma.googleCredential, "findUnique").mockResolvedValueOnce(stale as never);
+            try {
+                await GoogleAuthController.getValidClient(null);
+            } finally {
+                staleRead.mockRestore();
+            }
+
+            const cred = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
+            expect(cred.accessToken).toBe(refreshed);
+            delete process.env.ENCRYPTION_KEY_PREVIOUS;
+            expect(decrypt(cred.refreshToken)).toBe("refresh-under-a");
+        });
+
+        it("still reports connected when ENCRYPTION_KEY is unset", async () => {
+            delete process.env.ENCRYPTION_KEY;
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+            try {
+                await expect(GoogleAuthController.getStatus(null)).resolves.toMatchObject({ connected: true });
+            } finally {
+                process.env.ALLOW_PLAINTEXT_STORAGE = "true";
+            }
         });
 
         it("reports tokens no configured key decrypts as disconnected without throwing or deleting them", async () => {

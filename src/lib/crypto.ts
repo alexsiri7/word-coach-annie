@@ -14,6 +14,7 @@
  * (implemented in scripts/encryption-keyring.mjs).
  */
 import {
+    ENCRYPTED_COLUMNS,
     ENCRYPTED_PREFIX,
     decryptWithKeys,
     deriveKey,
@@ -22,6 +23,16 @@ import {
 } from "../../scripts/encryption-keyring.mjs";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+
+type FieldOf<C> = C extends { table: infer T extends string; columns: readonly (infer K extends string)[] }
+    ? `${T}.${K}`
+    : never;
+
+/** A stored column registered in ENCRYPTED_COLUMNS, as "Table.column". */
+export type EncryptedField = FieldOf<(typeof ENCRYPTED_COLUMNS)[number]>;
+
+const UNDECRYPTABLE_WARNING =
+    "[crypto] Stored value could not be decrypted with any configured key; treating as disconnected";
 
 let encryptionWarningLogged = false;
 
@@ -111,7 +122,7 @@ export function decrypt(value: string): string {
  */
 export async function readEncrypted(
     value: string,
-    opts: { field: string; rewrite?: (reencrypted: string) => Promise<unknown> }
+    opts: { field: EncryptedField; rewrite?: (reencrypted: string) => Promise<unknown> }
 ): Promise<string | null> {
     if (!value || !isEncrypted(value)) return value;
 
@@ -120,10 +131,7 @@ export async function readEncrypted(
 
     const result = decryptWithKeys(value, keyring);
     if (!result) {
-        logger.warn(
-            "[crypto] Stored value could not be decrypted with any configured key; treating as disconnected",
-            { field: opts.field }
-        );
+        logger.warn(UNDECRYPTABLE_WARNING, { field: opts.field });
         return null;
     }
 
@@ -138,4 +146,19 @@ export async function readEncrypted(
         }
     }
     return result.plaintext;
+}
+
+/**
+ * For connection-status checks: true when the stored value is encrypted and no
+ * configured key decrypts it, so the caller can report it as disconnected.
+ * Never throws and never rewrites. With ENCRYPTION_KEY unset it returns false,
+ * so status checks report what they did before key rotation existed.
+ */
+export function isUndecryptable(value: string, field: EncryptedField): boolean {
+    if (!value || !isEncrypted(value)) return false;
+    const { current, previous } = keySources(env);
+    if (!current) return false;
+    if (decryptWithKeys(value, [current, ...previous].map(deriveKey))) return false;
+    logger.warn(UNDECRYPTABLE_WARNING, { field });
+    return true;
 }

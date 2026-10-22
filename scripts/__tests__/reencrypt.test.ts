@@ -56,6 +56,32 @@ describe('reencryptStoredValues()', () => {
     });
   });
 
+  it('leaves a value replaced between its read and its rewrite alone', async () => {
+    const a = deriveKey(KEY_A);
+    const user = await testPrisma.user.create({ data: { email: 'race@example.com', googleId: 'g-race' } });
+    await testPrisma.userAiSettings.create({ data: { userId: user.id, apiKey: encryptWithKey(a, 'sk-stale') } });
+    const concurrent = encryptWithKey(a, 'sk-saved-meanwhile');
+    // A settings save lands after the sweep's SELECT and before its UPDATE.
+    const racing = {
+      $queryRawUnsafe: async (sql: string) => {
+        const rows = await testPrisma.$queryRawUnsafe(sql);
+        if (sql.includes('"UserAiSettings"')) {
+          await testPrisma.userAiSettings.update({ where: { userId: user.id }, data: { apiKey: concurrent } });
+        }
+        return rows;
+      },
+      $executeRawUnsafe: testPrisma.$executeRawUnsafe.bind(testPrisma),
+    };
+
+    await expect(reencryptStoredValues(racing, { qschema: 'public', env, log: quietLog })).resolves.toEqual({
+      rewritten: 0,
+      current: 0,
+      undecryptable: 0,
+    });
+    const settings = await testPrisma.userAiSettings.findUniqueOrThrow({ where: { userId: user.id } });
+    expect(settings.apiKey).toBe(concurrent);
+  });
+
   it('leaves plaintext and empty values alone', async () => {
     await testPrisma.aiSettings.create({ data: { id: 'default', apiKey: 'sk-legacy-plaintext' } });
     const user = await testPrisma.user.create({ data: { email: 'u@example.com', googleId: 'g-1' } });
@@ -94,8 +120,11 @@ describe('reencrypt.mjs as a script', () => {
   // The CMD swallows reencrypt.mjs failures, so a missing module would fail silently.
   it('is shipped in the image with its local imports', () => {
     const dockerfile = readFileSync(join(__dirname, '../../Dockerfile'), 'utf-8');
-    expect(dockerfile).toContain('COPY --from=builder /app/scripts/reencrypt.mjs');
-    expect(dockerfile).toContain('COPY --from=builder /app/scripts/encryption-keyring.mjs');
+    const imports = [...readFileSync(REENCRYPT_SCRIPT, 'utf-8').matchAll(/from '\.\/([\w-]+\.mjs)'/g)].map((m) => m[1]);
+    expect(imports).toEqual(['encryption-keyring.mjs', 'database-schema.mjs']);
+    for (const file of ['reencrypt.mjs', ...imports]) {
+      expect(dockerfile).toContain(`COPY --from=builder /app/scripts/${file}`);
+    }
     expect(dockerfile).toMatch(/node scripts\/migrate\.mjs && \(node scripts\/reencrypt\.mjs \|\| true\) && exec node server\.js/);
   });
 });

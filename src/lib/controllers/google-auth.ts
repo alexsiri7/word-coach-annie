@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { prisma } from '@/lib/db';
-import { encrypt, readEncrypted } from '@/lib/crypto';
+import { encrypt, isUndecryptable, readEncrypted } from '@/lib/crypto';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
 
@@ -115,9 +115,12 @@ export class GoogleAuthController {
         const resolvedUserId = userId ?? DEFAULT_USER_ID;
         const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
-        const accessToken = await readToken(cred, 'accessToken');
-        const refreshToken = await readToken(cred, 'refreshToken');
-        if (accessToken === null || refreshToken === null) return { connected: false };
+        if (
+            isUndecryptable(cred.accessToken, 'GoogleCredential.accessToken') ||
+            isUndecryptable(cred.refreshToken, 'GoogleCredential.refreshToken')
+        ) {
+            return { connected: false };
+        }
 
         // Check if token is expired, though client handles refresh
         const isExpired = cred.expiresAt.getTime() < Date.now();

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { encrypt, readEncrypted } from '@/lib/crypto';
+import { encrypt, isUndecryptable, readEncrypted } from '@/lib/crypto';
 
 const HASHNODE_GQL = 'https://gql.hashnode.com';
 
@@ -88,7 +88,7 @@ export class HashnodeAuthController {
         const resolvedUserId = userId ?? 'local';
         const cred = await prisma.hashnodeCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
-        if (await readHashnodeToken(cred) === null) return { connected: false };
+        if (isUndecryptable(cred.accessToken, 'HashnodeCredential.accessToken')) return { connected: false };
         return { connected: true, username: cred.username, publicationId: cred.publicationId };
     }
 
