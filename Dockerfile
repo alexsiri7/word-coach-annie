@@ -57,10 +57,15 @@ COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/scripts/sql-tokenizer.mjs ./scripts/sql-tokenizer.mjs
 COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-security.mjs
 COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
+# Release-step re-encryption after an ENCRYPTION_KEY rotation
+COPY --from=builder /app/scripts/encryption-keyring.mjs ./scripts/encryption-keyring.mjs
+COPY --from=builder /app/scripts/reencrypt.mjs ./scripts/reencrypt.mjs
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node scripts/migrate.mjs && exec node server.js"]
+# A failed re-encryption sweep must not block startup: reads still rewrite
+# previous-key values lazily.
+CMD ["sh", "-c", "node scripts/migrate.mjs && (node scripts/reencrypt.mjs || true) && exec node server.js"]

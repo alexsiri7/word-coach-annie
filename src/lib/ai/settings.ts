@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/crypto";
+import { readEncrypted } from "@/lib/crypto";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -44,6 +44,34 @@ function getEnvDefaults(): AiProviderConfig {
 }
 
 /**
+ * Decrypt a user's stored API key, rewriting it under the current key when it
+ * was read with a previous one. "" when unset or no configured key decrypts it.
+ */
+export async function readUserApiKey(settings: { id: string; apiKey: string }): Promise<string> {
+  const apiKey = await readEncrypted(settings.apiKey, {
+    field: "UserAiSettings.apiKey",
+    // Compare-and-swap: a settings save that already replaced the key wins.
+    rewrite: (reencrypted) => prisma.userAiSettings.updateMany({
+      where: { id: settings.id, apiKey: settings.apiKey },
+      data: { apiKey: reencrypted },
+    }),
+  });
+  return apiKey ?? "";
+}
+
+/** Same as readUserApiKey, for the global ("default") settings row. */
+export async function readGlobalApiKey(settings: { id: string; apiKey: string }): Promise<string> {
+  const apiKey = await readEncrypted(settings.apiKey, {
+    field: "AiSettings.apiKey",
+    rewrite: (reencrypted) => prisma.aiSettings.updateMany({
+      where: { id: settings.id, apiKey: settings.apiKey },
+      data: { apiKey: reencrypted },
+    }),
+  });
+  return apiKey ?? "";
+}
+
+/**
  * Get AI provider configuration.
  * Priority: User DB settings > Global DB settings > env vars > hardcoded defaults.
  * API keys stored in DB are decrypted transparently.
@@ -56,7 +84,7 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
     try {
       const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
       if (userSettings) {
-        const decryptedKey = decrypt(userSettings.apiKey);
+        const decryptedKey = await readUserApiKey(userSettings);
         // If user has a key set, use their full config (with fallbacks for empty fields)
         if (decryptedKey) {
           return {
@@ -74,7 +102,7 @@ export async function getAiConfig(userId?: string | null): Promise<AiProviderCon
   try {
     const settings = await prisma.aiSettings.findUnique({ where: { id: "default" } });
     if (settings) {
-      const decryptedKey = decrypt(settings.apiKey);
+      const decryptedKey = await readGlobalApiKey(settings);
       return {
         apiKey: decryptedKey || envDefaults.apiKey,
         model: settings.model || envDefaults.model,

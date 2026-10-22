@@ -34,6 +34,7 @@ const envSchema = z.object({
   API_TOKEN: z.string().optional(),
   JWT_SECRET: z.string().optional(),
   ENCRYPTION_KEY: z.string().optional(),
+  ENCRYPTION_KEY_PREVIOUS: z.string().optional(), // comma-separated older keys, decrypt-only (rotation)
 
   // Access control — invite-only allowlist (comma-separated emails)
   ALLOWED_EMAILS: z.string().optional(),

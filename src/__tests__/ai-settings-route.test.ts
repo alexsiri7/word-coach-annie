@@ -16,7 +16,7 @@ vi.mock("@/lib/db", () => ({
 // Mock crypto
 vi.mock("@/lib/crypto", () => ({
   encrypt: vi.fn((val: string) => `enc:${val}`),
-  decrypt: vi.fn((val: string) => val.replace(/^enc:/, "")),
+  readEncrypted: vi.fn(async (val: string) => val.replace(/^enc:/, "")),
 }));
 
 // Mock api-auth

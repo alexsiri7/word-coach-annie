@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { decrypt } from '@/lib/crypto';
+import { readHashnodeToken } from '@/lib/controllers/hashnode-auth';
 import { exportHashnode } from '@/mcp/tools/export';
 
 const HASHNODE_GQL = 'https://gql.hashnode.com';
@@ -31,7 +31,8 @@ export class HashnodePublishController {
         // Get credential
         const resolvedUserId = userId ?? 'local';
         const cred = await prisma.hashnodeCredential.findUnique({ where: { userId: resolvedUserId } });
-        if (!cred) {
+        const accessToken = cred ? await readHashnodeToken(cred) : null;
+        if (!cred || accessToken === null) {
             throw new Error('Hashnode account not connected');
         }
 
@@ -62,8 +63,6 @@ export class HashnodePublishController {
 
         // Generate content
         const contentMarkdown = await exportHashnode(projectId, nodeId);
-
-        const accessToken = decrypt(cred.accessToken);
 
         // Build tag input for Hashnode
         const tagInput = tags.map((name) => ({ name, slug: name.toLowerCase().replace(/\s+/g, '-') }));

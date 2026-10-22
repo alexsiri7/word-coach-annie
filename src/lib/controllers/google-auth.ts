@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { prisma } from '@/lib/db';
-import { encrypt, decrypt } from '@/lib/crypto';
+import { encrypt, readEncrypted } from '@/lib/crypto';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
 
@@ -10,6 +10,21 @@ import { logger } from '@/lib/logger';
 type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
 
 const DEFAULT_USER_ID = 'local';
+
+type GoogleCredentialRow = { id: string; accessToken: string; refreshToken: string };
+type TokenColumn = 'accessToken' | 'refreshToken';
+
+/** Decrypt one token column, rewriting it under the current key when it was read with a previous one. */
+function readToken(cred: GoogleCredentialRow, column: TokenColumn): Promise<string | null> {
+    return readEncrypted(cred[column], {
+        field: `GoogleCredential.${column}`,
+        // Compare-and-swap: a token refresh that already replaced the value wins.
+        rewrite: (reencrypted) => prisma.googleCredential.updateMany({
+            where: { id: cred.id, [column]: cred[column] },
+            data: { [column]: reencrypted },
+        }),
+    });
+}
 
 export class GoogleAuthController {
     private static getClient(redirectUri?: string): OAuth2Client {
@@ -58,10 +73,14 @@ export class GoogleAuthController {
         const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return null;
 
+        const accessToken = await readToken(cred, 'accessToken');
+        const refreshToken = await readToken(cred, 'refreshToken');
+        if (accessToken === null || refreshToken === null) return null;
+
         const client = this.getClient(undefined);
         client.setCredentials({
-            access_token: decrypt(cred.accessToken),
-            refresh_token: decrypt(cred.refreshToken),
+            access_token: accessToken,
+            refresh_token: refreshToken,
             expiry_date: cred.expiresAt.getTime()
         });
 
@@ -96,6 +115,9 @@ export class GoogleAuthController {
         const resolvedUserId = userId ?? DEFAULT_USER_ID;
         const cred = await prisma.googleCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
+        const accessToken = await readToken(cred, 'accessToken');
+        const refreshToken = await readToken(cred, 'refreshToken');
+        if (accessToken === null || refreshToken === null) return { connected: false };
 
         // Check if token is expired, though client handles refresh
         const isExpired = cred.expiresAt.getTime() < Date.now();
