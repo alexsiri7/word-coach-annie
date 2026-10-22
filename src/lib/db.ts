@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { withConnectionRetry } from "@/lib/db-retry";
+import { configuredDatabaseSchema } from "../../scripts/database-schema.mjs";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: ExtendedPrismaClient | undefined;
@@ -21,12 +22,7 @@ export const connectionRetry = Prisma.defineExtension({
 
 /** The configured DATABASE_SCHEMA, or undefined to use the connection's default. */
 export function databaseSchema(): string | undefined {
-  const schema = process.env.DATABASE_SCHEMA?.trim();
-  if (!schema) return undefined;
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
-    throw new Error(`DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
-  }
-  return schema;
+  return configuredDatabaseSchema(process.env);
 }
 
 function createPrismaClient() {

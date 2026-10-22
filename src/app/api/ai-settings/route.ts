@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 import { getCurrentUserId } from "@/lib/api-auth";
-import { COACHING_STYLES, RESPONSE_LENGTHS } from "@/lib/ai/settings";
+import { COACHING_STYLES, RESPONSE_LENGTHS, readGlobalApiKey, readUserApiKey } from "@/lib/ai/settings";
 
 // Numeric bounds match the inputs on the settings page. chatWindowSize and
 // messagesUntilCompression size the chat route's history query and prompt.
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       try {
         const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
         if (userSettings) {
-          const decryptedKey = decrypt(userSettings.apiKey);
+          const decryptedKey = await readUserApiKey(userSettings);
           return NextResponse.json({
             apiKey: decryptedKey ? maskKey(decryptedKey) : "",
             model: userSettings.model,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     if (!settings) {
       return NextResponse.json({ apiKey: "", model: "", scope: "global" });
     }
-    const decryptedKey = decrypt(settings.apiKey);
+    const decryptedKey = await readGlobalApiKey(settings);
     return NextResponse.json({
       apiKey: decryptedKey ? maskKey(decryptedKey) : "",
       model: settings.model,
@@ -103,7 +103,7 @@ export async function PUT(request: NextRequest) {
           },
         });
 
-        const decryptedKey = decrypt(settings.apiKey);
+        const decryptedKey = await readUserApiKey(settings);
         return NextResponse.json({
           apiKey: decryptedKey ? maskKey(decryptedKey) : "",
           model: settings.model,
@@ -133,7 +133,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    const decryptedKey = decrypt(settings.apiKey);
+    const decryptedKey = await readGlobalApiKey(settings);
     return NextResponse.json({
       apiKey: decryptedKey ? maskKey(decryptedKey) : "",
       model: settings.model,
