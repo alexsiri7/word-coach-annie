@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import withPWA, { runtimeCaching } from "@ducanh2912/next-pwa";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { execSync } from "child_process";
@@ -202,8 +202,16 @@ export default withSentryConfig(withAnalyzer(pwaConfig), {
   project: process.env.SENTRY_PROJECT,
 
   // Automatically tree-shake Sentry logger statements for smaller bundles
-  disableLogger: true,
+  // (v11 moved the top-level `disableLogger` here).
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
 
-  // Hides source maps from generated client bundles
-  hideSourceMaps: true,
+  // Keep source maps out of the deployed client bundles: delete them after
+  // upload (`hideSourceMaps` no longer exists in the v11 build options).
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
 });

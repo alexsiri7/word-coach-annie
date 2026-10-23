@@ -1,5 +1,30 @@
 import type { ErrorEvent } from "@sentry/nextjs";
 
+const PII_HEADER_DENY = ["forwarded", "-ip", "remote-", "via", "-user"];
+
+/**
+ * Sentry v11 replaced `sendDefaultPii` with `dataCollection`, and leaving it
+ * unset now collects cookies, full request/response bodies, user info, DB
+ * query data and GenAI inputs/outputs by default. Request bodies here carry
+ * manuscript text (user PII), and `beforeSend` does not scrub `request.data`,
+ * so pin the v10 `sendDefaultPii: false` baseline explicitly (values taken
+ * from the v10 -> v11 migration guide).
+ */
+export const dataCollection = {
+    userInfo: false,
+    cookies: false,
+    httpHeaders: {
+        request: { deny: PII_HEADER_DENY },
+        response: { deny: PII_HEADER_DENY },
+    },
+    httpBodies: [],
+    urlQueryParams: { deny: PII_HEADER_DENY },
+    genAI: { inputs: false, outputs: false },
+    databaseQueryData: false,
+    queues: false,
+    graphQL: { document: false, variables: false },
+} satisfies NonNullable<Parameters<typeof import("@sentry/nextjs").init>[0]>["dataCollection"];
+
 const SENSITIVE_KEY = /token|secret|password|api[-_]?key|cookie|authorization|email/i;
 
 function redact<T>(node: T, depth = 0): T {

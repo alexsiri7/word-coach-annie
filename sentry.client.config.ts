@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
-import { beforeSend } from "@/lib/sentry-scrub";
+import { beforeSend, dataCollection } from "@/lib/sentry-scrub";
 
 const replayConsented =
   typeof window === "undefined" ||
@@ -9,7 +9,8 @@ const replayConsented =
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
-  sendDefaultPii: false,
+  // v11: replaces `sendDefaultPii: false`; see sentry-scrub.ts.
+  dataCollection,
   beforeSend,
 
   // Performance: sample 10% of transactions in production

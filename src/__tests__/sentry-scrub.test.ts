@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ErrorEvent } from "@sentry/nextjs";
-import { beforeSend } from "@/lib/sentry-scrub";
+import { beforeSend, dataCollection } from "@/lib/sentry-scrub";
 
 function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
   return {
@@ -120,5 +120,29 @@ describe("sentry-scrub beforeSend", () => {
     const result = beforeSend(event);
     expect((result.contexts!.user as Record<string, unknown>).email).toBe("[REDACTED]");
     expect((result.contexts!.user as Record<string, unknown>).name).toBe("Test");
+  });
+});
+
+// Sentry v11 collects bodies, cookies, user info, DB queries and GenAI I/O by
+// default when `dataCollection` is unset. Request bodies carry manuscript text,
+// so the restrictive v10 (`sendDefaultPii: false`) baseline must stay pinned.
+describe("sentry-scrub dataCollection", () => {
+  it("keeps the restrictive v10 baseline", () => {
+    expect(dataCollection.userInfo).toBe(false);
+    expect(dataCollection.cookies).toBe(false);
+    expect(dataCollection.httpBodies).toEqual([]);
+    expect(dataCollection.databaseQueryData).toBe(false);
+    expect(dataCollection.queues).toBe(false);
+    expect(dataCollection.genAI).toEqual({ inputs: false, outputs: false });
+    expect(dataCollection.graphQL).toEqual({ document: false, variables: false });
+  });
+
+  it("is passed to every Sentry.init config", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).toMatch(/^\s*dataCollection,\s*$/m);
+      expect(src, f).not.toMatch(/sendDefaultPii/);
+    }
   });
 });
