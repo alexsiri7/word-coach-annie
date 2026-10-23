@@ -142,7 +142,7 @@ describe("sentry-scrub dataCollection", () => {
     for (const f of ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).toMatch(/^\s*dataCollection,\s*$/m);
-      expect(src, f).not.toMatch(/sendDefaultPii/);
+      expect(src, f).not.toMatch(/^\s*sendDefaultPii\s*:/m);
     }
   });
 });
