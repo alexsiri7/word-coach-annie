@@ -42,7 +42,21 @@ function redact<T>(node: T, depth = 0): T {
     return out as T;
 }
 
-export function beforeSend(event: ErrorEvent): ErrorEvent {
+/**
+ * The MCP SDK answers a client whose `Mcp-Protocol-Version` it doesn't support
+ * with a 400 carrying this message. That is spec-defined version negotiation
+ * (the client retries with a version from the supported list), not a server
+ * fault, so it must not open Sentry issues.
+ */
+const MCP_PROTOCOL_VERSION_MISMATCH = "Bad Request: Unsupported protocol version:";
+
+function isMcpProtocolVersionMismatch(event: ErrorEvent): boolean {
+    const messages = [event.message, ...(event.exception?.values ?? []).map((v) => v.value)];
+    return messages.some((m) => m?.startsWith(MCP_PROTOCOL_VERSION_MISMATCH));
+}
+
+export function beforeSend(event: ErrorEvent): ErrorEvent | null {
+    if (isMcpProtocolVersionMismatch(event)) return null;
     if (event.request?.cookies) {
         (event.request as Record<string, unknown>).cookies = "[REDACTED]";
     }
