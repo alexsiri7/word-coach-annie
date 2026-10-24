@@ -12,21 +12,21 @@ function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
 describe("sentry-scrub beforeSend", () => {
   it("redacts password fields in extra", () => {
     const event = makeEvent({ extra: { password: "hunter2", safe: "ok" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.password).toBe("[REDACTED]");
     expect(result.extra!.safe).toBe("ok");
   });
 
   it("redacts token fields case-insensitively", () => {
     const event = makeEvent({ extra: { Token: "abc", ACCESS_TOKEN: "xyz" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.Token).toBe("[REDACTED]");
     expect(result.extra!.ACCESS_TOKEN).toBe("[REDACTED]");
   });
 
   it("redacts api_key and apiKey variants", () => {
     const event = makeEvent({ extra: { api_key: "k1", apiKey: "k2", "API-KEY": "k3" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.api_key).toBe("[REDACTED]");
     expect(result.extra!.apiKey).toBe("[REDACTED]");
     expect(result.extra!["API-KEY"]).toBe("[REDACTED]");
@@ -35,7 +35,7 @@ describe("sentry-scrub beforeSend", () => {
   it("truncates strings longer than 2000 chars", () => {
     const longString = "x".repeat(3000);
     const event = makeEvent({ extra: { message: longString } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     const truncated = result.extra!.message as string;
     expect(truncated).toHaveLength(2000 + "…[truncated]".length);
     expect(truncated.endsWith("…[truncated]")).toBe(true);
@@ -48,7 +48,7 @@ describe("sentry-scrub beforeSend", () => {
       obj = { nested: obj };
     }
     const event = makeEvent({ extra: { deep: obj } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
 
     // Walk down to find the deepest object
     let current: unknown = result.extra!.deep;
@@ -63,7 +63,7 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       request: { url: "http://localhost", cookies: { session: "abc" } },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.request!.cookies).toBe("[REDACTED]");
   });
 
@@ -74,7 +74,7 @@ describe("sentry-scrub beforeSend", () => {
         headers: { authorization: "Bearer secret", cookie: "session=abc", "content-type": "text/html" },
       },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.request!.headers!.authorization).toBe("[REDACTED]");
     expect(result.request!.headers!.cookie).toBe("[REDACTED]");
     expect(result.request!.headers!["content-type"]).toBe("text/html");
@@ -82,7 +82,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("preserves non-sensitive keys untouched", () => {
     const event = makeEvent({ extra: { userId: "u1", action: "click", count: 42 } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.userId).toBe("u1");
     expect(result.extra!.action).toBe("click");
     expect(result.extra!.count).toBe(42);
@@ -90,7 +90,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("handles null/undefined values in extra without throwing", () => {
     const event = makeEvent({ extra: { a: null, b: undefined, c: "ok" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.a).toBeNull();
     expect(result.extra!.b).toBeUndefined();
     expect(result.extra!.c).toBe("ok");
@@ -100,7 +100,7 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       extra: { items: [{ token: "abc", name: "foo" }, { secret: "xyz" }] },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     const items = result.extra!.items as Array<Record<string, unknown>>;
     expect(items[0].token).toBe("[REDACTED]");
     expect(items[0].name).toBe("foo");
@@ -109,7 +109,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("returns empty event unchanged", () => {
     const event = makeEvent({});
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.event_id).toBe("test-event");
   });
 
@@ -117,9 +117,30 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       contexts: { user: { email: "user@example.com", name: "Test" } } as ErrorEvent["contexts"],
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect((result.contexts!.user as Record<string, unknown>).email).toBe("[REDACTED]");
     expect((result.contexts!.user as Record<string, unknown>).name).toBe("Test");
+  });
+});
+
+describe("sentry-scrub beforeSend MCP protocol-version negotiation", () => {
+  const mismatch =
+    "Bad Request: Unsupported protocol version: 2026-07-28 (supported versions: 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05, 2024-10-07)";
+
+  it("drops the SDK's unsupported-protocol-version exception", () => {
+    const event = makeEvent({ exception: { values: [{ type: "Error", value: mismatch }] } });
+    expect(beforeSend(event)).toBeNull();
+  });
+
+  it("drops the unsupported-protocol-version message event", () => {
+    expect(beforeSend(makeEvent({ message: mismatch }))).toBeNull();
+  });
+
+  it("keeps other MCP transport errors", () => {
+    const event = makeEvent({
+      exception: { values: [{ type: "Error", value: "Invalid Host header: evil.com" }] },
+    });
+    expect(beforeSend(event)).toBe(event);
   });
 });
 
