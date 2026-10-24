@@ -3,6 +3,7 @@ import type { ErrorEvent } from "@sentry/nextjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { beforeBreadcrumb, beforeSend, dataCollection } from "@/lib/sentry-scrub";
+import { mcpTransportOptions } from "@/mcp/transport-options";
 
 function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
   return {
@@ -197,10 +198,7 @@ describe("sentry-scrub beforeSend MCP protocol-version negotiation", () => {
   let responseMessage: string;
 
   beforeAll(async () => {
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
+    const transport = new WebStandardStreamableHTTPServerTransport(mcpTransportOptions);
     const errors: Error[] = [];
     transport.onerror = (e) => errors.push(e);
     const server = new McpServer({ name: "sentry-scrub-test", version: "1.0.0" });
