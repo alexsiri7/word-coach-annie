@@ -1,4 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
 export class ProjectsController {
@@ -139,16 +141,22 @@ export class ProjectsController {
             throw new Error("Title is required");
         }
 
-        const project = await prisma.project.create({
-            data: {
-                title: title.trim(),
-                ...(author && { author: author.trim() }),
-                ...(synopsis && { synopsis: synopsis.trim() }),
-                ...(genre && { genre: genre.trim() }),
-                ...(projectType && { projectType }),
-                ...(userId && { userId }),
+        const project = await prisma.$transaction(
+            async (tx) => {
+                await assertActiveProjectLimit(tx, userId);
+                return tx.project.create({
+                    data: {
+                        title: title.trim(),
+                        ...(author && { author: author.trim() }),
+                        ...(synopsis && { synopsis: synopsis.trim() }),
+                        ...(genre && { genre: genre.trim() }),
+                        ...(projectType && { projectType }),
+                        ...(userId && { userId }),
+                    },
+                });
             },
-        });
+            { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        );
 
         return {
             id: project.id,
