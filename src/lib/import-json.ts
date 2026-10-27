@@ -1,4 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { randomUUID } from "crypto";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
@@ -64,6 +66,8 @@ interface ExportData {
 /**
  * Import a project from the standard export JSON format.
  * Generates new IDs for all entities while preserving internal references.
+ * Enforces the active-project limit, except for the onboarding sample
+ * (`isSample`), which a partial unique index already caps at one per user.
  */
 export async function importProjectJson(
   data: ExportData,
@@ -83,6 +87,8 @@ export async function importProjectJson(
   const projectId = randomUUID();
 
   await prisma.$transaction(async (tx) => {
+    if (!options?.isSample) await assertActiveProjectLimit(tx, options?.userId);
+
     // 1. Create project
     await tx.project.create({
       data: {
@@ -189,7 +195,7 @@ export async function importProjectJson(
         },
       });
     }
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   return { projectId };
 }
