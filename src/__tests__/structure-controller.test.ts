@@ -135,6 +135,18 @@ describe("StructureController", () => {
                 ).rejects.toThrow("cannot be its own parent");
             });
 
+            it("throws when re-parenting a chapter under its own scene", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                await expect(
+                    StructureController.updateNode(ch.id, { parentId: scene.id })
+                ).rejects.toThrow("Cannot move a node into its own descendant");
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline.map((n) => n.id)).toEqual([ch.id]);
+                expect(outline[0].children.map((n) => n.id)).toEqual([scene.id]);
+            });
+
             it("throws for non-existent node", async () => {
                 await expect(
                     StructureController.updateNode("bad", { title: "X" })
@@ -571,6 +583,19 @@ describe("StructureController", () => {
                 ]);
                 expect(result.totalUpdated).toBe(1);
                 expect(result.totalErrors).toBe(1);
+            });
+
+            it("rejects re-parenting a chapter under its own scene", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                const result = await StructureController.batchUpdateNodes([
+                    { nodeId: ch.id, parentId: scene.id },
+                ]);
+                expect(result.totalUpdated).toBe(0);
+                expect(result.errors[0].error).toBe("Cannot move a node into its own descendant");
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline.map((n) => n.id)).toEqual([ch.id]);
             });
 
             it("throws for empty array", async () => {

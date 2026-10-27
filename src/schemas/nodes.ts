@@ -16,7 +16,7 @@ export const NodeUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   synopsis: z.string().optional(),
   status: SceneStatus.optional(),
-  orderIndex: z.number().int().optional(),
+  orderIndex: z.number().int().min(0).max(10_000).optional(),
   parentId: z.string().nullable().optional(),
 });
 

@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { NodeUpdateSchema } from "@/schemas/nodes";
+import { isDescendant } from "@/lib/node-tree";
 
 export async function GET(
   request: NextRequest,
@@ -86,6 +87,12 @@ export async function PATCH(
       if (parentId === id) {
         return NextResponse.json(
           { error: "A node cannot be its own parent" },
+          { status: 400 }
+        );
+      }
+      if (await isDescendant(id, parentId)) {
+        return NextResponse.json(
+          { error: "Cannot move a node into its own descendant" },
           { status: 400 }
         );
       }

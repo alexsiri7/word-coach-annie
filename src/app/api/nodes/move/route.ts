@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { isDescendant } from "@/lib/node-tree";
 
 /**
  * POST /api/nodes/move
@@ -137,24 +138,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/** Check if `possibleDescendantId` is a descendant of `ancestorId`. */
-async function isDescendant(ancestorId: string, possibleDescendantId: string): Promise<boolean> {
-  let currentId: string | null = possibleDescendantId;
-  const visited = new Set<string>();
-
-  while (currentId) {
-    if (currentId === ancestorId) return true;
-    if (visited.has(currentId)) return false;
-    visited.add(currentId);
-
-    const found: { parentId: string | null } | null = await prisma.structureNode.findUnique({
-      where: { id: currentId },
-      select: { parentId: true },
-    });
-    currentId = found?.parentId ?? null;
-  }
-
-  return false;
 }

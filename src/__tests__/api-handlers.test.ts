@@ -187,6 +187,27 @@ describe("API Route Handlers", () => {
             expect(res.status).toBe(400);
         });
 
+        it("PATCH rejects re-parenting a chapter under its own scene", async () => {
+            const chapter = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Chapter", orderIndex: 1 },
+            });
+            await testPrisma.structureNode.update({ where: { id: nodeId }, data: { parentId: chapter.id } });
+
+            const { PATCH } = await import("@/app/api/nodes/[id]/route");
+            const req = mockReq(`http://localhost/api/nodes/${chapter.id}`, { parentId: nodeId });
+            const res = await PATCH(req, mockParams({ id: chapter.id }));
+            expect(res.status).toBe(400);
+            const after = await testPrisma.structureNode.findUnique({ where: { id: chapter.id } });
+            expect(after?.parentId).toBeNull();
+        });
+
+        it("PATCH rejects a negative orderIndex", async () => {
+            const { PATCH } = await import("@/app/api/nodes/[id]/route");
+            const req = mockReq(`http://localhost/api/nodes/${nodeId}`, { orderIndex: -1 });
+            const res = await PATCH(req, mockParams({ id: nodeId }));
+            expect(res.status).toBe(400);
+        });
+
         it("DELETE removes node and reindexes", async () => {
             const { DELETE } = await import("@/app/api/nodes/[id]/route");
             const req = mockReq(`http://localhost/api/nodes/${nodeId}`);

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
+import { isDescendant } from "@/lib/node-tree";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -304,6 +305,9 @@ export class StructureController {
                 where: { id: data.parentId, projectId: existing.projectId },
             });
             if (!parentNode) throw new Error("Parent node not found in this project");
+            if (await isDescendant(nodeId, data.parentId)) {
+                throw new Error("Cannot move a node into its own descendant");
+            }
         }
 
         const updateData: Record<string, unknown> = {};
