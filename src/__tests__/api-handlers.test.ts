@@ -228,6 +228,43 @@ describe("API Route Handlers", () => {
             expect(overMax.status).toBe(400);
         });
 
+        it("move re-parents a scene under a chapter", async () => {
+            const chapter = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Chapter", orderIndex: 1 },
+            });
+
+            const { POST } = await import("@/app/api/nodes/move/route");
+            const res = await POST(mockReq("http://localhost/api/nodes/move", { nodeId, newParentId: chapter.id, newIndex: 0 }));
+            expect(res.status).toBe(200);
+            const after = await testPrisma.structureNode.findUnique({ where: { id: nodeId } });
+            expect(after?.parentId).toBe(chapter.id);
+        });
+
+        it("move rejects re-parenting a chapter under its own scene", async () => {
+            const chapter = await testPrisma.structureNode.create({
+                data: { projectId, type: "CHAPTER", title: "Chapter", orderIndex: 1 },
+            });
+            await testPrisma.structureNode.update({ where: { id: nodeId }, data: { parentId: chapter.id } });
+
+            const { POST } = await import("@/app/api/nodes/move/route");
+            const res = await POST(mockReq("http://localhost/api/nodes/move", { nodeId: chapter.id, newParentId: nodeId, newIndex: 0 }));
+            expect(res.status).toBe(400);
+            const after = await testPrisma.structureNode.findUnique({ where: { id: chapter.id } });
+            expect(after?.parentId).toBeNull();
+        });
+
+        it("move lets only one of two concurrent cross re-parents through", async () => {
+            const a = await testPrisma.structureNode.create({ data: { projectId, type: "CHAPTER", title: "A", orderIndex: 1 } });
+            const b = await testPrisma.structureNode.create({ data: { projectId, type: "CHAPTER", title: "B", orderIndex: 2 } });
+
+            const { POST } = await import("@/app/api/nodes/move/route");
+            const responses = await Promise.all([
+                POST(mockReq("http://localhost/api/nodes/move", { nodeId: a.id, newParentId: b.id, newIndex: 0 })),
+                POST(mockReq("http://localhost/api/nodes/move", { nodeId: b.id, newParentId: a.id, newIndex: 0 })),
+            ]);
+            expect(responses.map((r) => r.status).sort()).toEqual([200, 400]);
+        });
+
         it("DELETE removes node and reindexes", async () => {
             const { DELETE } = await import("@/app/api/nodes/[id]/route");
             const req = mockReq(`http://localhost/api/nodes/${nodeId}`);
