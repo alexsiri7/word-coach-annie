@@ -894,9 +894,9 @@ Create the sample project (Sherlock Holmes) for new users. No-op if the user alr
 ### `POST /api/projects/import`
 Import a project from a JSON export file.
 
-**Body**: JSON export data (project object)
+**Body**: JSON export data (project object). A story object with an unknown `type` is imported as `NOTE`.
 
-**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex`, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
+**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
 
 ---
 

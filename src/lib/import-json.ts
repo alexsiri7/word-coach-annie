@@ -110,11 +110,6 @@ function assertImportable(data: ExportData) {
       throw new ImportValidationError(`Invalid structure node orderIndex: ${node.orderIndex}`);
     }
   }
-  for (const obj of data.storyObjects) {
-    if (!StoryObjectType.safeParse(obj.type).success) {
-      throw new ImportValidationError(`Invalid story object type: ${obj.type}`);
-    }
-  }
 }
 
 /**
@@ -213,7 +208,9 @@ export async function importProjectJson(
         data: {
           id: objectIdMap.get(obj.id)!,
           projectId,
-          type: obj.type,
+          // Defaulted, not rejected: world objects take a free-form type and
+          // copying one into a project carries it over, so exports can hold it.
+          type: StoryObjectType.catch("NOTE").parse(obj.type),
           name: sanitizeInput(obj.name ?? ""),
           description: sanitizeInput(obj.description ?? ""),
           notes: sanitizeInput(obj.notes ?? ""),
