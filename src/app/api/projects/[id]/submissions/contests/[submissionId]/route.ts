@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
+import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
 import { ContestSubmissionUpdateSchema } from "@/schemas/submissions";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -56,8 +57,11 @@ export async function PATCH(
         const submission = await ContestSubmissionController.updateContestSubmission(id, data);
         return NextResponse.json(submission);
     } catch (error) {
-        if (error instanceof Error && error.message.startsWith("Provider not found")) {
+        if (error instanceof NotFoundError) {
             return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        if (error instanceof ForbiddenError) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
         logger.error("PATCH /api/projects/[id]/submissions/contests/[submissionId] error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
+import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
 import { ContestSubmissionCreateSchema } from "@/schemas/submissions";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
@@ -54,8 +55,11 @@ export async function POST(
 
         return NextResponse.json(submission, { status: 201 });
     } catch (error) {
-        if (error instanceof Error && error.message.startsWith("Provider not found")) {
+        if (error instanceof NotFoundError) {
             return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        if (error instanceof ForbiddenError) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
         logger.error("POST /api/projects/[id]/submissions/contests error", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

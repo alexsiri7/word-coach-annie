@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { NotFoundError } from "@/lib/controllers/errors";
 
 type WritingTaskWithScene = Prisma.WritingTaskGetPayload<{
     include: { scene: { select: { id: true; title: true } } };
@@ -93,6 +94,14 @@ export class WritingTaskController {
             });
             if (!project) throw new Error(`Project not found: ${params.projectId}`);
             ownerId = project.userId;
+        }
+
+        if (params.sceneId) {
+            const scene = await prisma.structureNode.findFirst({
+                where: { id: params.sceneId, projectId: params.projectId },
+                select: { id: true },
+            });
+            if (!scene) throw new NotFoundError(`Scene not found in project: ${params.sceneId}`);
         }
 
         const task = await prisma.writingTask.create({

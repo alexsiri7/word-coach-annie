@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SessionsController } from "@/lib/controllers/sessions";
+import { NotFoundError } from "@/lib/controllers/errors";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { SessionCreateSchema } from "@/schemas/sessions";
 import { logger } from "@/lib/logger";
 
 export async function POST(
@@ -13,18 +15,29 @@ export async function POST(
     const access = await verifyProjectWriteAccess(projectId, userId, req.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+
+    const parsed = SessionCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+    const { nodeId, startedAt, endedAt, wordsWritten, durationSeconds, date } = parsed.data;
+
     const session = await SessionsController.createSession({
       projectId,
-      nodeId: body.nodeId ?? null,
-      startedAt: body.startedAt ? new Date(body.startedAt) : undefined,
-      endedAt: body.endedAt ? new Date(body.endedAt) : undefined,
-      wordsWritten: body.wordsWritten ?? 0,
-      durationSeconds: body.durationSeconds ?? 0,
-      date: body.date,
+      nodeId: nodeId ?? null,
+      startedAt: startedAt ? new Date(startedAt) : undefined,
+      endedAt: endedAt ? new Date(endedAt) : undefined,
+      wordsWritten,
+      durationSeconds,
+      date,
     });
     return NextResponse.json(session, { status: 201 });
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     logger.error("Failed to create writing session", { error, projectId });
     return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
   }
