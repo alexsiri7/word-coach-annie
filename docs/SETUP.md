@@ -109,7 +109,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 | Variable | Description |
 |----------|-------------|
 | `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. **Required** when storing AI API keys; set `ALLOW_PLAINTEXT_STORAGE=true` in local dev to opt out. |
-| `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
+| `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. **Required** when auth is enabled and must be at least 32 characters; there is no fallback. Production refuses to start if `JWT_SECRET`, `API_TOKEN` or `ENCRYPTION_KEY` is set but shorter than 32 characters. |
 | `ALLOWED_EMAILS` | Comma-separated list of Google emails allowed to sign in. When unset, any Google account can sign in. |
 | `OAUTH_ALLOWED_REDIRECT_HOSTS` | Comma-separated exact hostnames that MCP clients may register as HTTPS `redirect_uris` via `/oauth/register`. Loopback (`localhost`, `127.0.0.1`, `[::1]`) over `http`/`https` is always allowed. When unset or empty: `claude.ai`. Add a host here to support another web MCP connector. |
 

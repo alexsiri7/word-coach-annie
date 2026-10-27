@@ -17,7 +17,7 @@ describe("GET /api/auth/me with a legacy API_TOKEN session cookie", () => {
         origApiToken = process.env.API_TOKEN;
         origJwtSecret = process.env.JWT_SECRET;
         process.env.API_TOKEN = API_TOKEN;
-        process.env.JWT_SECRET = "me-route-jwt-secret";
+        process.env.JWT_SECRET = "me-route-jwt-secret-0123456789abcdef";
     });
 
     afterEach(() => {

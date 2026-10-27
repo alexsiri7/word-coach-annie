@@ -82,7 +82,7 @@ describe("JWT session tokens", () => {
     beforeEach(() => {
         origJwt = process.env.JWT_SECRET;
         origApiToken = process.env.API_TOKEN;
-        process.env.JWT_SECRET = "test-jwt-secret";
+        process.env.JWT_SECRET = "test-jwt-secret-0123456789abcdef";
     });
 
     afterEach(() => {
@@ -173,7 +173,7 @@ describe("JWT session tokens", () => {
         const encoder = new TextEncoder();
         const key = await crypto.subtle.importKey(
             "raw",
-            encoder.encode("test-jwt-secret"),
+            encoder.encode("test-jwt-secret-0123456789abcdef"),
             { name: "HMAC", hash: "SHA-256" },
             false,
             ["sign"]
@@ -201,7 +201,7 @@ describe("verifySessionTokenNode — blocklist integration", () => {
 
     beforeEach(async () => {
         origJwt = process.env.JWT_SECRET;
-        process.env.JWT_SECRET = "test-jwt-secret";
+        process.env.JWT_SECRET = "test-jwt-secret-0123456789abcdef";
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
@@ -260,7 +260,7 @@ describe("refresh token functions", () => {
 
     beforeEach(async () => {
         origJwt = process.env.JWT_SECRET;
-        process.env.JWT_SECRET = "test-jwt-secret";
+        process.env.JWT_SECRET = "test-jwt-secret-0123456789abcdef";
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
@@ -406,8 +406,20 @@ describe("resolveJwtSecret", () => {
     });
 
     it("returns JWT_SECRET when set", () => {
-        process.env.JWT_SECRET = "my-super-secret-key";
-        expect(resolveJwtSecret()).toBe("my-super-secret-key");
+        const secret = "a".repeat(64);
+        process.env.JWT_SECRET = secret;
+        expect(resolveJwtSecret()).toBe(secret);
+    });
+
+    it.each([
+        ["auth is enabled", "some-token"],
+        ["auth is disabled", undefined],
+    ])("throws on a JWT_SECRET shorter than 32 characters when %s", (_, apiToken) => {
+        process.env.JWT_SECRET = "x".repeat(31);
+        if (apiToken) process.env.API_TOKEN = apiToken;
+        else delete process.env.API_TOKEN;
+        delete process.env.GOOGLE_CLIENT_ID;
+        expect(() => resolveJwtSecret()).toThrow("JWT_SECRET is too short");
     });
 
     it("returns 'annie-dev-secret' when auth is disabled", () => {
