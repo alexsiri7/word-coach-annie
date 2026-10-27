@@ -80,7 +80,7 @@ describe("importProjectJson input limits", () => {
     await expectRejected(exportWith({ structureNodes: [node({ orderIndex: -(2 ** 31) - 1 })] }), "Invalid structure node orderIndex");
   });
 
-  it("imports a story object with an unknown type as NOTE", async () => {
+  it("keeps a free-form story object type and defaults a missing or blank one to NOTE", async () => {
     const storyObjectCreate = vi.fn();
     const tx = { project: { create: vi.fn() }, storyObject: { create: storyObjectCreate } };
     vi.mocked(prisma.$transaction).mockImplementationOnce(
@@ -88,10 +88,18 @@ describe("importProjectJson input limits", () => {
     );
     const obj = { name: "", description: "", notes: "", role: null, tags: "" };
     await importProjectJson(
-      exportWith({ storyObjects: [{ id: "o1", type: "VILLAIN", ...obj }, { id: "o2", type: "LOCATION", ...obj }] }),
+      exportWith({
+        storyObjects: [
+          { id: "o1", type: "ANIMAL", ...obj },
+          { id: "o2", type: "LOCATION", ...obj },
+          { id: "o3", type: "  ", ...obj },
+          { id: "o4", type: null as unknown as string, ...obj },
+          { id: "o5", ...obj } as ExportData["storyObjects"][number],
+        ],
+      }),
       { isSample: true }
     );
-    expect(storyObjectCreate.mock.calls.map(([arg]) => arg.data.type)).toEqual(["NOTE", "LOCATION"]);
+    expect(storyObjectCreate.mock.calls.map(([arg]) => arg.data.type)).toEqual(["ANIMAL", "LOCATION", "NOTE", "NOTE", "NOTE"]);
   });
 
   it("rejects an unknown projectType", async () => {

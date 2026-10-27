@@ -7,7 +7,6 @@ import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 import { NodeType, SceneStatus } from "@/schemas/nodes";
 import { ProjectType } from "@/schemas/projects";
-import { StoryObjectType } from "@/schemas/story-objects";
 
 interface ExportData {
   exportVersion: number;
@@ -85,6 +84,10 @@ const MAX_IMPORT_ITEMS = {
 // Bounded by the Postgres `int4` column, not NodeOrderIndex: node creation
 // via `insertAfterIndex` is unbounded, so real exports can exceed that range.
 const ImportedOrderIndex = z.number().int().min(-2_147_483_648).max(2_147_483_647);
+
+// Free-form like WorldObject.type (copying a world object into a project
+// carries its type over verbatim), so only a missing or blank type defaults.
+const ImportedStoryObjectType = z.string().trim().min(1).catch("NOTE");
 
 /** Rejects payloads whose shape would make the import unbounded or store values the app can't render. */
 function assertImportable(data: ExportData) {
@@ -208,9 +211,7 @@ export async function importProjectJson(
         data: {
           id: objectIdMap.get(obj.id)!,
           projectId,
-          // Defaulted, not rejected: world objects take a free-form type and
-          // copying one into a project carries it over, so exports can hold it.
-          type: StoryObjectType.catch("NOTE").parse(obj.type),
+          type: ImportedStoryObjectType.parse(obj.type),
           name: sanitizeInput(obj.name ?? ""),
           description: sanitizeInput(obj.description ?? ""),
           notes: sanitizeInput(obj.notes ?? ""),
