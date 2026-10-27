@@ -33,20 +33,18 @@ const exportPayload = {
   relationships: [],
 };
 
-async function userAtLimit() {
+async function userWithProjects(count: number) {
   const user = await testPrisma.user.create({
     data: { email: "at-limit@test.com", googleId: "g-at-limit" },
   });
   await testPrisma.project.createMany({
-    data: [
-      { title: "P1", userId: user.id },
-      { title: "P2", userId: user.id },
-      { title: "P3", userId: user.id },
-    ],
+    data: Array.from({ length: count }, (_, i) => ({ title: `P${i + 1}`, userId: user.id })),
   });
   vi.mocked(getCurrentUserId).mockReturnValue(user.id);
   return user;
 }
+
+const userAtLimit = () => userWithProjects(3);
 
 function projectCount(userId: string) {
   return testPrisma.project.count({ where: { userId } });
@@ -115,5 +113,43 @@ describe("active project limit on non-REST creation paths", () => {
 
     expect(res.status).toBe(201);
     expect(await testPrisma.project.count({ where: { userId: user.id, isSample: true } })).toBe(1);
+  });
+
+  it("onboarding sample counts toward the limit once created", async () => {
+    const user = await userWithProjects(2);
+    const { POST: createSample } = await import("@/app/api/onboarding/sample/route");
+    expect((await createSample(post("http://localhost/api/onboarding/sample", {}))).status).toBe(201);
+
+    await expect(createProject({ title: "P4", userId: user.id })).rejects.toThrow(LIMIT_MESSAGE);
+    expect(await projectCount(user.id)).toBe(3);
+  });
+
+  // Node is single-threaded, so the two transactions are interleaved rather than
+  // truly simultaneous; the loser fails either the limit check or with P2034.
+  it("concurrent imports one slot below the limit create only one project", async () => {
+    const user = await userWithProjects(2);
+    const { POST } = await import("@/app/api/projects/import/route");
+
+    const responses = await Promise.all([
+      POST(post("http://localhost/api/projects/import", exportPayload)),
+      POST(post("http://localhost/api/projects/import", exportPayload)),
+    ]);
+
+    const statuses = responses.map((r) => r.status).sort();
+    expect(statuses[0]).toBe(201);
+    expect([403, 409]).toContain(statuses[1]);
+    expect(await projectCount(user.id)).toBe(3);
+  });
+
+  it("concurrent create_project calls one slot below the limit create only one project", async () => {
+    const user = await userWithProjects(2);
+
+    const results = await Promise.allSettled([
+      createProject({ title: "A", userId: user.id }),
+      createProject({ title: "B", userId: user.id }),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await projectCount(user.id)).toBe(3);
   });
 });
