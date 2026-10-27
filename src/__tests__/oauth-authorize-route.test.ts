@@ -1,10 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({
   SESSION_COOKIE_NAME: "session",
-  verifySessionToken: vi.fn(async () => ({ userId: "u1", email: "u@test.com" })),
   safeEqual: (a: string, b: string) => a === b,
+}));
+
+vi.mock("@/lib/auth-server", () => ({
+  verifySessionTokenNode: vi.fn(),
 }));
 
 vi.mock("@/lib/oauth-store", () => ({
@@ -16,6 +19,14 @@ vi.mock("@/lib/oauth-store", () => ({
 }));
 
 import { GET, POST } from "@/app/oauth/authorize/route";
+import { verifySessionTokenNode } from "@/lib/auth-server";
+import { createAuthCode } from "@/lib/oauth-store";
+
+beforeEach(() => {
+  vi.mocked(verifySessionTokenNode).mockReset();
+  vi.mocked(verifySessionTokenNode).mockResolvedValue({ userId: "u1", email: "u@test.com", name: "U" });
+  vi.mocked(createAuthCode).mockClear();
+});
 
 function makeGetRequest(): NextRequest {
   return new NextRequest(
@@ -227,5 +238,36 @@ describe("POST /oauth/authorize nonce propagation", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('nonce="my-test-nonce"');
+  });
+});
+
+describe("/oauth/authorize revoked session", () => {
+  it("GET redirects to login instead of rendering consent when the session is revoked", async () => {
+    vi.mocked(verifySessionTokenNode).mockResolvedValue(null);
+    const res = await GET(makeGetRequest());
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("csrf_oauth=");
+    expect(verifySessionTokenNode).toHaveBeenCalledWith("valid-session");
+  });
+
+  it("POST approve does not issue an auth code when the session is revoked", async () => {
+    vi.mocked(verifySessionTokenNode).mockResolvedValue(null);
+    const req = makePostRequest(
+      {
+        action: "approve",
+        csrf_token: "token-abc",
+        response_type: "code",
+        client_id: "c1",
+        redirect_uri: "http://localhost/callback",
+        code_challenge: "abc",
+        code_challenge_method: "S256",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+    expect(createAuthCode).not.toHaveBeenCalled();
   });
 });
