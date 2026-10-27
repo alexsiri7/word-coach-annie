@@ -3,7 +3,7 @@ import { SignJWT } from "jose";
 
 // JWT_SECRET must be set before importing the module
 const origJwt = process.env.JWT_SECRET;
-process.env.JWT_SECRET = "test-jwt-secret-for-oauth-tokens";
+process.env.JWT_SECRET = "test-jwt-secret-for-oauth-tokens-0123";
 
 import {
   createMcpToken,
@@ -17,7 +17,7 @@ import { getJwtKey } from "@/lib/auth";
 
 describe("MCP OAuth Tokens", () => {
   beforeEach(() => {
-    process.env.JWT_SECRET = "test-jwt-secret-for-oauth-tokens";
+    process.env.JWT_SECRET = "test-jwt-secret-for-oauth-tokens-0123";
   });
 
   afterEach(() => {

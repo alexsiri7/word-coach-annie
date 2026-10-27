@@ -57,6 +57,7 @@ COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/scripts/sql-tokenizer.mjs ./scripts/sql-tokenizer.mjs
 COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-security.mjs
 COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
+COPY --from=builder /app/scripts/secret-strength.mjs ./scripts/secret-strength.mjs
 COPY --from=builder /app/scripts/database-schema.mjs ./scripts/database-schema.mjs
 # Release-step re-encryption after an ENCRYPTION_KEY rotation
 COPY --from=builder /app/scripts/encryption-keyring.mjs ./scripts/encryption-keyring.mjs

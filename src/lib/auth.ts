@@ -11,6 +11,7 @@ import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { authConfigurationProblems } from "../../scripts/auth-configuration.mjs";
+import { MIN_SECRET_LENGTH, secretStrengthProblems } from "../../scripts/secret-strength.mjs";
 
 const SESSION_COOKIE_NAME = "annie_session";
 const REFRESH_COOKIE_NAME = "annie_refresh";
@@ -35,18 +36,22 @@ export interface SessionPayload {
 /**
  * Resolve the raw JWT secret string.
  * Falls back to "annie-dev-secret" only when auth is disabled (local dev).
- * Throws if auth is enabled but no secret is configured.
+ * Throws if auth is enabled but no secret is configured, or if the configured
+ * secret is shorter than MIN_SECRET_LENGTH.
  */
 export function resolveJwtSecret(): string {
     // Use only JWT_SECRET — do not reuse API_TOKEN or ENCRYPTION_KEY as a JWT seed.
     // Those serve distinct purposes and reuse allows key-confusion attacks.
     const secret = env.JWT_SECRET;
-    if (secret) return secret;
+    const requirement = `Set JWT_SECRET to a random string of at least ${MIN_SECRET_LENGTH} characters.`;
+    if (secret) {
+        if (secretStrengthProblems({ JWT_SECRET: secret }).length > 0) {
+            throw new Error(`JWT_SECRET is too short. ${requirement}`);
+        }
+        return secret;
+    }
     if (isAuthEnabled()) {
-        throw new Error(
-            "JWT_SECRET is required when auth is enabled. " +
-            "Set JWT_SECRET to a random string of at least 32 characters."
-        );
+        throw new Error(`JWT_SECRET is required when auth is enabled. ${requirement}`);
     }
     return "annie-dev-secret";
 }
