@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { StructureController, ConflictError } from "@/lib/controllers/structure";
+import { StructureController, ConflictError, InputTooLargeError } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
@@ -78,6 +78,12 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (typeof content !== "string") {
+      return NextResponse.json(
+        { error: "content must be a string" },
+        { status: 400 }
+      );
+    }
 
     // The editor always saves against the version it last saw; a missing hash
     // means "none seen", so it can never silently overwrite an existing version.
@@ -90,6 +96,9 @@ export async function POST(
         { conflict: true, content: error.serverContent, contentHash: computeContentHash(error.serverContent) },
         { status: 409 }
       );
+    }
+    if (error instanceof InputTooLargeError) {
+      return NextResponse.json({ error: error.message }, { status: 413 });
     }
     logger.error("Failed to save content", error);
     return NextResponse.json(

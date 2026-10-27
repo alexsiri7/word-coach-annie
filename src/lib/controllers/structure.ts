@@ -3,7 +3,7 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
-import { sanitizeHtml } from "@/lib/sanitize-server";
+import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex } from "@/schemas/nodes";
@@ -15,9 +15,33 @@ export class ConflictError extends Error {
   }
 }
 
+export class InputTooLargeError extends Error {
+  constructor(field: string, max: number) {
+    super(`${field} exceeds the maximum length of ${max} characters`);
+    this.name = "InputTooLargeError";
+  }
+}
+
 export const ANNOTATION_ERRORS = {
     CONTENT_REQUIRED: "Content is required",
 } as const;
+
+export const MAX_SCENE_CONTENT_LENGTH = 2 * 1024 * 1024;
+
+// A selection can span a whole scene, and a text-quote range is JSON that
+// embeds the selected text, escaped, plus prefix/suffix.
+export const MAX_ANNOTATION_LENGTHS = {
+    content: 10_000,
+    selectedText: MAX_SCENE_CONTENT_LENGTH,
+    range: 2 * MAX_SCENE_CONTENT_LENGTH,
+} as const;
+
+function assertAnnotationWithinLimits(fields: { content: string; range?: string; selectedText?: string | null }) {
+    for (const [field, max] of Object.entries(MAX_ANNOTATION_LENGTHS)) {
+        const value = fields[field as keyof typeof MAX_ANNOTATION_LENGTHS];
+        if (value && value.length > max) throw new InputTooLargeError(field, max);
+    }
+}
 
 export const MAX_SCENE_VERSIONS = 50;
 
@@ -376,7 +400,19 @@ export class StructureController {
         return { deleted: true, id: nodeId, title: node.title };
     }
 
-    static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
+    /** Limits apply to the input as given; `sanitize` escapes it afterwards, which can lengthen it. */
+    static async addAnnotation(
+        nodeId: string,
+        content: string,
+        range: string = "",
+        selectedText: string | null = null,
+        { sanitize = false }: { sanitize?: boolean } = {}
+    ) {
+        assertAnnotationWithinLimits({ content, range, selectedText });
+        if (sanitize) {
+            content = sanitizeInput(content);
+            if (selectedText) selectedText = sanitizeInput(selectedText);
+        }
         if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
 
         // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
@@ -446,6 +482,9 @@ export class StructureController {
      * mismatch; a write with no stored version is always allowed.
      */
     static async writeSceneContent(nodeId: string, rawContent: string, contentHash?: string | null) {
+        if (rawContent.length > MAX_SCENE_CONTENT_LENGTH) {
+            throw new InputTooLargeError("Scene content", MAX_SCENE_CONTENT_LENGTH);
+        }
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },

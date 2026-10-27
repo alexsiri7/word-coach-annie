@@ -358,12 +358,14 @@ Get a scene's content (latest version + version history + annotations).
 
 ---
 
-### `PUT /api/nodes/:id/content`
+### `POST /api/nodes/:id/content`
 Save scene content (creates a new version).
 
 **Body**: `{ content: "string" }`
 
 **Response**: `{ version: ContentVersion, wordCount: number }`
+
+**Errors**: `400` if `content` is missing or not a string; `413` if it exceeds 2 MiB (2,097,152 characters)
 
 ---
 
@@ -376,6 +378,13 @@ Restore a previous content version.
 
 ### `GET /api/nodes/:id/annotations`
 List annotations for a node.
+
+### `POST /api/nodes/:id/annotations`
+Add an annotation to a node.
+
+**Body**: `{ content: string, range?: string, selectedText?: string }`
+
+**Errors**: `400` if `content` is empty, a field is not a string, `content` exceeds 10,000 characters, or `selectedText` exceeds 2 MiB (2,097,152) or `range` 4 MiB (4,194,304) characters. Limits apply before sanitization
 
 ---
 
@@ -885,9 +894,9 @@ Create the sample project (Sherlock Holmes) for new users. No-op if the user alr
 ### `POST /api/projects/import`
 Import a project from a JSON export file.
 
-**Body**: JSON export data (project object)
+**Body**: JSON export data (project object). A story object with a missing or blank `type` is imported as `NOTE`; any other `type` is kept as-is.
 
-**Errors**: `401` unauthenticated (Google OAuth mode only)
+**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
 
 ---
 

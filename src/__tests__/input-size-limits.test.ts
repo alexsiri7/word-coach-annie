@@ -6,6 +6,7 @@ vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => "user-1"),
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectAccess: vi.fn(async () => ({ authorized: true })),
+  verifyProjectWriteAccessByNode: vi.fn(async () => ({ authorized: true })),
 }));
 vi.mock("@/lib/ai/adk-agent", () => ({
   runChatAgent: vi.fn(async () => ({ finalContent: "ok", toolLog: [] })),
@@ -20,7 +21,10 @@ vi.mock("@/lib/ai/settings", () => ({
 vi.mock("@/lib/ai/chat-compression", () => ({ compressConversation: vi.fn(async () => undefined) }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/db", () => ({ prisma: { conversation: { findUniqueOrThrow: vi.fn(async () => ({ projectId: "proj-1" })) }, chatMessage: { create: vi.fn() }, project: { findUnique: vi.fn(async () => ({ id: "proj-1" })) } } }));
-vi.mock("@/lib/import-json", () => ({ importProjectJson: vi.fn(async () => ({ projectId: "imported-1" })) }));
+vi.mock("@/lib/import-json", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/import-json")>()),
+  importProjectJson: vi.fn(async () => ({ projectId: "imported-1" })),
+}));
 vi.mock("@/lib/env", () => ({ env: { GITHUB_FEEDBACK_TOKEN: "tok", GITHUB_FEEDBACK_REPO: "owner/repo" } }));
 vi.mock("@/lib/auth", () => ({ isGoogleAuthMode: vi.fn(() => false) }));
 
@@ -30,8 +34,11 @@ globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ id: 1 }) 
 import { POST as chatPost } from "@/app/api/chat/route";
 import { POST as inlinePost } from "@/app/api/ai-inline/route";
 import { POST as importPost } from "@/app/api/projects/import/route";
+import { importProjectJson, ImportValidationError } from "@/lib/import-json";
 import { POST as feedbackPost } from "@/app/api/feedback/route";
 import { GET as searchGet } from "@/app/api/projects/[id]/search/route";
+import { POST as contentPost } from "@/app/api/nodes/[id]/content/route";
+import { MAX_SCENE_CONTENT_LENGTH } from "@/lib/controllers/structure";
 
 function postJson(url: string, body: unknown, headers?: Record<string, string>): NextRequest {
   return new NextRequest(url, {
@@ -153,6 +160,48 @@ describe("POST /api/projects/import — input size limits", () => {
     expect(res.status).not.toBe(413);
   });
 
+  const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+
+  function streamedImportRequest(chunks: Uint8Array[]) {
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift();
+        if (chunk) controller.enqueue(chunk);
+        else controller.close();
+      },
+    });
+    const req = new NextRequest("http://localhost/api/projects/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      duplex: "half",
+    });
+    expect(req.headers.get("content-length")).toBeNull();
+    return req;
+  }
+
+  it("returns 413 for a streamed body over 5MB with no Content-Length, without importing it", async () => {
+    const chunk = new Uint8Array(1024 * 1024).fill(0x20);
+    const res = await importPost(streamedImportRequest(new Array(6).fill(chunk)));
+    expect(res.status).toBe(413);
+    expect(importProjectJson).not.toHaveBeenCalled();
+  });
+
+  it("imports a streamed body of exactly 5MB with no Content-Length", async () => {
+    const json = new TextEncoder().encode(JSON.stringify({ project: {}, exportVersion: 1 }));
+    const padding = new Uint8Array(MAX_IMPORT_BYTES - json.byteLength).fill(0x20);
+    const res = await importPost(streamedImportRequest([json, padding]));
+    expect(res.status).not.toBe(413);
+    expect(importProjectJson).toHaveBeenCalledOnce();
+  });
+
+  it("returns 400 when the payload fails import validation", async () => {
+    vi.mocked(importProjectJson).mockRejectedValueOnce(new ImportValidationError("structureNodes exceeds the maximum of 5000"));
+    const res = await importPost(postJson("http://localhost/api/projects/import", { project: {}, exportVersion: 1 }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("structureNodes exceeds the maximum of 5000");
+  });
+
   it("does not return 413 when content-length header is absent", async () => {
     const req = new NextRequest("http://localhost/api/projects/import", {
       method: "POST",
@@ -161,6 +210,27 @@ describe("POST /api/projects/import — input size limits", () => {
     });
     const res = await importPost(req);
     expect(res.status).not.toBe(413);
+  });
+});
+
+// ── /api/nodes/[id]/content ───────────────────────────────────────────────────
+describe("POST /api/nodes/[id]/content — input size limits", () => {
+  const params = { params: Promise.resolve({ id: "node-1" }) };
+
+  // The db mock has no structureNode model, so reaching the controller's lookup would 500.
+  it("returns 413 when content exceeds the cap, before touching the scene", async () => {
+    const res = await contentPost(postJson("http://localhost/api/nodes/node-1/content", {
+      content: "a".repeat(MAX_SCENE_CONTENT_LENGTH + 1),
+    }), params);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toHaveProperty("error");
+  });
+
+  it("returns 400 when content is not a string", async () => {
+    const res = await contentPost(postJson("http://localhost/api/nodes/node-1/content", {
+      content: { html: "<p>hi</p>" },
+    }), params);
+    expect(res.status).toBe(400);
   });
 });
 

@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+export const ProjectType = z.enum(["FICTION", "ARTICLE_COLLECTION", "GENERAL"]);
+
 export const ProjectCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),
   author: z.string().optional(),
   synopsis: z.string().optional(),
   genre: z.string().optional(),
-  projectType: z.enum(["FICTION", "ARTICLE_COLLECTION", "GENERAL"]).optional(),
+  projectType: ProjectType.optional(),
 });
 
 export const ProjectUpdateSchema = z
@@ -14,7 +16,7 @@ export const ProjectUpdateSchema = z
     author: z.string().optional(),
     synopsis: z.string().optional(),
     genre: z.string().optional(),
-    projectType: z.enum(["FICTION", "ARTICLE_COLLECTION", "GENERAL"]).optional(),
+    projectType: ProjectType.optional(),
     aiInstructions: z.string().optional(),
     archivedAt: z.string().nullable().optional(),
   })

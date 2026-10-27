@@ -6,8 +6,8 @@ vi.mock("@/lib/api-auth", () => ({
   verifyProjectReadAccessByNode: vi.fn(async () => ({ authorized: true, projectId: "proj-1", role: "READER" })),
 }));
 
-vi.mock("@/lib/controllers/structure", () => ({
-  ANNOTATION_ERRORS: { CONTENT_REQUIRED: "Content is required" },
+vi.mock("@/lib/controllers/structure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/controllers/structure")>()),
   StructureController: {
     addAnnotation: vi.fn(),
   },
@@ -25,12 +25,20 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     annotation: {
       findMany: vi.fn(async () => []),
+      create: vi.fn(async ({ data }: { data: unknown }) => data),
     },
   },
 }));
 
-import { StructureController, ANNOTATION_ERRORS } from "@/lib/controllers/structure";
+import { StructureController, ANNOTATION_ERRORS, MAX_ANNOTATION_LENGTHS } from "@/lib/controllers/structure";
+import { prisma } from "@/lib/db";
 import { verifyProjectReadAccessByNode } from "@/lib/api-auth";
+import { sanitizeInput } from "@/lib/sanitize-server";
+
+async function useRealAddAnnotation() {
+  const actual = await vi.importActual<typeof import("@/lib/controllers/structure")>("@/lib/controllers/structure");
+  vi.mocked(StructureController.addAnnotation).mockImplementation(actual.StructureController.addAnnotation);
+}
 
 function makePostRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/nodes/node-1/annotations", {
@@ -47,6 +55,8 @@ function mockParams(nodeId: string) {
 describe("POST /api/nodes/[id]/annotations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(sanitizeInput).mockImplementation((s: string) => s);
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({ authorized: true, projectId: "proj-1", role: "READER" });
   });
 
   it("returns 400 with 'Content is required' when that validation error is thrown", async () => {
@@ -103,5 +113,60 @@ describe("POST /api/nodes/[id]/annotations", () => {
     const res = await POST(makePostRequest({ content: "note" }), mockParams("node-1"));
 
     expect(res.status).toBe(403);
+  });
+
+  it.each(Object.entries(MAX_ANNOTATION_LENGTHS))(
+    "returns 400 without saving when %s exceeds %i characters",
+    async (field, max) => {
+      await useRealAddAnnotation();
+      const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+      const res = await POST(
+        makePostRequest({ content: "note", [field]: "a".repeat(max + 1) }),
+        mockParams("node-1")
+      );
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain(field);
+      expect(prisma.annotation.create).not.toHaveBeenCalled();
+    }
+  );
+
+  it("accepts fields at their maximum length", async () => {
+    await useRealAddAnnotation();
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(
+      makePostRequest({
+        content: "a".repeat(MAX_ANNOTATION_LENGTHS.content),
+        range: "r".repeat(MAX_ANNOTATION_LENGTHS.range),
+        selectedText: "s".repeat(MAX_ANNOTATION_LENGTHS.selectedText),
+      }),
+      mockParams("node-1")
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("checks lengths before sanitizing, so escaping cannot push valid input over the limit", async () => {
+    await useRealAddAnnotation();
+    const actual = await vi.importActual<typeof import("@/lib/sanitize-server")>("@/lib/sanitize-server");
+    vi.mocked(sanitizeInput).mockImplementation(actual.sanitizeInput);
+    const content = "a & b < c ".repeat(MAX_ANNOTATION_LENGTHS.content / 10);
+    expect(actual.sanitizeInput(content).length).toBeGreaterThan(MAX_ANNOTATION_LENGTHS.content);
+
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(makePostRequest({ content, selectedText: content }), mockParams("node-1"));
+
+    expect(res.status).toBe(201);
+    expect(prisma.annotation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ content: actual.sanitizeInput(content) }),
+    });
+  });
+
+  it("returns 400 when a field is not a string", async () => {
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(makePostRequest({ content: { text: "note" } }), mockParams("node-1"));
+
+    expect(res.status).toBe(400);
+    expect(StructureController.addAnnotation).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { ANNOTATION_ERRORS, StructureController } from "@/lib/controllers/structure";
+import {
+    ANNOTATION_ERRORS,
+    InputTooLargeError,
+    StructureController,
+} from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function GET(
     request: NextRequest,
@@ -43,17 +46,27 @@ export async function POST(
         if (!access.authorized) return access.response;
 
         const body = await request.json();
-        const { content, range, selectedText } = body;
+        const { content = "", range, selectedText } = body;
+        if (
+            typeof content !== "string" ||
+            (range !== undefined && typeof range !== "string") ||
+            (selectedText != null && typeof selectedText !== "string")
+        ) {
+            return NextResponse.json(
+                { error: "content, range and selectedText must be strings" },
+                { status: 400 }
+            );
+        }
 
-        const annotation = await StructureController.addAnnotation(
-            nodeId,
-            sanitizeInput(content),
-            range,
-            selectedText ? sanitizeInput(selectedText) : selectedText
-        );
+        const annotation = await StructureController.addAnnotation(nodeId, content, range, selectedText, {
+            sanitize: true,
+        });
 
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {
+        if (error instanceof InputTooLargeError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         logger.error("Failed to create annotation", error);
         const isContentRequired = error instanceof Error && error.message === ANNOTATION_ERRORS.CONTENT_REQUIRED;
         return NextResponse.json(
