@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-import { isDescendant } from "@/lib/node-tree";
+import { assertValidParent, InvalidParentError } from "@/lib/node-tree";
 
 /**
  * POST /api/nodes/move
@@ -33,38 +33,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Node not found" }, { status: 404 });
     }
 
-    // Validate parent exists (if specified) and belongs to the same project
-    if (newParentId !== undefined && newParentId !== null) {
-      if (newParentId === nodeId) {
-        return NextResponse.json(
-          { error: "A node cannot be its own parent" },
-          { status: 400 }
-        );
-      }
-      const parent = await prisma.structureNode.findFirst({
-        where: { id: newParentId, projectId: node.projectId },
-      });
-      if (!parent) {
-        return NextResponse.json(
-          { error: "Parent node not found in this project" },
-          { status: 400 }
-        );
-      }
-      // Prevent nesting a node inside its own descendant
-      if (await isDescendant(nodeId, newParentId)) {
-        return NextResponse.json(
-          { error: "Cannot move a node into its own descendant" },
-          { status: 400 }
-        );
-      }
-    }
-
     const oldParentId = node.parentId;
     const resolvedNewParentId = newParentId === undefined ? oldParentId : newParentId;
     const sameParent = oldParentId === resolvedNewParentId;
 
     // Use a transaction to keep indices consistent
     await prisma.$transaction(async (tx) => {
+      if (newParentId !== undefined && newParentId !== null) await assertValidParent(tx, node, newParentId);
+
       if (sameParent) {
         // Reorder within the same parent
         const siblings = await tx.structureNode.findMany({
@@ -132,6 +108,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof InvalidParentError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     logger.error("Failed to move node", error);
     return NextResponse.json(
       { error: "Internal server error" },

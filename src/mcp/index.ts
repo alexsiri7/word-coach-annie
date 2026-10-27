@@ -54,6 +54,7 @@ import {
     getTaskDashboard,
 } from "./tools/writing-tasks";
 import { WritingTaskCapacity, WritingTaskDueDate, WritingTaskKind } from "@/schemas/writing-tasks";
+import { NodeOrderIndex } from "@/schemas/nodes";
 import {
     listRelationships,
     createRelationship,
@@ -440,7 +441,7 @@ server.tool(
         title: z.string().optional().describe("New title"),
         synopsis: z.string().optional().describe("New synopsis"),
         status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
-        orderIndex: z.number().optional().describe("New order index"),
+        orderIndex: NodeOrderIndex.optional().describe("New order index"),
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
     async ({ nodeId, contentHash, ...data }) =>
@@ -910,7 +911,7 @@ server.tool(
             title: z.string().optional().describe("New title"),
             synopsis: z.string().optional().describe("New synopsis"),
             status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
-            orderIndex: z.number().optional().describe("New order index"),
+            orderIndex: NodeOrderIndex.optional().describe("New order index"),
             parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
         })).describe("Array of updates to apply"),
     },

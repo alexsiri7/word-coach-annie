@@ -147,6 +147,37 @@ describe("StructureController", () => {
                 expect(outline[0].children.map((n) => n.id)).toEqual([scene.id]);
             });
 
+            it("throws when re-parenting a part under its own scene", async () => {
+                const part = await StructureController.createNode({ projectId, type: "PART", title: "P" });
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch", parentId: part.id });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                await expect(
+                    StructureController.updateNode(part.id, { parentId: scene.id })
+                ).rejects.toThrow("Cannot move a node into its own descendant");
+            });
+
+            it("lets only one of two concurrent cross re-parents through", async () => {
+                const a = await StructureController.createNode({ projectId, type: "CHAPTER", title: "A" });
+                const b = await StructureController.createNode({ projectId, type: "CHAPTER", title: "B" });
+                const results = await Promise.allSettled([
+                    StructureController.updateNode(a.id, { parentId: b.id }),
+                    StructureController.updateNode(b.id, { parentId: a.id }),
+                ]);
+                expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline).toHaveLength(1);
+            });
+
+            it("bounds orderIndex to 0..10,000", async () => {
+                const node = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                await expect(StructureController.updateNode(node.id, { orderIndex: -1 })).rejects.toThrow("orderIndex");
+                await expect(StructureController.updateNode(node.id, { orderIndex: 10_001 })).rejects.toThrow("orderIndex");
+                await expect(StructureController.updateNode(node.id, { orderIndex: 1.5 })).rejects.toThrow("orderIndex");
+                const atMax = await StructureController.updateNode(node.id, { orderIndex: 10_000 });
+                expect(atMax.orderIndex).toBe(10_000);
+            });
+
             it("throws for non-existent node", async () => {
                 await expect(
                     StructureController.updateNode("bad", { title: "X" })

@@ -10,6 +10,7 @@ import { FunctionTool, BaseToolset } from "@google/adk";
 import type { BaseTool, ToolPredicate, ToolInputParameters } from "@google/adk";
 import type { ReadonlyContext } from "@google/adk";
 import { z, ZodObject, ZodRawShape } from "zod";
+import { NodeOrderIndex } from "@/schemas/nodes";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -174,7 +175,7 @@ const tools: ToolDefinition[] = [
             title: z.string().optional().describe("New title"),
             synopsis: z.string().optional().describe("New synopsis"),
             status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
-            orderIndex: z.number().optional().describe("New order index"),
+            orderIndex: NodeOrderIndex.optional().describe("New order index"),
             parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
         }),
     },

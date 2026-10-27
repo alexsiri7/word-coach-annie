@@ -5,7 +5,8 @@ import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
-import { isDescendant } from "@/lib/node-tree";
+import { assertValidParent } from "@/lib/node-tree";
+import { NodeOrderIndex } from "@/schemas/nodes";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -299,15 +300,9 @@ export class StructureController {
             throw new Error(`status must be one of: ${validStatuses.join(", ")}`);
         }
 
-        if (data.parentId !== undefined && data.parentId !== null) {
-            if (data.parentId === nodeId) throw new Error("A node cannot be its own parent");
-            const parentNode = await prisma.structureNode.findFirst({
-                where: { id: data.parentId, projectId: existing.projectId },
-            });
-            if (!parentNode) throw new Error("Parent node not found in this project");
-            if (await isDescendant(nodeId, data.parentId)) {
-                throw new Error("Cannot move a node into its own descendant");
-            }
+        if (data.orderIndex !== undefined) {
+            const orderIndex = NodeOrderIndex.safeParse(data.orderIndex);
+            if (!orderIndex.success) throw new Error(`orderIndex: ${orderIndex.error.issues[0].message}`);
         }
 
         const updateData: Record<string, unknown> = {};
@@ -321,16 +316,17 @@ export class StructureController {
             throw new Error("No fields to update");
         }
 
-        const [node] = await Promise.all([
-            prisma.structureNode.update({
-                where: { id: nodeId },
-                data: updateData,
-            }),
-            prisma.project.update({
+        const node = await prisma.$transaction(async (tx) => {
+            await tx.project.update({
                 where: { id: existing.projectId },
                 data: { updatedAt: new Date() },
-            }),
-        ]);
+            });
+            if (data.parentId !== undefined && data.parentId !== null) await assertValidParent(tx, existing, data.parentId);
+            return tx.structureNode.update({
+                where: { id: nodeId },
+                data: updateData,
+            });
+        });
 
         return {
             id: node.id,
