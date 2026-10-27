@@ -33,16 +33,16 @@ Authenticate with the API token and receive a session cookie.
 
 **Body**: `{ "token": "<API_TOKEN>" }`
 
-**Response**: Sets `annie-session` cookie. Returns `{ "ok": true }`.
+**Response**: Sets an `annie_session` cookie, unique to this login, that the server rejects after one hour (`SESSION_MAX_AGE`) or once `API_TOKEN` is rotated. Returns `{ "ok": true }`.
 
-**Error**: `501` if `API_TOKEN` not configured; `401` if token wrong.
+**Error**: `501` if `API_TOKEN` not configured; `401` if token is wrong, missing, or not a string; `429` after 5 attempts per minute from one IP.
 
 ---
 
 ### `GET /api/auth/me`
 Returns the current authenticated user (Google OAuth only).
 
-**Response**: `{ "id", "email", "name", "picture" }` or `401` if not authenticated.
+**Response**: `{ "id", "email", "name", "picture" }` or `401` if not authenticated. Shares the per-IP limit of 5 requests per minute with login and refresh (`429` beyond it).
 
 ---
 

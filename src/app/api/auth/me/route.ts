@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     SESSION_COOKIE_NAME,
     verifySessionToken,
-    deriveSessionToken,
+    verifyLegacySessionCookie,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
 
@@ -32,14 +32,11 @@ export async function GET(request: NextRequest) {
 
     // Check legacy API_TOKEN session
     const apiToken = env.API_TOKEN;
-    if (apiToken) {
-        const expected = await deriveSessionToken(apiToken);
-        if (cookie === expected) {
-            return NextResponse.json({
-                authenticated: true,
-                user: null,
-            });
-        }
+    if (apiToken && await verifyLegacySessionCookie(cookie, apiToken)) {
+        return NextResponse.json({
+            authenticated: true,
+            user: null,
+        });
     }
 
     return NextResponse.json({ authenticated: false }, { status: 401 });
