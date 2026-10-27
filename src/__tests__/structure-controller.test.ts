@@ -331,6 +331,18 @@ describe("StructureController", () => {
                     StructureController.restoreSceneVersion(scene.id, "bad-version")
                 ).rejects.toThrow("Version not found");
             });
+
+            it("does not deadlock against concurrent updateNode calls on the same scene", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S" });
+                await StructureController.writeSceneContent(scene.id, "<p>Original</p>");
+                const versionId = (await StructureController.getSceneVersions(scene.id)).versions[0].id;
+                const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) =>
+                    i % 2
+                        ? StructureController.restoreSceneVersion(scene.id, versionId)
+                        : StructureController.updateNode(scene.id, { title: `Title ${i}` })
+                ));
+                expect(results.filter((r) => r.status === "rejected")).toEqual([]);
+            });
         });
 
         describe("annotations", () => {
