@@ -15,9 +15,32 @@ export class ConflictError extends Error {
   }
 }
 
+export class InputTooLargeError extends Error {
+  constructor(field: string, max: number) {
+    super(`${field} exceeds the maximum length of ${max} characters`);
+    this.name = "InputTooLargeError";
+  }
+}
+
 export const ANNOTATION_ERRORS = {
     CONTENT_REQUIRED: "Content is required",
 } as const;
+
+export const MAX_SCENE_CONTENT_LENGTH = 2 * 1024 * 1024;
+
+// A text-quote range is JSON that embeds the selected text, escaped, plus prefix/suffix.
+export const MAX_ANNOTATION_LENGTHS = {
+    content: 10_000,
+    selectedText: 10_000,
+    range: 25_000,
+} as const;
+
+export function assertAnnotationWithinLimits(fields: { content: string; range?: string; selectedText?: string | null }) {
+    for (const [field, max] of Object.entries(MAX_ANNOTATION_LENGTHS)) {
+        const value = fields[field as keyof typeof MAX_ANNOTATION_LENGTHS];
+        if (value && value.length > max) throw new InputTooLargeError(field, max);
+    }
+}
 
 export const MAX_SCENE_VERSIONS = 50;
 
@@ -378,6 +401,7 @@ export class StructureController {
 
     static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
         if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
+        assertAnnotationWithinLimits({ content, range, selectedText });
 
         // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
         // in this context; crypto.randomUUID() is cryptographically secure and globally unique.
@@ -446,6 +470,9 @@ export class StructureController {
      * mismatch; a write with no stored version is always allowed.
      */
     static async writeSceneContent(nodeId: string, rawContent: string, contentHash?: string | null) {
+        if (rawContent.length > MAX_SCENE_CONTENT_LENGTH) {
+            throw new InputTooLargeError("Scene content", MAX_SCENE_CONTENT_LENGTH);
+        }
         const node = await prisma.structureNode.findUnique({
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },

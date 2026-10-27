@@ -4,6 +4,8 @@ import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { randomUUID } from "crypto";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
+import { NodeType, SceneStatus } from "@/schemas/nodes";
+import { ProjectType } from "@/schemas/projects";
 
 interface ExportData {
   exportVersion: number;
@@ -63,6 +65,44 @@ interface ExportData {
   }>;
 }
 
+export class ImportValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportValidationError";
+  }
+}
+
+const MAX_IMPORT_ITEMS = {
+  structureNodes: 5_000,
+  contentVersions: 20_000,
+  storyObjects: 5_000,
+  annotations: 20_000,
+  relationships: 20_000,
+} as const;
+
+/** Rejects payloads whose shape would make the import unbounded or store values the app can't render. */
+function assertImportable(data: ExportData) {
+  for (const [key, max] of Object.entries(MAX_IMPORT_ITEMS)) {
+    const items: unknown = data[key as keyof typeof MAX_IMPORT_ITEMS];
+    if (!Array.isArray(items)) throw new ImportValidationError(`${key} must be an array`);
+    if (items.length > max) throw new ImportValidationError(`${key} exceeds the maximum of ${max}`);
+  }
+  if (data.project.projectType && !ProjectType.safeParse(data.project.projectType).success) {
+    throw new ImportValidationError(`Invalid projectType: ${data.project.projectType}`);
+  }
+  for (const node of data.structureNodes) {
+    if (!NodeType.safeParse(node.type).success) {
+      throw new ImportValidationError(`Invalid structure node type: ${node.type}`);
+    }
+    if (node.status && !SceneStatus.safeParse(node.status).success) {
+      throw new ImportValidationError(`Invalid structure node status: ${node.status}`);
+    }
+    if (!Number.isInteger(node.orderIndex)) {
+      throw new ImportValidationError(`Invalid structure node orderIndex: ${node.orderIndex}`);
+    }
+  }
+}
+
 /**
  * Import a project from the standard export JSON format.
  * Generates new IDs for all entities while preserving internal references.
@@ -73,6 +113,8 @@ export async function importProjectJson(
   data: ExportData,
   options?: { userId?: string; isSample?: boolean }
 ): Promise<{ projectId: string }> {
+  assertImportable(data);
+
   // Build ID mapping tables: old ID -> new ID
   const nodeIdMap = new Map<string, string>();
   const objectIdMap = new Map<string, string>();

@@ -365,6 +365,8 @@ Save scene content (creates a new version).
 
 **Response**: `{ version: ContentVersion, wordCount: number }`
 
+**Errors**: `400` if `content` is missing or not a string; `413` if it exceeds 2 MiB (2,097,152 characters)
+
 ---
 
 ### `PATCH /api/nodes/:id/content`
@@ -376,6 +378,13 @@ Restore a previous content version.
 
 ### `GET /api/nodes/:id/annotations`
 List annotations for a node.
+
+### `POST /api/nodes/:id/annotations`
+Add an annotation to a node.
+
+**Body**: `{ content: string, range?: string, selectedText?: string }`
+
+**Errors**: `400` if `content` is empty, a field is not a string, or `content`/`selectedText` exceed 10,000 or `range` 25,000 characters
 
 ---
 
@@ -887,7 +896,7 @@ Import a project from a JSON export file.
 
 **Body**: JSON export data (project object)
 
-**Errors**: `401` unauthenticated (Google OAuth mode only)
+**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex`, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
 
 ---
 

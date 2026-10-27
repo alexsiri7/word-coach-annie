@@ -6,8 +6,8 @@ vi.mock("@/lib/api-auth", () => ({
   verifyProjectReadAccessByNode: vi.fn(async () => ({ authorized: true, projectId: "proj-1", role: "READER" })),
 }));
 
-vi.mock("@/lib/controllers/structure", () => ({
-  ANNOTATION_ERRORS: { CONTENT_REQUIRED: "Content is required" },
+vi.mock("@/lib/controllers/structure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/controllers/structure")>()),
   StructureController: {
     addAnnotation: vi.fn(),
   },
@@ -29,7 +29,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { StructureController, ANNOTATION_ERRORS } from "@/lib/controllers/structure";
+import { StructureController, ANNOTATION_ERRORS, MAX_ANNOTATION_LENGTHS } from "@/lib/controllers/structure";
 import { verifyProjectReadAccessByNode } from "@/lib/api-auth";
 
 function makePostRequest(body: unknown): NextRequest {
@@ -47,6 +47,7 @@ function mockParams(nodeId: string) {
 describe("POST /api/nodes/[id]/annotations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({ authorized: true, projectId: "proj-1", role: "READER" });
   });
 
   it("returns 400 with 'Content is required' when that validation error is thrown", async () => {
@@ -103,5 +104,43 @@ describe("POST /api/nodes/[id]/annotations", () => {
     const res = await POST(makePostRequest({ content: "note" }), mockParams("node-1"));
 
     expect(res.status).toBe(403);
+  });
+
+  it.each(Object.entries(MAX_ANNOTATION_LENGTHS))(
+    "returns 400 without saving when %s exceeds %i characters",
+    async (field, max) => {
+      const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+      const res = await POST(
+        makePostRequest({ content: "note", [field]: "a".repeat(max + 1) }),
+        mockParams("node-1")
+      );
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain(field);
+      expect(StructureController.addAnnotation).not.toHaveBeenCalled();
+    }
+  );
+
+  it("accepts fields at their maximum length", async () => {
+    vi.mocked(StructureController.addAnnotation).mockResolvedValue({ id: "a1" } as never);
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(
+      makePostRequest({
+        content: "a".repeat(MAX_ANNOTATION_LENGTHS.content),
+        range: "r".repeat(MAX_ANNOTATION_LENGTHS.range),
+        selectedText: "s".repeat(MAX_ANNOTATION_LENGTHS.selectedText),
+      }),
+      mockParams("node-1")
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 400 when a field is not a string", async () => {
+    const { POST } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await POST(makePostRequest({ content: { text: "note" } }), mockParams("node-1"));
+
+    expect(res.status).toBe(400);
+    expect(StructureController.addAnnotation).not.toHaveBeenCalled();
   });
 });
