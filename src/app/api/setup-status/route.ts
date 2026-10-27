@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/crypto";
+import { readGlobalApiKey, readUserApiKey } from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 
 // GET /api/setup-status — check if initial setup (API key) is complete
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       try {
         const userSettings = await prisma.userAiSettings.findUnique({ where: { userId } });
         if (userSettings) {
-          const decryptedKey = decrypt(userSettings.apiKey);
+          const decryptedKey = await readUserApiKey(userSettings);
           if (decryptedKey) {
             return NextResponse.json({ setupComplete: true, hasApiKey: true });
           }
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (!settings) {
       return NextResponse.json({ setupComplete: false, hasApiKey: false });
     }
-    const decryptedKey = decrypt(settings.apiKey);
+    const decryptedKey = await readGlobalApiKey(settings);
     const hasApiKey = !!decryptedKey;
     return NextResponse.json({ setupComplete: hasApiKey, hasApiKey });
   } catch {

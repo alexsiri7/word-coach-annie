@@ -14,13 +14,13 @@ vi.mock("@/lib/db", () => ({
 
 // Mock crypto
 vi.mock("@/lib/crypto", () => ({
-    decrypt: vi.fn((val: string) => val),
+    readEncrypted: vi.fn(async (val: string) => val),
 }));
 
 import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import type { AiPreferences } from "@/lib/ai/settings";
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/crypto";
+import { readEncrypted } from "@/lib/crypto";
 
 describe("AI settings", () => {
     const origEnv: Record<string, string | undefined> = {};
@@ -66,7 +66,7 @@ describe("AI settings", () => {
             apiKey: "db-key",
             model: "db-model",
         } as never);
-        vi.mocked(decrypt).mockReturnValue("decrypted-db-key");
+        vi.mocked(readEncrypted).mockResolvedValue("decrypted-db-key");
 
         process.env.AI_API_KEY = "env-key";
 
@@ -82,7 +82,7 @@ describe("AI settings", () => {
             apiKey: "",
             model: "",
         } as never);
-        vi.mocked(decrypt).mockReturnValue("");
+        vi.mocked(readEncrypted).mockResolvedValue("");
 
         process.env.AI_API_KEY = "env-key";
         process.env.AI_MODEL = "env-model";
@@ -136,7 +136,7 @@ describe("AI settings", () => {
                 apiKey: "user-encrypted-key",
                 model: "user-model",
             } as never);
-            vi.mocked(decrypt).mockReturnValue("user-decrypted-key");
+            vi.mocked(readEncrypted).mockResolvedValue("user-decrypted-key");
 
             process.env.AI_API_KEY = "env-key";
 
@@ -154,7 +154,7 @@ describe("AI settings", () => {
                 apiKey: "global-key",
                 model: "global-model",
             } as never);
-            vi.mocked(decrypt).mockReturnValue("global-decrypted-key");
+            vi.mocked(readEncrypted).mockResolvedValue("global-decrypted-key");
 
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("global-decrypted-key");
@@ -175,9 +175,9 @@ describe("AI settings", () => {
                 apiKey: "global-key",
                 model: "global-model",
             } as never);
-            vi.mocked(decrypt)
-                .mockReturnValueOnce("")
-                .mockReturnValueOnce("global-decrypted-key");
+            vi.mocked(readEncrypted)
+                .mockResolvedValueOnce("")
+                .mockResolvedValueOnce("global-decrypted-key");
 
             const config = await getAiConfig("user-1");
             expect(config.apiKey).toBe("global-decrypted-key");
@@ -192,7 +192,7 @@ describe("AI settings", () => {
                 apiKey: "user-key",
                 model: "",
             } as never);
-            vi.mocked(decrypt).mockReturnValue("user-decrypted-key");
+            vi.mocked(readEncrypted).mockResolvedValue("user-decrypted-key");
 
             process.env.AI_MODEL = "env-model";
 

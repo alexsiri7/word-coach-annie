@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HashnodePublishController } from "@/lib/controllers/hashnode-publish";
 import { testPrisma } from "./setup";
 import { encrypt } from "@/lib/crypto";
+import { logger } from "@/lib/logger";
 
 // Mock exportHashnode to return predictable content
 vi.mock("@/mcp/tools/export", () => ({
@@ -290,6 +291,27 @@ describe("HashnodePublishController", () => {
             await expect(
                 HashnodePublishController.publish(projectId, null, {})
             ).rejects.toThrow("Hashnode account not connected");
+        });
+
+        it("throws not connected when no configured key decrypts the stored token", async () => {
+            const origEncKey = process.env.ENCRYPTION_KEY;
+            process.env.ENCRYPTION_KEY = "hashnode-key-a";
+            await testPrisma.hashnodeCredential.update({
+                where: { id: credId },
+                data: { accessToken: encrypt("token-under-a") },
+            });
+            process.env.ENCRYPTION_KEY = "hashnode-key-b";
+            const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+            try {
+                await expect(
+                    HashnodePublishController.publish(projectId, null, {})
+                ).rejects.toThrow(/^Hashnode account not connected$/);
+                expect(global.fetch).not.toHaveBeenCalled();
+            } finally {
+                warn.mockRestore();
+                if (origEncKey !== undefined) process.env.ENCRYPTION_KEY = origEncKey;
+                else delete process.env.ENCRYPTION_KEY;
+            }
         });
 
         it("throws when Hashnode API returns HTTP error", async () => {
