@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, verifySessionToken, safeEqual } from "@/lib/auth";
+import { SESSION_COOKIE_NAME, safeEqual } from "@/lib/auth";
+import { verifySessionTokenNode } from "@/lib/auth-server";
 import { getClient, createAuthCode } from "@/lib/oauth-store";
 import { escapeHtml } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
   if (!sessionCookie) {
     return redirectToLogin(request);
   }
-  const session = await verifySessionToken(sessionCookie);
+  const session = await verifySessionTokenNode(sessionCookie);
   if (!session) {
     return redirectToLogin(request);
   }
@@ -245,7 +246,7 @@ async function validateRequest(request: NextRequest): Promise<{
     return { error: redirectToLogin(request) };
   }
 
-  const session = await verifySessionToken(sessionCookie);
+  const session = await verifySessionTokenNode(sessionCookie);
   if (!session) {
     return { error: redirectToLogin(request) };
   }
