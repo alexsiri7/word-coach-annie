@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const csrfToken = crypto.randomUUID();
 
-  const response = renderConsentPage(clientName!, {
+  const response = renderConsentPage(clientName!, redirectUri, {
     response_type: params!.responseType,
     client_id: params!.clientId,
     redirect_uri: redirectUri,
@@ -70,9 +70,25 @@ export async function POST(request: NextRequest) {
   }
 
   const action = formData.get("action") as string | null;
-
-  const redirectUri = formData.get("redirect_uri") as string;
+  const clientId = formData.get("client_id") as string | null;
+  const redirectUri = formData.get("redirect_uri") as string | null;
   const state = formData.get("state") as string;
+
+  // Validate the client before either branch, so neither can redirect to an
+  // unregistered destination.
+  if (!clientId || !redirectUri) {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "client_id and redirect_uri are required" },
+      { status: 400 },
+    );
+  }
+  const client = await getClient(clientId);
+  if (!client || !client.redirect_uris.includes(redirectUri)) {
+    return NextResponse.json(
+      { error: "invalid_client", error_description: "Unknown client or mismatched redirect_uri" },
+      { status: 400 },
+    );
+  }
 
   // Deny => redirect with error
   if (action === "deny") {
@@ -89,22 +105,12 @@ export async function POST(request: NextRequest) {
 
   // Re-validate everything on the POST (params come from hidden fields)
   const responseType = formData.get("response_type") as string | null;
-  const clientId = formData.get("client_id") as string | null;
   const codeChallenge = formData.get("code_challenge") as string | null;
   const codeChallengeMethod = formData.get("code_challenge_method") as string | null;
 
-  if (responseType !== "code" || !clientId || !redirectUri || !codeChallenge || codeChallengeMethod !== "S256") {
+  if (responseType !== "code" || !codeChallenge || codeChallengeMethod !== "S256") {
     return NextResponse.json(
       { error: "invalid_request", error_description: "Missing or invalid OAuth parameters" },
-      { status: 400 },
-    );
-  }
-
-  // Validate client_id
-  const client = await getClient(clientId);
-  if (!client || !client.redirect_uris.includes(redirectUri)) {
-    return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client or mismatched redirect_uri" },
       { status: 400 },
     );
   }
@@ -383,9 +389,11 @@ function renderCodePage(code: string, redirectUrl: string, nonce: string): NextR
 /** Render an inline HTML consent page. */
 function renderConsentPage(
   clientName: string,
+  redirectUri: string,
   hiddenFields: Record<string, string>,
 ): NextResponse {
   const escapedName = escapeHtml(clientName);
+  const escapedRedirectHost = escapeHtml(new URL(redirectUri).host);
 
   const hiddenInputs = Object.entries(hiddenFields)
     .map(([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}" />`)
@@ -439,6 +447,12 @@ function renderConsentPage(
       margin: 1rem 0 1.5rem;
       line-height: 1.5;
     }
+    .redirect {
+      color: #64748b;
+      font-size: 0.85rem;
+      margin: -0.75rem 0 1.5rem;
+    }
+    .redirect-host { color: #1a1a2e; font-weight: 600; word-break: break-all; }
     .actions { display: flex; gap: 0.75rem; }
     button {
       flex: 1;
@@ -462,6 +476,9 @@ function renderConsentPage(
     <p class="description">
       <span class="client-name">${escapedName}</span>
       wants to access your Annie writing projects.
+    </p>
+    <p class="redirect">
+      You will be redirected to <span class="redirect-host">${escapedRedirectHost}</span>
     </p>
     <form method="post" action="/oauth/authorize">
       ${hiddenInputs}
