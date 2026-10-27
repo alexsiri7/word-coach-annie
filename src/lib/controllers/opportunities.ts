@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
+import { safeHref } from "@/lib/http-url";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
 export class NotFoundError extends Error {}
@@ -387,7 +388,9 @@ export class OpportunityCandidateController {
                     contestName: opportunity.title,
                     submissionDate: new Date().toISOString(),
                     reviewDate: opportunity.reviewDate?.toISOString(),
-                    submissionUrl: opportunity.rulesUrl ?? undefined,
+                    // A rulesUrl stored before http(s) validation existed is left behind
+                    // rather than copied into a new row the submission schema would refuse.
+                    submissionUrl: safeHref(opportunity.rulesUrl),
                 },
                 tx
             );
