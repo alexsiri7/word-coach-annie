@@ -22,7 +22,7 @@ const SILENT_RENEW_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes
 
 // /api/auth/me shares the 5-per-minute per-IP auth rate limit with login and refresh,
 // and UserMenu remounts on every page, so a tab reuses a signed-in answer for one window.
-const CURRENT_USER_CACHE_MS = 60 * 1000;
+export const CURRENT_USER_CACHE_MS = 60 * 1000;
 
 interface CurrentUser {
     authenticated: boolean;

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { CURRENT_USER_CACHE_MS } from "@/hooks/use-auth";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 
 const signedIn = { authenticated: true, user: { userId: "u1", email: "a@example.com", name: "A" } };
 
@@ -17,6 +19,10 @@ async function loadFetchCurrentUser() {
 }
 
 describe("fetchCurrentUser", () => {
+    it("caches a signed-in answer for at least the auth rate-limit window", () => {
+        expect(CURRENT_USER_CACHE_MS).toBeGreaterThanOrEqual(RATE_LIMITS.auth.windowMs);
+    });
+
     beforeEach(() => {
         vi.useFakeTimers();
     });
@@ -35,7 +41,7 @@ describe("fetchCurrentUser", () => {
         }
         expect(fetchMock).toHaveBeenCalledTimes(1);
 
-        vi.advanceTimersByTime(60_000);
+        vi.advanceTimersByTime(CURRENT_USER_CACHE_MS);
         await fetchCurrentUser();
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
