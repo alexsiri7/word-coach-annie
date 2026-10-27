@@ -38,6 +38,10 @@ const envSchema = z.object({
   // Access control — invite-only allowlist (comma-separated emails)
   ALLOWED_EMAILS: z.string().optional(),
 
+  // OAuth DCR — HTTPS redirect hosts clients may register (comma-separated,
+  // exact hostnames). Loopback is always allowed. Default when unset: claude.ai
+  OAUTH_ALLOWED_REDIRECT_HOSTS: z.string().optional(),
+
   // Feedback (GitHub issue creation)
   GITHUB_FEEDBACK_TOKEN: z.string().optional(),
   GITHUB_FEEDBACK_REPO: z.string().optional(), // format: "owner/repo"
