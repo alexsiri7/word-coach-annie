@@ -3,6 +3,8 @@ import { z } from "zod";
 export const NodeType = z.enum(["PART", "CHAPTER", "SCENE"]);
 export const SceneStatus = z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]);
 
+export const NodeOrderIndex = z.number().int().min(0).max(10_000);
+
 export const NodeCreateSchema = z.object({
   type: NodeType,
   title: z.string().min(1, "title is required"),
@@ -16,7 +18,7 @@ export const NodeUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   synopsis: z.string().optional(),
   status: SceneStatus.optional(),
-  orderIndex: z.number().int().optional(),
+  orderIndex: NodeOrderIndex.optional(),
   parentId: z.string().nullable().optional(),
 });
 

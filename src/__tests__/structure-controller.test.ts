@@ -135,6 +135,49 @@ describe("StructureController", () => {
                 ).rejects.toThrow("cannot be its own parent");
             });
 
+            it("throws when re-parenting a chapter under its own scene", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                await expect(
+                    StructureController.updateNode(ch.id, { parentId: scene.id })
+                ).rejects.toThrow("Cannot move a node into its own descendant");
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline.map((n) => n.id)).toEqual([ch.id]);
+                expect(outline[0].children.map((n) => n.id)).toEqual([scene.id]);
+            });
+
+            it("throws when re-parenting a part under its own scene", async () => {
+                const part = await StructureController.createNode({ projectId, type: "PART", title: "P" });
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch", parentId: part.id });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                await expect(
+                    StructureController.updateNode(part.id, { parentId: scene.id })
+                ).rejects.toThrow("Cannot move a node into its own descendant");
+            });
+
+            it("lets only one of two concurrent cross re-parents through", async () => {
+                const a = await StructureController.createNode({ projectId, type: "CHAPTER", title: "A" });
+                const b = await StructureController.createNode({ projectId, type: "CHAPTER", title: "B" });
+                const results = await Promise.allSettled([
+                    StructureController.updateNode(a.id, { parentId: b.id }),
+                    StructureController.updateNode(b.id, { parentId: a.id }),
+                ]);
+                expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline).toHaveLength(1);
+            });
+
+            it("bounds orderIndex to 0..10,000", async () => {
+                const node = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                await expect(StructureController.updateNode(node.id, { orderIndex: -1 })).rejects.toThrow("orderIndex");
+                await expect(StructureController.updateNode(node.id, { orderIndex: 10_001 })).rejects.toThrow("orderIndex");
+                await expect(StructureController.updateNode(node.id, { orderIndex: 1.5 })).rejects.toThrow("orderIndex");
+                const atMax = await StructureController.updateNode(node.id, { orderIndex: 10_000 });
+                expect(atMax.orderIndex).toBe(10_000);
+            });
+
             it("throws for non-existent node", async () => {
                 await expect(
                     StructureController.updateNode("bad", { title: "X" })
@@ -198,6 +241,16 @@ describe("StructureController", () => {
                 await expect(
                     StructureController.writeSceneContent(chapter.id, "content")
                 ).rejects.toThrow("Content can only be written to SCENE nodes");
+            });
+
+            it("does not deadlock against concurrent updateNode calls on the same scene", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S" });
+                const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) =>
+                    i % 2
+                        ? StructureController.writeSceneContent(scene.id, `<p>Draft ${i}</p>`)
+                        : StructureController.updateNode(scene.id, { title: `Title ${i}` })
+                ));
+                expect(results.filter((r) => r.status === "rejected")).toEqual([]);
             });
 
             it("throws for malformed beat content", async () => {
@@ -277,6 +330,18 @@ describe("StructureController", () => {
                 await expect(
                     StructureController.restoreSceneVersion(scene.id, "bad-version")
                 ).rejects.toThrow("Version not found");
+            });
+
+            it("does not deadlock against concurrent updateNode calls on the same scene", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S" });
+                await StructureController.writeSceneContent(scene.id, "<p>Original</p>");
+                const versionId = (await StructureController.getSceneVersions(scene.id)).versions[0].id;
+                const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) =>
+                    i % 2
+                        ? StructureController.restoreSceneVersion(scene.id, versionId)
+                        : StructureController.updateNode(scene.id, { title: `Title ${i}` })
+                ));
+                expect(results.filter((r) => r.status === "rejected")).toEqual([]);
             });
         });
 
@@ -571,6 +636,19 @@ describe("StructureController", () => {
                 ]);
                 expect(result.totalUpdated).toBe(1);
                 expect(result.totalErrors).toBe(1);
+            });
+
+            it("rejects re-parenting a chapter under its own scene", async () => {
+                const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title: "Ch" });
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S", parentId: ch.id });
+                const result = await StructureController.batchUpdateNodes([
+                    { nodeId: ch.id, parentId: scene.id },
+                ]);
+                expect(result.totalUpdated).toBe(0);
+                expect(result.errors[0].error).toBe("Cannot move a node into its own descendant");
+
+                const outline = await StructureController.getOutline(projectId);
+                expect(outline.map((n) => n.id)).toEqual([ch.id]);
             });
 
             it("throws for empty array", async () => {
