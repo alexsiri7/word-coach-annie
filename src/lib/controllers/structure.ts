@@ -5,6 +5,8 @@ import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
+import { assertValidParent, lockProject } from "@/lib/node-tree";
+import { NodeOrderIndex } from "@/schemas/nodes";
 
 export class ConflictError extends Error {
   constructor(public serverContent: string) {
@@ -36,7 +38,8 @@ async function pruneSceneVersions(tx: DbClient, nodeId: string) {
 
 // Row-locks the scene until the transaction commits, serializing every
 // version write to it so a hash check can't be overtaken before its insert.
-async function lockSceneNode(tx: DbClient, nodeId: string) {
+async function lockSceneNode(tx: DbClient, projectId: string, nodeId: string) {
+    await lockProject(tx, projectId);
     await tx.structureNode.update({
         where: { id: nodeId },
         data: { updatedAt: new Date() },
@@ -298,12 +301,9 @@ export class StructureController {
             throw new Error(`status must be one of: ${validStatuses.join(", ")}`);
         }
 
-        if (data.parentId !== undefined && data.parentId !== null) {
-            if (data.parentId === nodeId) throw new Error("A node cannot be its own parent");
-            const parentNode = await prisma.structureNode.findFirst({
-                where: { id: data.parentId, projectId: existing.projectId },
-            });
-            if (!parentNode) throw new Error("Parent node not found in this project");
+        if (data.orderIndex !== undefined) {
+            const orderIndex = NodeOrderIndex.safeParse(data.orderIndex);
+            if (!orderIndex.success) throw new Error(`orderIndex: ${orderIndex.error.issues[0].message}`);
         }
 
         const updateData: Record<string, unknown> = {};
@@ -317,16 +317,14 @@ export class StructureController {
             throw new Error("No fields to update");
         }
 
-        const [node] = await Promise.all([
-            prisma.structureNode.update({
+        const node = await prisma.$transaction(async (tx) => {
+            await lockProject(tx, existing.projectId);
+            if (data.parentId !== undefined && data.parentId !== null) await assertValidParent(tx, existing, data.parentId);
+            return tx.structureNode.update({
                 where: { id: nodeId },
                 data: updateData,
-            }),
-            prisma.project.update({
-                where: { id: existing.projectId },
-                data: { updatedAt: new Date() },
-            }),
-        ]);
+            });
+        });
 
         return {
             id: node.id,
@@ -461,7 +459,7 @@ export class StructureController {
         const wordCount = countSceneWords(content);
 
         const version = await prisma.$transaction(async (tx) => {
-            await lockSceneNode(tx, nodeId);
+            await lockSceneNode(tx, node.projectId, nodeId);
 
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
@@ -477,15 +475,9 @@ export class StructureController {
                 }
             }
 
-            const [newVersion] = await Promise.all([
-                tx.contentVersion.create({
-                    data: { nodeId, content, wordCount },
-                }),
-                tx.project.update({
-                    where: { id: node.projectId },
-                    data: { updatedAt: new Date() },
-                }),
-            ]);
+            const newVersion = await tx.contentVersion.create({
+                data: { nodeId, content, wordCount },
+            });
 
             await pruneSceneVersions(tx, nodeId);
 
@@ -548,17 +540,11 @@ export class StructureController {
         const content = sanitizeHtml(oldVersion.content);
 
         const newVersion = await prisma.$transaction(async (tx) => {
-            await lockSceneNode(tx, nodeId);
+            await lockSceneNode(tx, node.projectId, nodeId);
 
-            const [created] = await Promise.all([
-                tx.contentVersion.create({
-                    data: { nodeId, content, wordCount: countSceneWords(content) },
-                }),
-                tx.project.update({
-                    where: { id: node.projectId },
-                    data: { updatedAt: new Date() },
-                }),
-            ]);
+            const created = await tx.contentVersion.create({
+                data: { nodeId, content, wordCount: countSceneWords(content) },
+            });
 
             await pruneSceneVersions(tx, nodeId);
 

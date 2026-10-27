@@ -224,8 +224,10 @@ export async function exportHashnode(projectId: string, nodeId?: string): Promis
         // Prepare Medium Front Matter if it's a root-ish node (Chapter/Article)
         if (node.type === "CHAPTER" || (nodeId && node.id === nodeId)) {
             lines.push(`---`);
-            lines.push(`title: "${node.title}"`);
-            if (node.synopsis) lines.push(`description: "${node.synopsis}"`);
+            // JSON strings are valid YAML double-quoted scalars, so quotes and
+            // newlines in user text cannot break out into new front-matter keys.
+            lines.push(`title: ${JSON.stringify(node.title)}`);
+            if (node.synopsis) lines.push(`description: ${JSON.stringify(node.synopsis)}`);
             lines.push(`---`);
             lines.push("");
         }

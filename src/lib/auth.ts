@@ -123,18 +123,52 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     }
 }
 
-/**
- * Derive a session token from the API token using SHA-256.
- * This is the legacy API_TOKEN session cookie (non-JWT).
- * Uses Web Crypto API (available in Edge Runtime and Node.js).
- */
-export async function deriveSessionToken(apiToken: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode("annie-session:" + apiToken);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(hash))
+const LEGACY_SESSION_VERSION = "v1";
+
+function toHex(bytes: ArrayBuffer | Uint8Array): string {
+    return Array.from(new Uint8Array(bytes))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
+}
+
+async function signLegacySession(apiToken: string, issuedAt: string, nonce: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(apiToken),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+    );
+    const message = `annie-session:${LEGACY_SESSION_VERSION}:${issuedAt}:${nonce}`;
+    return toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
+}
+
+/**
+ * Mint a legacy API_TOKEN session cookie: `v1.<issuedAt>.<nonce>.<hmac>`.
+ * Each login gets a fresh nonce, and issuedAt (unix seconds) lets the server
+ * enforce SESSION_MAX_AGE itself instead of trusting the browser's maxAge.
+ * Rotating API_TOKEN invalidates every outstanding cookie.
+ */
+export async function createLegacySessionCookie(apiToken: string, now: number = Date.now()): Promise<string> {
+    const issuedAt = String(Math.floor(now / 1000));
+    const nonce = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const mac = await signLegacySession(apiToken, issuedAt, nonce);
+    return `${LEGACY_SESSION_VERSION}.${issuedAt}.${nonce}.${mac}`;
+}
+
+/** Verify a cookie from createLegacySessionCookie: HMAC checked in constant time, age checked server-side. */
+export async function verifyLegacySessionCookie(
+    cookie: string,
+    apiToken: string,
+    now: number = Date.now()
+): Promise<boolean> {
+    const parts = cookie.split(".");
+    if (parts.length !== 4) return false;
+    const [version, issuedAt, nonce, mac] = parts;
+    if (version !== LEGACY_SESSION_VERSION || !/^\d+$/.test(issuedAt) || !nonce) return false;
+    if (Math.floor(now / 1000) - Number(issuedAt) > SESSION_MAX_AGE) return false;
+    return safeEqual(mac, await signLegacySession(apiToken, issuedAt, nonce));
 }
 
 /**

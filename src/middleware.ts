@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import {
     SESSION_COOKIE_NAME,
-    deriveSessionToken,
+    verifyLegacySessionCookie,
     verifySessionToken,
     isAuthEnabled,
     safeEqual,
@@ -51,6 +51,8 @@ const PUBLIC_PATHS = [
     "/oauth/token",
     "/version.json",
 ];
+
+const AUTH_RATE_LIMITED_PATHS = new Set(["/api/auth/login", "/api/auth/refresh", "/api/auth/me"]);
 
 function isPublicPath(pathname: string): boolean {
     return PUBLIC_PATHS.some(
@@ -157,9 +159,9 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
-    // This prevents credential-stuffing/brute-force on /api/auth/login and /api/auth/refresh.
+    // This prevents credential-stuffing/brute-force on the public endpoints that check credentials.
     const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-    if ((pathname === "/api/auth/login" || pathname === "/api/auth/refresh") && !rateLimitBypassed) {
+    if (AUTH_RATE_LIMITED_PATHS.has(pathname) && !rateLimitBypassed) {
         const ip = getClientIp(request.headers);
         const result = await checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
         if (!result.allowed) {
@@ -212,7 +214,7 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // Check session cookie (browser access — JWT or legacy API_TOKEN hash)
+    // Check session cookie (browser access — JWT or legacy API_TOKEN HMAC cookie)
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     if (sessionCookie) {
         // Try JWT verification first (Google OAuth sessions)
@@ -232,14 +234,11 @@ export async function middleware(request: NextRequest) {
         }
 
         // Fall back to legacy API_TOKEN session cookie
-        if (apiToken) {
-            const expected = await deriveSessionToken(apiToken);
-            if (safeEqual(sessionCookie, expected)) {
-                // Rate limit legacy sessions by token
-                const rateLimited = await applyRateLimit(request, "apitoken");
-                if (rateLimited) return rateLimited;
-                return nextWithNonce();
-            }
+        if (apiToken && await verifyLegacySessionCookie(sessionCookie, apiToken)) {
+            // Rate limit legacy sessions by token
+            const rateLimited = await applyRateLimit(request, "apitoken");
+            if (rateLimited) return rateLimited;
+            return nextWithNonce();
         }
     }
 

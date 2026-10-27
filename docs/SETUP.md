@@ -82,6 +82,8 @@ The app works with any OpenAI-compatible provider (OpenAI, Anthropic via proxy, 
 
 Required for: Google sign-in and Google Docs export.
 
+`APP_BASE_URL` (e.g., `https://yourdomain.com`) sets the public origin used in absolute URLs — the MCP OAuth discovery metadata and calendar feed links. When unset, the origin of `GOOGLE_REDIRECT_URI` is used; without either, those endpoints return an error.
+
 #### OAuth Consent Screen Setup
 
 To allow any Google account to sign in (not just test users), the OAuth consent screen must be published:
@@ -110,6 +112,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 | `ENCRYPTION_KEY_PREVIOUS` | Optional. Comma-separated older encryption keys, used only to decrypt values written before a rotation. See [Rotating ENCRYPTION_KEY](#rotating-encryption_key). |
 | `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. Falls back to `API_TOKEN`. |
 | `ALLOWED_EMAILS` | Comma-separated list of Google emails allowed to sign in. When unset, any Google account can sign in. |
+| `OAUTH_ALLOWED_REDIRECT_HOSTS` | Comma-separated exact hostnames that MCP clients may register as HTTPS `redirect_uris` via `/oauth/register`. Loopback (`localhost`, `127.0.0.1`, `[::1]`) over `http`/`https` is always allowed. When unset or empty: `claude.ai`. Add a host here to support another web MCP connector. |
 
 > **Migration note:** Prior to this release, `ENCRYPTION_KEY` fell back to `API_TOKEN`. This fallback has been removed for security. If you relied on it, set `ENCRYPTION_KEY` explicitly before upgrading. Generate one with: `openssl rand -hex 32`
 
@@ -129,7 +132,7 @@ A stored value that no configured key can decrypt is treated as disconnected: th
 
 | Variable | Description |
 |----------|-------------|
-| `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. Production requires `rediss://` (startup refuses `redis://`). |
+| `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. Production requires `rediss://` (startup refuses `redis://`). The server must speak RESP3 (Redis 6+ / `HELLO 3`): ioredis 6 negotiates RESP3 by default and does not fall back, and because the limiter fails open a RESP2-only server would silently disable rate limiting. |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for public access |
 | `PHOENIX_SECRET` | Signs Phoenix auth tokens. Required when running `docker-compose.yml`; generate with `openssl rand -hex 32` |
 | `PHOENIX_ADMIN_SECRET` | Bearer token the app sends to Phoenix on trace export. Required when running `docker-compose.yml`; generate separately from `PHOENIX_SECRET` |
@@ -146,6 +149,7 @@ The app binds only to `127.0.0.1:3000` by default. For secure public access with
 1. Create a tunnel at the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
 2. Set `CLOUDFLARE_TUNNEL_TOKEN` in `.env.local`
 3. Configure the tunnel to route to `http://localhost:3000`
+4. Set `APP_BASE_URL` to the tunnel's public origin (e.g., `https://annie.yourdomain.com`) — the calendar feed and MCP OAuth discovery metadata build their links from it, not from forwarded request headers
 
 The `tunnel` service in `docker-compose.yml` starts automatically alongside the app.
 

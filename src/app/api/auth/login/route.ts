@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
-    deriveSessionToken,
+    createLegacySessionCookie,
     safeEqual,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -20,14 +20,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const token = body?.token;
 
-    if (!token || !safeEqual(token, apiToken)) {
+    if (typeof token !== "string" || !safeEqual(token, apiToken)) {
         return NextResponse.json(
             { error: "Invalid token" },
             { status: 401 }
         );
     }
 
-    const sessionToken = await deriveSessionToken(apiToken);
+    const sessionToken = await createLegacySessionCookie(apiToken);
 
     const response = NextResponse.json({ ok: true });
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {

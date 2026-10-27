@@ -18,16 +18,21 @@ vi.mock("@/lib/oauth-tokens", () => ({
 
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 
-// Mock auth module
-vi.mock("@/lib/auth", () => ({
-    SESSION_COOKIE_NAME: "annie_session",
-    deriveSessionToken: vi.fn(async (token: string) => `hashed_${token}`),
-    verifySessionToken: vi.fn(async () => null),
-    isAuthEnabled: vi.fn(() => false),
-    safeEqual: (a: string, b: string) => a === b,
-}));
+// Mock auth module; the legacy API_TOKEN cookie helpers stay real so their verification is exercised end to end.
+vi.mock("@/lib/auth", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/auth")>();
+    return {
+        SESSION_COOKIE_NAME: "annie_session",
+        SESSION_MAX_AGE: actual.SESSION_MAX_AGE,
+        createLegacySessionCookie: actual.createLegacySessionCookie,
+        verifyLegacySessionCookie: actual.verifyLegacySessionCookie,
+        verifySessionToken: vi.fn(async () => null),
+        isAuthEnabled: vi.fn(() => false),
+        safeEqual: (a: string, b: string) => a === b,
+    };
+});
 
-import { isAuthEnabled, deriveSessionToken, verifySessionToken } from "@/lib/auth";
+import { isAuthEnabled, createLegacySessionCookie, verifySessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 
 function createRequest(path: string, options?: {
     method?: string;
@@ -152,30 +157,45 @@ describe("middleware", () => {
         expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
     });
 
-    it("falls back to legacy API_TOKEN session cookie", async () => {
-        vi.mocked(isAuthEnabled).mockReturnValue(true);
-        vi.mocked(verifySessionToken).mockResolvedValue(null);
-        vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
-        process.env.API_TOKEN = "my-token";
-        const req = createRequest("/api/projects", {
-            cookies: { annie_session: "hashed_my-token" },
-        });
-        const res = await middleware(req);
-        expect(res.status).toBe(200);
-    });
+    describe("legacy API_TOKEN session cookie", () => {
+        const legacyRequest = (cookie: string) =>
+            createRequest("/api/projects", { cookies: { annie_session: cookie } });
 
-    it("rejects mismatched legacy API_TOKEN session cookie", async () => {
-        vi.mocked(isAuthEnabled).mockReturnValue(true);
-        vi.mocked(verifySessionToken).mockResolvedValue(null);
-        vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
-        process.env.API_TOKEN = "my-token";
-
-        const req = createRequest("/api/projects", {
-            cookies: { annie_session: "wrong-cookie-value" },
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+            process.env.API_TOKEN = "my-token";
         });
 
-        const res = await middleware(req);
-        expect(res.status).toBe(401);
+        it("accepts a freshly issued cookie", async () => {
+            const res = await middleware(legacyRequest(await createLegacySessionCookie("my-token")));
+            expect(res.status).toBe(200);
+        });
+
+        it("rejects a cookie older than SESSION_MAX_AGE", async () => {
+            const issued = Date.now() - (SESSION_MAX_AGE + 60) * 1000;
+            const res = await middleware(legacyRequest(await createLegacySessionCookie("my-token", issued)));
+            expect(res.status).toBe(401);
+        });
+
+        it("rejects a tampered cookie", async () => {
+            const cookie = await createLegacySessionCookie("my-token");
+            const tampered = cookie.slice(0, -1) + (cookie.endsWith("0") ? "1" : "0");
+            const res = await middleware(legacyRequest(tampered));
+            expect(res.status).toBe(401);
+        });
+
+        it("rejects a cookie issued before API_TOKEN was rotated", async () => {
+            const res = await middleware(legacyRequest(await createLegacySessionCookie("previous-token")));
+            expect(res.status).toBe(401);
+        });
+
+        it("rejects the old deterministic session value", async () => {
+            const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("annie-session:my-token"));
+            const legacy = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+            const res = await middleware(legacyRequest(legacy));
+            expect(res.status).toBe(401);
+        });
     });
 
     it("returns 401 for unauthenticated API requests", async () => {
@@ -286,13 +306,13 @@ describe("middleware", () => {
         it("drops client-supplied x-user-id on the legacy API_TOKEN cookie branch", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue(null);
-            vi.mocked(deriveSessionToken).mockResolvedValue("hashed_my-token");
             process.env.API_TOKEN = "my-token";
             const req = createRequest("/api/projects", {
                 headers: { "x-user-id": "victim-id" },
-                cookies: { annie_session: "hashed_my-token" },
+                cookies: { annie_session: await createLegacySessionCookie("my-token") },
             });
             const res = await middleware(req);
+            expect(res.status).toBe(200);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
         });
 
@@ -622,6 +642,34 @@ describe("middleware", () => {
             const res = await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
+        it("counts /api/auth/me in the per-IP auth bucket", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-real-ip": "9.9.9.9" };
+
+            for (let i = 0; i < 5; i++) {
+                expect((await middleware(createRequest("/api/auth/me", { headers }))).status).toBe(200);
+            }
+
+            const res = await middleware(createRequest("/api/auth/me", { headers }));
+            expect(res.status).toBe(429);
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
+        it("shares one per-IP auth bucket across /me, /refresh and /login", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-real-ip": "7.7.7.7" };
+
+            for (let i = 0; i < 3; i++) {
+                expect((await middleware(createRequest("/api/auth/me", { headers }))).status).toBe(200);
+            }
+            for (let i = 0; i < 2; i++) {
+                expect((await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }))).status).toBe(200);
+            }
+
+            const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+            expect(res.status).toBe(429);
         });
 
         it("ignores a spoofed x-forwarded-for when keying the auth rate limit", async () => {

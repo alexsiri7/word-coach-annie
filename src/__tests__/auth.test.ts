@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-    deriveSessionToken,
+    createLegacySessionCookie,
+    verifyLegacySessionCookie,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     REFRESH_MAX_AGE,
@@ -25,21 +26,52 @@ vi.mock("@/lib/token-blocklist", () => ({
 }));
 
 describe("auth utilities", () => {
-    it("deriveSessionToken produces consistent hex output", async () => {
-        const token1 = await deriveSessionToken("test-token-123");
-        const token2 = await deriveSessionToken("test-token-123");
-        expect(token1).toBe(token2);
-        expect(token1).toMatch(/^[0-9a-f]{64}$/);
+    it("SESSION_COOKIE_NAME is defined", () => {
+        expect(SESSION_COOKIE_NAME).toBe("annie_session");
+    });
+});
+
+describe("legacy API_TOKEN session cookie", () => {
+    const API_TOKEN = "test-token-123";
+    const NOW = Date.UTC(2026, 0, 1);
+
+    it("has the form v1.<issuedAt>.<nonce>.<hmac>", async () => {
+        const cookie = await createLegacySessionCookie(API_TOKEN, NOW);
+        expect(cookie).toMatch(/^v1\.\d+\.[0-9a-f]{32}\.[0-9a-f]{64}$/);
+        expect(cookie.split(".")[1]).toBe(String(NOW / 1000));
     });
 
-    it("deriveSessionToken produces different output for different inputs", async () => {
-        const a = await deriveSessionToken("token-a");
-        const b = await deriveSessionToken("token-b");
+    it("differs on every mint", async () => {
+        const a = await createLegacySessionCookie(API_TOKEN, NOW);
+        const b = await createLegacySessionCookie(API_TOKEN, NOW);
         expect(a).not.toBe(b);
     });
 
-    it("SESSION_COOKIE_NAME is defined", () => {
-        expect(SESSION_COOKIE_NAME).toBe("annie_session");
+    it("verifies until SESSION_MAX_AGE has elapsed", async () => {
+        const cookie = await createLegacySessionCookie(API_TOKEN, NOW);
+        expect(await verifyLegacySessionCookie(cookie, API_TOKEN, NOW)).toBe(true);
+        expect(await verifyLegacySessionCookie(cookie, API_TOKEN, NOW + SESSION_MAX_AGE * 1000)).toBe(true);
+        expect(await verifyLegacySessionCookie(cookie, API_TOKEN, NOW + (SESSION_MAX_AGE + 1) * 1000)).toBe(false);
+    });
+
+    it("rejects a cookie whose issuedAt or nonce was tampered with", async () => {
+        const [version, issuedAt, nonce, mac] = (await createLegacySessionCookie(API_TOKEN, NOW)).split(".");
+        const later = String(Number(issuedAt) + 3600);
+        const otherNonce = nonce.replace(/^./, (c) => (c === "0" ? "1" : "0"));
+        expect(await verifyLegacySessionCookie([version, later, nonce, mac].join("."), API_TOKEN, NOW)).toBe(false);
+        expect(await verifyLegacySessionCookie([version, issuedAt, otherNonce, mac].join("."), API_TOKEN, NOW)).toBe(false);
+        expect(await verifyLegacySessionCookie(["v2", issuedAt, nonce, mac].join("."), API_TOKEN, NOW)).toBe(false);
+    });
+
+    it("rejects cookies minted under a rotated API_TOKEN", async () => {
+        const cookie = await createLegacySessionCookie("old-token", NOW);
+        expect(await verifyLegacySessionCookie(cookie, "new-token", NOW)).toBe(false);
+    });
+
+    it("rejects the old deterministic SHA-256(annie-session:API_TOKEN) value", async () => {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("annie-session:" + API_TOKEN));
+        const legacy = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        expect(await verifyLegacySessionCookie(legacy, API_TOKEN, NOW)).toBe(false);
     });
 });
 
@@ -491,6 +523,44 @@ describe("middleware auth logic", () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const res = await POST(req as any);
             expect(res.status).toBe(401);
+        });
+
+        it.each([
+            ["a number", 12345],
+            ["an array", ["x"]],
+            ["an array as long as the token", Array.from(TEST_TOKEN)],
+            ["missing", undefined],
+        ])("returns 401 when token is %s", async (_label, token) => {
+            process.env.API_TOKEN = TEST_TOKEN;
+            const { POST } = await import("@/app/api/auth/login/route");
+            const req = new Request("http://localhost/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+            });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const res = await POST(req as any);
+            expect(res.status).toBe(401);
+        });
+
+        it("issues a different, verifiable cookie on each login", async () => {
+            process.env.API_TOKEN = TEST_TOKEN;
+            const { POST } = await import("@/app/api/auth/login/route");
+            const login = async () => {
+                const req = new Request("http://localhost/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token: TEST_TOKEN }),
+                });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const res = await POST(req as any);
+                return /annie_session=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1] ?? "";
+            };
+            const first = await login();
+            const second = await login();
+            expect(first).not.toBe(second);
+            expect(await verifyLegacySessionCookie(first, TEST_TOKEN)).toBe(true);
+            expect(await verifyLegacySessionCookie(second, TEST_TOKEN)).toBe(true);
         });
 
         it("sets session cookie on valid token", async () => {

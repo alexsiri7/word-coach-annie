@@ -5,7 +5,6 @@
  * survive Railway deploys and work across multiple replicas.
  */
 
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -16,11 +15,25 @@ export const GLOBAL_CLIENT_LIMIT = parseInt(
   10
 );
 
+export const SUPPORTED_GRANT_TYPES = ["authorization_code", "refresh_token"] as const;
+export type GrantType = (typeof SUPPORTED_GRANT_TYPES)[number];
+
+export function isGrantType(value: unknown): value is GrantType {
+  return SUPPORTED_GRANT_TYPES.some((g) => g === value);
+}
+
+/** `URL.hostname` keeps the brackets on IPv6 literals, hence `[::1]`. */
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.includes(hostname);
+}
+
 export interface ClientRegistration {
   client_id: string;
   client_name: string;
   redirect_uris: string[];
-  grant_types: string[];
+  grant_types: GrantType[];
   registered_at: number;
 }
 
@@ -79,7 +92,7 @@ export async function getClient(
     client_id: row.id,
     client_name: row.clientName,
     redirect_uris: JSON.parse(row.redirectUris) as string[],
-    grant_types: JSON.parse(row.grantTypes) as string[],
+    grant_types: (JSON.parse(row.grantTypes) as unknown[]).filter(isGrantType),
     registered_at: row.createdAt.getTime(),
   };
 }
@@ -117,31 +130,16 @@ export async function createAuthCode(
 }
 
 /**
- * Consume an auth code (single use). Returns null if not found or expired.
- *
- * Note: `findUnique` + `delete` are two separate DB calls. In practice this
- * is safe for low-concurrency OAuth flows, but is not strictly atomic — a
- * narrow TOCTOU window exists under high concurrency. Use a `$transaction`
- * if strict exactly-once guarantees are needed.
+ * Look up an unexpired auth code without consuming it, so the caller can
+ * validate the exchange first. An expired code is deleted and returns null.
  */
-export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
+export async function findAuthCode(code: string): Promise<AuthCode | null> {
   const row = await prisma.oAuthAuthCode.findUnique({ where: { code } });
   if (!row) return null;
-  // Delete regardless of expiry (clean up always)
-  try {
-    await prisma.oAuthAuthCode.delete({ where: { code } });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2025"
-    ) {
-      // Another replica already consumed this code — treat as already used.
-      return null;
-    }
-    logger.error("consumeAuthCode: unexpected error deleting auth code", err);
-    throw err;
+  if (row.expiresAt < new Date()) {
+    await prisma.oAuthAuthCode.deleteMany({ where: { code } });
+    return null;
   }
-  if (row.expiresAt < new Date()) return null;
   return {
     code: row.code,
     userId: row.userId,
@@ -152,4 +150,15 @@ export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
     clientId: row.clientId,
     expiresAt: row.expiresAt.getTime(),
   };
+}
+
+/**
+ * Consume an auth code (single use). The delete is a single statement, so of
+ * any number of concurrent callers exactly one gets true.
+ */
+export async function consumeAuthCode(code: string): Promise<boolean> {
+  const { count } = await prisma.oAuthAuthCode.deleteMany({
+    where: { code, expiresAt: { gte: new Date() } },
+  });
+  return count === 1;
 }

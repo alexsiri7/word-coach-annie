@@ -1,13 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({
   SESSION_COOKIE_NAME: "session",
-  verifySessionToken: vi.fn(async () => ({ userId: "u1", email: "u@test.com" })),
   safeEqual: (a: string, b: string) => a === b,
 }));
 
-vi.mock("@/lib/oauth-store", () => ({
+vi.mock("@/lib/auth-server", () => ({
+  verifySessionTokenNode: vi.fn(),
+}));
+
+vi.mock("@/lib/oauth-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/oauth-store")>()),
   getClient: vi.fn(async () => ({
     client_name: "TestApp",
     redirect_uris: ["http://localhost/callback"],
@@ -16,6 +20,14 @@ vi.mock("@/lib/oauth-store", () => ({
 }));
 
 import { GET, POST } from "@/app/oauth/authorize/route";
+import { verifySessionTokenNode } from "@/lib/auth-server";
+import { createAuthCode, getClient } from "@/lib/oauth-store";
+
+beforeEach(() => {
+  vi.mocked(verifySessionTokenNode).mockReset();
+  vi.mocked(verifySessionTokenNode).mockResolvedValue({ userId: "u1", email: "u@test.com", name: "U" });
+  vi.mocked(createAuthCode).mockClear();
+});
 
 function makeGetRequest(): NextRequest {
   return new NextRequest(
@@ -111,6 +123,7 @@ describe("POST /oauth/authorize CSRF protection", () => {
       {
         action: "deny",
         csrf_token: "token-abc",
+        client_id: "c1",
         redirect_uri: "http://localhost/callback",
         state: "",
       },
@@ -188,6 +201,35 @@ describe("POST /oauth/authorize approve happy-path", () => {
     const html = await res.text();
     expect(html).toContain("code-123"); // from mocked createAuthCode
   });
+
+  it.each(["http://localhost:8080/cb", "http://127.0.0.1:8080/cb", "http://[::1]:8080/cb"])(
+    "renders the code page for loopback redirect %s",
+    async (redirectUri) => {
+      vi.mocked(getClient).mockResolvedValueOnce({
+        client_id: "c1",
+        client_name: "TestApp",
+        redirect_uris: [redirectUri],
+        grant_types: ["authorization_code"],
+        registered_at: 0,
+      });
+      const res = await POST(
+        makePostRequest(
+          {
+            action: "approve",
+            csrf_token: "token-abc",
+            response_type: "code",
+            client_id: "c1",
+            redirect_uri: redirectUri,
+            code_challenge: "abc",
+            code_challenge_method: "S256",
+          },
+          "session=valid-session; csrf_oauth=token-abc",
+        ),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Authorization Code - Annie");
+    },
+  );
 });
 
 describe("POST /oauth/authorize nonce propagation", () => {
@@ -196,6 +238,7 @@ describe("POST /oauth/authorize nonce propagation", () => {
       {
         action: "deny",
         csrf_token: "token-abc",
+        client_id: "c1",
         redirect_uri: "http://localhost/callback",
         state: "",
       },
@@ -227,5 +270,128 @@ describe("POST /oauth/authorize nonce propagation", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('nonce="my-test-nonce"');
+  });
+});
+
+describe("/oauth/authorize revoked session", () => {
+  it("GET redirects to login instead of rendering consent when the session is revoked", async () => {
+    vi.mocked(verifySessionTokenNode).mockResolvedValue(null);
+    const res = await GET(makeGetRequest());
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("csrf_oauth=");
+    expect(verifySessionTokenNode).toHaveBeenCalledWith("valid-session");
+  });
+
+  it("POST approve does not issue an auth code when the session is revoked", async () => {
+    vi.mocked(verifySessionTokenNode).mockResolvedValue(null);
+    const req = makePostRequest(
+      {
+        action: "approve",
+        csrf_token: "token-abc",
+        response_type: "code",
+        client_id: "c1",
+        redirect_uri: "http://localhost/callback",
+        code_challenge: "abc",
+        code_challenge_method: "S256",
+      },
+      "session=valid-session; csrf_oauth=token-abc",
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /oauth/authorize deny validates the client first", () => {
+  function deny(fields: Record<string, string>): Promise<Response> {
+    return POST(
+      makePostRequest(
+        { action: "deny", csrf_token: "token-abc", state: "st-1", ...fields },
+        "session=valid-session; csrf_oauth=token-abc",
+      ),
+    );
+  }
+
+  it("returns 400 and no redirect page for an unknown client_id", async () => {
+    vi.mocked(getClient).mockResolvedValueOnce(null);
+    const res = await deny({ client_id: "unknown", redirect_uri: "http://localhost/callback" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_client");
+  });
+
+  it("returns 400 and no redirect page for an unregistered redirect_uri", async () => {
+    const res = await deny({ client_id: "c1", redirect_uri: "https://evil.example/cb" });
+    expect(res.status).toBe(400);
+    expect(await res.text()).not.toContain("window.location.replace");
+  });
+
+  it("returns 400 when client_id is missing", async () => {
+    const res = await deny({ redirect_uri: "http://localhost/callback" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_request");
+  });
+
+  it("redirects a valid client with error=access_denied and state", async () => {
+    const res = await deny({ client_id: "c1", redirect_uri: "http://localhost/callback" });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("http://localhost/callback?error=access_denied&state=st-1");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /oauth/authorize approve validates the client", () => {
+  function approve(fields: Record<string, string>): Promise<Response> {
+    return POST(
+      makePostRequest(
+        {
+          action: "approve",
+          csrf_token: "token-abc",
+          response_type: "code",
+          code_challenge: "abc",
+          code_challenge_method: "S256",
+          state: "st-1",
+          ...fields,
+        },
+        "session=valid-session; csrf_oauth=token-abc",
+      ),
+    );
+  }
+
+  it("returns 400 and issues no code for an unknown client_id", async () => {
+    vi.mocked(getClient).mockResolvedValueOnce(null);
+    const res = await approve({ client_id: "unknown", redirect_uri: "http://localhost/callback" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_client");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 and issues no code for an unregistered redirect_uri", async () => {
+    const res = await approve({ client_id: "c1", redirect_uri: "https://evil.example/cb" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_client");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /oauth/authorize consent page", () => {
+  it("shows the HTML-escaped redirect host", async () => {
+    vi.mocked(getClient).mockResolvedValueOnce({
+      client_id: "c1",
+      client_name: "TestApp",
+      redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+      grant_types: ["authorization_code"],
+      registered_at: 0,
+    });
+    const res = await GET(
+      new NextRequest(
+        "http://localhost/oauth/authorize?response_type=code&client_id=c1&redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback&code_challenge=abc&code_challenge_method=S256",
+        { headers: { cookie: "session=valid-session" } },
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('<span class="redirect-host">claude.ai</span>');
   });
 });

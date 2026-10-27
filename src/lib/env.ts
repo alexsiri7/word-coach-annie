@@ -14,6 +14,10 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  // Public origin for absolute URLs (OAuth metadata, calendar feed).
+  // Falls back to the origin of GOOGLE_REDIRECT_URI when unset.
+  APP_BASE_URL: z.url().optional(),
+
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -38,6 +42,10 @@ const envSchema = z.object({
 
   // Access control — invite-only allowlist (comma-separated emails)
   ALLOWED_EMAILS: z.string().optional(),
+
+  // OAuth DCR — HTTPS redirect hosts clients may register (comma-separated,
+  // exact hostnames). Loopback is always allowed. Default when unset: claude.ai
+  OAUTH_ALLOWED_REDIRECT_HOSTS: z.string().optional(),
 
   // Feedback (GitHub issue creation)
   GITHUB_FEEDBACK_TOKEN: z.string().optional(),

@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { NodeUpdateSchema } from "@/schemas/nodes";
+import { assertValidParent, InvalidParentError } from "@/lib/node-tree";
 
 export async function GET(
   request: NextRequest,
@@ -73,24 +74,6 @@ export async function PATCH(
     }
     const { title, synopsis, status, orderIndex, parentId } = parsed.data;
 
-    if (parentId !== undefined && parentId !== null) {
-      const parentNode = await prisma.structureNode.findFirst({
-        where: { id: parentId, projectId: existing.projectId },
-      });
-      if (!parentNode) {
-        return NextResponse.json(
-          { error: "Parent node not found in this project" },
-          { status: 400 }
-        );
-      }
-      if (parentId === id) {
-        return NextResponse.json(
-          { error: "A node cannot be its own parent" },
-          { status: 400 }
-        );
-      }
-    }
-
     const data: Record<string, unknown> = {};
     if (title !== undefined) data.title = sanitizeInput(title);
     if (synopsis !== undefined) data.synopsis = sanitizeInput(synopsis);
@@ -105,13 +88,19 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.structureNode.update({
-      where: { id },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      if (parentId !== undefined && parentId !== null) await assertValidParent(tx, existing, parentId);
+      return tx.structureNode.update({
+        where: { id },
+        data,
+      });
     });
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof InvalidParentError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     logger.error("Failed to update node", error);
     return NextResponse.json(
       { error: "Internal server error" },
