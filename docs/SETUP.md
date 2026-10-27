@@ -82,6 +82,8 @@ The app works with any OpenAI-compatible provider (OpenAI, Anthropic via proxy, 
 
 Required for: Google sign-in and Google Docs export.
 
+`APP_BASE_URL` (e.g., `https://yourdomain.com`) sets the public origin used in absolute URLs — the MCP OAuth discovery metadata and calendar feed links. When unset, the origin of `GOOGLE_REDIRECT_URI` is used; without either, those endpoints return an error.
+
 #### OAuth Consent Screen Setup
 
 To allow any Google account to sign in (not just test users), the OAuth consent screen must be published:

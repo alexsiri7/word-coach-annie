@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { publicOrigin } from "@/lib/public-origin";
 
 /**
  * GET /.well-known/oauth-authorization-server
@@ -6,10 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
  * OAuth 2.0 Authorization Server Metadata (RFC 8414).
  * Used by MCP clients (e.g. Claude Code) to discover endpoints.
  */
-export function GET(request: NextRequest) {
-  const proto = request.headers.get("x-forwarded-proto") || "https";
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
-  const origin = `${proto}://${host}`;
+export function GET() {
+  const origin = publicOrigin();
 
   return NextResponse.json({
     issuer: origin,

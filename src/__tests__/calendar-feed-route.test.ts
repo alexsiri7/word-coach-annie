@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/api-auth", async (importOriginal) => {
@@ -30,9 +30,9 @@ async function readToken(): Promise<string> {
     return feedPath.replace("/api/calendar/opportunities/", "");
 }
 
-async function fetchFeed(pathSegment: string) {
+async function fetchFeed(pathSegment: string, headers: Record<string, string> = {}) {
     const { GET } = await import("@/app/api/calendar/opportunities/[token]/route");
-    const request = new NextRequest(`http://localhost/api/calendar/opportunities/${pathSegment}`);
+    const request = new NextRequest(`http://localhost/api/calendar/opportunities/${pathSegment}`, { headers });
     return GET(request, { params: Promise.resolve({ token: pathSegment }) });
 }
 
@@ -49,6 +49,11 @@ describe("Calendar feed", () => {
         const provider = await prisma.provider.create({ data: { userId, name: "Contest Org" } });
         providerId = provider.id;
         vi.mocked(getCurrentUserId).mockReturnValue(userId);
+        vi.stubEnv("APP_BASE_URL", "https://annie.example");
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
     });
 
     function createOpportunity(data: Record<string, unknown> = {}) {
@@ -150,8 +155,22 @@ describe("Calendar feed", () => {
             expect(body).toContain("DTEND;VALUE=DATE:20300402");
             expect(body).toContain("SUMMARY:Spring Prize — Contest Org");
             expect(unfold(body)).toContain("DESCRIPTION:Rules: https://example.com/rules\\nEntry fee: £10\\nWord limit: 2000\\nLine limit: 40\\nGenres: Literary fiction");
-            expect(unfold(body)).toContain(`URL:https://localhost/opportunity/${opportunity.id}`);
+            expect(unfold(body)).toContain(`URL:https://annie.example/opportunity/${opportunity.id}`);
             expect(body).not.toContain("VALARM");
+        });
+
+        it("builds event URLs on the configured origin, not a forged forwarded host", async () => {
+            const opportunity = await createOpportunity();
+
+            const res = await fetchFeed(await readToken(), {
+                "x-forwarded-host": "evil.example",
+                "x-forwarded-proto": "http",
+                host: "evil.example",
+            });
+
+            const body = unfold(await res.text());
+            expect(body).toContain(`URL:https://annie.example/opportunity/${opportunity.id}`);
+            expect(body).not.toContain("evil.example");
         });
 
         it("omits closed opportunities and keeps the ones still open", async () => {
