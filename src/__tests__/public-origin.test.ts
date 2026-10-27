@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { NextRequest } from "next/server";
 import { publicOrigin } from "@/lib/public-origin";
 import { GET as getAuthServerMetadata } from "@/app/.well-known/oauth-authorization-server/route";
 
@@ -38,5 +39,27 @@ describe("GET /.well-known/oauth-authorization-server", () => {
             token_endpoint: "https://annie.example/oauth/token",
             registration_endpoint: "https://annie.example/oauth/register",
         });
+    });
+
+    it("ignores forged forwarded-host and host headers", async () => {
+        vi.stubEnv("APP_BASE_URL", "https://annie.example");
+        const handler: (request: NextRequest) => Response = getAuthServerMetadata;
+        const request = new NextRequest("http://evil.example/.well-known/oauth-authorization-server", {
+            headers: {
+                "x-forwarded-host": "evil.example",
+                "x-forwarded-proto": "http",
+                host: "evil.example",
+            },
+        });
+
+        const metadata = await handler(request).json();
+
+        expect(metadata).toMatchObject({
+            issuer: "https://annie.example",
+            authorization_endpoint: "https://annie.example/oauth/authorize",
+            token_endpoint: "https://annie.example/oauth/token",
+            registration_endpoint: "https://annie.example/oauth/register",
+        });
+        expect(JSON.stringify(metadata)).not.toContain("evil.example");
     });
 });
