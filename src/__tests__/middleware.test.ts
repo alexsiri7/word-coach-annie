@@ -657,6 +657,21 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
 
+        it("shares one per-IP auth bucket across /me, /refresh and /login", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-real-ip": "7.7.7.7" };
+
+            for (let i = 0; i < 3; i++) {
+                expect((await middleware(createRequest("/api/auth/me", { headers }))).status).toBe(200);
+            }
+            for (let i = 0; i < 2; i++) {
+                expect((await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }))).status).toBe(200);
+            }
+
+            const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+            expect(res.status).toBe(429);
+        });
+
         it("ignores a spoofed x-forwarded-for when keying the auth rate limit", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             const refresh = (i: number) => createRequest("/api/auth/refresh", {
