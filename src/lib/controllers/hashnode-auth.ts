@@ -1,7 +1,22 @@
 import { prisma } from '@/lib/db';
-import { encrypt, decrypt } from '@/lib/crypto';
+import { encrypt, isUndecryptable, readEncrypted } from '@/lib/crypto';
 
 const HASHNODE_GQL = 'https://gql.hashnode.com';
+
+/**
+ * Decrypt a stored Hashnode token, rewriting it under the current key when it
+ * was read with a previous one. Null when no configured key decrypts it.
+ */
+export function readHashnodeToken(cred: { id: string; accessToken: string }): Promise<string | null> {
+    return readEncrypted(cred.accessToken, {
+        field: 'HashnodeCredential.accessToken',
+        // Compare-and-swap: a reconnect that already replaced the token wins.
+        rewrite: (reencrypted) => prisma.hashnodeCredential.updateMany({
+            where: { id: cred.id, accessToken: cred.accessToken },
+            data: { accessToken: reencrypted },
+        }),
+    });
+}
 
 export class HashnodeAuthController {
     static async connect(accessToken: string, userId: string | null) {
@@ -73,6 +88,7 @@ export class HashnodeAuthController {
         const resolvedUserId = userId ?? 'local';
         const cred = await prisma.hashnodeCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return { connected: false };
+        if (isUndecryptable(cred.accessToken, 'HashnodeCredential.accessToken')) return { connected: false };
         return { connected: true, username: cred.username, publicationId: cred.publicationId };
     }
 
@@ -85,6 +101,6 @@ export class HashnodeAuthController {
         const resolvedUserId = userId ?? 'local';
         const cred = await prisma.hashnodeCredential.findUnique({ where: { userId: resolvedUserId } });
         if (!cred) return null;
-        return decrypt(cred.accessToken);
+        return readHashnodeToken(cred);
     }
 }

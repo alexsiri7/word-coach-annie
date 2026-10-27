@@ -15,6 +15,7 @@ import { splitSqlStatements } from './sql-tokenizer.mjs';
 import { transportSecurityProblems } from './transport-security.mjs';
 import { authConfigurationProblems } from './auth-configuration.mjs';
 import { secretStrengthProblems } from './secret-strength.mjs';
+import { configuredDatabaseSchema, quotedDatabaseSchema } from './database-schema.mjs';
 
 // This script is the container's startup gate (Dockerfile CMD runs it before
 // server.js) and the server inherits its environment, so refusing here keeps a
@@ -44,17 +45,14 @@ if (!connectionString) {
   process.exit(0);
 }
 
-// DATABASE_SCHEMA names the schema holding the app's tables (and the
-// _prisma_migrations bookkeeping table). Defaults to `public`, which is what
-// local development uses; production and staging each set their own. It is
-// interpolated into SQL below, so it must be a plain identifier.
-const schema = process.env.DATABASE_SCHEMA?.trim() || 'public';
-if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
-  console.error(`Migration failed: DATABASE_SCHEMA must be a plain SQL identifier, got ${JSON.stringify(schema)}`);
+let schema, qschema;
+try {
+  schema = configuredDatabaseSchema(process.env) ?? 'public';
+  qschema = quotedDatabaseSchema(process.env);
+} catch (e) {
+  console.error(`Migration failed: ${e.message}`);
   process.exit(1);
 }
-// `public` stays unquoted so the emitted SQL is unchanged for existing deploys.
-const qschema = schema === 'public' ? 'public' : `"${schema}"`;
 
 let PrismaClient, PrismaPg;
 try {

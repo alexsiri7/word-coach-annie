@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GoogleAuthController } from "@/lib/controllers/google-auth";
+import { decrypt, encrypt } from "@/lib/crypto";
+import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import { testPrisma } from "./setup";
 
 // Track the most recently constructed OAuth2 mock instance so tests can inspect it.
@@ -276,6 +279,89 @@ describe("GoogleAuthController", () => {
 
             const creds = await testPrisma.googleCredential.findMany();
             expect(creds).toHaveLength(0);
+        });
+    });
+
+    describe("ENCRYPTION_KEY rotation", () => {
+        const KEY_A = "google-rotation-key-a";
+        const KEY_B = "google-rotation-key-b";
+        let origEncKey: string | undefined;
+        let origPrevious: string | undefined;
+
+        beforeEach(async () => {
+            origEncKey = process.env.ENCRYPTION_KEY;
+            origPrevious = process.env.ENCRYPTION_KEY_PREVIOUS;
+            process.env.ENCRYPTION_KEY = KEY_A;
+            delete process.env.ENCRYPTION_KEY_PREVIOUS;
+            await testPrisma.googleCredential.create({
+                data: {
+                    userId: "local",
+                    accessToken: encrypt("access-under-a"),
+                    refreshToken: encrypt("refresh-under-a"),
+                    expiresAt: new Date(Date.now() + 3600000),
+                    scope: "test-scope"
+                }
+            });
+        });
+
+        afterEach(() => {
+            if (origEncKey !== undefined) process.env.ENCRYPTION_KEY = origEncKey;
+            else delete process.env.ENCRYPTION_KEY;
+            if (origPrevious !== undefined) process.env.ENCRYPTION_KEY_PREVIOUS = origPrevious;
+            else delete process.env.ENCRYPTION_KEY_PREVIOUS;
+        });
+
+        it("reads tokens under a previous key and rewrites them under the current key", async () => {
+            process.env.ENCRYPTION_KEY = KEY_B;
+            process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
+
+            const client = await GoogleAuthController.getValidClient(null);
+            expect(client).not.toBeNull();
+
+            delete process.env.ENCRYPTION_KEY_PREVIOUS;
+            const cred = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
+            expect(decrypt(cred.accessToken)).toBe("access-under-a");
+            expect(decrypt(cred.refreshToken)).toBe("refresh-under-a");
+        });
+
+        it("does not overwrite a token refreshed between the read and the rewrite", async () => {
+            const stale = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
+            process.env.ENCRYPTION_KEY = KEY_B;
+            process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
+            const refreshed = encrypt("access-refreshed-meanwhile");
+            await testPrisma.googleCredential.update({ where: { userId: "local" }, data: { accessToken: refreshed } });
+
+            const staleRead = vi.spyOn(prisma.googleCredential, "findUnique").mockResolvedValueOnce(stale as never);
+            try {
+                await GoogleAuthController.getValidClient(null);
+            } finally {
+                staleRead.mockRestore();
+            }
+
+            const cred = await testPrisma.googleCredential.findUniqueOrThrow({ where: { userId: "local" } });
+            expect(cred.accessToken).toBe(refreshed);
+            delete process.env.ENCRYPTION_KEY_PREVIOUS;
+            expect(decrypt(cred.refreshToken)).toBe("refresh-under-a");
+        });
+
+        it("still reports connected when ENCRYPTION_KEY is unset", async () => {
+            delete process.env.ENCRYPTION_KEY;
+            delete process.env.ALLOW_PLAINTEXT_STORAGE;
+            try {
+                await expect(GoogleAuthController.getStatus(null)).resolves.toMatchObject({ connected: true });
+            } finally {
+                process.env.ALLOW_PLAINTEXT_STORAGE = "true";
+            }
+        });
+
+        it("reports tokens no configured key decrypts as disconnected without throwing or deleting them", async () => {
+            process.env.ENCRYPTION_KEY = KEY_B;
+            const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+            await expect(GoogleAuthController.getStatus(null)).resolves.toEqual({ connected: false });
+            await expect(GoogleAuthController.getValidClient(null)).resolves.toBeNull();
+            expect(await testPrisma.googleCredential.count({ where: { userId: "local" } })).toBe(1);
+            warn.mockRestore();
         });
     });
 });
