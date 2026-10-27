@@ -4,11 +4,9 @@ import {
     ANNOTATION_ERRORS,
     InputTooLargeError,
     StructureController,
-    assertAnnotationWithinLimits,
 } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-import { sanitizeInput } from "@/lib/sanitize-server";
 
 export async function GET(
     request: NextRequest,
@@ -59,14 +57,10 @@ export async function POST(
                 { status: 400 }
             );
         }
-        assertAnnotationWithinLimits({ content, range, selectedText });
 
-        const annotation = await StructureController.addAnnotation(
-            nodeId,
-            sanitizeInput(content),
-            range,
-            selectedText ? sanitizeInput(selectedText) : selectedText
-        );
+        const annotation = await StructureController.addAnnotation(nodeId, content, range, selectedText, {
+            sanitize: true,
+        });
 
         return NextResponse.json(annotation, { status: 201 });
     } catch (error) {

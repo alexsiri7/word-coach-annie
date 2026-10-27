@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { randomUUID } from "crypto";
@@ -6,6 +7,7 @@ import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 import { NodeType, SceneStatus } from "@/schemas/nodes";
 import { ProjectType } from "@/schemas/projects";
+import { StoryObjectType } from "@/schemas/story-objects";
 
 interface ExportData {
   exportVersion: number;
@@ -80,12 +82,19 @@ const MAX_IMPORT_ITEMS = {
   relationships: 20_000,
 } as const;
 
+// Bounded by the Postgres `int4` column, not NodeOrderIndex: node creation
+// via `insertAfterIndex` is unbounded, so real exports can exceed that range.
+const ImportedOrderIndex = z.number().int().min(-2_147_483_648).max(2_147_483_647);
+
 /** Rejects payloads whose shape would make the import unbounded or store values the app can't render. */
 function assertImportable(data: ExportData) {
   for (const [key, max] of Object.entries(MAX_IMPORT_ITEMS)) {
     const items: unknown = data[key as keyof typeof MAX_IMPORT_ITEMS];
     if (!Array.isArray(items)) throw new ImportValidationError(`${key} must be an array`);
     if (items.length > max) throw new ImportValidationError(`${key} exceeds the maximum of ${max}`);
+    if (!items.every((item) => typeof item === "object" && item !== null && !Array.isArray(item))) {
+      throw new ImportValidationError(`${key} entries must be objects`);
+    }
   }
   if (data.project.projectType && !ProjectType.safeParse(data.project.projectType).success) {
     throw new ImportValidationError(`Invalid projectType: ${data.project.projectType}`);
@@ -97,8 +106,13 @@ function assertImportable(data: ExportData) {
     if (node.status && !SceneStatus.safeParse(node.status).success) {
       throw new ImportValidationError(`Invalid structure node status: ${node.status}`);
     }
-    if (!Number.isInteger(node.orderIndex)) {
+    if (!ImportedOrderIndex.safeParse(node.orderIndex).success) {
       throw new ImportValidationError(`Invalid structure node orderIndex: ${node.orderIndex}`);
+    }
+  }
+  for (const obj of data.storyObjects) {
+    if (!StoryObjectType.safeParse(obj.type).success) {
+      throw new ImportValidationError(`Invalid story object type: ${obj.type}`);
     }
   }
 }

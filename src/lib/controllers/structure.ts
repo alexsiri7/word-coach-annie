@@ -3,7 +3,7 @@ import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
-import { sanitizeHtml } from "@/lib/sanitize-server";
+import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex } from "@/schemas/nodes";
@@ -28,14 +28,15 @@ export const ANNOTATION_ERRORS = {
 
 export const MAX_SCENE_CONTENT_LENGTH = 2 * 1024 * 1024;
 
-// A text-quote range is JSON that embeds the selected text, escaped, plus prefix/suffix.
+// A selection can span a whole scene, and a text-quote range is JSON that
+// embeds the selected text, escaped, plus prefix/suffix.
 export const MAX_ANNOTATION_LENGTHS = {
     content: 10_000,
-    selectedText: 10_000,
-    range: 25_000,
+    selectedText: MAX_SCENE_CONTENT_LENGTH,
+    range: 2 * MAX_SCENE_CONTENT_LENGTH,
 } as const;
 
-export function assertAnnotationWithinLimits(fields: { content: string; range?: string; selectedText?: string | null }) {
+function assertAnnotationWithinLimits(fields: { content: string; range?: string; selectedText?: string | null }) {
     for (const [field, max] of Object.entries(MAX_ANNOTATION_LENGTHS)) {
         const value = fields[field as keyof typeof MAX_ANNOTATION_LENGTHS];
         if (value && value.length > max) throw new InputTooLargeError(field, max);
@@ -399,9 +400,20 @@ export class StructureController {
         return { deleted: true, id: nodeId, title: node.title };
     }
 
-    static async addAnnotation(nodeId: string, content: string, range: string = "", selectedText: string | null = null) {
-        if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
+    /** Limits apply to the input as given; `sanitize` escapes it afterwards, which can lengthen it. */
+    static async addAnnotation(
+        nodeId: string,
+        content: string,
+        range: string = "",
+        selectedText: string | null = null,
+        { sanitize = false }: { sanitize?: boolean } = {}
+    ) {
         assertAnnotationWithinLimits({ content, range, selectedText });
+        if (sanitize) {
+            content = sanitizeInput(content);
+            if (selectedText) selectedText = sanitizeInput(selectedText);
+        }
+        if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
 
         // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
         // in this context; crypto.randomUUID() is cryptographically secure and globally unique.

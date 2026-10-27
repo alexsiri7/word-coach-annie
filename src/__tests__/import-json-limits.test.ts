@@ -50,6 +50,15 @@ describe("importProjectJson input limits", () => {
     );
   });
 
+  it.each(["structureNodes", "contentVersions", "storyObjects", "annotations", "relationships"] as const)(
+    "rejects %s entries that are not objects",
+    async (key) => {
+      for (const entry of [null, "x", []]) {
+        await expectRejected(exportWith({ [key]: [entry] }), `${key} entries must be objects`);
+      }
+    }
+  );
+
   it("rejects an unknown structure node type", async () => {
     await expectRejected(exportWith({ structureNodes: [node({ type: "BOOK" })] }), "Invalid structure node type");
   });
@@ -66,6 +75,18 @@ describe("importProjectJson input limits", () => {
     );
   });
 
+  it("rejects an orderIndex outside the database integer range", async () => {
+    await expectRejected(exportWith({ structureNodes: [node({ orderIndex: 2 ** 31 })] }), "Invalid structure node orderIndex");
+    await expectRejected(exportWith({ structureNodes: [node({ orderIndex: -(2 ** 31) - 1 })] }), "Invalid structure node orderIndex");
+  });
+
+  it("rejects an unknown story object type", async () => {
+    await expectRejected(
+      exportWith({ storyObjects: [{ id: "o1", type: "VILLAIN", name: "", description: "", notes: "", role: null, tags: "" }] }),
+      "Invalid story object type"
+    );
+  });
+
   it("rejects an unknown projectType", async () => {
     await expectRejected(
       exportWith({ project: { title: "T", author: "", synopsis: "", genre: "", projectType: "POETRY" } }),
@@ -76,7 +97,7 @@ describe("importProjectJson input limits", () => {
   it("accepts collections at their maximum and empty status/projectType defaults", async () => {
     await importProjectJson(exportWith({
       project: { title: "T", author: "", synopsis: "", genre: "", projectType: "" },
-      structureNodes: [node({ status: "" }), ...new Array(4_999).fill(node())],
+      structureNodes: [node({ status: "" }), node({ orderIndex: 2 ** 31 - 1 }), ...new Array(4_998).fill(node())],
       contentVersions: new Array(20_000).fill({}),
     }));
     expect(prisma.$transaction).toHaveBeenCalledOnce();

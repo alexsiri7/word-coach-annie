@@ -160,12 +160,13 @@ describe("POST /api/projects/import — input size limits", () => {
     expect(res.status).not.toBe(413);
   });
 
-  it("returns 413 for a streamed body over 5MB with no Content-Length, without importing it", async () => {
-    const chunk = new Uint8Array(1024 * 1024).fill(0x20);
-    let sent = 0;
+  const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+
+  function streamedImportRequest(chunks: Uint8Array[]) {
     const body = new ReadableStream<Uint8Array>({
       pull(controller) {
-        if (sent++ < 6) controller.enqueue(chunk);
+        const chunk = chunks.shift();
+        if (chunk) controller.enqueue(chunk);
         else controller.close();
       },
     });
@@ -176,10 +177,22 @@ describe("POST /api/projects/import — input size limits", () => {
       duplex: "half",
     });
     expect(req.headers.get("content-length")).toBeNull();
+    return req;
+  }
 
-    const res = await importPost(req);
+  it("returns 413 for a streamed body over 5MB with no Content-Length, without importing it", async () => {
+    const chunk = new Uint8Array(1024 * 1024).fill(0x20);
+    const res = await importPost(streamedImportRequest(new Array(6).fill(chunk)));
     expect(res.status).toBe(413);
     expect(importProjectJson).not.toHaveBeenCalled();
+  });
+
+  it("imports a streamed body of exactly 5MB with no Content-Length", async () => {
+    const json = new TextEncoder().encode(JSON.stringify({ project: {}, exportVersion: 1 }));
+    const padding = new Uint8Array(MAX_IMPORT_BYTES - json.byteLength).fill(0x20);
+    const res = await importPost(streamedImportRequest([json, padding]));
+    expect(res.status).not.toBe(413);
+    expect(importProjectJson).toHaveBeenCalledOnce();
   });
 
   it("returns 400 when the payload fails import validation", async () => {

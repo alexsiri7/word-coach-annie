@@ -358,7 +358,7 @@ Get a scene's content (latest version + version history + annotations).
 
 ---
 
-### `PUT /api/nodes/:id/content`
+### `POST /api/nodes/:id/content`
 Save scene content (creates a new version).
 
 **Body**: `{ content: "string" }`
@@ -384,7 +384,7 @@ Add an annotation to a node.
 
 **Body**: `{ content: string, range?: string, selectedText?: string }`
 
-**Errors**: `400` if `content` is empty, a field is not a string, or `content`/`selectedText` exceed 10,000 or `range` 25,000 characters
+**Errors**: `400` if `content` is empty, a field is not a string, `content` exceeds 10,000 characters, or `selectedText` exceeds 2 MiB (2,097,152) or `range` 4 MiB (4,194,304) characters. Limits apply before sanitization
 
 ---
 
