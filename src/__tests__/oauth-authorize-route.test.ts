@@ -10,7 +10,8 @@ vi.mock("@/lib/auth-server", () => ({
   verifySessionTokenNode: vi.fn(),
 }));
 
-vi.mock("@/lib/oauth-store", () => ({
+vi.mock("@/lib/oauth-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/oauth-store")>()),
   getClient: vi.fn(async () => ({
     client_name: "TestApp",
     redirect_uris: ["http://localhost/callback"],
@@ -200,6 +201,35 @@ describe("POST /oauth/authorize approve happy-path", () => {
     const html = await res.text();
     expect(html).toContain("code-123"); // from mocked createAuthCode
   });
+
+  it.each(["http://localhost:8080/cb", "http://127.0.0.1:8080/cb", "http://[::1]:8080/cb"])(
+    "renders the code page for loopback redirect %s",
+    async (redirectUri) => {
+      vi.mocked(getClient).mockResolvedValueOnce({
+        client_id: "c1",
+        client_name: "TestApp",
+        redirect_uris: [redirectUri],
+        grant_types: ["authorization_code"],
+        registered_at: 0,
+      });
+      const res = await POST(
+        makePostRequest(
+          {
+            action: "approve",
+            csrf_token: "token-abc",
+            response_type: "code",
+            client_id: "c1",
+            redirect_uri: redirectUri,
+            code_challenge: "abc",
+            code_challenge_method: "S256",
+          },
+          "session=valid-session; csrf_oauth=token-abc",
+        ),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Authorization Code - Annie");
+    },
+  );
 });
 
 describe("POST /oauth/authorize nonce propagation", () => {

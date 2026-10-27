@@ -22,6 +22,13 @@ export function isGrantType(value: unknown): value is GrantType {
   return SUPPORTED_GRANT_TYPES.some((g) => g === value);
 }
 
+/** `URL.hostname` keeps the brackets on IPv6 literals, hence `[::1]`. */
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.includes(hostname);
+}
+
 export interface ClientRegistration {
   client_id: string;
   client_name: string;

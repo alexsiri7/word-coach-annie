@@ -6,6 +6,7 @@ import {
   IP_REGISTRATION_LIMIT,
   GLOBAL_CLIENT_LIMIT,
   SUPPORTED_GRANT_TYPES,
+  isLoopbackHost,
   type ClientRegistration,
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
@@ -14,7 +15,6 @@ import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
 
-const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 const DEFAULT_ALLOWED_REDIRECT_HOSTS = "claude.ai";
 
 /**
@@ -23,7 +23,7 @@ const DEFAULT_ALLOWED_REDIRECT_HOSTS = "claude.ai";
  * client cannot send authorization codes to an attacker-controlled site.
  */
 function isAllowedRedirect(uri: URL): boolean {
-  if (LOOPBACK_HOSTS.includes(uri.hostname)) {
+  if (isLoopbackHost(uri.hostname)) {
     return uri.protocol === "http:" || uri.protocol === "https:";
   }
   const allowedHosts = (env.OAUTH_ALLOWED_REDIRECT_HOSTS?.trim() || DEFAULT_ALLOWED_REDIRECT_HOSTS)

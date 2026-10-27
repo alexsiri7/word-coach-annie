@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, safeEqual } from "@/lib/auth";
 import { verifySessionTokenNode } from "@/lib/auth-server";
-import { getClient, createAuthCode } from "@/lib/oauth-store";
+import { getClient, createAuthCode, isLoopbackHost } from "@/lib/oauth-store";
 import { escapeHtml } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
@@ -153,9 +153,9 @@ export async function POST(request: NextRequest) {
     redirectUrl.searchParams.set("state", state);
   }
 
-  // For localhost redirects (CLI tools via SSH, etc.), show the code on a page
+  // For loopback redirects (CLI tools via SSH, etc.), show the code on a page
   // so the user can copy it manually if the redirect can't reach the local server.
-  if (redirectUrl.hostname === "localhost" || redirectUrl.hostname === "127.0.0.1") {
+  if (isLoopbackHost(redirectUrl.hostname)) {
     return renderCodePage(authCode.code, redirectUrl.toString(), nonce);
   }
 
