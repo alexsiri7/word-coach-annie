@@ -312,6 +312,40 @@ describe("POST /oauth/authorize deny validates the client first", () => {
   });
 });
 
+describe("POST /oauth/authorize approve validates the client", () => {
+  function approve(fields: Record<string, string>): Promise<Response> {
+    return POST(
+      makePostRequest(
+        {
+          action: "approve",
+          csrf_token: "token-abc",
+          response_type: "code",
+          code_challenge: "abc",
+          code_challenge_method: "S256",
+          state: "st-1",
+          ...fields,
+        },
+        "session=valid-session; csrf_oauth=token-abc",
+      ),
+    );
+  }
+
+  it("returns 400 and issues no code for an unknown client_id", async () => {
+    vi.mocked(getClient).mockResolvedValueOnce(null);
+    const res = await approve({ client_id: "unknown", redirect_uri: "http://localhost/callback" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_client");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 and issues no code for an unregistered redirect_uri", async () => {
+    const res = await approve({ client_id: "c1", redirect_uri: "https://evil.example/cb" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_client");
+    expect(createAuthCode).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /oauth/authorize consent page", () => {
   it("shows the HTML-escaped redirect host", async () => {
     vi.mocked(getClient).mockResolvedValueOnce({
