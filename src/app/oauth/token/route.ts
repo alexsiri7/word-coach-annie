@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeAuthCode, getClient } from "@/lib/oauth-store";
+import { consumeAuthCode, findAuthCode, getClient } from "@/lib/oauth-store";
 import {
   createMcpToken,
   verifyMcpToken,
@@ -78,18 +78,21 @@ async function handleAuthorizationCode(body: Record<string, string>) {
     );
   }
 
-  // Validate client exists
   const client = await getClient(client_id);
   if (!client) {
     return errorResponse("invalid_client", "Unknown client_id");
   }
+  if (!client.grant_types.includes("authorization_code")) {
+    return errorResponse("unauthorized_client", "Client is not registered for authorization_code");
+  }
 
-  // Consume the authorization code (single use)
+  // Validate the exchange before consuming the code, so a request that merely
+  // carries a leaked code cannot burn it and deny the legitimate exchange.
   let authCode;
   try {
-    authCode = await consumeAuthCode(code);
+    authCode = await findAuthCode(code);
   } catch (err) {
-    logger.error("handleAuthorizationCode: failed to consume auth code", err);
+    logger.error("handleAuthorizationCode: failed to load auth code", err);
     return errorResponse("server_error", "Internal server error", 500);
   }
   if (!authCode) {
@@ -99,20 +102,28 @@ async function handleAuthorizationCode(body: Record<string, string>) {
     );
   }
 
-  // Validate redirect_uri matches
   if (authCode.redirectUri !== redirect_uri) {
     return errorResponse("invalid_grant", "redirect_uri mismatch");
   }
 
-  // Validate client_id matches
   if (authCode.clientId !== client_id) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
-  // Verify PKCE
   const pkceValid = await verifyPkce(code_verifier, authCode.codeChallenge);
   if (!pkceValid) {
     return errorResponse("invalid_grant", "PKCE verification failed");
+  }
+
+  let consumed;
+  try {
+    consumed = await consumeAuthCode(code);
+  } catch (err) {
+    logger.error("handleAuthorizationCode: failed to consume auth code", err);
+    return errorResponse("server_error", "Internal server error", 500);
+  }
+  if (!consumed) {
+    return errorResponse("invalid_grant", "Authorization code has already been used");
   }
 
   // Issue tokens
@@ -147,6 +158,9 @@ async function handleRefreshToken(body: Record<string, string>) {
   const client = await getClient(client_id);
   if (!client) {
     return errorResponse("invalid_client", "Unknown client_id");
+  }
+  if (!client.grant_types.includes("refresh_token")) {
+    return errorResponse("unauthorized_client", "Client is not registered for refresh_token");
   }
 
   // Verify the refresh token

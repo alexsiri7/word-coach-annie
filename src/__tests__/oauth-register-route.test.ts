@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/auth", () => ({ isAuthEnabled: vi.fn().mockReturnValue(false) }));
 vi.mock("@/lib/api-auth", () => ({ getCurrentUserId: vi.fn().mockReturnValue(null) }));
 
-import { countClientsByIpInWindow, countTotalClients } from "@/lib/oauth-store";
+import { countClientsByIpInWindow, countTotalClients, registerClient } from "@/lib/oauth-store";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { POST } from "@/app/oauth/register/route";
 
@@ -104,6 +104,73 @@ describe("POST /oauth/register", () => {
   it("returns 400 when redirect_uri uses plain HTTP (non-localhost)", async () => {
     const res = await POST(makeRegisterRequest({ redirect_uris: ["http://evil.com/cb"] }));
     expect(res.status).toBe(400);
+  });
+
+  describe("redirect host allow-list", () => {
+    afterEach(() => {
+      delete process.env.OAUTH_ALLOWED_REDIRECT_HOSTS;
+    });
+
+    it.each([
+      "http://localhost:3000/cb",
+      "https://127.0.0.1/cb",
+      "http://[::1]:8080/cb",
+      "https://claude.ai/api/mcp/auth_callback",
+    ])("accepts %s by default", async (uri) => {
+      const res = await POST(makeRegisterRequest({ redirect_uris: [uri] }));
+      expect(res.status).toBe(201);
+    });
+
+    it.each([
+      "https://evil.example/cb",
+      "https://claude.ai.evil.example/cb",
+      "http://claude.ai/cb",
+      "ftp://localhost/cb",
+      "myapp://localhost/cb",
+    ])("rejects %s by default", async (uri) => {
+      const res = await POST(makeRegisterRequest({ redirect_uris: [uri] }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_client_metadata");
+      expect(registerClient).not.toHaveBeenCalled();
+    });
+
+    it("rejects the whole registration when any one redirect_uri is not allowed", async () => {
+      const res = await POST(makeRegisterRequest({
+        redirect_uris: ["https://claude.ai/cb", "https://evil.example/cb"],
+      }));
+      expect(res.status).toBe(400);
+    });
+
+    it("uses OAUTH_ALLOWED_REDIRECT_HOSTS instead of the default when set", async () => {
+      process.env.OAUTH_ALLOWED_REDIRECT_HOSTS = " Connector.Example , other.example";
+      expect((await POST(makeRegisterRequest({ redirect_uris: ["https://connector.example/cb"] }))).status).toBe(201);
+      expect((await POST(makeRegisterRequest({ redirect_uris: ["https://claude.ai/cb"] }))).status).toBe(400);
+      expect((await POST(makeRegisterRequest({ redirect_uris: ["http://localhost:3000/cb"] }))).status).toBe(201);
+    });
+  });
+
+  describe("grant_types", () => {
+    it("defaults to authorization_code and refresh_token", async () => {
+      const res = await POST(makeRegisterRequest(validBody));
+      expect((await res.json()).grant_types).toEqual(["authorization_code", "refresh_token"]);
+    });
+
+    it("stores only the supported subset of requested grant types", async () => {
+      const res = await POST(makeRegisterRequest({
+        ...validBody,
+        grant_types: ["authorization_code", "client_credentials", "implicit"],
+      }));
+      expect(res.status).toBe(201);
+      expect((await res.json()).grant_types).toEqual(["authorization_code"]);
+      expect(vi.mocked(registerClient).mock.calls[0][0].grant_types).toEqual(["authorization_code"]);
+    });
+
+    it("rejects a registration with no supported grant type", async () => {
+      const res = await POST(makeRegisterRequest({ ...validBody, grant_types: ["client_credentials"] }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_client_metadata");
+      expect(registerClient).not.toHaveBeenCalled();
+    });
   });
 
   it("truncates client_name to 80 characters", async () => {

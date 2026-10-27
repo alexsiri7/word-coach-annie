@@ -6,6 +6,7 @@ import {
   registerClient,
   getClient,
   createAuthCode,
+  findAuthCode,
   consumeAuthCode,
   type ClientRegistration,
 } from "@/lib/oauth-store";
@@ -68,104 +69,75 @@ describe("OAuth Store", () => {
       await prisma.oAuthAuthCode.deleteMany();
     });
 
-    it("creates and consumes an auth code", async () => {
-      const code = await createAuthCode({
-        userId: "user-1",
-        email: "test@example.com",
-        codeChallenge: "challenge123",
-        codeChallengeMethod: "S256",
-        redirectUri: "http://localhost:3000/callback",
-        clientId: "client-1",
+    const codeParams = {
+      userId: "user-1",
+      email: "test@example.com",
+      codeChallenge: "challenge",
+      codeChallengeMethod: "S256",
+      redirectUri: "http://localhost/cb",
+      clientId: "client-1",
+    };
+
+    async function expire(code: string) {
+      await prisma.oAuthAuthCode.update({
+        where: { code },
+        data: { expiresAt: new Date(Date.now() - 1000) },
       });
+    }
+
+    it("creates and finds an auth code without consuming it", async () => {
+      const code = await createAuthCode(codeParams);
 
       expect(code.code).toBeTruthy();
       expect(code.userId).toBe("user-1");
       expect(code.expiresAt).toBeGreaterThan(Date.now());
 
-      const consumed = await consumeAuthCode(code.code);
-      expect(consumed).not.toBeNull();
-      expect(consumed!.userId).toBe("user-1");
-      expect(consumed!.email).toBe("test@example.com");
+      const found = await findAuthCode(code.code);
+      expect(found).not.toBeNull();
+      expect(found!.userId).toBe("user-1");
+      expect(found!.email).toBe("test@example.com");
+      expect(await findAuthCode(code.code)).not.toBeNull();
     });
 
-    it("auth code is single-use (second consumption returns null)", async () => {
-      const code = await createAuthCode({
-        userId: "user-1",
-        email: "test@example.com",
-        codeChallenge: "challenge",
-        codeChallengeMethod: "S256",
-        redirectUri: "http://localhost/cb",
-        clientId: "client-1",
-      });
+    it("auth code is single-use (second consumption returns false)", async () => {
+      const code = await createAuthCode(codeParams);
 
-      const first = await consumeAuthCode(code.code);
-      expect(first).not.toBeNull();
-
-      const second = await consumeAuthCode(code.code);
-      expect(second).toBeNull();
+      expect(await consumeAuthCode(code.code)).toBe(true);
+      expect(await consumeAuthCode(code.code)).toBe(false);
+      expect(await findAuthCode(code.code)).toBeNull();
     });
 
-    it("returns null for nonexistent auth code", async () => {
-      const result = await consumeAuthCode("nonexistent-code");
-      expect(result).toBeNull();
+    it("concurrent consumptions cannot both succeed", async () => {
+      const code = await createAuthCode(codeParams);
+
+      const results = await Promise.all(Array.from({ length: 5 }, () => consumeAuthCode(code.code)));
+      expect(results.filter(Boolean)).toHaveLength(1);
     });
 
-    it("returns null for expired auth code", async () => {
-      const code = await createAuthCode({
-        userId: "user-1",
-        email: "test@example.com",
-        codeChallenge: "challenge",
-        codeChallengeMethod: "S256",
-        redirectUri: "http://localhost/cb",
-        clientId: "client-1",
-      });
-
-      // Manually expire the code in the DB
-      await prisma.oAuthAuthCode.update({
-        where: { code: code.code },
-        data: { expiresAt: new Date(Date.now() - 1000) },
-      });
-
-      const result = await consumeAuthCode(code.code);
-      expect(result).toBeNull();
+    it("returns null / false for nonexistent auth code", async () => {
+      expect(await findAuthCode("nonexistent-code")).toBeNull();
+      expect(await consumeAuthCode("nonexistent-code")).toBe(false);
     });
 
-    it("deletes expired auth code from database even though it returns null", async () => {
-      const code = await createAuthCode({
-        userId: "user-1",
-        email: "test@example.com",
-        codeChallenge: "challenge",
-        codeChallengeMethod: "S256",
-        redirectUri: "http://localhost/cb",
-        clientId: "client-1",
-      });
+    it("does not consume an expired auth code", async () => {
+      const code = await createAuthCode(codeParams);
+      await expire(code.code);
 
-      // Manually expire the code in the DB
-      await prisma.oAuthAuthCode.update({
-        where: { code: code.code },
-        data: { expiresAt: new Date(Date.now() - 1000) },
-      });
+      expect(await consumeAuthCode(code.code)).toBe(false);
+    });
 
-      const result = await consumeAuthCode(code.code);
-      expect(result).toBeNull();
+    it("deletes an expired auth code on lookup", async () => {
+      const code = await createAuthCode(codeParams);
+      await expire(code.code);
 
-      // Confirm the row was cleaned up even though it was expired
+      expect(await findAuthCode(code.code)).toBeNull();
       const row = await prisma.oAuthAuthCode.findUnique({ where: { code: code.code } });
       expect(row).toBeNull();
     });
 
     it("each auth code gets a unique code string", async () => {
-      const params = {
-        userId: "user-1",
-        email: "test@example.com",
-        codeChallenge: "challenge",
-        codeChallengeMethod: "S256",
-        redirectUri: "http://localhost/cb",
-        clientId: "client-1",
-      };
-
-      const code1 = await createAuthCode(params);
-      const code2 = await createAuthCode(params);
+      const code1 = await createAuthCode(codeParams);
+      const code2 = await createAuthCode(codeParams);
       expect(code1.code).not.toBe(code2.code);
     });
   });

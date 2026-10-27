@@ -11,6 +11,26 @@ import { getCurrentUserId } from "@/lib/api-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
+import { env } from "@/lib/env";
+
+const SUPPORTED_GRANT_TYPES = ["authorization_code", "refresh_token"];
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+const DEFAULT_ALLOWED_REDIRECT_HOSTS = "claude.ai";
+
+/**
+ * Loopback redirects (CLI tools) may use http or https; any other host must be
+ * HTTPS and listed in OAUTH_ALLOWED_REDIRECT_HOSTS, so a freely registered
+ * client cannot send authorization codes to an attacker-controlled site.
+ */
+function isAllowedRedirect(uri: URL): boolean {
+  if (LOOPBACK_HOSTS.includes(uri.hostname)) {
+    return uri.protocol === "http:" || uri.protocol === "https:";
+  }
+  const allowedHosts = (env.OAUTH_ALLOWED_REDIRECT_HOSTS?.trim() || DEFAULT_ALLOWED_REDIRECT_HOSTS)
+    .split(",")
+    .map((h) => h.trim().toLowerCase());
+  return uri.protocol === "https:" && allowedHosts.includes(uri.hostname);
+}
 
 /**
  * POST /oauth/register
@@ -105,28 +125,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Allow localhost (CLI tools) and HTTPS (web connectors like Claude.ai)
-    const host = parsed.hostname;
-    const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
-    const isHttps = parsed.protocol === "https:";
-    if (!isLocalhost && !isHttps) {
+    if (!isAllowedRedirect(parsed)) {
       return NextResponse.json(
         {
           error: "invalid_client_metadata",
           error_description:
-            "redirect_uris must use localhost or HTTPS",
+            "redirect_uris must be http(s) loopback or HTTPS on an allowed host",
         },
         { status: 400 }
       );
     }
   }
 
+  const requestedGrantTypes = body.grant_types;
+  const grantTypes = Array.isArray(requestedGrantTypes)
+    ? SUPPORTED_GRANT_TYPES.filter((g) => requestedGrantTypes.includes(g))
+    : SUPPORTED_GRANT_TYPES;
+  if (grantTypes.length === 0) {
+    return NextResponse.json(
+      {
+        error: "invalid_client_metadata",
+        error_description: `grant_types must include one of: ${SUPPORTED_GRANT_TYPES.join(", ")}`,
+      },
+      { status: 400 }
+    );
+  }
+
   const clientId = crypto.randomUUID();
   const rawClientName = typeof body.client_name === "string" ? body.client_name : "Unknown Client";
   const clientName = rawClientName.slice(0, 80);
-  const grantTypes = Array.isArray(body.grant_types)
-    ? (body.grant_types as string[])
-    : ["authorization_code", "refresh_token"];
 
   const registration: ClientRegistration = {
     client_id: clientId,
