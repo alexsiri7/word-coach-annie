@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/controllers/opportunities";
+import { ConflictError } from "@/lib/controllers/opportunities";
+import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
 import { logger } from "@/lib/logger";
 import { Prisma } from "@prisma/client";
 

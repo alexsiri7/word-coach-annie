@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { buildCalendar, type CalendarEvent } from "@/lib/ics";
-import { NotFoundError } from "@/lib/controllers/opportunities";
+import { NotFoundError } from "@/lib/controllers/errors";
 
 export const CALENDAR_NAME = "Annie — submission deadlines";
 
