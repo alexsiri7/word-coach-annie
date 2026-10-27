@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/oauth-store", () => ({
+vi.mock("@/lib/oauth-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/oauth-store")>()),
   registerClient: vi.fn(),
   countClientsByIpInWindow: vi.fn().mockResolvedValue(0),
   countTotalClients: vi.fn().mockResolvedValue(0),

@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/oauth-store", () => ({
+vi.mock("@/lib/oauth-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/oauth-store")>()),
   consumeAuthCode: vi.fn(),
   findAuthCode: vi.fn(),
   getClient: vi.fn(),

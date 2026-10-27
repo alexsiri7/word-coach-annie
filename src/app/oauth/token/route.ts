@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeAuthCode, findAuthCode, getClient } from "@/lib/oauth-store";
+import {
+  consumeAuthCode,
+  findAuthCode,
+  getClient,
+  isGrantType,
+  SUPPORTED_GRANT_TYPES,
+  type GrantType,
+} from "@/lib/oauth-store";
 import {
   createMcpToken,
   verifyMcpToken,
@@ -56,17 +63,19 @@ export async function POST(request: NextRequest) {
   const body = await parseBody(request);
   const grantType = body.grant_type;
 
-  if (grantType === "authorization_code") {
-    return handleAuthorizationCode(body);
-  } else if (grantType === "refresh_token") {
-    return handleRefreshToken(body);
-  } else {
+  if (!isGrantType(grantType)) {
     return errorResponse(
       "unsupported_grant_type",
-      "Supported grant types: authorization_code, refresh_token"
+      `Supported grant types: ${SUPPORTED_GRANT_TYPES.join(", ")}`
     );
   }
+  return GRANT_HANDLERS[grantType](body);
 }
+
+const GRANT_HANDLERS: Record<GrantType, (body: Record<string, string>) => Promise<NextResponse>> = {
+  authorization_code: handleAuthorizationCode,
+  refresh_token: handleRefreshToken,
+};
 
 async function handleAuthorizationCode(body: Record<string, string>) {
   const { code, redirect_uri, client_id, code_verifier } = body;

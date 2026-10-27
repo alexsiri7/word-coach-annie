@@ -5,6 +5,7 @@ import {
   countTotalClients,
   IP_REGISTRATION_LIMIT,
   GLOBAL_CLIENT_LIMIT,
+  SUPPORTED_GRANT_TYPES,
   type ClientRegistration,
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
@@ -13,7 +14,6 @@ import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
 
-const SUPPORTED_GRANT_TYPES = ["authorization_code", "refresh_token"];
 const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 const DEFAULT_ALLOWED_REDIRECT_HOSTS = "claude.ai";
 
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
   const requestedGrantTypes = body.grant_types;
   const grantTypes = Array.isArray(requestedGrantTypes)
     ? SUPPORTED_GRANT_TYPES.filter((g) => requestedGrantTypes.includes(g))
-    : SUPPORTED_GRANT_TYPES;
+    : [...SUPPORTED_GRANT_TYPES];
   if (grantTypes.length === 0) {
     return NextResponse.json(
       {

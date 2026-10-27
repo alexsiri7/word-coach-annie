@@ -15,11 +15,18 @@ export const GLOBAL_CLIENT_LIMIT = parseInt(
   10
 );
 
+export const SUPPORTED_GRANT_TYPES = ["authorization_code", "refresh_token"] as const;
+export type GrantType = (typeof SUPPORTED_GRANT_TYPES)[number];
+
+export function isGrantType(value: unknown): value is GrantType {
+  return SUPPORTED_GRANT_TYPES.some((g) => g === value);
+}
+
 export interface ClientRegistration {
   client_id: string;
   client_name: string;
   redirect_uris: string[];
-  grant_types: string[];
+  grant_types: GrantType[];
   registered_at: number;
 }
 
@@ -78,7 +85,7 @@ export async function getClient(
     client_id: row.id,
     client_name: row.clientName,
     redirect_uris: JSON.parse(row.redirectUris) as string[],
-    grant_types: JSON.parse(row.grantTypes) as string[],
+    grant_types: (JSON.parse(row.grantTypes) as unknown[]).filter(isGrantType),
     registered_at: row.createdAt.getTime(),
   };
 }
