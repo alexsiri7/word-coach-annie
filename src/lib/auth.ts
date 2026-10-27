@@ -11,7 +11,7 @@ import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { authConfigurationProblems } from "../../scripts/auth-configuration.mjs";
-import { MIN_SECRET_LENGTH } from "../../scripts/secret-strength.mjs";
+import { MIN_SECRET_LENGTH, secretStrengthProblems } from "../../scripts/secret-strength.mjs";
 
 const SESSION_COOKIE_NAME = "annie_session";
 const REFRESH_COOKIE_NAME = "annie_refresh";
@@ -45,7 +45,7 @@ export function resolveJwtSecret(): string {
     const secret = env.JWT_SECRET;
     const requirement = `Set JWT_SECRET to a random string of at least ${MIN_SECRET_LENGTH} characters.`;
     if (secret) {
-        if (secret.length < MIN_SECRET_LENGTH) {
+        if (secretStrengthProblems({ JWT_SECRET: secret }).length > 0) {
             throw new Error(`JWT_SECRET is too short. ${requirement}`);
         }
         return secret;

@@ -4,9 +4,9 @@
  * JWT_SECRET signs session cookies, API_TOKEN authenticates API/MCP requests
  * and ENCRYPTION_KEY seeds the at-rest key for stored AI API keys; a short
  * value lets one captured token or ciphertext be cracked offline. Unset (or
- * empty) secrets are other gates' concern. MIN_SECRET_LENGTH is also enforced
- * by resolveJwtSecret() in src/lib/auth.ts. Keep it import-free: the Edge
- * middleware bundles auth.ts.
+ * empty) secrets are other gates' concern. resolveJwtSecret() in
+ * src/lib/auth.ts also applies this check to JWT_SECRET. Keep it import-free:
+ * the Edge middleware bundles auth.ts.
  */
 export const MIN_SECRET_LENGTH = 32;
 
