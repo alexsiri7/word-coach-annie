@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { clearClientData } from "@/lib/offline/clear-client-data";
+import { RATE_LIMITS } from "@/lib/rate-limit-config";
 
 export interface AuthUser {
     userId: string;
@@ -22,7 +23,7 @@ const SILENT_RENEW_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes
 
 // /api/auth/me shares the 5-per-minute per-IP auth rate limit with login and refresh,
 // and UserMenu remounts on every page, so a tab reuses a signed-in answer for one window.
-export const CURRENT_USER_CACHE_MS = 60 * 1000;
+const CURRENT_USER_CACHE_MS = RATE_LIMITS.auth.windowMs;
 
 interface CurrentUser {
     authenticated: boolean;
