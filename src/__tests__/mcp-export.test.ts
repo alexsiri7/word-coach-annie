@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { exportManuscript, exportStoryBible, exportHashnode, getProjectSummary, exportUniverse } from "@/mcp/tools/export";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
@@ -216,6 +217,16 @@ describe("MCP Export Tools", () => {
             const md = await exportHashnode(projectId, ch.id);
             expect(md).toContain("My Article");
             expect(md).toContain("Specific content");
+        });
+
+        it("escapes title and synopsis so they cannot inject front-matter keys", async () => {
+            const title = 'Foo"\ntags: [evil]\n---\n<script>x</script>';
+            const synopsis = 'Say "hi"\nslug: hijacked';
+            const ch = await StructureController.createNode({ projectId, type: "CHAPTER", title, synopsis });
+
+            const md = await exportHashnode(projectId, ch.id);
+            const [, frontMatter] = md.split(/^---$/m);
+            expect(parseYaml(frontMatter)).toEqual({ title, description: synopsis });
         });
 
         it("returns empty for project with no scenes", async () => {
