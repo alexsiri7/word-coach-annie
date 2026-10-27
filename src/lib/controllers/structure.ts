@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
-import { assertValidParent } from "@/lib/node-tree";
+import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex } from "@/schemas/nodes";
 
 export class ConflictError extends Error {
@@ -38,13 +38,8 @@ async function pruneSceneVersions(tx: DbClient, nodeId: string) {
 
 // Row-locks the scene until the transaction commits, serializing every
 // version write to it so a hash check can't be overtaken before its insert.
-// Bumps the project first: every transaction writing both rows locks
-// project-then-node (cf. assertValidParent), or two of them can deadlock.
 async function lockSceneNode(tx: DbClient, projectId: string, nodeId: string) {
-    await tx.project.update({
-        where: { id: projectId },
-        data: { updatedAt: new Date() },
-    });
+    await lockProject(tx, projectId);
     await tx.structureNode.update({
         where: { id: nodeId },
         data: { updatedAt: new Date() },
@@ -323,10 +318,7 @@ export class StructureController {
         }
 
         const node = await prisma.$transaction(async (tx) => {
-            await tx.project.update({
-                where: { id: existing.projectId },
-                data: { updatedAt: new Date() },
-            });
+            await lockProject(tx, existing.projectId);
             if (data.parentId !== undefined && data.parentId !== null) await assertValidParent(tx, existing, data.parentId);
             return tx.structureNode.update({
                 where: { id: nodeId },

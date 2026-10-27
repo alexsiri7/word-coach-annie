@@ -24,14 +24,26 @@ async function isDescendant(
   return false;
 }
 
+/**
+ * Row-locks the project until `tx` commits. Every transaction that writes both
+ * a project row and a structureNode row calls this before touching the node,
+ * so they all lock project-then-node; mixing orders lets two of them deadlock.
+ */
+export async function lockProject(tx: DbClient, projectId: string): Promise<void> {
+  await tx.project.update({
+    where: { id: projectId },
+    data: { updatedAt: new Date() },
+  });
+}
+
 export class InvalidParentError extends Error {}
 
 /**
  * Throws InvalidParentError unless `parentId` is a node in the same project
  * that is neither `node` nor one of its descendants.
  *
- * Row-locks the project until `tx` commits, serializing re-parents within it:
- * the descendant walk reads other nodes' parentIds, so two concurrent
+ * Locks the project (see lockProject), serializing re-parents within it: the
+ * descendant walk reads other nodes' parentIds, so two concurrent
  * re-parents (A under B, B under A) would each pass against the other's stale
  * parent and together form a cycle. Write the new parentId inside the same
  * transaction.
@@ -43,10 +55,7 @@ export async function assertValidParent(
 ): Promise<void> {
   if (parentId === node.id) throw new InvalidParentError("A node cannot be its own parent");
 
-  await tx.project.update({
-    where: { id: node.projectId },
-    data: { updatedAt: new Date() },
-  });
+  await lockProject(tx, node.projectId);
 
   const parent = await tx.structureNode.findFirst({
     where: { id: parentId, projectId: node.projectId },
