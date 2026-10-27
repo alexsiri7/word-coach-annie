@@ -20,6 +20,7 @@ import {
   type Opportunity, type OpportunityCandidate,
 } from "@/lib/opportunity-state";
 import { OpportunityStateBadge } from "@/components/opportunity-state-badge";
+import { safeHref } from "@/lib/http-url";
 import { CandidateState, OpportunityStatus } from "@/schemas/opportunities";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
@@ -225,6 +226,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
   );
   const active = opportunity?.candidates.filter((c) => c.state !== "dropped") ?? [];
   const dropped = opportunity?.candidates.filter((c) => c.state === "dropped") ?? [];
+  const rulesHref = safeHref(opportunity?.rulesUrl);
 
   function renderCandidate(candidate: OpportunityCandidate) {
     return (
@@ -336,9 +338,9 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
                   {closeCountdown(daysUntilClose(opportunity.closeDate, now))}
                 </p>
                 <OpportunityStateBadge state={deriveOpportunityState(opportunity, now)} />
-                {opportunity.rulesUrl && (
+                {rulesHref && (
                   <a
-                    href={opportunity.rulesUrl}
+                    href={rulesHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-accent hover:underline"

@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { HttpUrl } from "@/schemas/http-url";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
@@ -1003,7 +1004,7 @@ server.tool(
     "Create a new submission provider — a publication or contest-running organization you submit stories to.",
     {
         name: z.string().describe("Provider name"),
-        website: z.string().optional().describe("Provider website URL"),
+        website: HttpUrl.optional().describe("Provider website URL"),
         notes: z.string().optional().describe("Additional notes about this provider"),
     },
     async (params) =>
@@ -1016,7 +1017,7 @@ server.tool(
     {
         providerId: z.string().describe("The provider ID to update"),
         name: z.string().optional().describe("New provider name"),
-        website: z.string().optional().describe("New website URL"),
+        website: HttpUrl.optional().describe("New website URL"),
         notes: z.string().optional().describe("New notes"),
     },
     async (params) =>
@@ -1060,7 +1061,7 @@ server.tool(
         contestName: z.string().describe("Name of the contest"),
         submissionDate: z.string().describe("ISO 8601 date/time the story was submitted"),
         reviewDate: z.string().optional().describe("ISO 8601 date/time the submission was/will be reviewed"),
-        submissionUrl: z.string().optional().describe("URL of the submission or contest listing"),
+        submissionUrl: HttpUrl.optional().describe("URL of the submission or contest listing"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("Submission status (default \"submitted\")"),
     },
     async (params) =>
@@ -1079,7 +1080,7 @@ server.tool(
         contestName: z.string().optional().describe("New contest name"),
         submissionDate: z.string().optional().describe("New ISO 8601 submission date/time"),
         reviewDate: z.string().optional().describe("New ISO 8601 review date/time"),
-        submissionUrl: z.string().optional().describe("New submission URL"),
+        submissionUrl: HttpUrl.optional().describe("New submission URL"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("New submission status"),
     },
     async ({ submissionId, ...data }) =>
@@ -1137,7 +1138,7 @@ server.tool(
         title: z.string().describe("Opportunity title"),
         closeDate: z.string().describe("ISO 8601 date/time submissions close"),
         reviewDate: z.string().optional().describe("ISO 8601 date/time results are expected"),
-        rulesUrl: z.string().optional().describe("URL of the rules or call for submissions"),
+        rulesUrl: HttpUrl.optional().describe("URL of the rules or call for submissions"),
         entryFee: z.string().optional().describe("Entry fee as free text, e.g. \"£10\" or \"free for subscribers\""),
         wordLimit: z.number().optional().describe("Maximum word count accepted"),
         lineLimit: z.number().optional().describe("Maximum line count accepted"),
@@ -1158,7 +1159,7 @@ server.tool(
         title: z.string().optional().describe("New title"),
         closeDate: z.string().optional().describe("New ISO 8601 close date/time"),
         reviewDate: z.string().nullable().optional().describe("New ISO 8601 review date/time, or null to clear it"),
-        rulesUrl: z.string().nullable().optional().describe("New rules URL, or null to clear it"),
+        rulesUrl: HttpUrl.nullable().optional().describe("New rules URL, or null to clear it"),
         entryFee: z.string().nullable().optional().describe("New entry fee, or null to clear it"),
         wordLimit: z.number().nullable().optional().describe("New word limit, or null to clear it"),
         lineLimit: z.number().nullable().optional().describe("New line limit, or null to clear it"),
