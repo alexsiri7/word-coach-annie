@@ -243,6 +243,16 @@ describe("StructureController", () => {
                 ).rejects.toThrow("Content can only be written to SCENE nodes");
             });
 
+            it("does not deadlock against concurrent updateNode calls on the same scene", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S" });
+                const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) =>
+                    i % 2
+                        ? StructureController.writeSceneContent(scene.id, `<p>Draft ${i}</p>`)
+                        : StructureController.updateNode(scene.id, { title: `Title ${i}` })
+                ));
+                expect(results.filter((r) => r.status === "rejected")).toEqual([]);
+            });
+
             it("throws for malformed beat content", async () => {
                 const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
                 await expect(

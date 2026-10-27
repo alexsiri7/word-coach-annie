@@ -38,7 +38,13 @@ async function pruneSceneVersions(tx: DbClient, nodeId: string) {
 
 // Row-locks the scene until the transaction commits, serializing every
 // version write to it so a hash check can't be overtaken before its insert.
-async function lockSceneNode(tx: DbClient, nodeId: string) {
+// Bumps the project first: every transaction writing both rows locks
+// project-then-node (cf. assertValidParent), or two of them can deadlock.
+async function lockSceneNode(tx: DbClient, projectId: string, nodeId: string) {
+    await tx.project.update({
+        where: { id: projectId },
+        data: { updatedAt: new Date() },
+    });
     await tx.structureNode.update({
         where: { id: nodeId },
         data: { updatedAt: new Date() },
@@ -461,7 +467,7 @@ export class StructureController {
         const wordCount = countSceneWords(content);
 
         const version = await prisma.$transaction(async (tx) => {
-            await lockSceneNode(tx, nodeId);
+            await lockSceneNode(tx, node.projectId, nodeId);
 
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
@@ -477,15 +483,9 @@ export class StructureController {
                 }
             }
 
-            const [newVersion] = await Promise.all([
-                tx.contentVersion.create({
-                    data: { nodeId, content, wordCount },
-                }),
-                tx.project.update({
-                    where: { id: node.projectId },
-                    data: { updatedAt: new Date() },
-                }),
-            ]);
+            const newVersion = await tx.contentVersion.create({
+                data: { nodeId, content, wordCount },
+            });
 
             await pruneSceneVersions(tx, nodeId);
 
@@ -548,17 +548,11 @@ export class StructureController {
         const content = sanitizeHtml(oldVersion.content);
 
         const newVersion = await prisma.$transaction(async (tx) => {
-            await lockSceneNode(tx, nodeId);
+            await lockSceneNode(tx, node.projectId, nodeId);
 
-            const [created] = await Promise.all([
-                tx.contentVersion.create({
-                    data: { nodeId, content, wordCount: countSceneWords(content) },
-                }),
-                tx.project.update({
-                    where: { id: node.projectId },
-                    data: { updatedAt: new Date() },
-                }),
-            ]);
+            const created = await tx.contentVersion.create({
+                data: { nodeId, content, wordCount: countSceneWords(content) },
+            });
 
             await pruneSceneVersions(tx, nodeId);
 
