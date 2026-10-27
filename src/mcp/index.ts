@@ -1067,7 +1067,7 @@ server.tool(
     async (params) =>
         mcpRun("create_contest_submission", "Error creating contest submission", async () => {
             await verifyProjectOwnership(params.projectId, userId);
-            return createContestSubmission(params);
+            return createContestSubmission({ ...params, userId });
         })
 );
 
@@ -1086,7 +1086,7 @@ server.tool(
     async ({ submissionId, ...data }) =>
         mcpRun("update_contest_submission", "Error updating contest submission", async () => {
             await verifyProjectOwnership(await getProjectIdForContestSubmission(submissionId), userId);
-            return updateContestSubmission({ submissionId, ...data });
+            return updateContestSubmission({ submissionId, userId, ...data });
         })
 );
 

@@ -8,7 +8,7 @@ import { sanitizeInput } from "@/lib/sanitize-server";
 import { logger } from "@/lib/logger";
 
 type SubmissionResolution =
-    | { ok: true; id: string }
+    | { ok: true; id: string; userId: string | null }
     | { ok: false; response: NextResponse };
 
 async function resolveContestSubmission(
@@ -26,7 +26,7 @@ async function resolveContestSubmission(
     const userId = getCurrentUserId(request);
     const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return { ok: false, response: access.response };
-    return { ok: true, id: submissionId };
+    return { ok: true, id: submissionId, userId };
 }
 
 export async function PATCH(
@@ -36,7 +36,7 @@ export async function PATCH(
     try {
         const resolved = await resolveContestSubmission(request, params);
         if (!resolved.ok) return resolved.response;
-        const { id } = resolved;
+        const { id, userId } = resolved;
 
         const body = await request.json().catch(() => null);
         if (body === null) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -54,7 +54,7 @@ export async function PATCH(
         if (data.contestName !== undefined) data.contestName = sanitizeInput(data.contestName);
         if (data.submissionUrl !== undefined) data.submissionUrl = sanitizeInput(data.submissionUrl);
 
-        const submission = await ContestSubmissionController.updateContestSubmission(id, data);
+        const submission = await ContestSubmissionController.updateContestSubmission(id, userId, data);
         return NextResponse.json(submission);
     } catch (error) {
         if (error instanceof NotFoundError) {

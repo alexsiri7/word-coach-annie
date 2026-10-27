@@ -31,10 +31,12 @@ describe("Contest submission provider ownership", () => {
   let victimProviderId: string;
 
   beforeEach(async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue("attacker");
     await testPrisma.user.createMany({
       data: [
         { id: "attacker", email: "attacker@test.com", googleId: "g-attacker" },
         { id: "victim", email: "victim@test.com", googleId: "g-victim" },
+        { id: "editor", email: "editor@test.com", googleId: "g-editor" },
       ],
     });
     const project = await testPrisma.project.create({
@@ -88,5 +90,24 @@ describe("Contest submission provider ownership", () => {
   it("returns 404 for a provider that does not exist", async () => {
     const res = await create("no-such-provider");
     expect(res.status).toBe(404);
+  });
+
+  it("lets an editor of the project cite their own provider, but still not a third user's", async () => {
+    vi.mocked(getCurrentUserId).mockReturnValue("editor");
+    const editorProviderId = (await testPrisma.provider.create({ data: { name: "Editor's", userId: "editor" } })).id;
+
+    const created = await create(editorProviderId);
+    expect(created.status).toBe(201);
+    const { id: submissionId } = await created.json();
+
+    const patch = (providerId: string) =>
+      PATCH(
+        jsonRequest("PATCH", `/api/projects/${projectId}/submissions/contests/${submissionId}`, { providerId }),
+        { params: Promise.resolve({ id: projectId, submissionId }) }
+      );
+    expect((await patch(ownProviderId)).status).toBe(200);
+    expect((await patch(editorProviderId)).status).toBe(200);
+    expect((await patch(victimProviderId)).status).toBe(403);
+    expect((await create(victimProviderId)).status).toBe(403);
   });
 });

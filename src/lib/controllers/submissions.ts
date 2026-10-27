@@ -1,6 +1,6 @@
 import { prisma, type DbClient } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
+import { requireOwnedProvider } from "@/lib/controllers/provider-ownership";
 
 // ── Provider ────────────────────────────────────────────────────────────
 // Ownership follows the same convention as Opportunity: a null userId is the
@@ -107,20 +107,6 @@ function serializeContestSubmission(s: ContestSubmissionWithProvider) {
     };
 }
 
-/**
- * A submission may only cite a provider its project's owner owns: the reference is
- * `onDelete: Restrict`, so citing someone else's provider would block them from
- * deleting it. An unowned (single-user) project is unscoped, as for providers.
- */
-async function requireProviderOwnedBy(client: DbClient, providerId: string, ownerId: string | null) {
-    const provider = await client.provider.findUnique({
-        where: { id: providerId },
-        select: { id: true, userId: true },
-    });
-    if (!provider) throw new NotFoundError(`Provider not found: ${providerId}`);
-    if (ownerId && provider.userId !== ownerId) throw new ForbiddenError("Forbidden");
-}
-
 export class ContestSubmissionController {
     static async listContestSubmissions(params: { projectId: string }) {
         const project = await prisma.project.findUnique({
@@ -142,6 +128,8 @@ export class ContestSubmissionController {
     /** `client` lets a caller enrol this write in its own transaction. */
     static async createContestSubmission(
         params: {
+            /** The acting user, who may be an editor rather than the project's owner. */
+            userId: string | null;
             projectId: string;
             providerId: string;
             contestName: string;
@@ -158,7 +146,7 @@ export class ContestSubmissionController {
         });
         if (!project) throw new Error(`Project not found: ${params.projectId}`);
 
-        await requireProviderOwnedBy(client, params.providerId, project.userId);
+        await requireOwnedProvider(params.providerId, project.userId, { client, callerId: params.userId });
 
         const submission = await client.contestSubmission.create({
             data: {
@@ -178,6 +166,7 @@ export class ContestSubmissionController {
 
     static async updateContestSubmission(
         id: string,
+        userId: string | null,
         data: {
             providerId?: string;
             contestName?: string;
@@ -194,7 +183,7 @@ export class ContestSubmissionController {
         if (!existing) throw new Error(`Contest submission not found: ${id}`);
 
         if (data.providerId) {
-            await requireProviderOwnedBy(prisma, data.providerId, existing.project.userId);
+            await requireOwnedProvider(data.providerId, existing.project.userId, { callerId: userId });
         }
 
         const submission = await prisma.contestSubmission.update({

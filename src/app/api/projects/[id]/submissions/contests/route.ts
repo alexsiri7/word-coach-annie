@@ -44,6 +44,7 @@ export async function POST(
         if (!access.authorized) return access.response;
 
         const submission = await ContestSubmissionController.createContestSubmission({
+            userId,
             projectId,
             providerId: parsed.data.providerId,
             contestName: sanitizeInput(parsed.data.contestName),

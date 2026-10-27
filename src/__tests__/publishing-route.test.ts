@@ -136,12 +136,14 @@ describe("GET /api/publishing", () => {
 
     it("orders contest submissions with the most recent first", async () => {
         await ContestSubmissionController.createContestSubmission({
+            userId,
             projectId,
             providerId,
             contestName: "Older Prize",
             submissionDate: "2026-01-01T00:00:00.000Z",
         });
         await ContestSubmissionController.createContestSubmission({
+            userId,
             projectId,
             providerId,
             contestName: "Newer Prize",
