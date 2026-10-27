@@ -20,6 +20,41 @@ export interface AuthState {
 
 const SILENT_RENEW_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes
 
+// /api/auth/me shares the 5-per-minute per-IP auth rate limit with login and refresh,
+// and UserMenu remounts on every page, so a tab reuses a signed-in answer for one window.
+const CURRENT_USER_CACHE_MS = 60 * 1000;
+
+interface CurrentUser {
+    authenticated: boolean;
+    user: AuthUser | null;
+}
+
+let cachedCurrentUser: { fetchedAt: number; result: Promise<CurrentUser> } | null = null;
+
+async function requestCurrentUser(): Promise<CurrentUser> {
+    try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) return { authenticated: false, user: null };
+        const data = await res.json();
+        return { authenticated: data.authenticated, user: data.user || null };
+    } catch {
+        return { authenticated: false, user: null };
+    }
+}
+
+export function fetchCurrentUser({ fresh = false } = {}): Promise<CurrentUser> {
+    const now = Date.now();
+    if (!fresh && cachedCurrentUser && now - cachedCurrentUser.fetchedAt < CURRENT_USER_CACHE_MS) {
+        return cachedCurrentUser.result;
+    }
+    const entry = { fetchedAt: now, result: requestCurrentUser() };
+    cachedCurrentUser = entry;
+    entry.result.then(({ authenticated }) => {
+        if (!authenticated && cachedCurrentUser === entry) cachedCurrentUser = null;
+    });
+    return entry.result;
+}
+
 export function useAuth(): AuthState {
     const [authenticated, setAuthenticated] = useState(false);
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -46,24 +81,14 @@ export function useAuth(): AuthState {
         }
     }, []);
 
-    const refresh = useCallback(async () => {
-        try {
-            const res = await fetch("/api/auth/me");
-            if (res.ok) {
-                const data = await res.json();
-                setAuthenticated(data.authenticated);
-                setUser(data.user || null);
-            } else {
-                setAuthenticated(false);
-                setUser(null);
-            }
-        } catch {
-            setAuthenticated(false);
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
+    const load = useCallback(async (fresh: boolean) => {
+        const current = await fetchCurrentUser({ fresh });
+        setAuthenticated(current.authenticated);
+        setUser(current.user);
+        setLoading(false);
     }, []);
+
+    const refresh = useCallback(() => load(true), [load]);
 
     const logout = useCallback(async () => {
         clearRenewTimer();
@@ -75,8 +100,8 @@ export function useAuth(): AuthState {
     }, [clearRenewTimer]);
 
     useEffect(() => {
-        refresh();
-    }, [refresh]);
+        load(false);
+    }, [load]);
 
     // Start interval when authenticated; cleanup clears it on unmount or when auth changes.
     useEffect(() => {
