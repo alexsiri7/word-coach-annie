@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HttpUrl } from "./http-url";
 
 export const OpportunityStatus = z.enum(["found", "considering", "closed"]);
 export const CandidateState = z.enum(["candidate", "chosen", "dropped"]);
@@ -9,7 +10,7 @@ export const OpportunityCreateSchema = z.object({
     title: z.string().min(1, "title is required"),
     closeDate: z.iso.datetime({ message: "closeDate must be ISO 8601" }),
     reviewDate: z.iso.datetime({ message: "reviewDate must be ISO 8601" }).optional(),
-    rulesUrl: z.string().optional(),
+    rulesUrl: HttpUrl.optional(),
     entryFee: z.string().optional(),
     wordLimit: z.number().int().positive().optional(),
     lineLimit: z.number().int().positive().optional(),
@@ -26,7 +27,7 @@ export const OpportunityUpdateSchema = z.object({
     title: z.string().min(1, "title must be non-empty").optional(),
     closeDate: z.iso.datetime({ message: "closeDate must be ISO 8601" }).optional(),
     reviewDate: z.iso.datetime({ message: "reviewDate must be ISO 8601" }).nullable().optional(),
-    rulesUrl: z.string().nullable().optional(),
+    rulesUrl: HttpUrl.nullable().optional(),
     entryFee: z.string().nullable().optional(),
     wordLimit: z.number().int().positive().nullable().optional(),
     lineLimit: z.number().int().positive().nullable().optional(),

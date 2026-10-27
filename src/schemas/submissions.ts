@@ -1,17 +1,18 @@
 import { z } from "zod";
+import { HttpUrl } from "./http-url";
 
 export const SubmissionStatus = z.enum(["submitted", "accepted", "rejected", "withdrawn"]);
 
 // Provider
 export const ProviderCreateSchema = z.object({
     name: z.string().min(1, "name is required"),
-    website: z.string().optional(),
+    website: HttpUrl.optional(),
     notes: z.string().optional(),
 });
 
 export const ProviderUpdateSchema = z.object({
     name: z.string().min(1, "name must be non-empty").optional(),
-    website: z.string().optional(),
+    website: HttpUrl.optional(),
     notes: z.string().optional(),
 });
 
@@ -21,7 +22,7 @@ export const ContestSubmissionCreateSchema = z.object({
     contestName: z.string().min(1, "contestName is required"),
     submissionDate: z.iso.datetime({ message: "submissionDate must be ISO 8601" }),
     reviewDate: z.iso.datetime({ message: "reviewDate must be ISO 8601" }).optional(),
-    submissionUrl: z.string().optional(),
+    submissionUrl: HttpUrl.optional(),
     status: SubmissionStatus.optional().default("submitted"),
 });
 
@@ -30,7 +31,7 @@ export const ContestSubmissionUpdateSchema = z.object({
     contestName: z.string().min(1, "contestName must be non-empty").optional(),
     submissionDate: z.iso.datetime().optional(),
     reviewDate: z.iso.datetime().optional(),
-    submissionUrl: z.string().optional(),
+    submissionUrl: HttpUrl.optional(),
     status: SubmissionStatus.optional(),
 });
 

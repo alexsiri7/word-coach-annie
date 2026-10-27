@@ -411,6 +411,20 @@ describe("MCP Opportunity Tools", () => {
             expect(promoted.submissionId).toBe(submission.id);
         });
 
+        it("leaves out a stored rulesUrl that is not an http(s) URL", async () => {
+            await prisma.opportunity.update({ where: { id: opportunityId }, data: { rulesUrl: "javascript:alert(1)" } });
+            const candidate = await createOpportunityCandidate({
+                opportunityId,
+                userId,
+                projectId,
+                state: "chosen",
+            });
+
+            const { submission } = await promoteOpportunityCandidate(candidate.id, userId);
+
+            expect(submission.submissionUrl).toBe("");
+        });
+
         it("keeps the candidate record as the link between the piece and the opportunity", async () => {
             const candidate = await createOpportunityCandidate({
                 opportunityId,

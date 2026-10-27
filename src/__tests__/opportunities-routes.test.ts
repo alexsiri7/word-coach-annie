@@ -319,6 +319,12 @@ describe("Opportunity API routes", () => {
         expect((await res.json()).error).toContain("closeDate");
     });
 
+    it("returns 400 when rulesUrl is not an http(s) URL", async () => {
+        const res = await createOpportunityViaApi({ rulesUrl: "javascript:alert(1)" });
+        expect(res.status).toBe(400);
+        expect(await prisma.opportunity.count()).toBe(0);
+    });
+
     it("strips markup from free-text fields", async () => {
         const res = await createOpportunityViaApi({
             title: "<script>alert(1)</script>Spring Prize",
@@ -405,6 +411,18 @@ describe("Opportunity API routes", () => {
         const { PATCH } = await import("@/app/api/opportunities/[id]/route");
         const res = await PATCH(jsonRequest("PATCH", {}), { params: Promise.resolve({ id: created.id }) });
         expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when a patch sets rulesUrl to a non-http(s) URL", async () => {
+        const created = await (await createOpportunityViaApi({ rulesUrl: "https://example.com/rules" })).json();
+        const { PATCH } = await import("@/app/api/opportunities/[id]/route");
+        const res = await PATCH(jsonRequest("PATCH", { rulesUrl: "javascript:alert(1)" }), {
+            params: Promise.resolve({ id: created.id }),
+        });
+        expect(res.status).toBe(400);
+        expect((await prisma.opportunity.findUnique({ where: { id: created.id } }))?.rulesUrl).toBe(
+            "https://example.com/rules"
+        );
     });
 
     it("patches and deletes an opportunity", async () => {

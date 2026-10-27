@@ -313,7 +313,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Failed to save. Please try again.");
       const saved = await res.json();
       if (contestDialogMode === "create") {
         setContestSubmissions((prev) => [...prev, saved]);
@@ -325,7 +325,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       setContestDialogOpen(false);
     } catch (err) {
       console.error("[submissions/page] handleSaveContest failed", err);
-      setContestError("Failed to save. Please try again.");
+      setContestError(err instanceof Error ? err.message : "Failed to save. Please try again.");
     } finally {
       setContestSaving(false);
     }
