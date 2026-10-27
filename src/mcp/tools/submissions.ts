@@ -58,6 +58,7 @@ export async function listContestSubmissions(params: { projectId: string }) {
 }
 
 export async function createContestSubmission(params: {
+    userId: string | null;
     projectId: string;
     providerId: string;
     contestName: string;
@@ -72,6 +73,7 @@ export async function createContestSubmission(params: {
 }
 
 export async function updateContestSubmission(params: {
+    userId: string | null;
     submissionId: string;
     providerId?: string;
     contestName?: string;
@@ -80,11 +82,11 @@ export async function updateContestSubmission(params: {
     submissionUrl?: string;
     status?: string;
 }) {
-    const { submissionId, ...data } = params;
+    const { submissionId, userId, ...data } = params;
     if (Object.keys(data).length === 0) {
         throw new Error("No fields provided to update — at least one optional field must be supplied.");
     }
-    const result = await ContestSubmissionController.updateContestSubmission(submissionId, data);
+    const result = await ContestSubmissionController.updateContestSubmission(submissionId, userId, data);
     mcpCache.invalidatePrefix(`contestSubmissions:${result.projectId}`);
     return result;
 }

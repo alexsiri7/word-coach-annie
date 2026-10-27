@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
+import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
+import { requireOwnedProvider } from "@/lib/controllers/provider-ownership";
 import { safeHref } from "@/lib/http-url";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
-export class NotFoundError extends Error {}
-export class ForbiddenError extends Error {}
 /** The row exists and is owned, but its current state forbids the operation. */
 export class ConflictError extends Error {}
 
@@ -90,15 +90,6 @@ async function requireOwnedOpportunity(id: string, userId: string | null) {
     if (!existing) throw new NotFoundError(`Opportunity not found: ${id}`);
     if (userId && existing.userId !== userId) throw new ForbiddenError("Forbidden");
     return existing;
-}
-
-async function requireOwnedProvider(providerId: string, userId: string | null) {
-    const provider = await prisma.provider.findUnique({
-        where: { id: providerId },
-        select: { id: true, userId: true },
-    });
-    if (!provider) throw new NotFoundError(`Provider not found: ${providerId}`);
-    if (userId && provider.userId !== userId) throw new ForbiddenError("Forbidden");
 }
 
 async function requireOwnedProject(projectId: string, userId: string | null) {
@@ -383,6 +374,7 @@ export class OpportunityCandidateController {
         const { promoted, submission } = await prisma.$transaction(async (tx) => {
             const submission = await ContestSubmissionController.createContestSubmission(
                 {
+                    userId,
                     projectId: candidate.projectId,
                     providerId: opportunity.providerId,
                     contestName: opportunity.title,

@@ -108,6 +108,32 @@ describe("Writing Tasks API", () => {
       expect((await res.json()).error).toBe("sceneId requires projectId");
     });
 
+    it("returns 404 for a sceneId from another project and leaks no scene title", async () => {
+      const other = await testPrisma.project.create({ data: { title: "Other", author: "Someone" } });
+      const foreignScene = await testPrisma.structureNode.create({
+        data: { projectId: other.id, type: "SCENE", title: "Secret scene title", orderIndex: 0 },
+      });
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", { projectId, sceneId: foreignScene.id, name: "Peek" })
+      );
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(await res.json())).not.toContain("Secret scene title");
+      expect(await testPrisma.writingTask.count()).toBe(0);
+    });
+
+    it("links a sceneId from the same project", async () => {
+      const scene = await testPrisma.structureNode.create({
+        data: { projectId, type: "SCENE", title: "Opening", orderIndex: 0 },
+      });
+      const { POST } = await import("@/app/api/writing-tasks/route");
+      const res = await POST(
+        makePostRequest("/api/writing-tasks", { projectId, sceneId: scene.id, name: "Revise" })
+      );
+      expect(res.status).toBe(201);
+      expect((await res.json()).scene).toEqual({ id: scene.id, title: "Opening" });
+    });
+
     it("returns 401 for a practice task when Google auth is on and no user", async () => {
       vi.mocked(isGoogleAuthMode).mockReturnValueOnce(true);
       const { POST } = await import("@/app/api/writing-tasks/route");

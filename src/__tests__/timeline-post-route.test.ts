@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => "user-1"),
   verifyUniverseAccess: vi.fn(async () => ({ authorized: true })),
+  verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+import { verifyProjectWriteAccess } from "@/lib/api-auth";
 import { UniversesController } from "@/lib/controllers/universes";
 import { POST } from "@/app/api/world-objects/[id]/timeline/route";
 
@@ -87,5 +89,22 @@ describe("POST /api/world-objects/[id]/timeline — Zod validation", () => {
       mockParams
     );
     expect(res.status).toBe(400);
+  });
+
+  it("rejects a projectId the caller cannot write to", async () => {
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValueOnce({
+      authorized: false,
+      response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    });
+    const res = await POST(makeRequest({ label: "Event", projectId: "someone-elses" }), mockParams);
+    expect(res.status).toBe(403);
+    expect(verifyProjectWriteAccess).toHaveBeenCalledWith("someone-elses", "user-1", null);
+    expect(UniversesController.addTimelineEntry).not.toHaveBeenCalled();
+  });
+
+  it("skips the project check when no projectId is given", async () => {
+    const res = await POST(makeRequest({ label: "Event" }), mockParams);
+    expect(res.status).toBe(200);
+    expect(verifyProjectWriteAccess).not.toHaveBeenCalled();
   });
 });

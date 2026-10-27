@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
-import { getCurrentUserId, verifyUniverseAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectWriteAccess, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { TimelineEntryCreateSchema } from "@/schemas/timeline";
 
@@ -51,6 +51,14 @@ export async function POST(
                 { error: parsed.error.issues[0].message },
                 { status: 400 }
             );
+        }
+        if (parsed.data.projectId) {
+            const projectAccess = await verifyProjectWriteAccess(
+                parsed.data.projectId,
+                userId,
+                request.headers.get("x-user-email")
+            );
+            if (!projectAccess.authorized) return projectAccess.response;
         }
         const entry = await UniversesController.addTimelineEntry({
             ...parsed.data,

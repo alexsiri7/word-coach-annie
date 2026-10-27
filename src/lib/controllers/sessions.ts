@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { NotFoundError } from "@/lib/controllers/errors";
 
 export interface CreateSessionInput {
   projectId: string;
@@ -24,6 +25,7 @@ export interface HeatmapDay {
 
 export class SessionsController {
   static async createSession(input: CreateSessionInput) {
+    if (input.nodeId) await requireProjectNode(input.projectId, input.nodeId);
     const date = input.date ?? new Date().toISOString().slice(0, 10);
     return prisma.writingSession.create({
       data: {
@@ -78,6 +80,14 @@ export class SessionsController {
 
     return aggregateHeatmap(sessions, days);
   }
+}
+
+async function requireProjectNode(projectId: string, nodeId: string) {
+  const node = await prisma.structureNode.findFirst({
+    where: { id: nodeId, projectId },
+    select: { id: true },
+  });
+  if (!node) throw new NotFoundError(`Node not found in project: ${nodeId}`);
 }
 
 function aggregateHeatmap(

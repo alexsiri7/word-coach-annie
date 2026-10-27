@@ -109,6 +109,7 @@ describe("MCP Submission Tools", () => {
 
         it("creates and lists contest submissions for a project", async () => {
             await createContestSubmission({
+                userId,
                 projectId,
                 providerId,
                 contestName: "Big Contest",
@@ -122,29 +123,32 @@ describe("MCP Submission Tools", () => {
 
         it("updates specified fields and returns the submission", async () => {
             const created = await createContestSubmission({
+                userId,
                 projectId,
                 providerId,
                 contestName: "Original",
                 submissionDate: new Date().toISOString(),
             });
-            const updated = await updateContestSubmission({ submissionId: created.id, status: "accepted" });
+            const updated = await updateContestSubmission({ userId, submissionId: created.id, status: "accepted" });
             expect(updated.status).toBe("accepted");
             expect(updated.contestName).toBe("Original"); // unchanged field preserved
         });
 
         it("throws when no optional fields are provided to updateContestSubmission", async () => {
             const created = await createContestSubmission({
+                userId,
                 projectId,
                 providerId,
                 contestName: "Original",
                 submissionDate: new Date().toISOString(),
             });
-            await expect(updateContestSubmission({ submissionId: created.id }))
+            await expect(updateContestSubmission({ userId, submissionId: created.id }))
                 .rejects.toThrow("No fields provided to update");
         });
 
         it("deletes a contest submission", async () => {
             const created = await createContestSubmission({
+                userId,
                 projectId,
                 providerId,
                 contestName: "ToDelete",
@@ -158,13 +162,14 @@ describe("MCP Submission Tools", () => {
 
         it("invalidates cache so subsequent listContestSubmissions reflects the update", async () => {
             const created = await createContestSubmission({
+                userId,
                 projectId,
                 providerId,
                 contestName: "Before",
                 submissionDate: new Date().toISOString(),
             });
             await listContestSubmissions({ projectId }); // warm cache
-            await updateContestSubmission({ submissionId: created.id, contestName: "After" });
+            await updateContestSubmission({ userId, submissionId: created.id, contestName: "After" });
             const { submissions } = await listContestSubmissions({ projectId });
             expect(submissions.find((s) => s.id === created.id)?.contestName).toBe("After");
         });

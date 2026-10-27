@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WritingTaskController } from "@/lib/controllers/writing-tasks";
+import { NotFoundError } from "@/lib/controllers/errors";
 import { WritingTaskCreateSchema } from "@/schemas/writing-tasks";
 import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { isGoogleAuthMode } from "@/lib/auth";
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(task, { status: 201 });
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         logger.error("POST /api/writing-tasks error", error);
         return NextResponse.json(
             { error: "Internal server error" },
