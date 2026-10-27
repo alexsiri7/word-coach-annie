@@ -89,7 +89,7 @@
   },
   "overrides": {
     "undici": "^7.29.1",
-    "qs": "^6.16.0",
+    "qs": "^6.17.0",
     "mysql2": "^3.24.3",
     "adm-zip": "^0.6.1",
     "serialize-javascript": "^7.1.3"
