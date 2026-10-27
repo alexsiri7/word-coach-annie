@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CalendarFeedController } from "@/lib/controllers/calendar-feed";
 import { logger } from "@/lib/logger";
+import { publicOrigin } from "@/lib/public-origin";
 
 /** Long enough to spare the origin every poll, short enough that an edit lands the same day. */
 const CACHE_CONTROL = "private, max-age=900";
@@ -16,17 +17,14 @@ function notFound(): NextResponse {
  * token in the path is the credential. An unknown token is indistinguishable from a
  * malformed one — both are a bare 404.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
     try {
         const { token } = await params;
         if (!token.endsWith(".ics")) return notFound();
 
-        const proto = request.headers.get("x-forwarded-proto") || "https";
-        const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
-
         const feed = await CalendarFeedController.renderOpportunityFeed(
             token.slice(0, -".ics".length),
-            `${proto}://${host}`
+            publicOrigin()
         );
         if (feed === null) return notFound();
 

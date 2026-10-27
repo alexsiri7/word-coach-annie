@@ -14,6 +14,10 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  // Public origin for absolute URLs (OAuth metadata, calendar feed).
+  // Falls back to the origin of GOOGLE_REDIRECT_URI when unset.
+  APP_BASE_URL: z.url().optional(),
+
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

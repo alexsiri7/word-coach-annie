@@ -82,6 +82,8 @@ The app works with any OpenAI-compatible provider (OpenAI, Anthropic via proxy, 
 
 Required for: Google sign-in and Google Docs export.
 
+`APP_BASE_URL` (e.g., `https://yourdomain.com`) sets the public origin used in absolute URLs — the MCP OAuth discovery metadata and calendar feed links. When unset, the origin of `GOOGLE_REDIRECT_URI` is used; without either, those endpoints return an error.
+
 #### OAuth Consent Screen Setup
 
 To allow any Google account to sign in (not just test users), the OAuth consent screen must be published:
@@ -134,6 +136,7 @@ The app binds only to `127.0.0.1:3000` by default. For secure public access with
 1. Create a tunnel at the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
 2. Set `CLOUDFLARE_TUNNEL_TOKEN` in `.env.local`
 3. Configure the tunnel to route to `http://localhost:3000`
+4. Set `APP_BASE_URL` to the tunnel's public origin (e.g., `https://annie.yourdomain.com`) — the calendar feed and MCP OAuth discovery metadata build their links from it, not from forwarded request headers
 
 The `tunnel` service in `docker-compose.yml` starts automatically alongside the app.
 

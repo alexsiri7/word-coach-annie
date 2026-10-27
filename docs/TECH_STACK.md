@@ -167,6 +167,7 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 | `GOOGLE_CLIENT_ID` | OAuth for Docs export | No (production requires it unless `API_TOKEN` is set) |
 | `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback | No |
+| `APP_BASE_URL` | Public origin for absolute URLs (OAuth metadata, calendar feed) | No (falls back to the `GOOGLE_REDIRECT_URI` origin; one of the two must be set) |
 | `GEMINI_API_KEY` | Google AI (Gemini) API key | No (configure in Settings UI) |
 | `AI_MODEL` | Gemini model name (default: `gemini-2.0-flash-001`) | No |
 | `ALLOWED_EMAILS` | Access control (comma-separated) | No |
