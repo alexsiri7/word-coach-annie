@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { proxy } from "@/proxy";
 import { resetRateLimitStore, resetRedisClient } from "@/lib/rate-limit";
 
@@ -82,7 +85,7 @@ describe("proxy", () => {
         const csp = res.headers.get("Content-Security-Policy");
         expect(csp).toBeTruthy();
         expect(csp).toContain("script-src");
-        // Core security guarantee: no unsafe-inline in script-src (style-src retains it intentionally)
+        // Core security guarantee: no unsafe-inline in script-src
         expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
     });
 
@@ -458,6 +461,34 @@ describe("proxy", () => {
             expect(xNonce).toBeTruthy();
             expect(nonceMatch).not.toBeNull();
             expect(xNonce).toBe(nonceMatch![1]);
+        });
+
+        it("style-src allows inline styles only by nonce or hash", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/projects"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            const styleSrc = csp.match(/style-src [^;]*/)?.[0] ?? "";
+            const scriptNonce = csp.match(/script-src[^;]*'nonce-([A-Za-z0-9+/=_-]+)'/)?.[1];
+
+            expect(styleSrc).not.toContain("'unsafe-inline'");
+            expect(scriptNonce).toBeTruthy();
+            expect(styleSrc).toContain(`'nonce-${scriptNonce}'`);
+        });
+
+        it("library style hashes match the installed packages' CSS", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            const sha256 = (text: string) => createHash("sha256").update(text).digest("base64");
+
+            // Both packages' exports maps block require.resolve of their files.
+            for (const bundle of ["force-graph/dist/force-graph.mjs", "float-tooltip/dist/float-tooltip.mjs"]) {
+                const source = readFileSync(path.join(process.cwd(), "node_modules", bundle), "utf8");
+                const literal = source.match(/var css_248z = ("(?:[^"\\]|\\.)*");/);
+                expect(literal, `${bundle} no longer declares css_248z`).not.toBeNull();
+                expect(csp).toContain(`'sha256-${sha256(JSON.parse(literal![1]))}'`);
+            }
+            expect(csp).toContain(`'sha256-${sha256("")}'`);
         });
 
         it("sets Content-Security-Policy on proxy-generated 401s and redirects", async () => {

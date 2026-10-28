@@ -29,10 +29,10 @@ beforeEach(() => {
   vi.mocked(createAuthCode).mockClear();
 });
 
-function makeGetRequest(): NextRequest {
+function makeGetRequest(nonce?: string): NextRequest {
   return new NextRequest(
     "http://localhost/oauth/authorize?response_type=code&client_id=c1&redirect_uri=http%3A%2F%2Flocalhost%2Fcallback&code_challenge=abc&code_challenge_method=S256",
-    { headers: { cookie: "session=valid-session" } },
+    { headers: { cookie: "session=valid-session", ...(nonce ? { "x-nonce": nonce } : {}) } },
   );
 }
 
@@ -269,7 +269,14 @@ describe("POST /oauth/authorize nonce propagation", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('nonce="my-test-nonce"');
+    expect(html).toContain('<script nonce="my-test-nonce">');
+    expect(html).toContain('<style nonce="my-test-nonce">');
+  });
+
+  it("consent page style block carries nonce attribute", async () => {
+    const res = await GET(makeGetRequest("my-test-nonce"));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('<style nonce="my-test-nonce">');
   });
 });
 

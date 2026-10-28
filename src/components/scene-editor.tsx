@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { getCspNonce } from "@/lib/csp-nonce";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { cacheContentVersion, getCachedContent } from "@/lib/offline/cache-reads";
 import { computeOfflineContentHash } from "@/lib/offline/content-hash";
@@ -217,6 +218,7 @@ export function SceneEditor({
         },
       },
       immediatelyRender: false,
+      injectNonce: getCspNonce(),
       onUpdate: ({ editor, transaction }) => {
         // Annotation-reconciliation transactions (below) mark themselves
         // "silent" — they only add display-only marks for annotations that
