@@ -10,6 +10,7 @@ import {
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import type { RateLimitConfig } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 
 function buildCsp(nonce: string): string {
@@ -56,6 +57,16 @@ const METRICS_PATH = "/api/metrics";
 
 const AUTH_RATE_LIMITED_PATHS = new Set(["/api/auth/login", "/api/auth/refresh", "/api/auth/me"]);
 
+/**
+ * Per-IP bucket for a public path, which has no user to key on. Paths that check
+ * credentials or mint tokens get tighter buckets than the generic one.
+ */
+function publicPathLimit(pathname: string): { bucket: string; config: RateLimitConfig } {
+    if (AUTH_RATE_LIMITED_PATHS.has(pathname)) return { bucket: "auth", config: RATE_LIMITS.auth };
+    if (pathname === "/oauth/token") return { bucket: "oauth-token", config: RATE_LIMITS.oauthToken };
+    return { bucket: "public", config: RATE_LIMITS.public };
+}
+
 function isPublicPath(pathname: string): boolean {
     return PUBLIC_PATHS.some(
         (p) => pathname === p || pathname.startsWith(p + "/")
@@ -63,7 +74,7 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function makeRateLimitResponse(
-    config: { limit: number; windowMs: number },
+    config: RateLimitConfig,
     retryAfterMs: number,
     resetMs: number
 ): NextResponse {
@@ -92,7 +103,7 @@ function makeRateLimitResponse(
  * - Feedback submission (POST /api/feedback): 5/hour
  * Returns a 429 response if any limit is exceeded, or null if allowed.
  */
-async function tryLimit(key: string, config: { limit: number; windowMs: number }): Promise<NextResponse | null> {
+async function tryLimit(key: string, config: RateLimitConfig): Promise<NextResponse | null> {
     const result = await checkRateLimit(key, config);
     if (!result.allowed) return makeRateLimitResponse(config, result.retryAfterMs!, result.resetMs);
     return null;
@@ -160,20 +171,14 @@ export async function middleware(request: NextRequest) {
 
     const { pathname } = request.nextUrl;
 
-    // Auth endpoints get a tight per-IP bucket regardless of the public-path bypass.
-    // This prevents credential-stuffing/brute-force on the public endpoints that check credentials.
-    const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-    if (AUTH_RATE_LIMITED_PATHS.has(pathname) && !rateLimitBypassed) {
-        const ip = getClientIp(request.headers);
-        const result = await checkRateLimit(`auth:${ip}`, RATE_LIMITS.auth);
-        if (!result.allowed) {
-            return makeRateLimitResponse(RATE_LIMITS.auth, result.retryAfterMs!, result.resetMs);
-        }
-        return nextWithNonce();
-    }
-
-    // Allow public paths through
+    // Public paths skip authentication, so they are throttled per IP before being let through.
     if (isPublicPath(pathname)) {
+        const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
+        if (!rateLimitBypassed) {
+            const { bucket, config } = publicPathLimit(pathname);
+            const rateLimited = await tryLimit(`${bucket}:${getClientIp(request.headers)}`, config);
+            if (rateLimited) return rateLimited;
+        }
         return nextWithNonce();
     }
 

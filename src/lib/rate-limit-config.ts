@@ -26,4 +26,8 @@ export const RATE_LIMITS = {
     report: { limit: 10, windowMs: 3_600_000 } satisfies RateLimitConfig,
     /** Auth endpoints (login, refresh, me): 5 attempts per minute per IP — brute-force protection */
     auth: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
+    /** OAuth token endpoint (code exchange, refresh rotation): 10 per minute per IP */
+    oauthToken: { limit: 10, windowMs: 60_000 } satisfies RateLimitConfig,
+    /** Any other public (unauthenticated) path: 60 requests per minute per IP */
+    public: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
 };

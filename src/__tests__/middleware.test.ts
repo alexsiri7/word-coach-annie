@@ -704,6 +704,7 @@ describe("middleware", () => {
 
             const res = await middleware(createRequest("/api/auth/me", { headers }));
             expect(res.status).toBe(429);
+            expect(res.headers.get("Retry-After")).toBe("60");
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
 
@@ -720,6 +721,69 @@ describe("middleware", () => {
 
             const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
             expect(res.status).toBe(429);
+        });
+
+        it("returns 429 with Retry-After once an IP exceeds 60/min on other public paths", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-real-ip": "4.4.4.4" };
+
+            for (let i = 0; i < 30; i++) {
+                expect((await middleware(createRequest("/api/health", { headers }))).status).toBe(200);
+                expect((await middleware(createRequest("/version.json", { headers }))).status).toBe(200);
+            }
+
+            const res = await middleware(createRequest("/login", { headers }));
+            expect(res.status).toBe(429);
+            expect(res.headers.get("Retry-After")).toBe("60");
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("60");
+
+            const otherIp = await middleware(createRequest("/api/health", { headers: { "x-real-ip": "4.4.4.5" } }));
+            expect(otherIp.status).toBe(200);
+        });
+
+        it("gives /oauth/token its own 10/min per-IP bucket", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            const headers = { "x-real-ip": "3.3.3.3" };
+
+            for (let i = 0; i < 10; i++) {
+                expect((await middleware(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
+            }
+
+            const res = await middleware(createRequest("/oauth/token", { method: "POST", headers }));
+            expect(res.status).toBe(429);
+            expect(res.headers.get("Retry-After")).toBe("60");
+            expect(res.headers.get("X-RateLimit-Limit")).toBe("10");
+
+            expect((await middleware(createRequest("/api/health", { headers }))).status).toBe(200);
+        });
+
+        it("ignores DISABLE_RATE_LIMIT on public paths in production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            vi.stubEnv("NODE_ENV", "production");
+            try {
+                const headers = { "x-real-ip": "2.2.2.2" };
+                for (let i = 0; i < 5; i++) {
+                    await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+                }
+                const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+                expect(res.status).toBe(429);
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it("bypasses public-path limits with DISABLE_RATE_LIMIT outside production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            try {
+                const headers = { "x-real-ip": "2.2.2.3" };
+                for (let i = 0; i < 11; i++) {
+                    expect((await middleware(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
+                }
+            } finally {
+                vi.unstubAllEnvs();
+            }
         });
 
         it("ignores a spoofed x-forwarded-for when keying the auth rate limit", async () => {
