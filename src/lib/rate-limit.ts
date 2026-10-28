@@ -34,7 +34,7 @@ const CLEANUP_INTERVAL_MS = 60_000;
  * Used as the cleanup cutoff to avoid prematurely evicting long-window
  * entries (e.g. hourly limits) when a short-window request triggers cleanup.
  */
-const MAX_WINDOW_MS = 3_600_000; // 1 hour — matches the longest windowMs in RATE_LIMITS
+const MAX_WINDOW_MS = Math.max(...Object.values(RATE_LIMITS).map((c) => c.windowMs));
 let lastCleanup = Date.now();
 
 function memCleanup() {
