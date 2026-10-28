@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { ProjectCreateSchema } from "@/schemas/projects";
+import type { ProjectListItem } from "@/lib/types";
 import { ActiveProjectLimitError, assertActiveProjectLimit } from "@/lib/project-limit";
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       nodeCount: project._count.structureNodes,
       sceneCount: projectSceneCounts.get(project.id) || 0,
       characterCount: project._count.storyObjects,
-    }));
+    }) satisfies Record<keyof ProjectListItem, unknown>);
 
     return NextResponse.json({ projects: projectsWithWordCount, total });
   } catch (error) {

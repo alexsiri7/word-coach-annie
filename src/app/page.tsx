@@ -55,24 +55,7 @@ import { SetupWizard } from "@/components/setup-wizard";
 import { WritingHeatmap } from "@/components/writing-heatmap";
 import { countNeedsAttention, type Story } from "@/lib/story-placement";
 import type { Opportunity } from "@/lib/opportunity-state";
-import type { ProjectType } from "@/lib/types";
-
-interface Project {
-  id: string;
-  title: string;
-  author: string;
-  synopsis: string;
-  genre: string;
-  projectType: ProjectType;
-  wordCount: number;
-  nodeCount: number;
-  sceneCount: number;
-  characterCount: number;
-  createdAt: string;
-  updatedAt: string;
-  archivedAt: string | null;
-  isSample?: boolean;
-}
+import type { ProjectListItem as Project, ProjectType } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */

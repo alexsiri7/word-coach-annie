@@ -14,6 +14,24 @@ export interface Project {
   updatedAt: string;
 }
 
+/** One item of the GET /api/projects list response. */
+export interface ProjectListItem {
+  id: string;
+  title: string;
+  author: string;
+  synopsis: string;
+  genre: string;
+  projectType: ProjectType;
+  isSample: boolean;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  wordCount: number;
+  nodeCount: number;
+  sceneCount: number;
+  characterCount: number;
+}
+
 export interface SceneBlock {
   type: "CONTENT" | "BEAT";
   content: string;
