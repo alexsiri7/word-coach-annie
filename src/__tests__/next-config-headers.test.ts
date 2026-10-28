@@ -29,22 +29,13 @@ describe("next.config security headers (SEC-43)", () => {
     expect(config.poweredByHeader).toBe(false);
   });
 
-  it("isolates app pages with COOP and CORP same-origin", async () => {
+  it("isolates every route with COOP and CORP same-origin", async () => {
     const { rules } = await loadConfig();
-    for (const path of ["/", "/projects/abc", "/api/projects", "/landing"]) {
+    for (const path of ["/", "/projects/abc", "/api/projects", "/landing", "/login", "/oauth/authorize"]) {
       const headers = headersFor(rules, path);
       expect(headers["Cross-Origin-Opener-Policy"], path).toBe("same-origin");
       expect(headers["Cross-Origin-Resource-Policy"], path).toBe("same-origin");
       expect(headers["X-Frame-Options"], path).toBe("DENY");
-    }
-  });
-
-  it("keeps COOP off the OAuth consent flow so a client's popup keeps its opener", async () => {
-    const { rules } = await loadConfig();
-    for (const path of ["/oauth/authorize", "/login"]) {
-      const headers = headersFor(rules, path);
-      expect(headers["Cross-Origin-Opener-Policy"], path).toBeUndefined();
-      expect(headers["Cross-Origin-Resource-Policy"], path).toBe("same-origin");
     }
   });
 });

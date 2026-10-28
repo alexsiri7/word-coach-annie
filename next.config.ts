@@ -95,18 +95,11 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
           },
           {
-            key: "Cross-Origin-Resource-Policy",
+            key: "Cross-Origin-Opener-Policy",
             value: "same-origin",
           },
-        ],
-      },
-      // The MCP OAuth consent flow (/login → /oauth/authorize) can run in a popup opened by
-      // the connecting client (claude.ai); COOP same-origin would sever that popup's opener.
-      {
-        source: "/((?!oauth/|login(?:/|$)).*)",
-        headers: [
           {
-            key: "Cross-Origin-Opener-Policy",
+            key: "Cross-Origin-Resource-Policy",
             value: "same-origin",
           },
         ],

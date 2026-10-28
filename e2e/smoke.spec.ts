@@ -419,7 +419,7 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect.poll(() => saveRequests.length, { timeout: 5_000 }).toBeGreaterThan(0)
   })
 
-  test('3b. Spell-check underlines a misspelling (harper worker + WASM pass the CSP)', async ({
+  test('3b. Spell-check underlines a misspelling (harper worker + WASM pass the CSP and COOP)', async ({
     page,
   }) => {
     await mockFocusModeApi(page)
@@ -429,7 +429,9 @@ test.describe('E2E smoke tests – critical user flows', () => {
       if (/Content Security Policy/i.test(msg.text())) cspViolations.push(msg.text())
     })
 
-    await page.goto('/project/proj-1/scene/sc-1/focus')
+    const response = await page.goto('/project/proj-1/scene/sc-1/focus')
+    expect(response?.headers()['cross-origin-opener-policy']).toBe('same-origin')
+    expect(response?.headers()['cross-origin-resource-policy']).toBe('same-origin')
     await page.waitForSelector('main', { timeout: 20_000 })
 
     const editor = page.locator('.tiptap, .ProseMirror').first()
