@@ -199,7 +199,6 @@ export async function GET(request: NextRequest) {
     if (conversationId) {
       conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
-        include: { project: true },
       });
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -211,13 +210,11 @@ export async function GET(request: NextRequest) {
       conversation = await prisma.conversation.findFirst({
         where: { projectId: projectId! },
         orderBy: { createdAt: "desc" },
-        include: { project: true },
       });
       if (!conversation) {
         conversation = await prisma.conversation.create({
           data: { projectId: projectId!, title: "Chat" },
-          include: { project: true },
-        });
+          });
       }
     }
 
