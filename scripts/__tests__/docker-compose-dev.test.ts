@@ -3,6 +3,7 @@ import { join } from 'path';
 import { parse } from 'yaml';
 
 interface ComposeService {
+  image?: string;
   environment?: string[];
 }
 
@@ -25,5 +26,14 @@ describe('dev compose tunnel', () => {
     expect(overlay.app.environment).toContainEqual(
       expect.stringMatching(/^API_TOKEN=\$\{API_TOKEN:\?/),
     );
+  });
+});
+
+describe('dev compose images', () => {
+  it.each([
+    ['docker-compose.dev.yml', 'phoenix'],
+    ['docker-compose.tunnel.yml', 'tunnel'],
+  ])('%s pins %s to a digest or an explicit version', (file, service) => {
+    expect(services(file)[service].image).toMatch(/@sha256:[0-9a-f]{64}$|:\d+(\.\d+)+$/);
   });
 });
