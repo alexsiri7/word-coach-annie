@@ -109,7 +109,7 @@ export async function getSceneFocus(sceneId: string) {
     where: { id: sceneId },
     include: { project: { select: { title: true, id: true } } },
   });
-  if (!scene) throw new UserFacingError(`Scene not found: ${sceneId}`);
+  if (!scene) throw new UserFacingError("Scene not found");
 
   const siblings = await prisma.structureNode.findMany({
     where: { projectId: scene.projectId, type: "SCENE" },

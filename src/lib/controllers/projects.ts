@@ -81,7 +81,7 @@ export class ProjectsController {
             },
         });
 
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         // Calculate word count from latest content versions of all scenes
         const scenes = await prisma.structureNode.findMany({
@@ -175,7 +175,7 @@ export class ProjectsController {
         data: { title?: string; author?: string; synopsis?: string; genre?: string; universeId?: string | null; projectType?: string }
     ) {
         const existing = await prisma.project.findUnique({ where: { id: projectId } });
-        if (!existing) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!existing) throw new UserFacingError("Project not found");
 
         const updateData: Record<string, string> = {};
         if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());

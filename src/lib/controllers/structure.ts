@@ -153,7 +153,7 @@ export class StructureController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const nodes = await prisma.structureNode.findMany({
             where: { projectId },
@@ -231,7 +231,7 @@ export class StructureController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const validTypes = ["PART", "CHAPTER", "SCENE"];
         if (!validTypes.includes(type)) {
@@ -319,7 +319,7 @@ export class StructureController {
         }
     ) {
         const existing = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!existing) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!existing) throw new UserFacingError("Node not found");
 
         const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
         if (data.status && !validStatuses.includes(data.status)) {
@@ -364,7 +364,7 @@ export class StructureController {
 
     static async deleteNode(nodeId: string) {
         const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         // Note: autoSnapshot might need to be passed in or handled differently if we want to isolate dependencies
         // For now, we assume this is running in an environment where autoSnapshot works or handles itself gracefully.
@@ -434,7 +434,7 @@ export class StructureController {
 
     static async getNode(nodeId: string) {
         const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
         return node;
     }
 
@@ -443,7 +443,7 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, type: true, title: true },
         });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const version = await prisma.contentVersion.findFirst({
             where: { nodeId },
@@ -490,7 +490,7 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
         });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
         if (node.type !== "SCENE") throw new UserFacingError("Content can only be written to SCENE nodes");
 
         StructureController.validateSceneContent(rawContent);
@@ -544,7 +544,7 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, title: true },
         });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const versions = await prisma.contentVersion.findMany({
             where: { nodeId },
@@ -569,12 +569,12 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, title: true, projectId: true },
         });
-        if (!node) throw new UserFacingError(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const oldVersion = await prisma.contentVersion.findFirst({
             where: { id: versionId, nodeId },
         });
-        if (!oldVersion) throw new UserFacingError(`Version not found: ${versionId}`);
+        if (!oldVersion) throw new UserFacingError("Version not found");
 
         // Versions stored before every write path sanitized may still carry unsafe markup.
         const content = sanitizeHtml(oldVersion.content);
@@ -639,7 +639,7 @@ export class StructureController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const results = [];
         const errors = [];

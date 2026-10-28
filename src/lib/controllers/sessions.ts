@@ -87,7 +87,7 @@ async function requireProjectNode(projectId: string, nodeId: string) {
     where: { id: nodeId, projectId },
     select: { id: true },
   });
-  if (!node) throw new NotFoundError(`Node not found in project: ${nodeId}`);
+  if (!node) throw new NotFoundError("Node not found in project");
 }
 
 function aggregateHeatmap(

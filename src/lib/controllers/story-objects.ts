@@ -19,7 +19,7 @@ export class StoryObjectController {
             where: { id: projectId },
             select: { id: true, universeId: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         if (type && !VALID_TYPES.includes(type as StoryObjectType)) {
             throw new UserFacingError(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
@@ -109,7 +109,7 @@ export class StoryObjectController {
             },
         });
 
-        if (!obj) throw new UserFacingError(`Story object not found: ${objectId}`);
+        if (!obj) throw new UserFacingError("Story object not found");
 
         const relatedTo = [
             ...obj.relationships.map((r) => ({
@@ -163,7 +163,7 @@ export class StoryObjectController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         if (!VALID_TYPES.includes(type as StoryObjectType)) {
             throw new UserFacingError(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
@@ -211,7 +211,7 @@ export class StoryObjectController {
             where: { id: objectId },
             select: { id: true },
         });
-        if (!existing) throw new UserFacingError(`Story object not found: ${objectId}`);
+        if (!existing) throw new UserFacingError("Story object not found");
 
         if (data.name !== undefined && data.name.trim().length === 0) {
             throw new UserFacingError("name must be a non-empty string");
@@ -247,7 +247,7 @@ export class StoryObjectController {
 
     static async deleteStoryObject(objectId: string) {
         const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
-        if (!obj) throw new UserFacingError(`Story object not found: ${objectId}`);
+        if (!obj) throw new UserFacingError("Story object not found");
 
         try {
             autoSnapshot("delete_story_object", obj.name);
@@ -278,7 +278,7 @@ export class StoryObjectController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const results = [];
         const errors = [];
@@ -376,7 +376,7 @@ export class StoryObjectController {
             const objectId = objectIds[i];
             try {
                 const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
-                if (!obj) throw new UserFacingError(`Story object not found: ${objectId}`);
+                if (!obj) throw new UserFacingError("Story object not found");
                 await prisma.storyObject.delete({ where: { id: objectId } });
                 results.push({ index: i, success: true, id: objectId, name: obj.name });
             } catch (e) {

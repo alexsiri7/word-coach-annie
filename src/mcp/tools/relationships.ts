@@ -54,7 +54,7 @@ export async function listRelationships(projectId: string) {
                 where: { id: projectId },
                 select: { id: true, universeId: true },
             });
-            if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+            if (!project) throw new UserFacingError("Project not found");
 
             const [nodes, objects] = await Promise.all([
                 prisma.structureNode.findMany({
@@ -125,7 +125,7 @@ export async function createRelationship(params: {
         where: { id: projectId },
         select: { id: true, universeId: true },
     });
-    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError("Project not found");
 
     if (
         !VALID_RELATIONSHIP_TYPES.includes(
@@ -207,7 +207,7 @@ export async function deleteRelationship(relationshipId: string) {
             toWorldObject: { select: { name: true } },
         },
     });
-    if (!existing) throw new UserFacingError(`Relationship not found: ${relationshipId}`);
+    if (!existing) throw new UserFacingError("Relationship not found");
 
     const fromName = existing.fromNode?.title || existing.fromObject?.name || existing.fromWorldObject?.name || "?";
     const toName = existing.toNode?.title || existing.toObject?.name || existing.toWorldObject?.name || "?";

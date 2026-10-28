@@ -38,7 +38,7 @@ export class UniversesController {
             },
         });
 
-        if (!universe) throw new UserFacingError(`Universe not found: ${id}`);
+        if (!universe) throw new UserFacingError("Universe not found");
 
         return {
             id: universe.id,
@@ -139,7 +139,7 @@ export class UniversesController {
             },
         });
 
-        if (!wo) throw new UserFacingError(`World Object not found: ${id}`);
+        if (!wo) throw new UserFacingError("World Object not found");
 
         return {
             ...wo,
@@ -255,7 +255,7 @@ export class UniversesController {
 
     static async getTimelineEntry(id: string) {
         const entry = await prisma.worldObjectTimelineEntry.findUnique({ where: { id } });
-        if (!entry) throw new UserFacingError(`Timeline entry not found: ${id}`);
+        if (!entry) throw new UserFacingError("Timeline entry not found");
         return entry;
     }
 
@@ -332,7 +332,7 @@ export class UniversesController {
                 where: { id: worldObjectId },
                 include: { relationships: true, relatedBy: true },
             });
-            if (!wo) throw new UserFacingError(`World object not found: ${worldObjectId}`);
+            if (!wo) throw new UserFacingError("World object not found");
 
             // 2. Create StoryObject (copy — original stays in universe)
             const so = await tx.storyObject.create({
@@ -386,7 +386,7 @@ export class UniversesController {
             const obj = await tx.storyObject.findUnique({
                 where: { id: storyObjectId },
             });
-            if (!obj) throw new UserFacingError(`Story object not found: ${storyObjectId}`);
+            if (!obj) throw new UserFacingError("Story object not found");
 
             // 2. Create WorldObject
             const wo = await tx.worldObject.create({
