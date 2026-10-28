@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
-import { beforeSend, dataCollection } from "@/lib/sentry-scrub";
+import { beforeBreadcrumb, beforeSend, dataCollection } from "@/lib/sentry-scrub";
 
 const replayConsented =
   typeof window === "undefined" ||
@@ -12,6 +12,7 @@ Sentry.init({
   // v11: replaces `sendDefaultPii: false`; see sentry-scrub.ts.
   dataCollection,
   beforeSend,
+  beforeBreadcrumb,
 
   // Performance: sample 10% of transactions in production
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,

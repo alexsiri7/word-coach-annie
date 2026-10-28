@@ -112,8 +112,11 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>Sentry</strong> — error reports tagged with your internal
-                account ID (not your email) to help us fix bugs; manuscript content
-                is scrubbed before sending. Session replay, if enabled, requires
+                account ID (not your email) to help us fix bugs. Before sending we
+                drop request bodies and console logs, mask email addresses in error
+                messages, and redact credentials and fields that hold text or
+                response bodies. An error message itself can still include a short
+                fragment of what caused it. Session replay, if enabled, requires
                 your separate consent in Settings
               </li>
             </ul>
