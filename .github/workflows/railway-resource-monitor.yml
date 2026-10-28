@@ -91,7 +91,7 @@ jobs:
 
       - name: Alert if above threshold
         if: steps.metrics.outputs.has_data == 'true' && (fromJSON(steps.metrics.outputs.memory_pct) >= fromJSON(env.MEMORY_THRESHOLD_PCT) || fromJSON(steps.metrics.outputs.cpu_pct) >= fromJSON(env.CPU_THRESHOLD_PCT))
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           MEMORY_PCT: ${{ steps.metrics.outputs.memory_pct }}
           CPU_PCT: ${{ steps.metrics.outputs.cpu_pct }}
@@ -159,7 +159,7 @@ jobs:
 
       - name: Resolve if below threshold
         if: steps.metrics.outputs.has_data == 'true' && fromJSON(steps.metrics.outputs.memory_pct) < fromJSON(env.MEMORY_THRESHOLD_PCT) && fromJSON(steps.metrics.outputs.cpu_pct) < fromJSON(env.CPU_THRESHOLD_PCT)
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           MEMORY_PCT: ${{ steps.metrics.outputs.memory_pct }}
           CPU_PCT: ${{ steps.metrics.outputs.cpu_pct }}
