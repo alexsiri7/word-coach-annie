@@ -1,5 +1,6 @@
 import { google, docs_v1, drive_v3 } from 'googleapis';
 import { GoogleAuthController } from './controllers/google-auth';
+import { UserFacingError } from './controllers/errors';
 
 interface InlineStyle {
     start: number;
@@ -145,7 +146,7 @@ export class GoogleDocsApi {
 
     static async createDocument(title: string, userId?: string | null): Promise<string> {
         const auth = await GoogleAuthController.getValidClient(userId);
-        if (!auth) throw new Error("Not authenticated");
+        if (!auth) throw new UserFacingError("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
         const res = await docs.documents.create({
@@ -157,7 +158,7 @@ export class GoogleDocsApi {
 
     static async getDocument(documentId: string, userId?: string | null): Promise<docs_v1.Schema$Document> {
         const auth = await GoogleAuthController.getValidClient(userId);
-        if (!auth) throw new Error("Not authenticated");
+        if (!auth) throw new UserFacingError("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
         const res = await docs.documents.get({ documentId });
@@ -166,7 +167,7 @@ export class GoogleDocsApi {
 
     static async updateDocument(documentId: string, requests: docs_v1.Schema$Request[], userId?: string | null) {
         const auth = await GoogleAuthController.getValidClient(userId);
-        if (!auth) throw new Error("Not authenticated");
+        if (!auth) throw new UserFacingError("Not authenticated");
 
         const docs = google.docs({ version: 'v1', auth });
         await docs.documents.batchUpdate({
@@ -177,7 +178,7 @@ export class GoogleDocsApi {
 
     static async fetchComments(documentId: string, userId?: string | null): Promise<drive_v3.Schema$Comment[]> {
         const auth = await GoogleAuthController.getValidClient(userId);
-        if (!auth) throw new Error("Not authenticated");
+        if (!auth) throw new UserFacingError("Not authenticated");
 
         const drive = google.drive({ version: 'v3', auth });
         const allComments: drive_v3.Schema$Comment[] = [];
