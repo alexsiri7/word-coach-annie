@@ -29,7 +29,7 @@ export function databaseSchema(): string | undefined {
  * A table reference for raw SQL. The adapter below qualifies only
  * Prisma-generated SQL with DATABASE_SCHEMA, so raw queries must name it here.
  */
-export function rawTable(name: string): Prisma.Sql {
+export function rawTable(name: Prisma.ModelName): Prisma.Sql {
   const schema = databaseSchema();
   return Prisma.raw(schema ? `"${schema}"."${name}"` : `"${name}"`);
 }
