@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth";
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-limit";
 import type { RateLimitConfig } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 
@@ -116,14 +116,7 @@ async function applyRateLimit(
     const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
-    // Allow E2E / CI environments to bypass rate limiting (not honoured in production)
-    if (process.env.DISABLE_RATE_LIMIT === "true") {
-        if (process.env.NODE_ENV === "production") {
-            console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
-        } else {
-            return null;
-        }
-    }
+    if (isRateLimitBypassed()) return null;
 
     const method = request.method;
 
@@ -173,8 +166,7 @@ export async function middleware(request: NextRequest) {
 
     // Public paths skip authentication, so they are throttled per IP before being let through.
     if (isPublicPath(pathname)) {
-        const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-        if (!rateLimitBypassed) {
+        if (!isRateLimitBypassed()) {
             const { bucket, config } = publicPathLimit(pathname);
             const rateLimited = await tryLimit(`${bucket}:${getClientIp(request.headers)}`, config);
             if (rateLimited) return rateLimited;

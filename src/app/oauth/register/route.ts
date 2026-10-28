@@ -10,7 +10,7 @@ import {
   type ClientRegistration,
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, isRateLimitBypassed } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
@@ -42,7 +42,7 @@ function isAllowedRedirect(uri: URL): boolean {
 export async function POST(request: NextRequest) {
   // Per-IP throttle to limit client registration abuse
   const ip = getClientIp(request.headers);
-  if (process.env.DISABLE_RATE_LIMIT !== "true") {
+  if (!isRateLimitBypassed()) {
     const rl = await checkRateLimit(`oauth-register:${ip}`, RATE_LIMITS.oauthRegister);
     if (!rl.allowed) {
       return NextResponse.json(

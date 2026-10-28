@@ -201,6 +201,19 @@ export async function checkRateLimit(
 
 export { RATE_LIMITS };
 
+/**
+ * Whether DISABLE_RATE_LIMIT=true lets E2E / CI runs skip rate limiting.
+ * Never honoured in production, so a leaked flag cannot switch the limits off there.
+ */
+export function isRateLimitBypassed(): boolean {
+    if (process.env.DISABLE_RATE_LIMIT !== "true") return false;
+    if (process.env.NODE_ENV === "production") {
+        logger.warn("[rate-limit] DISABLE_RATE_LIMIT=true is ignored in production");
+        return false;
+    }
+    return true;
+}
+
 /** Clear all in-memory entries (for testing — in-memory mode only) */
 export function resetRateLimitStore() {
     memStore.clear();

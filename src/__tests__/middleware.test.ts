@@ -603,6 +603,48 @@ describe("middleware", () => {
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
 
+        it("ignores DISABLE_RATE_LIMIT on authenticated API routes in production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "feedback-prod-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            vi.stubEnv("NODE_ENV", "production");
+            try {
+                const feedback = () => middleware(createRequest("/api/feedback", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                }));
+                for (let i = 0; i < 5; i++) await feedback();
+                expect((await feedback()).status).toBe(429);
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it("bypasses authenticated API limits with DISABLE_RATE_LIMIT outside production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "feedback-dev-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            try {
+                for (let i = 0; i < 6; i++) {
+                    const res = await middleware(createRequest("/api/feedback", {
+                        method: "POST",
+                        cookies: { annie_session: "valid-jwt" },
+                    }));
+                    expect(res.status).toBe(200);
+                }
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
         it("returns 429 when project import limit exceeded (20/hour)", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
