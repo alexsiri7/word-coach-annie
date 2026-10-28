@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DOMPurify from "dompurify";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import {
   Clock,
@@ -21,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { sanitizeDisplayHtml } from "@/lib/sanitize-display";
 import { timeAgo } from "./editor-config";
 import type { ContentVersion } from "@/lib/types";
 
@@ -209,10 +209,9 @@ export function VersionHistoryPanel({
                   <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : (
-                // The CSP blocks style= attributes in innerHTML anyway.
                 <div
                   className="text-sm text-text-secondary leading-relaxed prose-preview"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent || "", { FORBID_ATTR: ["style"] }) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeDisplayHtml(previewContent || "") }}
                 />
               )}
             </div>
