@@ -58,21 +58,16 @@ export async function compressConversation(
   const summarizedThroughMessageId = toCompress.at(-1)!.id;
   // Clearing the chat deletes the messages this summary was built from; if that
   // happened while the completion ran, the summary must not be written back.
-  // The existence check runs only after taking the Conversation row lock, so a
-  // clear still in flight finishes first and the check sees its deletion.
-  const written = await prisma.$transaction(async (tx) => {
+  // The existence condition is evaluated only after taking the Conversation row
+  // lock, so a clear still in flight finishes first and the write sees its deletion.
+  const { count } = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT 1 FROM ${rawTable("Conversation")} WHERE id = ${conversation.id} FOR UPDATE`;
-    const stillPresent = await tx.chatMessage.count({
-      where: { id: summarizedThroughMessageId, conversationId: conversation.id },
-    });
-    if (stillPresent === 0) return false;
-    await tx.conversation.update({
-      where: { id: conversation.id },
+    return tx.conversation.updateMany({
+      where: { id: conversation.id, messages: { some: { id: summarizedThroughMessageId } } },
       data: { summary: newSummary, summarizedThroughMessageId },
     });
-    return true;
   });
-  if (!written) {
+  if (count === 0) {
     logger.info("compressConversation: history cleared during compression, summary discarded", {
       conversationId: conversation.id,
     });

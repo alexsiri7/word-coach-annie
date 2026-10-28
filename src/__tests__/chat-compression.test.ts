@@ -5,8 +5,7 @@ vi.mock("@/lib/db", async () => {
   const { rawTable } = await vi.importActual<typeof import("@/lib/db")>("@/lib/db");
   const tx = {
     $executeRaw: vi.fn(async () => 1),
-    chatMessage: { count: vi.fn(async () => 1) },
-    conversation: { update: vi.fn() },
+    conversation: { updateMany: vi.fn(async () => ({ count: 1 })) },
   };
   return { rawTable, prisma: { $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)), tx } };
 });
@@ -23,8 +22,7 @@ import { prisma } from "@/lib/db";
 
 const { tx } = prisma as unknown as { tx: {
   $executeRaw: ReturnType<typeof vi.fn>;
-  chatMessage: { count: ReturnType<typeof vi.fn> };
-  conversation: { update: ReturnType<typeof vi.fn> };
+  conversation: { updateMany: ReturnType<typeof vi.fn> };
 } };
 
 const baseConversation = {
@@ -77,11 +75,8 @@ describe("compressConversation", () => {
 
     await compressConversation(baseConversation, messages, settings, aiConfig);
 
-    expect(tx.chatMessage.count).toHaveBeenCalledWith({
-      where: { id: "msg-2", conversationId: "conv-1" },
-    });
-    expect(tx.conversation.update).toHaveBeenCalledWith({
-      where: { id: "conv-1" },
+    expect(tx.conversation.updateMany).toHaveBeenCalledWith({
+      where: { id: "conv-1", messages: { some: { id: "msg-2" } } },
       data: {
         summary: "Summary of discussion.",
         summarizedThroughMessageId: "msg-2",
