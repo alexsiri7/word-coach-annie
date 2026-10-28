@@ -1,19 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "fs";
 import { join, relative } from "path";
+import { shippedFiles } from "./source-files";
 
 // SEC-32: fonts are self-hosted via next/font, so nothing the app ships may
 // make a visitor's browser contact Google's font hosts.
 const ROOT = join(__dirname, "../..");
 const GOOGLE_FONT_HOSTS = /fonts\.(googleapis|gstatic)\.com/;
-
-function shippedFiles(dir: string): string[] {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) return entry.name === "__tests__" ? [] : shippedFiles(path);
-        return [path];
-    });
-}
 
 function rootConfigFiles(): string[] {
     return readdirSync(ROOT, { withFileTypes: true })

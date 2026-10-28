@@ -1,18 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync } from "fs";
 import { join, relative } from "path";
 import { encrypt, decrypt, isEncrypted, isUndecryptable, readEncrypted } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
+import { shippedFiles } from "./source-files";
 
 const SRC = join(__dirname, "..");
-
-function productionSources(dir: string): string[] {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) return entry.name === "__tests__" ? [] : productionSources(path);
-        return /\.tsx?$/.test(entry.name) ? [path] : [];
-    });
-}
 
 describe("crypto", () => {
     let origEncKey: string | undefined;
@@ -257,7 +250,8 @@ describe("crypto", () => {
         // Reads that bypass readEncrypted() are not tied to ENCRYPTED_COLUMNS by
         // the EncryptedField type, so reencrypt.mjs could miss their column.
         it("routes every production read of a stored secret through readEncrypted()", () => {
-            const decryptCallers = productionSources(SRC)
+            const decryptCallers = shippedFiles(SRC)
+                .filter((file) => /\.tsx?$/.test(file))
                 .filter((file) => !file.endsWith(join("lib", "crypto.ts")))
                 .filter((file) => /\bdecrypt\(/.test(readFileSync(file, "utf-8")))
                 .map((file) => relative(SRC, file));
