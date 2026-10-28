@@ -212,6 +212,11 @@ export function ShareDialog({
           {error && (
             <p className="text-xs text-danger">{error}</p>
           )}
+          <p className="text-xs text-text-muted">
+            We store the email address you add so that person can sign in and
+            open this project. They are not notified — let them know yourself.
+            Removing them deletes their email from Annie.
+          </p>
         </div>
 
         {/* Current shares */}

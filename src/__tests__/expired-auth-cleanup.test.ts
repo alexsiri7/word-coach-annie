@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { testPrisma } from "./setup";
 import { pruneExpiredAuthRows } from "@/lib/expired-auth-cleanup";
+import { countClientsByIpInWindow, IP_WINDOW_MS } from "@/lib/oauth-store";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -25,6 +26,7 @@ describe("pruneExpiredAuthRows", () => {
   beforeEach(async () => {
     await testPrisma.revokedToken.deleteMany();
     await testPrisma.oAuthAuthCode.deleteMany();
+    await testPrisma.oAuthClient.deleteMany();
   });
 
   it("deletes expired revoked tokens and auth codes, keeping unexpired ones", async () => {
@@ -44,6 +46,28 @@ describe("pruneExpiredAuthRows", () => {
     const codes = await testPrisma.oAuthAuthCode.findMany();
     expect(tokens.map((t) => t.jti)).toEqual(["live"]);
     expect(codes.map((c) => c.code)).toEqual(["live"]);
+  });
+
+  it("clears registration IPs older than the per-IP window and keeps the client rows", async () => {
+    const realNow = new Date();
+    const client = (id: string, ageMs: number) => ({
+      id,
+      redirectUris: "[]",
+      registrationIp: "1.2.3.4",
+      createdAt: new Date(realNow.getTime() - ageMs),
+    });
+    await testPrisma.oAuthClient.createMany({
+      data: [client("old", IP_WINDOW_MS + 1000), client("recent", IP_WINDOW_MS - 60_000)],
+    });
+
+    await pruneExpiredAuthRows(realNow);
+
+    const clients = await testPrisma.oAuthClient.findMany({ orderBy: { id: "asc" } });
+    expect(clients.map((c) => [c.id, c.registrationIp])).toEqual([
+      ["old", null],
+      ["recent", "1.2.3.4"],
+    ]);
+    expect(await countClientsByIpInWindow("1.2.3.4")).toBe(1);
   });
 
   it("logs and swallows database errors", async () => {

@@ -240,6 +240,32 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(await testPrisma.writingTask.findUnique({ where: { id: task.id } })).toBeNull();
   });
 
+  it("deletes shares granted to the user's email on other owners' projects", async () => {
+    const owner = await testPrisma.user.create({
+      data: { id: "del-owner11", email: "owner11@test.com", googleId: "g-owner11" },
+    });
+    const project = await testPrisma.project.create({
+      data: { id: "proj-del11", title: "Shared Novel", userId: owner.id },
+    });
+    await testPrisma.projectShare.createMany({
+      data: [
+        { projectId: project.id, email: "del11@test.com" },
+        { projectId: project.id, email: "someone-else@test.com" },
+      ],
+    });
+    const user = await testPrisma.user.create({
+      data: { id: "del-u11", email: "Del11@test.com", googleId: "g-del11" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "Del11@test.com" }));
+    expect(res.status).toBe(200);
+
+    const remaining = await testPrisma.projectShare.findMany({ where: { projectId: project.id } });
+    expect(remaining.map((s) => s.email)).toEqual(["someone-else@test.com"]);
+  });
+
   it("returns 400 for malformed email format", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u8", email: "del8@test.com", googleId: "g-del8" },
