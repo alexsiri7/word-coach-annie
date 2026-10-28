@@ -130,8 +130,8 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     peerReview: { findMany: vi.fn(async () => []) },
     project: { findFirst: vi.fn(async () => ({ id: "p1" })) },
-    structureNode: { findUniqueOrThrow: vi.fn(async () => ({ projectId: "p1" })) },
-    storyObject: { findUniqueOrThrow: vi.fn(async () => ({ projectId: "p1" })) },
+    structureNode: { findUnique: vi.fn(async () => ({ projectId: "p1" })) },
+    storyObject: { findUnique: vi.fn(async () => ({ projectId: "p1" })) },
     relationship: { findUnique: vi.fn(async () => ({ fromNode: { projectId: "p1" }, toNode: null, fromObject: null, toObject: null, fromWorldObject: null, toWorldObject: null })) },
   },
 }));

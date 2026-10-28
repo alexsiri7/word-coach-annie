@@ -1,6 +1,7 @@
 import { prisma, type DbClient } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { requireOwnedProvider } from "@/lib/controllers/provider-ownership";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // ── Provider ────────────────────────────────────────────────────────────
 // Ownership follows the same convention as Opportunity: a null userId is the
@@ -56,8 +57,8 @@ export class ProviderController {
             where: { id },
             select: { id: true, userId: true },
         });
-        if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (userId && existing.userId !== userId) throw new Error("Forbidden");
+        if (!existing) throw new UserFacingError("Provider not found");
+        if (userId && existing.userId !== userId) throw new UserFacingError("Forbidden");
 
         const provider = await prisma.provider.update({
             where: { id },
@@ -76,8 +77,8 @@ export class ProviderController {
             where: { id },
             select: { id: true, userId: true },
         });
-        if (!existing) throw new Error(`Provider not found: ${id}`);
-        if (userId && existing.userId !== userId) throw new Error("Forbidden");
+        if (!existing) throw new UserFacingError("Provider not found");
+        if (userId && existing.userId !== userId) throw new UserFacingError("Forbidden");
 
         await prisma.provider.delete({ where: { id } });
 
@@ -113,7 +114,7 @@ export class ContestSubmissionController {
             where: { id: params.projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const rawSubmissions = await prisma.contestSubmission.findMany({
             where: { projectId: params.projectId },
@@ -144,7 +145,7 @@ export class ContestSubmissionController {
             where: { id: params.projectId },
             select: { id: true, userId: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         await requireOwnedProvider(params.providerId, project.userId, { client, callerId: params.userId });
 
@@ -180,7 +181,7 @@ export class ContestSubmissionController {
             where: { id },
             select: { id: true, project: { select: { userId: true } } },
         });
-        if (!existing) throw new Error(`Contest submission not found: ${id}`);
+        if (!existing) throw new UserFacingError("Contest submission not found");
 
         if (data.providerId) {
             await requireOwnedProvider(data.providerId, existing.project.userId, { callerId: userId });
@@ -207,7 +208,7 @@ export class ContestSubmissionController {
             where: { id },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Contest submission not found: ${id}`);
+        if (!existing) throw new UserFacingError("Contest submission not found");
 
         await prisma.contestSubmission.delete({ where: { id } });
 
@@ -235,7 +236,7 @@ export class PublicationSubmissionController {
             where: { id: params.projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const rawSubmissions = await prisma.publicationSubmission.findMany({
             where: { projectId: params.projectId },
@@ -256,7 +257,7 @@ export class PublicationSubmissionController {
             where: { id: params.projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${params.projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const submission = await prisma.publicationSubmission.create({
             data: {
@@ -282,7 +283,7 @@ export class PublicationSubmissionController {
             where: { id },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Publication submission not found: ${id}`);
+        if (!existing) throw new UserFacingError("Publication submission not found");
 
         const submission = await prisma.publicationSubmission.update({
             where: { id },
@@ -301,7 +302,7 @@ export class PublicationSubmissionController {
             where: { id },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Publication submission not found: ${id}`);
+        if (!existing) throw new UserFacingError("Publication submission not found");
 
         await prisma.publicationSubmission.delete({ where: { id } });
 

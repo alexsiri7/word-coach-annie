@@ -2,6 +2,7 @@ import { ProjectsController } from "@/lib/controllers/projects";
 import { mcpCache } from "@/lib/cache";
 import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
 import { prisma } from "@/lib/db";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 function projectContentHash(p: {
     title: string;
@@ -25,7 +26,7 @@ export async function getProject(userId: string | null, projectId: string) {
             where: { id: projectId, userId },
             select: { id: true },
         });
-        if (!project) throw new Error("Project not found or access denied");
+        if (!project) throw new UserFacingError("Project not found or access denied");
     }
     const raw = await mcpCache.getOrSet(
         `project:${userId}:${projectId}`,
@@ -60,7 +61,7 @@ export async function updateProject(
             where: { id: projectId, userId },
             select: { id: true },
         });
-        if (!project) throw new Error("Project not found or access denied");
+        if (!project) throw new UserFacingError("Project not found or access denied");
     }
     if (contentHash !== undefined) {
         const current = await ProjectsController.getProject(projectId);

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { GoogleDocsApi } from "../google-api";
 import { exportManuscript, exportStoryBible, exportUniverse } from "../../mcp/tools/export";
 import { logger } from "@/lib/logger";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export type ExportMode = 'UNIVERSE' | 'STORY_INTERNAL' | 'STORY_READER';
 
@@ -92,7 +93,7 @@ export class GoogleDocsExporter {
             const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
             if (code === 404 || message.includes('not found')) {
                 await prisma.googleDocExport.delete({ where: { id: exportRecord!.id } });
-                throw new Error("Google Doc not found. Mapping removed. Please try again to create a new doc.");
+                throw new UserFacingError("Google Doc not found. Mapping removed. Please try again to create a new doc.");
             }
             throw error;
         }

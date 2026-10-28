@@ -7,7 +7,8 @@ import { listSkills, loadSkill } from "./skills";
 import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
-import { StaleWriteError } from "@/mcp/content-hash";
+import { mcpRun, toolError, type McpResult } from "@/mcp/tool-errors";
+import { UserFacingError } from "@/lib/controllers/errors";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
@@ -127,9 +128,13 @@ import {
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
 import {
+    AccessDeniedError,
+    assertProjectOwner as verifyProjectOwnership,
     assertUniverseOwner as verifyUniverseOwnership,
     assertRelationshipOwner,
     projectIdForAnnotation,
+    projectIdForNode,
+    projectIdForStoryObject,
     universeIdForWorldObject,
     universeIdForTimelineEntry,
 } from "@/lib/ownership";
@@ -195,7 +200,7 @@ server.tool = ((...args: unknown[]) => {
 }) as typeof server.tool;
 
 /** Guard for destructive tools — returns error if not allowed. */
-function destructiveGuard(): { content: [{ type: "text"; text: string }]; isError: true } | null {
+function destructiveGuard(): McpResult | null {
     if (!allowDestructive) {
         return {
             content: [{ type: "text", text: "This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable." }],
@@ -205,82 +210,34 @@ function destructiveGuard(): { content: [{ type: "text"; text: string }]; isErro
     return null;
 }
 
-type McpResult = { content: [{ type: "text"; text: string }]; isError?: true };
-
-/** Shared try-catch wrapper for tool handlers that return JSON results. */
-async function mcpRun(
-    logLabel: string,
-    errorPrefix: string,
-    fn: () => Promise<unknown>
-): Promise<McpResult> {
-    try {
-        const result = await fn();
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    } catch (e) {
-        if (e instanceof StaleWriteError) {
-            logger.warn(`${logLabel}: stale write rejected`, e);
-        } else {
-            logger.error(`${logLabel}: failed`, e);
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        return { content: [{ type: "text", text: `${errorPrefix}: ${message}` }], isError: true };
-    }
-}
-
-/** Verify userId owns the project. Throws if not. No-op in single-user mode. */
-async function verifyProjectOwnership(projectId: string, uid: string | null): Promise<void> {
-    if (!uid) return;
-    const project = await prisma.project.findFirst({
-        where: { id: projectId, userId: uid },
-        select: { id: true },
-    });
-    if (!project) throw new Error("Project not found or access denied");
-}
-
 /** Verify userId may modify a writing task — via its project, or its own owner when it has none. No-op in single-user mode. */
 async function verifyWritingTaskAccess(taskId: string, uid: string | null): Promise<void> {
     const task = await prisma.writingTask.findUnique({
         where: { id: taskId },
         select: { projectId: true, userId: true },
     });
-    if (!task) throw new Error(`Writing task not found: ${taskId}`);
+    if (!task) throw new AccessDeniedError("Writing task");
     if (task.projectId) return verifyProjectOwnership(task.projectId, uid);
-    if (uid && task.userId !== uid) throw new Error("Writing task not found or access denied");
-}
-
-/** Look up the projectId that owns a structure node. */
-async function getProjectIdForNode(nodeId: string): Promise<string> {
-    const node = await prisma.structureNode.findUniqueOrThrow({
-        where: { id: nodeId },
-        select: { projectId: true },
-    });
-    return node.projectId;
-}
-
-/** Look up the projectId that owns a story object. */
-async function getProjectIdForStoryObject(objectId: string): Promise<string> {
-    const obj = await prisma.storyObject.findUniqueOrThrow({
-        where: { id: objectId },
-        select: { projectId: true },
-    });
-    return obj.projectId;
+    if (uid && task.userId !== uid) throw new AccessDeniedError("Writing task");
 }
 
 /** Look up the projectId that owns a contest submission. */
 async function getProjectIdForContestSubmission(submissionId: string): Promise<string> {
-    const submission = await prisma.contestSubmission.findUniqueOrThrow({
+    const submission = await prisma.contestSubmission.findUnique({
         where: { id: submissionId },
         select: { projectId: true },
     });
+    if (!submission) throw new AccessDeniedError("Contest submission");
     return submission.projectId;
 }
 
 /** Look up the projectId that owns a publication submission. */
 async function getProjectIdForPublicationSubmission(submissionId: string): Promise<string> {
-    const submission = await prisma.publicationSubmission.findUniqueOrThrow({
+    const submission = await prisma.publicationSubmission.findUnique({
         where: { id: submissionId },
         select: { projectId: true },
     });
+    if (!submission) throw new AccessDeniedError("Publication submission");
     return submission.projectId;
 }
 
@@ -364,7 +321,7 @@ server.tool(
         universeId: z.string(),
     },
     async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
-        await verifyProjectOwnership(await getProjectIdForStoryObject(storyObjectId), userId);
+        await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
         await verifyUniverseOwnership(universeId, userId);
         const result = await transferStoryObjectToUniverse(storyObjectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -447,7 +404,7 @@ server.tool(
     },
     async ({ nodeId, contentHash, ...data }) =>
         mcpRun("update_node", "Error updating node", async () => {
-            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             return updateNode(nodeId, data, contentHash);
         })
 );
@@ -460,7 +417,7 @@ server.tool(
     },
     async ({ nodeId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
         const result = await deleteNode(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -475,7 +432,7 @@ server.tool(
         nodeId: z.string().describe("The scene node ID"),
     },
     async ({ nodeId }) => {
-        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
         const result = await readSceneContent(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -495,10 +452,10 @@ server.tool(
     },
     async ({ nodeId, contentHash, content, blocks }) =>
         mcpRun("write_scene_content", "Error writing scene content", async () => {
-            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             if (blocks) return writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             if (content !== undefined) return writeSceneContent(nodeId, content, contentHash);
-            throw new Error("Either 'content' or 'blocks' must be provided");
+            throw new UserFacingError("Either 'content' or 'blocks' must be provided");
         })
 );
 
@@ -515,7 +472,7 @@ server.tool(
     },
     async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) =>
         mcpRun("update_paragraph", "Error updating paragraph", async () => {
-            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             return updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
         })
 );
@@ -541,7 +498,7 @@ server.tool(
     },
     async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) =>
         mcpRun("insert_beat", "Error inserting beat", async () => {
-            await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             return insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
         })
 );
@@ -554,7 +511,7 @@ server.tool(
         limit: z.number().optional().describe("Max versions to return (default 20)"),
     },
     async ({ nodeId, limit }) => {
-        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
         const result = await getSceneVersions(nodeId, limit);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -568,7 +525,7 @@ server.tool(
         versionId: z.string().describe("The version ID to restore"),
     },
     async ({ nodeId, versionId }) => {
-        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
         const result = await restoreSceneVersion(nodeId, versionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -584,7 +541,7 @@ server.tool(
         selectedText: z.string().optional(),
     },
     async ({ nodeId, content, range, selectedText }: { nodeId: string; content: string; range?: string; selectedText?: string }) => {
-        await verifyProjectOwnership(await getProjectIdForNode(nodeId), userId);
+        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
         const result = await addAnnotation(nodeId, content, range, selectedText);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -672,7 +629,7 @@ server.tool(
         objectId: z.string(),
     },
     async ({ objectId }: { objectId: string }) => {
-        await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
+        await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
         const result = await getStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -711,7 +668,7 @@ server.tool(
     },
     async ({ objectId, contentHash, ...data }) =>
         mcpRun("update_story_object", "Error updating story object", async () => {
-            await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
+            await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
             return updateStoryObject(objectId, data, contentHash);
         })
 );
@@ -724,7 +681,7 @@ server.tool(
     },
     async ({ objectId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await getProjectIdForStoryObject(objectId), userId);
+        await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
         const result = await deleteStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -767,7 +724,7 @@ server.tool(
         })).describe("Array of updates to apply"),
     },
     async ({ updates }) => {
-        const projectIds = await Promise.all(updates.map(u => getProjectIdForStoryObject(u.objectId)));
+        const projectIds = await Promise.all(updates.map(u => projectIdForStoryObject(u.objectId)));
         await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchUpdateStoryObjects(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -782,7 +739,7 @@ server.tool(
     },
     async ({ objectIds }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        const projectIds = await Promise.all(objectIds.map(id => getProjectIdForStoryObject(id)));
+        const projectIds = await Promise.all(objectIds.map(id => projectIdForStoryObject(id)));
         await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchDeleteStoryObjects(objectIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -917,7 +874,7 @@ server.tool(
         })).describe("Array of updates to apply"),
     },
     async ({ updates }) => {
-        const projectIds = await Promise.all(updates.map(u => getProjectIdForNode(u.nodeId)));
+        const projectIds = await Promise.all(updates.map(u => projectIdForNode(u.nodeId)));
         await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchUpdateNodes(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -932,7 +889,7 @@ server.tool(
     },
     async ({ nodeIds }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        const projectIds = await Promise.all(nodeIds.map(id => getProjectIdForNode(id)));
+        const projectIds = await Promise.all(nodeIds.map(id => projectIdForNode(id)));
         await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
         const result = await batchDeleteNodes(nodeIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -1629,8 +1586,7 @@ server.tool(
             return { content: [{ type: "text", text: `Please visit this URL to authorize: ${url}` }] };
         } catch (e) {
             logger.error("google_auth_connect: failed to generate auth URL", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error generating auth URL. Check environment variables (GOOGLE_CLIENT_ID, etc). Error: ${message}` }], isError: true };
+            return toolError("Error generating auth URL", e);
         }
     }
 );
@@ -1647,8 +1603,7 @@ server.tool(
             return { content: [{ type: "text", text: "Successfully connected to Google!" }] };
         } catch (e) {
             logger.error("google_auth_callback: failed to complete OAuth flow", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error connecting: ${message}` }], isError: true };
+            return toolError("Error connecting", e);
         }
     }
 );
@@ -1694,8 +1649,7 @@ server.tool(
             return { content: [{ type: "text", text: `Export successful! Document: ${result.googleDocUrl}` }] };
         } catch (e) {
             logger.error("export_to_google_docs: export failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Export failed: ${message}` }], isError: true };
+            return toolError("Export failed", e);
         }
     }
 );
@@ -1722,7 +1676,7 @@ server.tool(
         sceneId: z.string().describe("The scene node ID"),
     },
     async ({ sceneId }) => {
-        await verifyProjectOwnership(await getProjectIdForNode(sceneId), userId);
+        await verifyProjectOwnership(await projectIdForNode(sceneId), userId);
         const result = await getSceneFocus(sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -2213,8 +2167,7 @@ server.tool(
             return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
         } catch (e) {
             logger.error("get_peer_reviews: failed", e);
-            const message = e instanceof Error ? e.message : String(e);
-            return { content: [{ type: "text", text: `Error fetching peer reviews: ${message}` }], isError: true };
+            return toolError("Error fetching peer reviews", e);
         }
     }
 );

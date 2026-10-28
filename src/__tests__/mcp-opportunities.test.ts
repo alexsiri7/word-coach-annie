@@ -14,6 +14,7 @@ import {
 import { createProvider } from "@/mcp/tools/submissions";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { prisma } from "@/lib/db";
+import { mcpRun } from "@/mcp/tool-errors";
 
 const CLOSE_DATE = "2030-04-01T00:00:00.000Z";
 const REVIEW_DATE = "2030-06-01T00:00:00.000Z";
@@ -453,10 +454,13 @@ describe("MCP Opportunity Tools", () => {
                 projectId,
                 state: "chosen",
             });
-            await promoteOpportunityCandidate(candidate.id, userId);
+            const { submission } = await promoteOpportunityCandidate(candidate.id, userId);
 
-            await expect(promoteOpportunityCandidate(candidate.id, userId))
-                .rejects.toThrow("already promoted");
+            const result = await mcpRun("promote", "Error promoting opportunity candidate", () =>
+                promoteOpportunityCandidate(candidate.id, userId));
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("already promoted");
+            expect(result.content[0].text).not.toContain(submission.id);
             expect(await prisma.contestSubmission.count({ where: { projectId } })).toBe(1);
         });
 

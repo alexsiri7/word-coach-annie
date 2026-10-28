@@ -7,15 +7,16 @@ import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex } from "@/schemas/nodes";
+import { UserFacingError } from "@/lib/controllers/errors";
 
-export class ConflictError extends Error {
+export class ConflictError extends UserFacingError {
   constructor(public serverContent: string) {
     super("Content conflict: server version has changed since last read");
     this.name = "ConflictError";
   }
 }
 
-export class InputTooLargeError extends Error {
+export class InputTooLargeError extends UserFacingError {
   constructor(field: string, max: number) {
     super(`${field} exceeds the maximum length of ${max} characters`);
     this.name = "InputTooLargeError";
@@ -137,11 +138,11 @@ export class StructureController {
                 const segment = segments[i];
                 const closeIndex = segment.indexOf("-->");
                 if (closeIndex === -1) {
-                    throw new Error("Malformed scene content: Unclosed beat annotation found.");
+                    throw new UserFacingError("Malformed scene content: Unclosed beat annotation found.");
                 }
                 // Check for nesting
                 if (segment.substring(0, closeIndex).includes("<!--")) {
-                    throw new Error("Malformed scene content: Nested comments in beats are not allowed.");
+                    throw new UserFacingError("Malformed scene content: Nested comments in beats are not allowed.");
                 }
             }
         }
@@ -152,7 +153,7 @@ export class StructureController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const nodes = await prisma.structureNode.findMany({
             where: { projectId },
@@ -230,23 +231,23 @@ export class StructureController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const validTypes = ["PART", "CHAPTER", "SCENE"];
         if (!validTypes.includes(type)) {
-            throw new Error(`type must be one of: ${validTypes.join(", ")}`);
+            throw new UserFacingError(`type must be one of: ${validTypes.join(", ")}`);
         }
 
         const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
         if (status && !validStatuses.includes(status)) {
-            throw new Error(`status must be one of: ${validStatuses.join(", ")}`);
+            throw new UserFacingError(`status must be one of: ${validStatuses.join(", ")}`);
         }
 
         if (parentId) {
             const parentNode = await prisma.structureNode.findFirst({
                 where: { id: parentId, projectId },
             });
-            if (!parentNode) throw new Error("Parent node not found in this project");
+            if (!parentNode) throw new UserFacingError("Parent node not found in this project");
         }
 
         let orderIndex: number;
@@ -318,16 +319,16 @@ export class StructureController {
         }
     ) {
         const existing = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!existing) throw new Error(`Node not found: ${nodeId}`);
+        if (!existing) throw new UserFacingError("Node not found");
 
         const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
         if (data.status && !validStatuses.includes(data.status)) {
-            throw new Error(`status must be one of: ${validStatuses.join(", ")}`);
+            throw new UserFacingError(`status must be one of: ${validStatuses.join(", ")}`);
         }
 
         if (data.orderIndex !== undefined) {
             const orderIndex = NodeOrderIndex.safeParse(data.orderIndex);
-            if (!orderIndex.success) throw new Error(`orderIndex: ${orderIndex.error.issues[0].message}`);
+            if (!orderIndex.success) throw new UserFacingError(`orderIndex: ${orderIndex.error.issues[0].message}`);
         }
 
         const updateData: Record<string, unknown> = {};
@@ -338,7 +339,7 @@ export class StructureController {
         if (data.parentId !== undefined) updateData.parentId = data.parentId;
 
         if (Object.keys(updateData).length === 0) {
-            throw new Error("No fields to update");
+            throw new UserFacingError("No fields to update");
         }
 
         const node = await prisma.$transaction(async (tx) => {
@@ -363,7 +364,7 @@ export class StructureController {
 
     static async deleteNode(nodeId: string) {
         const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         // Note: autoSnapshot might need to be passed in or handled differently if we want to isolate dependencies
         // For now, we assume this is running in an environment where autoSnapshot works or handles itself gracefully.
@@ -413,7 +414,7 @@ export class StructureController {
             content = sanitizeInput(content);
             if (selectedText) selectedText = sanitizeInput(selectedText);
         }
-        if (!content) throw new Error(ANNOTATION_ERRORS.CONTENT_REQUIRED);
+        if (!content) throw new UserFacingError(ANNOTATION_ERRORS.CONTENT_REQUIRED);
 
         // Explicit ID provided as a workaround for Prisma client not applying @default(cuid())
         // in this context; crypto.randomUUID() is cryptographically secure and globally unique.
@@ -433,7 +434,7 @@ export class StructureController {
 
     static async getNode(nodeId: string) {
         const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
         return node;
     }
 
@@ -442,7 +443,7 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, type: true, title: true },
         });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const version = await prisma.contentVersion.findFirst({
             where: { nodeId },
@@ -489,8 +490,8 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, type: true, title: true, projectId: true },
         });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
-        if (node.type !== "SCENE") throw new Error("Content can only be written to SCENE nodes");
+        if (!node) throw new UserFacingError("Node not found");
+        if (node.type !== "SCENE") throw new UserFacingError("Content can only be written to SCENE nodes");
 
         StructureController.validateSceneContent(rawContent);
         const content = sanitizeHtml(rawContent);
@@ -543,7 +544,7 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, title: true },
         });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const versions = await prisma.contentVersion.findMany({
             where: { nodeId },
@@ -568,12 +569,12 @@ export class StructureController {
             where: { id: nodeId },
             select: { id: true, title: true, projectId: true },
         });
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
+        if (!node) throw new UserFacingError("Node not found");
 
         const oldVersion = await prisma.contentVersion.findFirst({
             where: { id: versionId, nodeId },
         });
-        if (!oldVersion) throw new Error(`Version not found: ${versionId}`);
+        if (!oldVersion) throw new UserFacingError("Version not found");
 
         // Versions stored before every write path sanitized may still carry unsafe markup.
         const content = sanitizeHtml(oldVersion.content);
@@ -631,14 +632,14 @@ export class StructureController {
             status?: string;
         }>
     ) {
-        if (nodes.length === 0) throw new Error("nodes array must not be empty");
-        if (nodes.length > 50) throw new Error("Maximum 50 nodes per batch");
+        if (nodes.length === 0) throw new UserFacingError("nodes array must not be empty");
+        if (nodes.length > 50) throw new UserFacingError("Maximum 50 nodes per batch");
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const results = [];
         const errors = [];
@@ -673,8 +674,8 @@ export class StructureController {
             parentId?: string | null;
         }>
     ) {
-        if (updates.length === 0) throw new Error("updates array must not be empty");
-        if (updates.length > 50) throw new Error("Maximum 50 updates per batch");
+        if (updates.length === 0) throw new UserFacingError("updates array must not be empty");
+        if (updates.length > 50) throw new UserFacingError("Maximum 50 updates per batch");
 
         const results = [];
         const errors = [];
@@ -698,8 +699,8 @@ export class StructureController {
     }
 
     static async batchDeleteNodes(nodeIds: string[]) {
-        if (nodeIds.length === 0) throw new Error("nodeIds array must not be empty");
-        if (nodeIds.length > 50) throw new Error("Maximum 50 deletions per batch");
+        if (nodeIds.length === 0) throw new UserFacingError("nodeIds array must not be empty");
+        if (nodeIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
 
         try {
             autoSnapshot("batch_delete_nodes", `${nodeIds.length} nodes`);

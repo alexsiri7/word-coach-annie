@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export class ProjectsController {
     static async listProjects(limit: number = 20, offset: number = 0, userId?: string | null) {
@@ -80,7 +81,7 @@ export class ProjectsController {
             },
         });
 
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         // Calculate word count from latest content versions of all scenes
         const scenes = await prisma.structureNode.findMany({
@@ -138,7 +139,7 @@ export class ProjectsController {
         const { title, author, synopsis, genre, projectType, userId } = params;
 
         if (!title || title.trim().length === 0) {
-            throw new Error("Title is required");
+            throw new UserFacingError("Title is required");
         }
 
         const project = await prisma.$transaction(
@@ -174,7 +175,7 @@ export class ProjectsController {
         data: { title?: string; author?: string; synopsis?: string; genre?: string; universeId?: string | null; projectType?: string }
     ) {
         const existing = await prisma.project.findUnique({ where: { id: projectId } });
-        if (!existing) throw new Error(`Project not found: ${projectId}`);
+        if (!existing) throw new UserFacingError("Project not found");
 
         const updateData: Record<string, string> = {};
         if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());
@@ -185,7 +186,7 @@ export class ProjectsController {
         if (data.universeId !== undefined) (updateData as Record<string, unknown>).universeId = data.universeId;
 
         if (Object.keys(updateData).length === 0) {
-            throw new Error("No fields to update");
+            throw new UserFacingError("No fields to update");
         }
 
         const project = await prisma.project.update({

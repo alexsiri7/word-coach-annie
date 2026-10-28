@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { HashnodePublishController } from "@/lib/controllers/hashnode-publish";
+import { HashnodeNotConnectedError } from "@/lib/controllers/hashnode-auth";
+import { UpstreamServiceError } from "@/lib/controllers/errors";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +90,36 @@ describe("POST /api/projects/[id]/publish-to-hashnode", () => {
       const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
       const res = await POST(makeRequest({}), routeParams);
       expect(res.status).toBe(201);
+    });
+  });
+
+  describe("publish failures", () => {
+    it("maps HashnodeNotConnectedError to a fixed 400", async () => {
+      vi.mocked(HashnodePublishController.publish).mockRejectedValueOnce(new HashnodeNotConnectedError());
+      const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
+      const res = await POST(makeRequest({}), routeParams);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Hashnode account not connected" });
+    });
+
+    it("maps UpstreamServiceError to a fixed 502 without upstream detail", async () => {
+      vi.mocked(HashnodePublishController.publish).mockRejectedValueOnce(
+        new UpstreamServiceError("Hashnode API error (500): secret-upstream-body"),
+      );
+      const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
+      const res = await POST(makeRequest({}), routeParams);
+      expect(res.status).toBe(502);
+      const text = await res.text();
+      expect(JSON.parse(text)).toEqual({ error: "Upstream service error" });
+      expect(text).not.toContain("secret-upstream-body");
+    });
+
+    it("maps any other error to a fixed 500", async () => {
+      vi.mocked(HashnodePublishController.publish).mockRejectedValueOnce(new Error("internal detail"));
+      const { POST } = await import("@/app/api/projects/[id]/publish-to-hashnode/route");
+      const res = await POST(makeRequest({}), routeParams);
+      expect(res.status).toBe(500);
+      expect(await res.text()).not.toContain("internal detail");
     });
   });
 });

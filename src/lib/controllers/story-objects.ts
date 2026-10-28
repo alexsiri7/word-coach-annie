@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../../mcp/snapshot";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 const VALID_TYPES = ["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"] as const;
 type StoryObjectType = (typeof VALID_TYPES)[number];
@@ -18,10 +19,10 @@ export class StoryObjectController {
             where: { id: projectId },
             select: { id: true, universeId: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         if (type && !VALID_TYPES.includes(type as StoryObjectType)) {
-            throw new Error(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
+            throw new UserFacingError(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
         }
 
         const where: Record<string, unknown> = { projectId };
@@ -108,7 +109,7 @@ export class StoryObjectController {
             },
         });
 
-        if (!obj) throw new Error(`Story object not found: ${objectId}`);
+        if (!obj) throw new UserFacingError("Story object not found");
 
         const relatedTo = [
             ...obj.relationships.map((r) => ({
@@ -162,14 +163,14 @@ export class StoryObjectController {
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         if (!VALID_TYPES.includes(type as StoryObjectType)) {
-            throw new Error(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
+            throw new UserFacingError(`Invalid type. Must be one of: ${VALID_TYPES.join(", ")}`);
         }
 
         if (!name || name.trim().length === 0) {
-            throw new Error("name is required");
+            throw new UserFacingError("name is required");
         }
 
         const obj = await prisma.storyObject.create({
@@ -210,10 +211,10 @@ export class StoryObjectController {
             where: { id: objectId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Story object not found: ${objectId}`);
+        if (!existing) throw new UserFacingError("Story object not found");
 
         if (data.name !== undefined && data.name.trim().length === 0) {
-            throw new Error("name must be a non-empty string");
+            throw new UserFacingError("name must be a non-empty string");
         }
 
         const updateData: Record<string, unknown> = {};
@@ -224,7 +225,7 @@ export class StoryObjectController {
         if (data.tags !== undefined) updateData.tags = data.tags;
 
         if (Object.keys(updateData).length === 0) {
-            throw new Error("No fields to update");
+            throw new UserFacingError("No fields to update");
         }
 
         const obj = await prisma.storyObject.update({
@@ -246,7 +247,7 @@ export class StoryObjectController {
 
     static async deleteStoryObject(objectId: string) {
         const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
-        if (!obj) throw new Error(`Story object not found: ${objectId}`);
+        if (!obj) throw new UserFacingError("Story object not found");
 
         try {
             autoSnapshot("delete_story_object", obj.name);
@@ -270,14 +271,14 @@ export class StoryObjectController {
             tags?: string;
         }>
     ) {
-        if (objects.length === 0) throw new Error("objects array must not be empty");
-        if (objects.length > 50) throw new Error("Maximum 50 objects per batch");
+        if (objects.length === 0) throw new UserFacingError("objects array must not be empty");
+        if (objects.length > 50) throw new UserFacingError("Maximum 50 objects per batch");
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { id: true },
         });
-        if (!project) throw new Error(`Project not found: ${projectId}`);
+        if (!project) throw new UserFacingError("Project not found");
 
         const results = [];
         const errors = [];
@@ -286,10 +287,10 @@ export class StoryObjectController {
             const obj = objects[i];
             try {
                 if (!VALID_TYPES.includes(obj.type as StoryObjectType)) {
-                    throw new Error(`Invalid type "${obj.type}". Must be one of: ${VALID_TYPES.join(", ")}`);
+                    throw new UserFacingError(`Invalid type "${obj.type}". Must be one of: ${VALID_TYPES.join(", ")}`);
                 }
                 if (!obj.name || obj.name.trim().length === 0) {
-                    throw new Error("name is required");
+                    throw new UserFacingError("name is required");
                 }
 
                 const created = await prisma.storyObject.create({
@@ -334,8 +335,8 @@ export class StoryObjectController {
             tags?: string;
         }>
     ) {
-        if (updates.length === 0) throw new Error("updates array must not be empty");
-        if (updates.length > 50) throw new Error("Maximum 50 updates per batch");
+        if (updates.length === 0) throw new UserFacingError("updates array must not be empty");
+        if (updates.length > 50) throw new UserFacingError("Maximum 50 updates per batch");
 
         const results = [];
         const errors = [];
@@ -359,8 +360,8 @@ export class StoryObjectController {
     }
 
     static async batchDeleteStoryObjects(objectIds: string[]) {
-        if (objectIds.length === 0) throw new Error("objectIds array must not be empty");
-        if (objectIds.length > 50) throw new Error("Maximum 50 deletions per batch");
+        if (objectIds.length === 0) throw new UserFacingError("objectIds array must not be empty");
+        if (objectIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
 
         try {
             autoSnapshot("batch_delete_story_objects", `${objectIds.length} objects`);
@@ -375,7 +376,7 @@ export class StoryObjectController {
             const objectId = objectIds[i];
             try {
                 const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
-                if (!obj) throw new Error(`Story object not found: ${objectId}`);
+                if (!obj) throw new UserFacingError("Story object not found");
                 await prisma.storyObject.delete({ where: { id: objectId } });
                 results.push({ index: i, success: true, id: objectId, name: obj.name });
             } catch (e) {

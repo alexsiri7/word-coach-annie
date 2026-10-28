@@ -3,10 +3,11 @@ import {
     listSnapshots as listSnapshotsImpl,
     restoreSnapshot as restoreSnapshotImpl,
 } from "../snapshot";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export async function snapshotDatabase(message: string) {
     if (!message || message.trim().length === 0) {
-        throw new Error("A description message is required for the snapshot");
+        throw new UserFacingError("A description message is required for the snapshot");
     }
 
     const result = createSnapshot(message.trim());
@@ -27,7 +28,7 @@ export async function listDatabaseSnapshots(limit: number = 20) {
 
 export async function restoreDatabaseSnapshot(commitHash: string) {
     if (!commitHash || commitHash.trim().length === 0) {
-        throw new Error("commitHash is required");
+        throw new UserFacingError("commitHash is required");
     }
 
     const result = restoreSnapshotImpl(commitHash.trim());

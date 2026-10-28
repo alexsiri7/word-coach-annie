@@ -4,6 +4,7 @@ import {
     PublicationSubmissionController,
 } from "@/lib/controllers/submissions";
 import { mcpCache } from "@/lib/cache";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // ── Providers (user-scoped) ─────────────────────────────────────────────
 // Providers have a nullable-but-real FK to User. When the MCP server runs without
@@ -37,7 +38,7 @@ export async function updateProvider(params: {
 }) {
     const { providerId, userId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await ProviderController.updateProvider(providerId, userId, data);
     mcpCache.invalidatePrefix(`providers:${userId}`);
@@ -84,7 +85,7 @@ export async function updateContestSubmission(params: {
 }) {
     const { submissionId, userId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await ContestSubmissionController.updateContestSubmission(submissionId, userId, data);
     mcpCache.invalidatePrefix(`contestSubmissions:${result.projectId}`);
@@ -123,7 +124,7 @@ export async function updatePublicationSubmission(params: {
 }) {
     const { submissionId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await PublicationSubmissionController.updatePublicationSubmission(submissionId, data);
     mcpCache.invalidatePrefix(`publicationSubmissions:${result.projectId}`);

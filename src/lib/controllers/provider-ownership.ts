@@ -17,7 +17,7 @@ export async function requireOwnedProvider(
         where: { id: providerId },
         select: { id: true, userId: true },
     });
-    if (!provider) throw new NotFoundError(`Provider not found: ${providerId}`);
+    if (!provider) throw new NotFoundError("Provider not found");
     if (!userId || provider.userId === userId) return;
     if (callerId && provider.userId === callerId) return;
     throw new ForbiddenError("Forbidden");

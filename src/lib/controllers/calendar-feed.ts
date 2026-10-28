@@ -61,7 +61,7 @@ export class CalendarFeedController {
             where: { id: userId },
             select: { calendarFeedToken: true },
         });
-        if (!user) throw new NotFoundError(`User not found: ${userId}`);
+        if (!user) throw new NotFoundError("User not found");
         if (user.calendarFeedToken) return user.calendarFeedToken;
 
         // Conditional on the column still being null, so a concurrent mint wins outright
@@ -77,7 +77,7 @@ export class CalendarFeedController {
             where: { id: userId },
             select: { calendarFeedToken: true },
         });
-        if (!committed?.calendarFeedToken) throw new NotFoundError(`User not found: ${userId}`);
+        if (!committed?.calendarFeedToken) throw new NotFoundError("User not found");
         return committed.calendarFeedToken;
     }
 

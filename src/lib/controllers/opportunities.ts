@@ -1,13 +1,13 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
-import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
+import { ForbiddenError, NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 import { requireOwnedProvider } from "@/lib/controllers/provider-ownership";
 import { safeHref } from "@/lib/http-url";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
 /** The row exists and is owned, but its current state forbids the operation. */
-export class ConflictError extends Error {}
+export class ConflictError extends UserFacingError {}
 
 // ── Opportunity ─────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ async function requireOwnedOpportunity(id: string, userId: string | null) {
         where: { id },
         select: { id: true, userId: true, providerId: true, title: true, reviewDate: true, rulesUrl: true },
     });
-    if (!existing) throw new NotFoundError(`Opportunity not found: ${id}`);
+    if (!existing) throw new NotFoundError("Opportunity not found");
     if (userId && existing.userId !== userId) throw new ForbiddenError("Forbidden");
     return existing;
 }
@@ -97,7 +97,7 @@ async function requireOwnedProject(projectId: string, userId: string | null) {
         where: { id: projectId },
         select: { id: true, userId: true },
     });
-    if (!project) throw new NotFoundError(`Project not found: ${projectId}`);
+    if (!project) throw new NotFoundError("Project not found");
     if (userId && project.userId !== userId) throw new ForbiddenError("Forbidden");
 }
 
@@ -112,10 +112,10 @@ async function requireOwnedUnlinkedSubmission(submissionId: string, userId: stri
             _count: { select: { opportunityCandidates: true } },
         },
     });
-    if (!submission) throw new NotFoundError(`Contest submission not found: ${submissionId}`);
+    if (!submission) throw new NotFoundError("Contest submission not found");
     if (submission.project.userId !== userId) throw new ForbiddenError("Forbidden");
     if (submission._count.opportunityCandidates > 0) {
-        throw new ConflictError(`Contest submission ${submissionId} already belongs to an opportunity`);
+        throw new ConflictError("Contest submission already belongs to an opportunity");
     }
     return submission;
 }
@@ -192,7 +192,7 @@ export class OpportunityController {
             where: { id },
             include: withCandidateDetail,
         });
-        if (!opportunity) throw new NotFoundError(`Opportunity not found: ${id}`);
+        if (!opportunity) throw new NotFoundError("Opportunity not found");
         if (userId && opportunity.userId !== userId) throw new ForbiddenError("Forbidden");
 
         return serializeOpportunityWithCandidates(opportunity);
@@ -289,9 +289,9 @@ function serializeCandidate(c: Prisma.OpportunityCandidateGetPayload<object>) {
  */
 async function requireOwnedCandidate(candidateId: string, userId: string | null, opportunityId?: string) {
     const candidate = await prisma.opportunityCandidate.findUnique({ where: { id: candidateId } });
-    if (!candidate) throw new NotFoundError(`Opportunity candidate not found: ${candidateId}`);
+    if (!candidate) throw new NotFoundError("Opportunity candidate not found");
     if (opportunityId !== undefined && candidate.opportunityId !== opportunityId) {
-        throw new NotFoundError(`Opportunity candidate not found: ${candidateId}`);
+        throw new NotFoundError("Opportunity candidate not found");
     }
     const opportunity = await requireOwnedOpportunity(candidate.opportunityId, userId);
     return { candidate, opportunity };
@@ -368,7 +368,7 @@ export class OpportunityCandidateController {
             throw new ConflictError(`Only a candidate in state "chosen" can be promoted (this one is "${candidate.state}")`);
         }
         if (candidate.submissionId) {
-            throw new ConflictError(`Candidate was already promoted to submission ${candidate.submissionId}`);
+            throw new ConflictError("Candidate was already promoted to a submission");
         }
 
         const { promoted, submission } = await prisma.$transaction(async (tx) => {

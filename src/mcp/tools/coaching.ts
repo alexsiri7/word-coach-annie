@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // ─── Plot Thread Status ─────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export async function getSceneFocus(sceneId: string) {
     where: { id: sceneId },
     include: { project: { select: { title: true, id: true } } },
   });
-  if (!scene) throw new Error(`Scene not found: ${sceneId}`);
+  if (!scene) throw new UserFacingError("Scene not found");
 
   const siblings = await prisma.structureNode.findMany({
     where: { projectId: scene.projectId, type: "SCENE" },
@@ -240,7 +241,7 @@ export async function getManuscriptContext(projectId: string) {
     }),
   ]);
 
-  if (!project) throw new Error("Project not found");
+  if (!project) throw new UserFacingError("Project not found");
 
   const chapters = nodes.filter((n) => n.type === "CHAPTER");
   const scenes = nodes.filter((n) => n.type === "SCENE");
@@ -295,7 +296,7 @@ export async function getConsistencyContext(projectId: string, focusSceneId?: st
     where: { id: projectId },
     select: { title: true },
   });
-  if (!project) throw new Error("Project not found");
+  if (!project) throw new UserFacingError("Project not found");
 
   const characters = await prisma.storyObject.findMany({
     where: { projectId, type: "CHARACTER" },
@@ -366,7 +367,7 @@ export async function getStoryBibleCrossReference(projectId: string, sceneId?: s
     where: { id: projectId },
     select: { title: true },
   });
-  if (!project) throw new Error("Project not found");
+  if (!project) throw new UserFacingError("Project not found");
 
   // Fetch ALL story object types — not just characters
   const storyObjects = await prisma.storyObject.findMany({
@@ -480,7 +481,7 @@ export async function getVoiceContext(projectId: string, sceneId: string) {
     select: { id: true },
   });
   if (!sceneNode) {
-    throw new Error("Scene not found in this project");
+    throw new UserFacingError("Scene not found in this project");
   }
 
   const sceneRelationships = await prisma.relationship.findMany({
