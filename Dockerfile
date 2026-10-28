@@ -59,7 +59,7 @@ COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-secu
 COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
 COPY --from=builder /app/scripts/secret-strength.mjs ./scripts/secret-strength.mjs
 COPY --from=builder /app/scripts/database-schema.mjs ./scripts/database-schema.mjs
-# Release-step re-encryption after an ENCRYPTION_KEY rotation
+# Encryption keyring (also read by migrate.mjs) and the startup re-encryption sweep
 COPY --from=builder /app/scripts/encryption-keyring.mjs ./scripts/encryption-keyring.mjs
 COPY --from=builder /app/scripts/reencrypt.mjs ./scripts/reencrypt.mjs
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
@@ -68,6 +68,6 @@ USER nextjs
 
 EXPOSE 3000
 
-# A failed re-encryption sweep must not block startup: reads still rewrite
-# previous-key values lazily.
-CMD ["sh", "-c", "node scripts/migrate.mjs && (node scripts/reencrypt.mjs || true) && exec node server.js"]
+# A failed re-encryption sweep blocks startup: reads never encrypt values
+# stored as plaintext, so the sweep is the only thing that does.
+CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/reencrypt.mjs && exec node server.js"]

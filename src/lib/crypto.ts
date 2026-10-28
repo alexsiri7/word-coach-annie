@@ -8,9 +8,11 @@
  *
  * When ENCRYPTION_KEY is unset, throws by default and ENCRYPTION_KEY_PREVIOUS
  * is ignored. To allow plaintext storage in local dev, set
- * ALLOW_PLAINTEXT_STORAGE=true.
+ * ALLOW_PLAINTEXT_STORAGE=true; production ignores it and refuses to start
+ * while it is set (scripts/migrate.mjs).
  *
- * Encrypted format: "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
+ * Encrypted format: "enc:v2:<key-id>:<iv-hex>:<ciphertext+tag-hex>"; legacy
+ * "enc:v1:<iv-hex>:<ciphertext+tag-hex>" values still decrypt
  * (implemented in scripts/encryption-keyring.mjs).
  */
 import {
@@ -20,6 +22,7 @@ import {
     deriveKey,
     encryptWithKey,
     keySources,
+    parseEncrypted,
 } from "../../scripts/encryption-keyring.mjs";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -43,11 +46,11 @@ function getKeyring(): Buffer[] | null {
     // key-confusion attacks if the token is rotated or leaked.
     const { current, previous } = keySources(env);
     if (!current) {
-        if (process.env.ALLOW_PLAINTEXT_STORAGE !== "true") {
+        if (process.env.ALLOW_PLAINTEXT_STORAGE !== "true" || process.env.NODE_ENV === "production") {
             throw new Error(
                 "[crypto] ENCRYPTION_KEY must be set. " +
                 "Generate one with: openssl rand -hex 32\n" +
-                "To allow plaintext storage in local dev, set ALLOW_PLAINTEXT_STORAGE=true."
+                "To allow plaintext storage in local dev (never in production), set ALLOW_PLAINTEXT_STORAGE=true."
             );
         }
         if (!encryptionWarningLogged) {
@@ -71,7 +74,7 @@ export function isEncrypted(value: string): boolean {
 /**
  * Encrypt a plaintext value with the current key. Returns the encrypted string.
  * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
- * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the plaintext unchanged.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set outside production, returns the plaintext unchanged.
  */
 export function encrypt(plaintext: string): string {
     if (!plaintext) return plaintext;
@@ -85,7 +88,7 @@ export function encrypt(plaintext: string): string {
  * If the value is not encrypted (no prefix), returns it unchanged.
  * Throws if no configured key decrypts it.
  * Throws if no encryption key is available and ALLOW_PLAINTEXT_STORAGE is not set.
- * If ALLOW_PLAINTEXT_STORAGE=true and no key is set, returns the raw value unchanged.
+ * If ALLOW_PLAINTEXT_STORAGE=true and no key is set outside production, returns the raw value unchanged.
  */
 export function decrypt(value: string): string {
     if (!value || !isEncrypted(value)) return value;
@@ -93,10 +96,9 @@ export function decrypt(value: string): string {
     const keyring = getKeyring();
     if (!keyring) return value;
 
-    const parts = value.slice(ENCRYPTED_PREFIX.length).split(":");
-    if (parts.length !== 2) {
+    if (!parseEncrypted(value)) {
         throw new Error(
-            `[crypto] Malformed ciphertext (expected enc:v1:<iv>:<payload>, got ${parts.length} parts). ` +
+            "[crypto] Malformed ciphertext (expected enc:v2:<key-id>:<iv>:<payload> or enc:v1:<iv>:<payload>). " +
             "This may indicate data corruption or an incomplete write."
         );
     }
@@ -135,7 +137,7 @@ export async function readEncrypted(
         return null;
     }
 
-    if (result.keyIndex > 0 && opts.rewrite) {
+    if (result.stale && opts.rewrite) {
         try {
             await opts.rewrite(encryptWithKey(keyring[0], result.plaintext));
         } catch (err) {

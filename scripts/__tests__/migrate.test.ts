@@ -157,7 +157,7 @@ describe('migrate.mjs — production TLS gate', () => {
 describe('migrate.mjs — production auth gate', () => {
   function runWithoutAuth(overrides: NodeJS.ProcessEnv) {
     const env: NodeJS.ProcessEnv = { ...process.env, ...overrides };
-    for (const key of ['DATABASE_URL', 'REDIS_URL', 'API_TOKEN', 'GOOGLE_CLIENT_ID', 'JWT_SECRET', 'ENCRYPTION_KEY']) {
+    for (const key of ['DATABASE_URL', 'REDIS_URL', 'API_TOKEN', 'GOOGLE_CLIENT_ID', 'JWT_SECRET', 'ENCRYPTION_KEY', 'ALLOW_PLAINTEXT_STORAGE']) {
       if (!(key in overrides)) delete env[key];
     }
     return spawnSync('node', [MIGRATE_SCRIPT], { env, encoding: 'utf-8' });
@@ -203,6 +203,21 @@ describe('migrate.mjs — production auth gate', () => {
     expect(result.status).toBe(0);
     expect(result.stderr).not.toContain('Startup refused');
   });
+
+  it('refuses to start in production with ALLOW_PLAINTEXT_STORAGE=true', () => {
+    const result = runWithoutAuth({ NODE_ENV: 'production', API_TOKEN: 'a'.repeat(64), ALLOW_PLAINTEXT_STORAGE: 'true' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Startup refused: ALLOW_PLAINTEXT_STORAGE=true is set');
+    expect(result.stderr).not.toContain('skipping migrations');
+  });
+
+  it('starts outside production with ALLOW_PLAINTEXT_STORAGE=true', () => {
+    const result = runWithoutAuth({ NODE_ENV: 'development', ALLOW_PLAINTEXT_STORAGE: 'true' });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('Startup refused');
+  });
 });
 
 // The runner stage copies scripts one by one; a module migrate.mjs imports but
@@ -217,6 +232,7 @@ describe('Dockerfile ships every module migrate.mjs imports', () => {
     expect(imports).toContain('transport-security.mjs');
     expect(imports).toContain('auth-configuration.mjs');
     expect(imports).toContain('secret-strength.mjs');
+    expect(imports).toContain('encryption-keyring.mjs');
   });
 
   it.each(imports)('copies %s', (file) => {
