@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { prisma } from "@/lib/db";
-import { GET } from "../app/api/health/route";
 
 vi.mock("@/lib/db", () => ({
     prisma: {
@@ -10,8 +9,17 @@ vi.mock("@/lib/db", () => ({
 }));
 
 describe("GET /api/health", () => {
-    beforeEach(() => {
+    let GET: typeof import("../app/api/health/route").GET;
+
+    beforeEach(async () => {
         vi.clearAllMocks();
+        // The route caches its result at module level; load a fresh copy per test.
+        vi.resetModules();
+        ({ GET } = await import("../app/api/health/route"));
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it("returns status ok when data exists and does not expose counts", async () => {
@@ -28,7 +36,7 @@ describe("GET /api/health", () => {
         expect(body.users).toBeUndefined();
     });
 
-    it("returns status degraded with warning when both tables are empty", async () => {
+    it("returns status degraded without the data-loss detail when both tables are empty", async () => {
         (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
 
@@ -36,9 +44,23 @@ describe("GET /api/health", () => {
         const body = await res.json();
 
         expect(res.status).toBe(503);
-        expect(body.status).toBe("degraded");
-        expect(body.warning).toBeDefined();
-        expect(body.db).toBeUndefined();
+        expect(body).toEqual({ status: "degraded" });
+    });
+
+    it("queries the DB at most once per 10s window across many calls", async () => {
+        vi.useFakeTimers();
+        (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(5);
+        (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(10);
+
+        const responses = await Promise.all(Array.from({ length: 20 }, () => GET()));
+        await GET();
+        expect(responses.every((r) => r.status === 200)).toBe(true);
+        expect(prisma.project.count).toHaveBeenCalledTimes(1);
+        expect(prisma.user.count).toHaveBeenCalledTimes(1);
+
+        vi.advanceTimersByTime(10_000);
+        await GET();
+        expect(prisma.project.count).toHaveBeenCalledTimes(2);
     });
 
     it("returns 503 on DB error with generic message, not raw error details", async () => {
