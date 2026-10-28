@@ -15,24 +15,18 @@ services:
       - NODE_ENV=development
       - OTEL_ENABLED=true
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
-    command: sh -c "npx prisma generate && node scripts/migrate.mjs && npm run dev"
+    command: sh -c "npx prisma generate && node scripts/migrate.mjs && npm run dev:lan"
     depends_on:
       - phoenix
 
   phoenix:
-    image: arizephoenix/phoenix:latest
+    # Same digest as docker-compose.yml; update both together.
+    image: arizephoenix/phoenix@sha256:91bb10c1217cd1fc0b3ac5908cc8d11f663bc56e00241b7f7551af880d5bcd92
     restart: unless-stopped
     ports:
       - "127.0.0.1:6006:6006"
     volumes:
       - phoenix-data:/data
-
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    restart: always
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    command: tunnel --no-autoupdate run
 
 volumes:
   phoenix-data:

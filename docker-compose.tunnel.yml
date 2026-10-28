@@ -1,0 +1,17 @@
+# Publishes the dev server through a Cloudflare tunnel. Overlay on the dev stack:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.tunnel.yml up
+# Compose refuses to start without API_TOKEN, and passes it to the app so the
+# tunnel never exposes it with auth disabled.
+services:
+  app:
+    environment:
+      - API_TOKEN=${API_TOKEN:?set API_TOKEN before exposing the dev server through the tunnel}
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.5.2
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - app
