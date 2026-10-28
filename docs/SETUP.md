@@ -37,14 +37,27 @@ The app runs on `http://localhost:3000`. The database is at `./data/word-coach-a
 
 ### Image Source
 
-Production uses a pre-built image from GitHub Container Registry:
-```
-ghcr.io/alexsiri7/word-coach-annie:latest
+The `app` service runs `ghcr.io/alexsiri7/word-coach-annie`. No CI workflow builds or pushes this image: the GHCR push job was removed in `a23e000` when hosted deploys moved to Railway, which builds from source. A maintainer with write access to the GHCR package builds and pushes it by hand:
+
+```bash
+docker build -t ghcr.io/alexsiri7/word-coach-annie:latest .
+docker push ghcr.io/alexsiri7/word-coach-annie:latest
 ```
 
-CI builds and pushes this image on every commit to `main` that passes quality gates.
+Building, pushing and signing the image in CI is tracked in [#1367](https://github.com/alexsiri7/word-coach-annie/issues/1367).
 
-### Updating to Latest
+### Updating Images
+
+The third-party images (`phoenix`, `tunnel`) are pinned by digest, so `docker compose pull` cannot swap them for a different image under the same tag; Dependabot proposes bumps for `tunnel`, which also carries its version tag, as PRs. `app` still runs `:latest`, so `docker compose pull` fetches whatever was last pushed there until it is pinned.
+
+To pin `app` to a pushed image, resolve its digest (requires `docker login ghcr.io`):
+
+```bash
+docker pull ghcr.io/alexsiri7/word-coach-annie:latest
+docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/alexsiri7/word-coach-annie:latest
+```
+
+Set the `app` image to the printed `ghcr.io/alexsiri7/word-coach-annie@sha256:...` reference, with a comment giving the source tag and the date it was pinned (as for `phoenix`), then redeploy:
 
 ```bash
 docker compose pull && docker compose up -d
