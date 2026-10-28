@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/db", () => ({ prisma: { conversation: { update: vi.fn() } } }));
+vi.mock("@/lib/db", () => ({ prisma: { conversation: { updateMany: vi.fn(async () => ({ count: 1 })) } } }));
 vi.mock("@/lib/ai/adk-agent", () => ({
   runSimpleCompletion: vi.fn(async () => "Summary of discussion."),
 }));
@@ -57,8 +57,8 @@ describe("compressConversation", () => {
 
     await compressConversation(baseConversation, messages, settings, aiConfig);
 
-    expect(prisma.conversation.update).toHaveBeenCalledWith({
-      where: { id: "conv-1" },
+    expect(prisma.conversation.updateMany).toHaveBeenCalledWith({
+      where: { id: "conv-1", messages: { some: { id: "msg-2" } } },
       data: {
         summary: "Summary of discussion.",
         summarizedThroughMessageId: "msg-2",
@@ -86,6 +86,6 @@ describe("compressConversation", () => {
     await compressConversation(baseConversation, messages, settings, aiConfig);
 
     expect(runSimpleCompletion).not.toHaveBeenCalled();
-    expect(prisma.conversation.update).not.toHaveBeenCalled();
+    expect(prisma.conversation.updateMany).not.toHaveBeenCalled();
   });
 });

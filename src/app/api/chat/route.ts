@@ -518,7 +518,13 @@ export async function DELETE(request: NextRequest) {
     );
     if (!access.authorized) return access.response;
 
-    await prisma.chatMessage.deleteMany({ where: { conversationId } });
+    await prisma.$transaction([
+      prisma.chatMessage.deleteMany({ where: { conversationId } }),
+      prisma.conversation.update({
+        where: { id: conversationId },
+        data: { summary: null, summarizedThroughMessageId: null },
+      }),
+    ]);
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("DELETE /api/chat error", error);

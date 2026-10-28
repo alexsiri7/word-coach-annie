@@ -55,13 +55,19 @@ export async function compressConversation(
     temperature: 0.3,
   });
 
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      summary: newSummary,
-      summarizedThroughMessageId: toCompress.at(-1)!.id,
-    },
+  const summarizedThroughMessageId = toCompress.at(-1)!.id;
+  // Clearing the chat deletes the messages this summary was built from; if that
+  // happened while the completion ran, the summary must not be written back.
+  const { count } = await prisma.conversation.updateMany({
+    where: { id: conversation.id, messages: { some: { id: summarizedThroughMessageId } } },
+    data: { summary: newSummary, summarizedThroughMessageId },
   });
+  if (count === 0) {
+    logger.info("compressConversation: history cleared during compression, summary discarded", {
+      conversationId: conversation.id,
+    });
+    return;
+  }
 
   logger.info("compressConversation: done", { conversationId: conversation.id });
 }
