@@ -144,13 +144,12 @@ export function parseEncrypted(value) {
  * Decrypt an encrypted value. A v2 value is tried only with the configured key
  * its key id names; a v1 value with each key in turn.
  *
- * keyIndex 0 is the current key. stale is true when the value should be
- * rewritten with encryptWithKey(keys[0], plaintext): it was encrypted with a
- * previous key.
+ * stale is true when the value should be rewritten with
+ * encryptWithKey(keys[0], plaintext): it was encrypted with a previous key.
  *
  * @param {string} value
  * @param {Buffer[]} keys - Current key first, then previous keys
- * @returns {{ plaintext: string, keyIndex: number, stale: boolean } | null} null
+ * @returns {{ plaintext: string, stale: boolean } | null} null
  *   when the value is malformed or no key authenticates it
  */
 export function decryptWithKeys(value, keys) {
@@ -162,7 +161,7 @@ export function decryptWithKeys(value, keys) {
       const decipher = createDecipheriv(ALGORITHM, keys[keyIndex], parsed.iv);
       decipher.setAuthTag(parsed.tag);
       const decrypted = Buffer.concat([decipher.update(parsed.ciphertext), decipher.final()]);
-      return { plaintext: decrypted.toString('utf8'), keyIndex, stale: keyIndex > 0 };
+      return { plaintext: decrypted.toString('utf8'), stale: keyIndex > 0 };
     } catch {
       // Wrong key (or tampered value): try the next one.
     }
