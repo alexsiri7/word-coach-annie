@@ -68,6 +68,6 @@ USER nextjs
 
 EXPOSE 3000
 
-# A failed re-encryption sweep must not block startup: reads still rewrite
-# previous-key values lazily.
-CMD ["sh", "-c", "node scripts/migrate.mjs && (node scripts/reencrypt.mjs || true) && exec node server.js"]
+# A failed re-encryption sweep blocks startup: reads never encrypt values
+# stored as plaintext, so the sweep is the only thing that does.
+CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/reencrypt.mjs && exec node server.js"]

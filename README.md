@@ -78,7 +78,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `APP_BASE_URL` | No | Public origin for absolute URLs (OAuth metadata, calendar feed); falls back to the `GOOGLE_REDIRECT_URI` origin — one of the two must be set |
 | `API_TOKEN` | Recommended | Bearer token for API/MCP access (32-byte hex); production refuses to start unless `API_TOKEN` or `GOOGLE_CLIENT_ID` is set |
 | `JWT_SECRET` | No | JWT signing secret for Google OAuth sessions |
-| `ENCRYPTION_KEY` | No | Key for encrypting API keys at rest |
+| `ENCRYPTION_KEY` | Production | Key for encrypting API keys at rest (see [docs/SETUP.md](docs/SETUP.md)) |
 | `ALLOWED_EMAILS` | No | Comma-separated list of allowed Google accounts |
 | `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for public access |
 

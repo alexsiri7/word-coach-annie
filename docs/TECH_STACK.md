@@ -173,7 +173,7 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 | `ALLOWED_EMAILS` | Access control (comma-separated) | No |
 | `API_TOKEN` | Request authentication (32-byte hex) | Recommended (production requires it unless `GOOGLE_CLIENT_ID` is set) |
 | `JWT_SECRET` | OAuth session signing | No |
-| `ENCRYPTION_KEY` | Data-at-rest encryption | No |
+| `ENCRYPTION_KEY` | Data-at-rest encryption | Production |
 | `ENCRYPTION_KEY_PREVIOUS` | Older encryption keys, decrypt-only (key rotation) | No |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Error tracking | No |
 | `RAILWAY_TOKEN` | Railway API (for deploy pipeline) | CI only |

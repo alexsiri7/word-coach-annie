@@ -122,7 +122,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 
 1. Generate a new key: `openssl rand -hex 32`.
 2. Set the new key as `ENCRYPTION_KEY` and move the old one into `ENCRYPTION_KEY_PREVIOUS` (comma-separate several old keys if needed).
-3. Deploy. On startup the container runs `scripts/reencrypt.mjs`, which rewrites every stored value from a previous key to the new one. You can also run `node scripts/reencrypt.mjs` by hand. Values are also rewritten whenever the app reads them.
+3. Deploy. On startup the container runs `scripts/reencrypt.mjs`, which rewrites every stored value from a previous key to the new one. If the sweep fails, the container exits instead of starting the app. You can also run `node scripts/reencrypt.mjs` by hand. Values are also rewritten whenever the app reads them.
 4. Check the `reencrypt:` summary in the logs. After a successful run every value that could be decrypted is under the new key. `undecryptable` counts values no configured key can decrypt.
 5. Remove `ENCRYPTION_KEY_PREVIOUS` and redeploy.
 
