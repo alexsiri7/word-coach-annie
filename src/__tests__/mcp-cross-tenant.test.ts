@@ -16,10 +16,12 @@ vi.mock("../lib/controllers/google-auth", () => ({
         getAuthUrl: vi.fn(() => "https://example.com/auth"),
         handleCallback: vi.fn(async () => ({})),
         disconnect: vi.fn(async () => {}),
+        getValidClient: vi.fn(async () => null),
     },
 }));
 
 import { GoogleAuthController } from "../lib/controllers/google-auth";
+import { GoogleDocsApi } from "../lib/google-api";
 
 type ToolResult = { isError?: boolean; content: Array<{ text: string }> };
 
@@ -256,6 +258,36 @@ describe("MCP cross-tenant access (SEC-02)", () => {
             });
             expect(result.isError).toBe(true);
             expect(result.content[0].text).toContain("access denied");
+        });
+
+        it("tells the caller to reconnect when Google auth is missing", async () => {
+            const projectA = await prisma.project.create({ data: { title: "PA", userId: "owner-a" } });
+            const result = await callTool("owner-a", "export_to_google_docs", {
+                projectId: projectA.id,
+                exportMode: "STORY_READER",
+            });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toBe("Export failed: Not authenticated");
+        });
+
+        it("tells the caller to retry when the mapped Google Doc was deleted", async () => {
+            const projectA = await prisma.project.create({ data: { title: "PA", userId: "owner-a" } });
+            const create = vi.spyOn(GoogleDocsApi, "createDocument").mockResolvedValue("doc-1");
+            const replace = vi.spyOn(GoogleDocsApi, "replaceContent").mockRejectedValue(Object.assign(new Error("gone"), { code: 404 }));
+            try {
+                const result = await callTool("owner-a", "export_to_google_docs", {
+                    projectId: projectA.id,
+                    exportMode: "STORY_READER",
+                });
+                expect(result.isError).toBe(true);
+                expect(result.content[0].text).toBe(
+                    "Export failed: Google Doc not found. Mapping removed. Please try again to create a new doc.",
+                );
+                expect(await prisma.googleDocExport.count({ where: { projectId: projectA.id } })).toBe(0);
+            } finally {
+                create.mockRestore();
+                replace.mockRestore();
+            }
         });
     });
 });
