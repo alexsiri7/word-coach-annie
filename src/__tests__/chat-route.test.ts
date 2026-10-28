@@ -51,6 +51,7 @@ import { logger } from "@/lib/logger";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { loadSkill } from "@/mcp/skills";
 import { NextRequest } from "next/server";
+import type { ChatMessage } from "@prisma/client";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -467,6 +468,49 @@ describe("DELETE /api/chat", () => {
       { chatWindowSize: 5, messagesUntilCompression: 15, compressionModel: "" },
       { apiKey: "test-key", model: "test-model" }
     );
+
+    const after = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    expect(after.summary).toBeNull();
+    expect(after.summarizedThroughMessageId).toBeNull();
+  });
+
+  it("discards a summary whose write lands while the clear's transaction is still open", async () => {
+    const { compressConversation: realCompress } = await vi.importActual<
+      typeof import("@/lib/ai/chat-compression")
+    >("@/lib/ai/chat-compression");
+    const project = await testPrisma.project.create({
+      data: { title: "Del Race Tx Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Test chat" },
+    });
+    const messages: ChatMessage[] = [];
+    for (let i = 0; i < 8; i++) {
+      messages.push(
+        await testPrisma.chatMessage.create({
+          data: { conversationId: conversation.id, role: "user", content: `msg ${i}` },
+        })
+      );
+    }
+
+    // Same writes as DELETE /api/chat, held open so the compression write
+    // has to wait on the clear's row locks before it can run.
+    let compression: Promise<void> | undefined;
+    await testPrisma.$transaction(async (tx) => {
+      await tx.chatMessage.deleteMany({ where: { conversationId: conversation.id } });
+      await tx.conversation.update({
+        where: { id: conversation.id },
+        data: { summary: null, summarizedThroughMessageId: null },
+      });
+      compression = realCompress(
+        conversation,
+        messages,
+        { chatWindowSize: 5, messagesUntilCompression: 15, compressionModel: "" },
+        { apiKey: "test-key", model: "test-model" }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    await compression;
 
     const after = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversation.id } });
     expect(after.summary).toBeNull();

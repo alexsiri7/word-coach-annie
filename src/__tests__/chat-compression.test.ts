@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/db", () => ({ prisma: { conversation: { updateMany: vi.fn(async () => ({ count: 1 })) } } }));
+vi.mock("@/lib/db", () => {
+  const tx = {
+    $executeRaw: vi.fn(async () => 1),
+    chatMessage: { count: vi.fn(async () => 1) },
+    conversation: { update: vi.fn() },
+  };
+  return { prisma: { $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)), tx } };
+});
 vi.mock("@/lib/ai/adk-agent", () => ({
   runSimpleCompletion: vi.fn(async () => "Summary of discussion."),
 }));
@@ -11,6 +18,11 @@ vi.mock("@/lib/logger", () => ({
 import { compressConversation } from "@/lib/ai/chat-compression";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { prisma } from "@/lib/db";
+
+const { tx } = prisma as unknown as { tx: {
+  chatMessage: { count: ReturnType<typeof vi.fn> };
+  conversation: { update: ReturnType<typeof vi.fn> };
+} };
 
 const baseConversation = {
   id: "conv-1",
@@ -57,8 +69,11 @@ describe("compressConversation", () => {
 
     await compressConversation(baseConversation, messages, settings, aiConfig);
 
-    expect(prisma.conversation.updateMany).toHaveBeenCalledWith({
-      where: { id: "conv-1", messages: { some: { id: "msg-2" } } },
+    expect(tx.chatMessage.count).toHaveBeenCalledWith({
+      where: { id: "msg-2", conversationId: "conv-1" },
+    });
+    expect(tx.conversation.update).toHaveBeenCalledWith({
+      where: { id: "conv-1" },
       data: {
         summary: "Summary of discussion.",
         summarizedThroughMessageId: "msg-2",
@@ -86,6 +101,6 @@ describe("compressConversation", () => {
     await compressConversation(baseConversation, messages, settings, aiConfig);
 
     expect(runSimpleCompletion).not.toHaveBeenCalled();
-    expect(prisma.conversation.updateMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
