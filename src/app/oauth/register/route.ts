@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   // DB-persisted per-IP limit (24h rolling window, survives deploys)
   const ipCount = await countClientsByIpInWindow(ip);
   if (ipCount >= IP_REGISTRATION_LIMIT) {
-    logger.warn("oauth-registration-rejected", { reason: "ip_limit", ip, ipCount });
+    logger.warn("oauth-registration-rejected", { reason: "ip_limit", ipCount });
     return NextResponse.json(
       { error: "rate_limited", error_description: "too many registrations from this IP" },
       { status: 429 }
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
   };
 
   await registerClient(registration, { ip, userId: userId ?? undefined });
-  logger.info("oauth-client-registered", { clientId, ip, userId });
+  logger.info("oauth-client-registered", { clientId, userId });
 
   const { client_id, client_name, redirect_uris, grant_types } = registration;
   return NextResponse.json({ client_id, client_name, redirect_uris, grant_types }, { status: 201 });

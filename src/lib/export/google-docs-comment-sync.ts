@@ -111,7 +111,6 @@ export class GoogleDocsCommentSync {
 
             // Get anchor text from the comment's quotedFileContent
             const anchorText = comment.quotedFileContent?.value ?? "";
-            const authorName = comment.author?.displayName ?? "Google Docs";
 
             // Find matching scene
             const match = anchorText
@@ -131,12 +130,13 @@ export class GoogleDocsCommentSync {
                 continue;
             }
 
-            // Format content: include author name and any replies
-            let content = `[${sanitizeInput(authorName)}]: ${sanitizeInput(comment.content)}`;
+            // Commenters are third parties who never agreed to Annie storing their names,
+            // so a neutral label stands in for the author.
+            let content = `[Google Docs comment]: ${sanitizeInput(comment.content)}`;
             if (comment.replies && comment.replies.length > 0) {
                 const replyLines = comment.replies
                     .filter((r) => r.content)
-                    .map((r) => `  ↳ [${sanitizeInput(r.author?.displayName ?? "Reply")}]: ${sanitizeInput(r.content!)}`)
+                    .map((r) => `  ↳ [Reply]: ${sanitizeInput(r.content!)}`)
                     .join("\n");
                 if (replyLines) content += "\n" + replyLines;
             }

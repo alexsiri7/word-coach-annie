@@ -82,8 +82,7 @@ describe("GoogleDocsCommentSync", () => {
                 where: { nodeId: scene.id },
             });
             expect(annotations).toHaveLength(1);
-            expect(annotations[0].content).toContain("Reviewer");
-            expect(annotations[0].content).toContain("Great opening!");
+            expect(annotations[0].content).toBe("[Google Docs comment]: Great opening!");
             expect(annotations[0].externalId).toBe(`gdoc:doc-abc:comment-1`);
             expect(annotations[0].selectedText).toBe("a hero was born");
             expect(annotations[0].resolved).toBe(false);
@@ -141,7 +140,6 @@ describe("GoogleDocsCommentSync", () => {
             expect(result.imported).toBe(1);
             const [annotation] = await prisma.annotation.findMany({ where: { nodeId: scene.id } });
             expect(annotation.content).not.toContain("<");
-            expect(annotation.content).toContain("[Eve]:");
             expect(annotation.content).toContain("ok");
             expect(annotation.selectedText).toBe("a hero was born");
         });
@@ -293,10 +291,9 @@ describe("GoogleDocsCommentSync", () => {
             const annotations = await prisma.annotation.findMany({
                 where: { nodeId: scene.id },
             });
-            expect(annotations[0].content).toContain("Editor");
-            expect(annotations[0].content).toContain("Needs more description");
-            expect(annotations[0].content).toContain("Author");
-            expect(annotations[0].content).toContain("Agreed, let me revise");
+            expect(annotations[0].content).toBe(
+                "[Google Docs comment]: Needs more description\n  ↳ [Reply]: Agreed, let me revise"
+            );
         });
     });
 

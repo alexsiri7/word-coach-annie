@@ -187,7 +187,7 @@ export class GoogleDocsApi {
         do {
             const res = await drive.comments.list({
                 fileId: documentId,
-                fields: 'comments(id,content,quotedFileContent,author,resolved,replies,createdTime),nextPageToken',
+                fields: 'comments(id,content,quotedFileContent,resolved,replies(content),createdTime),nextPageToken',
                 includeDeleted: false,
                 pageToken,
             });

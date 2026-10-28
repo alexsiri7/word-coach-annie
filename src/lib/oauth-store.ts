@@ -8,7 +8,7 @@
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
-const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const IP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const IP_REGISTRATION_LIMIT = 25;
 export const GLOBAL_CLIENT_LIMIT = parseInt(
   process.env.OAUTH_GLOBAL_CLIENT_LIMIT ?? "10000",

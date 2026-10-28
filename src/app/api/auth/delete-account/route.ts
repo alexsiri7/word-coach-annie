@@ -40,7 +40,9 @@ export async function DELETE(request: NextRequest) {
 
     // Credentials and GoogleDocExports lack cascade; delete them explicitly before removing the user.
     // Project and Universe rows are also deleted explicitly (cascade covers them too, belt-and-suspenders).
+    // Shares of other owners' projects are keyed by the invitee's lowercased email, not a user relation.
     await prisma.$transaction([
+      prisma.projectShare.deleteMany({ where: { email: user.email.toLowerCase() } }),
       prisma.googleDocExport.deleteMany({ where: { project: { userId } } }),
       prisma.googleDocExport.deleteMany({ where: { universe: { userId } } }),
       prisma.googleCredential.deleteMany({ where: { userId } }),

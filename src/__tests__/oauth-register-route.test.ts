@@ -21,6 +21,7 @@ vi.mock("@/lib/api-auth", () => ({ getCurrentUserId: vi.fn().mockReturnValue(nul
 
 import { countClientsByIpInWindow, countTotalClients, registerClient } from "@/lib/oauth-store";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 import { POST } from "@/app/oauth/register/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,19 @@ describe("POST /oauth/register", () => {
     const body = await res.json();
     expect(body.client_id).toBeTruthy();
     expect(body.redirect_uris).toEqual(["http://localhost:3000/cb"]);
+  });
+
+  it("does not log the client IP on success or on a per-IP rejection", async () => {
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    await POST(makeRegisterRequest(validBody, "203.0.113.7"));
+    vi.mocked(countClientsByIpInWindow).mockResolvedValue(25);
+    await POST(makeRegisterRequest(validBody, "203.0.113.7"));
+
+    expect(info).toHaveBeenCalledWith("oauth-client-registered", expect.any(Object));
+    expect(warn).toHaveBeenCalledWith("oauth-registration-rejected", expect.any(Object));
+    expect(JSON.stringify([...info.mock.calls, ...warn.mock.calls])).not.toContain("203.0.113.7");
   });
 
   it("returns 429 when in-memory rate limit exceeded", async () => {
