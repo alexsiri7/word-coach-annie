@@ -29,6 +29,17 @@ function sentryCspReportUri(dsn: string | undefined): string | null {
     }
 }
 
+/**
+ * force-graph and float-tooltip (story graph) inject their CSS through rollup's styleInject,
+ * which offers no nonce hook and inserts an empty <style> before filling it. proxy.test.ts
+ * recomputes these from node_modules, so a library upgrade that changes the CSS fails there.
+ */
+const LIBRARY_STYLE_HASHES = [
+    "'sha256-jtRRMYY2VbEXuBKbHvqM1/fPT8vazFrEooXdvwUK4y8='", // force-graph dist/force-graph.mjs css_248z
+    "'sha256-9xjtvxMT1ApHlgn9ohbh2FNfvK5Tqtzy94BjfXBeMSY='", // float-tooltip dist/float-tooltip.mjs css_248z
+    "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='", // the empty string styleInject inserts first
+];
+
 function buildCsp(nonce: string): string {
     const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
     return [
@@ -38,8 +49,9 @@ function buildCsp(nonce: string): string {
         `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`,
         // harper.js WorkerLinter spawns its worker from a blob: URL.
         "worker-src 'self' blob:",
-        // style-src: unsafe-inline retained — 22+ inline style= attributes require it (SEC-011 note).
-        "style-src 'self' 'unsafe-inline'",
+        // No style= in server-rendered markup (client-side style props go through the CSSOM,
+        // which CSP does not govern); library <style> tags carry the nonce or a pinned hash.
+        `style-src 'self' 'nonce-${nonce}' ${LIBRARY_STYLE_HASHES.join(" ")}`,
         "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
         "font-src 'self'",
         "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",

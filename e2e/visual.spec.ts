@@ -252,12 +252,15 @@ const MOCK_ANNOTATIONS = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function disableAnimations(page: Page) {
-  await page.addStyleTag({
-    content: `*, *::before, *::after {
+  // A constructable stylesheet: the CSP blocks the <style> tag addStyleTag would insert.
+  await page.evaluate(() => {
+    const sheet = new CSSStyleSheet()
+    sheet.replaceSync(`*, *::before, *::after {
       animation-duration: 0s !important;
       animation-delay: 0s !important;
       transition-duration: 0s !important;
-    }`,
+    }`)
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
   })
 }
 

@@ -501,7 +501,8 @@ function SceneContent({
   // inject client-side below for annotations that aren't embedded.
   const sanitized = useMemo(() => {
     const DOMPurify = require("isomorphic-dompurify");
-    return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
+    // The CSP blocks style= attributes in server-rendered markup anyway.
+    return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"], FORBID_ATTR: ["style"] });
   }, [cleaned]);
 
   // `dangerouslySetInnerHTML` MUST receive a referentially-stable object, not

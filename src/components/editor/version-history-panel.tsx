@@ -209,9 +209,10 @@ export function VersionHistoryPanel({
                   <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : (
+                // The CSP blocks style= attributes in innerHTML anyway.
                 <div
                   className="text-sm text-text-secondary leading-relaxed prose-preview"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent || "") }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent || "", { FORBID_ATTR: ["style"] }) }}
                 />
               )}
             </div>
