@@ -7,7 +7,7 @@ import { listSkills, loadSkill } from "./skills";
 import { env } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
-import { mcpRun, toolError } from "@/mcp/tool-errors";
+import { mcpRun, toolError, type McpResult } from "@/mcp/tool-errors";
 import { UserFacingError } from "@/lib/controllers/errors";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "./annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
@@ -200,7 +200,7 @@ server.tool = ((...args: unknown[]) => {
 }) as typeof server.tool;
 
 /** Guard for destructive tools — returns error if not allowed. */
-function destructiveGuard(): { content: [{ type: "text"; text: string }]; isError: true } | null {
+function destructiveGuard(): McpResult | null {
     if (!allowDestructive) {
         return {
             content: [{ type: "text", text: "This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable." }],
