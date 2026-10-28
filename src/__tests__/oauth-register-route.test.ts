@@ -14,6 +14,7 @@ vi.mock("@/lib/oauth-store", async (importOriginal) => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn().mockReturnValue({ allowed: true, remaining: 5, resetMs: 0 }),
+  isRateLimitBypassed: () => false,
 }));
 
 vi.mock("@/lib/auth", () => ({ isAuthEnabled: vi.fn().mockReturnValue(false) }));
