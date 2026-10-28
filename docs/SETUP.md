@@ -181,6 +181,12 @@ docker compose -f docker-compose.dev.yml up -d
 
 The dev setup mounts the source directory into the container, so file changes are reflected immediately without rebuilding.
 
+The dev stack does not start a Cloudflare tunnel. To expose the dev server publicly, add the tunnel overlay; Compose refuses to start it unless `API_TOKEN` and `CLOUDFLARE_TUNNEL_TOKEN` are set (shell environment or `.env`), and the app receives that `API_TOKEN` so auth is on:
+
+```bash
+docker compose -f docker-compose.dev.yml -f docker-compose.tunnel.yml up
+```
+
 **Run commands inside the container:**
 
 ```bash
