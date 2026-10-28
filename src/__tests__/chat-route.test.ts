@@ -380,6 +380,55 @@ describe("GET /api/chat", () => {
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].content).toBe("Hello");
   });
+
+  it("does not expose the project row to an EDITOR collaborator", async () => {
+    const owner = await testPrisma.user.create({
+      data: { email: "owner@test.com", googleId: "g-owner" },
+    });
+    const universe = await testPrisma.universe.create({ data: { title: "Owner's Realm" } });
+    const project = await testPrisma.project.create({
+      data: { title: "Shared Novel", userId: owner.id, universeId: universe.id },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Test chat" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue("editor-user");
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true, role: "EDITOR" } as never);
+
+    const { GET } = await import("@/app/api/chat/route");
+    for (const res of [
+      await GET(makeGetRequest(conversation.id)),
+      await GET(new NextRequest(`http://localhost/api/chat?projectId=${project.id}`)),
+    ]) {
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.conversation.id).toBe(conversation.id);
+      expect(body.conversation).not.toHaveProperty("project");
+      expect(JSON.stringify(body)).not.toContain(owner.id);
+      expect(JSON.stringify(body)).not.toContain(universe.id);
+    }
+  });
+
+  it("does not expose the project row when it creates an EDITOR collaborator's first conversation", async () => {
+    const owner = await testPrisma.user.create({
+      data: { email: "owner@test.com", googleId: "g-owner" },
+    });
+    const universe = await testPrisma.universe.create({ data: { title: "Owner's Realm" } });
+    const project = await testPrisma.project.create({
+      data: { title: "Shared Novel", userId: owner.id, universeId: universe.id },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue("editor-user");
+    vi.mocked(verifyProjectWriteAccess).mockResolvedValue({ authorized: true, role: "EDITOR" } as never);
+
+    const { GET } = await import("@/app/api/chat/route");
+    const res = await GET(new NextRequest(`http://localhost/api/chat?projectId=${project.id}`));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(await testPrisma.conversation.count({ where: { projectId: project.id } })).toBe(1);
+    expect(body.conversation).not.toHaveProperty("project");
+    expect(JSON.stringify(body)).not.toContain(owner.id);
+    expect(JSON.stringify(body)).not.toContain(universe.id);
+  });
 });
 
 describe("DELETE /api/chat", () => {

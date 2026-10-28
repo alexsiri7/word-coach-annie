@@ -92,11 +92,54 @@ describe("middleware", () => {
         expect(res.status).toBe(200);
     });
 
-    it("blocks /api/metrics path when unauthenticated (auth required)", async () => {
-        vi.mocked(isAuthEnabled).mockReturnValue(true);
-        const req = createRequest("/api/metrics");
-        const res = await middleware(req);
-        expect(res.status).toBe(401);
+    describe("/api/metrics", () => {
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            process.env.API_TOKEN = "my-token";
+        });
+
+        afterEach(() => {
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+            vi.mocked(verifyMcpToken).mockResolvedValue(null);
+        });
+
+        it("rejects an unauthenticated request", async () => {
+            const res = await middleware(createRequest("/api/metrics"));
+            expect(res.status).toBe(401);
+        });
+
+        it("allows the API_TOKEN bearer", async () => {
+            const res = await middleware(createRequest("/api/metrics", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
+
+        it("rejects a user session cookie", async () => {
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const res = await middleware(createRequest("/api/metrics", {
+                cookies: { annie_session: "valid-jwt-token" },
+            }));
+            expect(res.status).toBe(401);
+        });
+
+        it("rejects an MCP access token", async () => {
+            vi.mocked(verifyMcpToken).mockResolvedValue({
+                userId: "mcp-user",
+                email: "mcp@example.com",
+                clientId: "test-client",
+                jti: "mcp-jti-1",
+                exp: Math.floor(Date.now() / 1000) + 3600,
+            });
+            const res = await middleware(createRequest("/api/metrics", {
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(401);
+        });
     });
 
     it("allows /api/auth/login path", async () => {
