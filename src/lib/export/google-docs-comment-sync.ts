@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { GoogleDocsApi } from "../google-api";
 import { logger } from "@/lib/logger";
+import { NotFoundError, UpstreamServiceError } from "@/lib/controllers/errors";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
 export interface CommentSyncResult {
@@ -83,14 +84,14 @@ export class GoogleDocsCommentSync {
         });
 
         if (!exportRecord) {
-            throw new Error("No Google Doc export found for this project. Export the project first.");
+            throw new NotFoundError("No Google Doc export found for this project. Export the project first.");
         }
 
         let comments;
         try {
             comments = await GoogleDocsApi.fetchComments(exportRecord.googleDocId, userId);
         } catch (error) {
-            throw new Error(`Failed to fetch comments from Google Docs: ${error instanceof Error ? error.message : error}`);
+            throw new UpstreamServiceError(`Failed to fetch comments from Google Docs: ${error instanceof Error ? error.message : error}`);
         }
 
         for (const comment of comments) {

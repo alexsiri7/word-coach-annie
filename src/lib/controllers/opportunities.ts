@@ -1,13 +1,13 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { ContestSubmissionController } from "@/lib/controllers/submissions";
-import { ForbiddenError, NotFoundError } from "@/lib/controllers/errors";
+import { ForbiddenError, NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 import { requireOwnedProvider } from "@/lib/controllers/provider-ownership";
 import { safeHref } from "@/lib/http-url";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 
 /** The row exists and is owned, but its current state forbids the operation. */
-export class ConflictError extends Error {}
+export class ConflictError extends UserFacingError {}
 
 // ── Opportunity ─────────────────────────────────────────────────────────
 

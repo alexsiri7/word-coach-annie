@@ -1,7 +1,49 @@
 import { prisma } from '@/lib/db';
 import { encrypt, isUndecryptable, readEncrypted } from '@/lib/crypto';
+import { UpstreamServiceError } from '@/lib/controllers/errors';
 
 const HASHNODE_GQL = 'https://gql.hashnode.com';
+
+/** Hashnode rejected the access token. */
+export class HashnodeAuthError extends Error {}
+
+/** The user has no stored Hashnode token that the current keys can decrypt. */
+export class HashnodeNotConnectedError extends Error {
+    constructor() {
+        super('Hashnode account not connected');
+    }
+}
+
+export interface HashnodeGqlResponse<T> {
+    data?: T;
+    errors?: { message?: string }[];
+}
+
+/**
+ * POST a GraphQL query to Hashnode. Throws UpstreamServiceError on a non-2xx
+ * response; GraphQL `errors` are returned for the caller to classify.
+ */
+export async function postHashnodeGql<T>(
+    accessToken: string,
+    query: string,
+    variables?: Record<string, unknown>
+): Promise<HashnodeGqlResponse<T>> {
+    const response = await fetch(HASHNODE_GQL, {
+        method: 'POST',
+        headers: {
+            Authorization: accessToken,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new UpstreamServiceError(`Hashnode API error (${response.status}): ${body}`);
+    }
+
+    return response.json();
+}
 
 /**
  * Decrypt a stored Hashnode token, rewriting it under the current key when it
@@ -21,43 +63,29 @@ export function readHashnodeToken(cred: { id: string; accessToken: string }): Pr
 export class HashnodeAuthController {
     static async connect(accessToken: string, userId: string | null) {
         // Verify token by calling Hashnode's me query
-        const response = await fetch(HASHNODE_GQL, {
-            method: 'POST',
-            headers: {
-                Authorization: accessToken,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                query: `
-                    query Me {
-                        me {
-                            username
-                            publications(first: 1) {
-                                edges {
-                                    node {
-                                        id
-                                    }
-                                }
+        const data = await postHashnodeGql<{
+            me?: { username?: string; publications?: { edges?: { node?: { id?: string } }[] } };
+        }>(accessToken, `
+            query Me {
+                me {
+                    username
+                    publications(first: 1) {
+                        edges {
+                            node {
+                                id
                             }
                         }
                     }
-                `,
-            }),
-        });
-
-        if (!response.ok) {
-            const body = await response.text();
-            throw new Error(`Hashnode API error (${response.status}): ${body}`);
-        }
-
-        const data = await response.json();
+                }
+            }
+        `);
         if (data.errors) {
-            throw new Error(`Hashnode token invalid: ${data.errors[0]?.message ?? 'unknown error'}`);
+            throw new HashnodeAuthError(`Hashnode token invalid: ${data.errors[0]?.message ?? 'unknown error'}`);
         }
 
         const me = data.data?.me;
         if (!me) {
-            throw new Error('Hashnode API rejected token: no user data returned');
+            throw new HashnodeAuthError('Hashnode API rejected token: no user data returned');
         }
 
         const username: string = me.username ?? '';

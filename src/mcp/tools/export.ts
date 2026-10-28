@@ -2,10 +2,11 @@ import { prisma } from "@/lib/db";
 import { mcpCache } from "@/lib/cache";
 import { htmlToMarkdown, type MarkdownOptions } from "@/lib/html-to-markdown";
 import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export async function exportManuscript(projectId: string, options: MarkdownOptions = {}): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
     const outline = await buildOutlineTree(projectId);
 
@@ -44,7 +45,7 @@ export async function exportManuscript(projectId: string, options: MarkdownOptio
 
 export async function exportStoryBible(projectId: string): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
     const lines: string[] = [];
     lines.push(`# Story Bible: ${project.title}\n`);
@@ -124,7 +125,7 @@ export async function exportStoryBible(projectId: string): Promise<string> {
 
 export async function exportHashnode(projectId: string, nodeId?: string): Promise<string> {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
     const where: Record<string, unknown> = { projectId };
     if (nodeId) {
@@ -255,7 +256,7 @@ async function _getProjectSummary(projectId: string) {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
     });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
     const nodes = await prisma.structureNode.findMany({
         where: { projectId },
@@ -355,7 +356,7 @@ export async function exportUniverse(universeId: string): Promise<string> {
         }
     });
 
-    if (!universe) throw new Error(`Universe not found: ${universeId}`);
+    if (!universe) throw new UserFacingError(`Universe not found: ${universeId}`);
 
     const lines: string[] = [];
     lines.push(`# Universe: ${universe.title}\n`);

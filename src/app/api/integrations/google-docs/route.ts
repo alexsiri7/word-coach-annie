@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleDocsCommentSync } from '@/lib/export/google-docs-comment-sync';
 import { GoogleAuthController } from '@/lib/controllers/google-auth';
 import { getCurrentUserId, verifyProjectWriteAccess, validateCsrfHeader } from '@/lib/api-auth';
+import { NotFoundError, UpstreamServiceError } from '@/lib/controllers/errors';
 import { logger } from '@/lib/logger';
 
 /**
@@ -74,8 +75,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result);
     } catch (error) {
         logger.error('POST /api/integrations/google-docs error', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        const status = message.includes('No Google Doc export found') ? 404 : 500;
-        return NextResponse.json({ error: message }, { status });
+        if (error instanceof NotFoundError) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        if (error instanceof UpstreamServiceError) {
+            return NextResponse.json({ error: 'Upstream service error' }, { status: 502 });
+        }
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../snapshot";
 import { mcpCache } from "@/lib/cache";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 type RelationshipEntity = { id: string; name: string; entityType: string } | null;
 
@@ -28,10 +29,10 @@ async function resolveObjectId(
     if (storyObj) return { objectId };
     if (universeId) {
         const worldObj = await prisma.worldObject.findFirst({ where: { id: objectId, universeId } });
-        if (!worldObj) throw new Error(`${fieldName} not found in this project or linked universe`);
+        if (!worldObj) throw new UserFacingError(`${fieldName} not found in this project or linked universe`);
         return { worldObjectId: objectId };
     }
-    throw new Error(`${fieldName} not found in this project`);
+    throw new UserFacingError(`${fieldName} not found in this project`);
 }
 
 const VALID_RELATIONSHIP_TYPES = [
@@ -53,7 +54,7 @@ export async function listRelationships(projectId: string) {
                 where: { id: projectId },
                 select: { id: true, universeId: true },
             });
-            if (!project) throw new Error(`Project not found: ${projectId}`);
+            if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
             const [nodes, objects] = await Promise.all([
                 prisma.structureNode.findMany({
@@ -124,39 +125,39 @@ export async function createRelationship(params: {
         where: { id: projectId },
         select: { id: true, universeId: true },
     });
-    if (!project) throw new Error(`Project not found: ${projectId}`);
+    if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
 
     if (
         !VALID_RELATIONSHIP_TYPES.includes(
             type as (typeof VALID_RELATIONSHIP_TYPES)[number]
         )
     ) {
-        throw new Error(
+        throw new UserFacingError(
             `Invalid type. Must be one of: ${VALID_RELATIONSHIP_TYPES.join(", ")}`
         );
     }
 
     const fromFields = [fromNodeId, fromObjectId].filter(Boolean);
     if (fromFields.length !== 1) {
-        throw new Error("Exactly one from-field must be provided (fromNodeId or fromObjectId)");
+        throw new UserFacingError("Exactly one from-field must be provided (fromNodeId or fromObjectId)");
     }
 
     const toFields = [toNodeId, toObjectId].filter(Boolean);
     if (toFields.length !== 1) {
-        throw new Error("Exactly one to-field must be provided (toNodeId or toObjectId)");
+        throw new UserFacingError("Exactly one to-field must be provided (toNodeId or toObjectId)");
     }
 
     const universeId = project.universeId;
 
     if (fromNodeId) {
         const node = await prisma.structureNode.findFirst({ where: { id: fromNodeId, projectId } });
-        if (!node) throw new Error("fromNodeId not found in this project");
+        if (!node) throw new UserFacingError("fromNodeId not found in this project");
     }
     const { objectId: resolvedFromObjectId, worldObjectId: resolvedFromWorldObjectId } =
         fromObjectId ? await resolveObjectId(fromObjectId, "fromObjectId", projectId, universeId) : {};
     if (toNodeId) {
         const node = await prisma.structureNode.findFirst({ where: { id: toNodeId, projectId } });
-        if (!node) throw new Error("toNodeId not found in this project");
+        if (!node) throw new UserFacingError("toNodeId not found in this project");
     }
     const { objectId: resolvedToObjectId, worldObjectId: resolvedToWorldObjectId } =
         toObjectId ? await resolveObjectId(toObjectId, "toObjectId", projectId, universeId) : {};
@@ -206,7 +207,7 @@ export async function deleteRelationship(relationshipId: string) {
             toWorldObject: { select: { name: true } },
         },
     });
-    if (!existing) throw new Error(`Relationship not found: ${relationshipId}`);
+    if (!existing) throw new UserFacingError(`Relationship not found: ${relationshipId}`);
 
     const fromName = existing.fromNode?.title || existing.fromObject?.name || existing.fromWorldObject?.name || "?";
     const toName = existing.toNode?.title || existing.toObject?.name || existing.toWorldObject?.name || "?";

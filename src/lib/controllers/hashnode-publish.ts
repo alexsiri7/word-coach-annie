@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/db';
-import { readHashnodeToken } from '@/lib/controllers/hashnode-auth';
+import { HashnodeNotConnectedError, postHashnodeGql, readHashnodeToken } from '@/lib/controllers/hashnode-auth';
+import { UpstreamServiceError } from '@/lib/controllers/errors';
 import { exportHashnode } from '@/mcp/tools/export';
-
-const HASHNODE_GQL = 'https://gql.hashnode.com';
 
 export interface PublishToHashnodeOptions {
     nodeId?: string;
@@ -20,6 +19,15 @@ export interface HashnodePublishResult {
     updated?: boolean;
 }
 
+/** Run a Hashnode mutation, treating GraphQL errors as upstream failures. */
+async function publishGql<T>(accessToken: string, query: string, input: Record<string, unknown>): Promise<{ data?: T }> {
+    const result = await postHashnodeGql<T>(accessToken, query, { input });
+    if (result.errors) {
+        throw new UpstreamServiceError(`Hashnode API error: ${result.errors[0]?.message ?? 'unknown'}`);
+    }
+    return result;
+}
+
 export class HashnodePublishController {
     static async publish(
         projectId: string,
@@ -33,7 +41,7 @@ export class HashnodePublishController {
         const cred = await prisma.hashnodeCredential.findUnique({ where: { userId: resolvedUserId } });
         const accessToken = cred ? await readHashnodeToken(cred) : null;
         if (!cred || accessToken === null) {
-            throw new Error('Hashnode account not connected');
+            throw new HashnodeNotConnectedError();
         }
 
         // Determine title
@@ -80,36 +88,16 @@ export class HashnodePublishController {
                 };
                 if (canonicalUrl) input.originalArticleURL = canonicalUrl;
 
-                const response = await fetch(HASHNODE_GQL, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: accessToken,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: `
-                            mutation UpdateDraft($input: UpdateDraftInput!) {
-                                updateDraft(input: $input) {
-                                    draft {
-                                        id
-                                        title
-                                    }
+                await publishGql(accessToken, `
+                        mutation UpdateDraft($input: UpdateDraftInput!) {
+                            updateDraft(input: $input) {
+                                draft {
+                                    id
+                                    title
                                 }
                             }
-                        `,
-                        variables: { input },
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Hashnode API error (${response.status}): ${errorText}`);
-                }
-
-                const result = await response.json();
-                if (result.errors) {
-                    throw new Error(`Hashnode API error: ${result.errors[0]?.message ?? 'unknown'}`);
-                }
+                        }
+                    `, input);
             } else {
                 const input: Record<string, unknown> = {
                     postId: existingExport.hashnodePostId,
@@ -120,36 +108,16 @@ export class HashnodePublishController {
                 };
                 if (canonicalUrl) input.originalArticleURL = canonicalUrl;
 
-                const response = await fetch(HASHNODE_GQL, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: accessToken,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: `
-                            mutation UpdatePost($input: UpdatePostInput!) {
-                                updatePost(input: $input) {
-                                    post {
-                                        id
-                                        url
-                                    }
+                await publishGql(accessToken, `
+                        mutation UpdatePost($input: UpdatePostInput!) {
+                            updatePost(input: $input) {
+                                post {
+                                    id
+                                    url
                                 }
                             }
-                        `,
-                        variables: { input },
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Hashnode API error (${response.status}): ${errorText}`);
-                }
-
-                const result = await response.json();
-                if (result.errors) {
-                    throw new Error(`Hashnode API error: ${result.errors[0]?.message ?? 'unknown'}`);
-                }
+                        }
+                    `, input);
             }
 
             await prisma.hashnodeExport.update({
@@ -179,39 +147,19 @@ export class HashnodePublishController {
             };
             if (canonicalUrl) input.originalArticleURL = canonicalUrl;
 
-            const response = await fetch(HASHNODE_GQL, {
-                method: 'POST',
-                headers: {
-                    Authorization: accessToken,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    query: `
-                        mutation CreateDraft($input: CreateDraftInput!) {
-                            createDraft(input: $input) {
-                                draft {
-                                    id
-                                    title
-                                }
+            const result = await publishGql<{ createDraft?: { draft?: { id: string } } }>(accessToken, `
+                    mutation CreateDraft($input: CreateDraftInput!) {
+                        createDraft(input: $input) {
+                            draft {
+                                id
+                                title
                             }
                         }
-                    `,
-                    variables: { input },
-                }),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Hashnode API error (${response.status}): ${errorText}`);
-            }
-
-            const result = await response.json();
-            if (result.errors) {
-                throw new Error(`Hashnode API error: ${result.errors[0]?.message ?? 'unknown'}`);
-            }
+                    }
+                `, input);
 
             const draft = result.data?.createDraft?.draft;
-            if (!draft) throw new Error('Hashnode createDraft returned no draft');
+            if (!draft) throw new UpstreamServiceError('Hashnode createDraft returned no draft');
 
             postId = draft.id;
             postUrl = `https://hashnode.com/draft/${draft.id}`;
@@ -228,39 +176,19 @@ export class HashnodePublishController {
             };
             if (canonicalUrl) input.originalArticleURL = canonicalUrl;
 
-            const response = await fetch(HASHNODE_GQL, {
-                method: 'POST',
-                headers: {
-                    Authorization: accessToken,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    query: `
-                        mutation PublishPost($input: PublishPostInput!) {
-                            publishPost(input: $input) {
-                                post {
-                                    id
-                                    url
-                                }
+            const result = await publishGql<{ publishPost?: { post?: { id: string; url: string } } }>(accessToken, `
+                    mutation PublishPost($input: PublishPostInput!) {
+                        publishPost(input: $input) {
+                            post {
+                                id
+                                url
                             }
                         }
-                    `,
-                    variables: { input },
-                }),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Hashnode API error (${response.status}): ${errorText}`);
-            }
-
-            const result = await response.json();
-            if (result.errors) {
-                throw new Error(`Hashnode API error: ${result.errors[0]?.message ?? 'unknown'}`);
-            }
+                    }
+                `, input);
 
             const post = result.data?.publishPost?.post;
-            if (!post) throw new Error('Hashnode publishPost returned no post');
+            if (!post) throw new UpstreamServiceError('Hashnode publishPost returned no post');
 
             postId = post.id;
             postUrl = post.url;

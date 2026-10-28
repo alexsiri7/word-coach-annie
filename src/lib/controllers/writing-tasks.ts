@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import { NotFoundError } from "@/lib/controllers/errors";
+import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 
 type WritingTaskWithScene = Prisma.WritingTaskGetPayload<{
     include: { scene: { select: { id: true; title: true } } };
@@ -46,7 +46,7 @@ export class WritingTaskController {
                 where: { id: projectId },
                 select: { id: true },
             });
-            if (!project) throw new Error(`Project not found: ${projectId}`);
+            if (!project) throw new UserFacingError(`Project not found: ${projectId}`);
             where = { projectId };
         } else {
             where = { projectId: null, ...(userId ? { userId } : {}) };
@@ -84,7 +84,7 @@ export class WritingTaskController {
         capacity?: string;
         dueDate?: string;
     }) {
-        if (params.sceneId && !params.projectId) throw new Error("sceneId requires projectId");
+        if (params.sceneId && !params.projectId) throw new UserFacingError("sceneId requires projectId");
 
         let ownerId = params.userId;
         if (params.projectId) {
@@ -92,7 +92,7 @@ export class WritingTaskController {
                 where: { id: params.projectId },
                 select: { id: true, userId: true },
             });
-            if (!project) throw new Error(`Project not found: ${params.projectId}`);
+            if (!project) throw new UserFacingError(`Project not found: ${params.projectId}`);
             ownerId = project.userId;
         }
 
@@ -148,7 +148,7 @@ export class WritingTaskController {
             where: { id: taskId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Writing task not found: ${taskId}`);
+        if (!existing) throw new UserFacingError(`Writing task not found: ${taskId}`);
 
         const task = await prisma.writingTask.update({
             where: { id: taskId },
@@ -176,7 +176,7 @@ export class WritingTaskController {
             where: { id: taskId },
             select: { id: true },
         });
-        if (!existing) throw new Error(`Writing task not found: ${taskId}`);
+        if (!existing) throw new UserFacingError(`Writing task not found: ${taskId}`);
 
         await prisma.writingTask.delete({ where: { id: taskId } });
 

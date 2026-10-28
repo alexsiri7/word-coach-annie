@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { HashnodeAuthController } from '@/lib/controllers/hashnode-auth';
+import { HashnodeAuthController, HashnodeAuthError } from '@/lib/controllers/hashnode-auth';
+import { UpstreamServiceError } from '@/lib/controllers/errors';
 import { getCurrentUserId, validateCsrfHeader } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 
@@ -23,9 +24,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ connected: true, ...result });
     } catch (error) {
         logger.error('POST /api/integrations/hashnode error', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        const status = message.includes('token invalid') || message.includes('rejected token') ? 401 : 500;
-        return NextResponse.json({ error: message }, { status });
+        if (error instanceof HashnodeAuthError) {
+            return NextResponse.json({ error: 'Invalid Hashnode token' }, { status: 401 });
+        }
+        if (error instanceof UpstreamServiceError) {
+            return NextResponse.json({ error: 'Upstream service error' }, { status: 502 });
+        }
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
 

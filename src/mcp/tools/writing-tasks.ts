@@ -2,6 +2,7 @@ import { WritingTaskController } from "@/lib/controllers/writing-tasks";
 import { TaskDashboardController } from "@/lib/controllers/task-dashboard";
 import { mcpCache } from "@/lib/cache";
 import type { WritingTaskCapacityValue, WritingTaskKindValue } from "@/schemas/writing-tasks";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // Writes invalidate every writingTasks: entry — practice-task lists are keyed by user, not project.
 const WRITING_TASKS_PREFIX = "writingTasks:";
@@ -54,7 +55,7 @@ export async function updateWritingTask(params: {
 }) {
     const { taskId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await WritingTaskController.updateWritingTask(taskId, data);
     mcpCache.invalidatePrefix(WRITING_TASKS_PREFIX);

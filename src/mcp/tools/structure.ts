@@ -2,6 +2,7 @@ import { StructureController, type OutlineNode } from "@/lib/controllers/structu
 import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
 import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 /** Invalidate caches affected by structure/content changes. */
 function invalidateStructureCaches(projectId?: string) {
@@ -181,7 +182,7 @@ export async function updateParagraph(
     const blocks = current.blocks;
     const flat = flattenBlocksToParagraphs(blocks);
     if (index < 0 || index >= flat.length) {
-        throw new Error(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
+        throw new UserFacingError(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
     }
     const entry = flat[index];
     if (paragraphContentHash !== undefined) {
@@ -226,7 +227,7 @@ export async function insertBeat(
     const totalParagraphs = flat.length;
     // afterParagraphIndex of -1 means "insert at the very beginning"
     if (afterParagraphIndex < -1 || afterParagraphIndex >= totalParagraphs) {
-        throw new Error(
+        throw new UserFacingError(
             `afterParagraphIndex ${afterParagraphIndex} out of range (-1–${totalParagraphs - 1})`
         );
     }

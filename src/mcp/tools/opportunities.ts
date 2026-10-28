@@ -5,6 +5,7 @@ import {
 } from "@/lib/controllers/opportunities";
 import type { CandidateStateValue, OpportunityStatusValue } from "@/schemas/opportunities";
 import { mcpCache } from "@/lib/cache";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // ── Opportunities (user-scoped) ─────────────────────────────────────────
 // Like providers, opportunities belong to the current user rather than to a
@@ -65,7 +66,7 @@ export async function updateOpportunity(params: {
 }) {
     const { opportunityId, userId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await OpportunityController.updateOpportunity(opportunityId, userId, data);
     invalidateOpportunities(userId);
@@ -109,7 +110,7 @@ export async function updateOpportunityCandidate(params: {
 }) {
     const { candidateId, userId, ...data } = params;
     if (Object.keys(data).length === 0) {
-        throw new Error("No fields provided to update — at least one optional field must be supplied.");
+        throw new UserFacingError("No fields provided to update — at least one optional field must be supplied.");
     }
     const result = await OpportunityCandidateController.updateCandidate(candidateId, userId, data);
     mcpCache.invalidatePrefix(`opportunityCandidates:${result.opportunityId}`);

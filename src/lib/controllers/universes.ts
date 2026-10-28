@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export class UniversesController {
     static async listUniverses(userId?: string | null) {
@@ -37,7 +38,7 @@ export class UniversesController {
             },
         });
 
-        if (!universe) throw new Error(`Universe not found: ${id}`);
+        if (!universe) throw new UserFacingError(`Universe not found: ${id}`);
 
         return {
             id: universe.id,
@@ -55,7 +56,7 @@ export class UniversesController {
     }
 
     static async createUniverse(data: { title: string; description?: string }, userId?: string | null) {
-        if (!data.title?.trim()) throw new Error("Title is required");
+        if (!data.title?.trim()) throw new UserFacingError("Title is required");
 
         const universe = await prisma.universe.create({
             data: {
@@ -79,7 +80,7 @@ export class UniversesController {
         if (data.title !== undefined) updateData.title = sanitizeInput(data.title.trim());
         if (data.description !== undefined) updateData.description = sanitizeInput(data.description.trim());
 
-        if (Object.keys(updateData).length === 0) throw new Error("No fields to update");
+        if (Object.keys(updateData).length === 0) throw new UserFacingError("No fields to update");
 
         const universe = await prisma.universe.update({
             where: { id },
@@ -138,7 +139,7 @@ export class UniversesController {
             },
         });
 
-        if (!wo) throw new Error(`World Object not found: ${id}`);
+        if (!wo) throw new UserFacingError(`World Object not found: ${id}`);
 
         return {
             ...wo,
@@ -160,8 +161,8 @@ export class UniversesController {
         notes?: string;
         tags?: string;
     }) {
-        if (!data.name?.trim()) throw new Error("Name is required");
-        if (!data.type?.trim()) throw new Error("Type is required");
+        if (!data.name?.trim()) throw new UserFacingError("Name is required");
+        if (!data.type?.trim()) throw new UserFacingError("Type is required");
 
         const wo = await prisma.worldObject.create({
             data: {
@@ -198,7 +199,7 @@ export class UniversesController {
         if (data.tags !== undefined) updateData.tags = sanitizeInput(data.tags.trim());
         if (data.type !== undefined) updateData.type = data.type.trim();
 
-        if (Object.keys(updateData).length === 0) throw new Error("No fields to update");
+        if (Object.keys(updateData).length === 0) throw new UserFacingError("No fields to update");
 
         const wo = await prisma.worldObject.update({
             where: { id },
@@ -254,7 +255,7 @@ export class UniversesController {
 
     static async getTimelineEntry(id: string) {
         const entry = await prisma.worldObjectTimelineEntry.findUnique({ where: { id } });
-        if (!entry) throw new Error(`Timeline entry not found: ${id}`);
+        if (!entry) throw new UserFacingError(`Timeline entry not found: ${id}`);
         return entry;
     }
 
@@ -273,7 +274,7 @@ export class UniversesController {
         if (data.attributes !== undefined) updateData.attributes = data.attributes.trim();
         if (data.orderIndex !== undefined) updateData.orderIndex = data.orderIndex;
 
-        if (Object.keys(updateData).length === 0) throw new Error("No fields to update");
+        if (Object.keys(updateData).length === 0) throw new UserFacingError("No fields to update");
 
         const entry = await prisma.worldObjectTimelineEntry.update({
             where: { id },
@@ -298,7 +299,7 @@ export class UniversesController {
             select: { id: true },
         });
         if (owned.length !== orderedIds.length) {
-            throw new Error("Some timeline entries do not belong to this world object");
+            throw new UserFacingError("Some timeline entries do not belong to this world object");
         }
         await prisma.$transaction(
             orderedIds.map((id, index) =>
@@ -331,7 +332,7 @@ export class UniversesController {
                 where: { id: worldObjectId },
                 include: { relationships: true, relatedBy: true },
             });
-            if (!wo) throw new Error(`World object not found: ${worldObjectId}`);
+            if (!wo) throw new UserFacingError(`World object not found: ${worldObjectId}`);
 
             // 2. Create StoryObject (copy — original stays in universe)
             const so = await tx.storyObject.create({
@@ -385,7 +386,7 @@ export class UniversesController {
             const obj = await tx.storyObject.findUnique({
                 where: { id: storyObjectId },
             });
-            if (!obj) throw new Error(`Story object not found: ${storyObjectId}`);
+            if (!obj) throw new UserFacingError(`Story object not found: ${storyObjectId}`);
 
             // 2. Create WorldObject
             const wo = await tx.worldObject.create({

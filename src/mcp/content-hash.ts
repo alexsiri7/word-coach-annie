@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 /**
  * Compute a SHA-256 hash over the provided fields (nullish values treated as "").
@@ -15,7 +16,7 @@ export function computeContentHash(...fields: (string | null | undefined)[]): st
 /**
  * Error thrown when a write operation detects a stale hash.
  */
-export class StaleWriteError extends Error {
+export class StaleWriteError extends UserFacingError {
     constructor(readTool: string) {
         super(
             `Stale write rejected: the content has been modified since you last read it. ` +

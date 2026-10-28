@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
 import { HashnodePublishController } from '@/lib/controllers/hashnode-publish';
+import { HashnodeNotConnectedError } from '@/lib/controllers/hashnode-auth';
+import { UpstreamServiceError } from '@/lib/controllers/errors';
 import { logger } from '@/lib/logger';
 
 /**
@@ -90,13 +92,11 @@ export async function POST(
         );
     } catch (error) {
         logger.error('POST /api/projects/[id]/publish-to-hashnode error', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-
-        if (message === 'Hashnode account not connected') {
-            return NextResponse.json({ error: message }, { status: 400 });
+        if (error instanceof HashnodeNotConnectedError) {
+            return NextResponse.json({ error: 'Hashnode account not connected' }, { status: 400 });
         }
-        if (message.startsWith('Hashnode API error')) {
-            return NextResponse.json({ error: message }, { status: 502 });
+        if (error instanceof UpstreamServiceError) {
+            return NextResponse.json({ error: 'Upstream service error' }, { status: 502 });
         }
 
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

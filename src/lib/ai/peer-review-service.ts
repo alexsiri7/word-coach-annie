@@ -5,6 +5,7 @@ import { getAiConfig } from "@/lib/ai/settings";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { exportManuscript } from "@/mcp/tools/export";
 import { wrapUserContent } from "@/lib/sanitize-server";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export interface ReviewFeedback {
   overallImpression: string;
@@ -180,12 +181,12 @@ export const AI_NOT_CONFIGURED = "AI not configured";
 export async function runPeerReview(projectId: string, userId?: string | null) {
   const manuscript = await exportManuscript(projectId);
   if (!manuscript.trim()) {
-    throw new Error(MANUSCRIPT_EMPTY);
+    throw new UserFacingError(MANUSCRIPT_EMPTY);
   }
 
   const aiConfig = await getAiConfig(userId);
   if (!aiConfig.apiKey) {
-    throw new Error(AI_NOT_CONFIGURED);
+    throw new UserFacingError(AI_NOT_CONFIGURED);
   }
 
   const truncated = manuscript.slice(0, 50000);

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
+import { UserFacingError } from "@/lib/controllers/errors";
 
-export class AccessDeniedError extends Error {
+export class AccessDeniedError extends UserFacingError {
     constructor(what = "Resource") {
         super(`${what} not found or access denied`);
         this.name = "AccessDeniedError";

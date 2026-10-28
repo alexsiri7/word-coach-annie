@@ -1,4 +1,5 @@
 import type { DbClient } from "@/lib/db";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 /** Check if `possibleDescendantId` is `ancestorId` or one of its descendants. */
 async function isDescendant(
@@ -36,7 +37,7 @@ export async function lockProject(tx: DbClient, projectId: string): Promise<void
   });
 }
 
-export class InvalidParentError extends Error {}
+export class InvalidParentError extends UserFacingError {}
 
 /**
  * Throws InvalidParentError unless `parentId` is a node in the same project
