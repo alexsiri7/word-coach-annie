@@ -116,8 +116,8 @@ export function decrypt(value: string): string {
 /**
  * Read a stored secret for use. Like decrypt(), but a value no configured key
  * can decrypt resolves to null (callers treat it as disconnected / no key)
- * instead of throwing, and a value decrypted with a previous key or stored in
- * the legacy v1 format is passed, re-encrypted under the current key, to `rewrite` so the caller can persist it.
+ * instead of throwing, and a value decrypted with a previous key is passed,
+ * re-encrypted under the current key, to `rewrite` so the caller can persist it.
  * A failed rewrite is logged and does not fail the read.
  *
  * `field` names the stored column in logs; the value itself is never logged.

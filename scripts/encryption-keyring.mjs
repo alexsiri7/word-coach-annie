@@ -14,7 +14,9 @@
  * Format: "enc:v2:<key-id>:<iv-hex>:<ciphertext+tag-hex>", where key-id names
  * the key that encrypted it (see keyId). Values written before #1323 use
  * "enc:v1:<iv-hex>:<ciphertext+tag-hex>"; they still decrypt, by trying every
- * configured key, and are rewritten as v2.
+ * configured key. A v1 value under the current key is left as it is, so the
+ * release before #1323, which reads only v1, can still read it after a
+ * rollback; one under a previous key is rewritten, as v2, like any other.
  */
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 
@@ -144,7 +146,7 @@ export function parseEncrypted(value) {
  *
  * keyIndex 0 is the current key. stale is true when the value should be
  * rewritten with encryptWithKey(keys[0], plaintext): it was encrypted with a
- * previous key, or it is in the v1 format.
+ * previous key.
  *
  * @param {string} value
  * @param {Buffer[]} keys - Current key first, then previous keys
@@ -160,7 +162,7 @@ export function decryptWithKeys(value, keys) {
       const decipher = createDecipheriv(ALGORITHM, keys[keyIndex], parsed.iv);
       decipher.setAuthTag(parsed.tag);
       const decrypted = Buffer.concat([decipher.update(parsed.ciphertext), decipher.final()]);
-      return { plaintext: decrypted.toString('utf8'), keyIndex, stale: keyIndex > 0 || parsed.kid === null };
+      return { plaintext: decrypted.toString('utf8'), keyIndex, stale: keyIndex > 0 };
     } catch {
       // Wrong key (or tampered value): try the next one.
     }

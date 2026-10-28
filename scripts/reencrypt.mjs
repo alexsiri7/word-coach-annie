@@ -6,8 +6,7 @@
  * Runs at container start after migrate.mjs (Dockerfile CMD), and can be run
  * by hand: `node scripts/reencrypt.mjs`. It is a no-op that never connects to
  * the database unless ENCRYPTION_KEY is set. Idempotent: values already under
- * the current key in the current format are left alone; legacy "enc:v1:"
- * values are rewritten in the key-id format. Values no configured key can decrypt are
+ * the current key, in either format, are left alone. Values no configured key can decrypt are
  * counted and left in place, never deleted.
  *
  * See "Rotating ENCRYPTION_KEY" in docs/SETUP.md.
@@ -26,7 +25,7 @@ import { quotedDatabaseSchema } from './database-schema.mjs';
 
 /**
  * Sweep every column in ENCRYPTED_COLUMNS and rewrite values decrypted with a
- * previous key or stored as v1, and plaintext values, under the current key.
+ * previous key, and plaintext values, under the current key.
  *
  * @param {{ $queryRawUnsafe: Function, $executeRawUnsafe: Function }} prisma
  * @param {{ qschema: string, env: Record<string, string | undefined>, log?: Pick<Console, 'warn'> }} options

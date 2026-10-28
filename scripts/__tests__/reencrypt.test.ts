@@ -94,22 +94,23 @@ describe('reencryptStoredValues()', () => {
     expect(settings.apiKey).toBe(concurrent);
   });
 
-  it('rewrites v1 values, under the current or a previous key, in the key-id format', async () => {
-    await testPrisma.aiSettings.create({ data: { id: 'default', apiKey: encryptV1(KEY_B, 'sk-v1-current') } });
+  it('rewrites v1 values under a previous key in the key-id format and leaves those under the current key', async () => {
+    const v1Current = encryptV1(KEY_B, 'sk-v1-current');
+    await testPrisma.aiSettings.create({ data: { id: 'default', apiKey: v1Current } });
     await testPrisma.hashnodeCredential.create({
       data: { userId: 'local', accessToken: encryptV1(KEY_A, 'hashnode-v1-previous'), publicationId: 'p', username: 'u' },
     });
 
     await expect(reencryptStoredValues(testPrisma, { qschema: 'public', env, log: quietLog })).resolves.toEqual({
-      rewritten: 2,
+      rewritten: 1,
       encrypted: 0,
-      current: 0,
+      current: 1,
       undecryptable: 0,
     });
 
+    // The release before #1323 reads only v1, so it must still read this after a rollback.
     const settings = await testPrisma.aiSettings.findUniqueOrThrow({ where: { id: 'default' } });
-    expect(settings.apiKey.startsWith('enc:v2:')).toBe(true);
-    expect(decryptUnderOnly(KEY_B, settings.apiKey)).toBe('sk-v1-current');
+    expect(settings.apiKey).toBe(v1Current);
     const hashnode = await testPrisma.hashnodeCredential.findUniqueOrThrow({ where: { userId: 'local' } });
     expect(hashnode.accessToken.startsWith('enc:v2:')).toBe(true);
     expect(decryptUnderOnly(KEY_B, hashnode.accessToken)).toBe('hashnode-v1-previous');

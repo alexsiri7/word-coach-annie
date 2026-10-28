@@ -222,13 +222,14 @@ describe("crypto", () => {
             expect(decryptUnderOnly(KEY_B, rewritten)).toBe("sk-v1-rotate");
         });
 
-        it("rewrites a v1 value under the current key as v2", async () => {
+        // The release before #1323 reads only v1, so it must still read these after a rollback.
+        it("does not rewrite a v1 value under the current key", async () => {
             const stored = encryptV1(KEY_B, "sk-v1-current");
             process.env.ENCRYPTION_KEY = KEY_B;
             const rewrite = vi.fn(async (_reencrypted: string) => {});
 
             await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-v1-current");
-            expect(rewrite.mock.calls[0][0].startsWith("enc:v2:")).toBe(true);
+            expect(rewrite).not.toHaveBeenCalled();
         });
 
         it("does not rewrite a value already under the current key", async () => {
