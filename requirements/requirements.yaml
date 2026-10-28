@@ -475,7 +475,7 @@ requirements:
     category: non-functional
     priority: must
     status: active
-    source: src/middleware.ts, src/__tests__/middleware.test.ts
+    source: src/proxy.ts, src/__tests__/proxy.test.ts
     acceptance:
       - "Unauthenticated request to a protected /api route is rejected; public paths pass"
       - "/api/mcp accepts a verified MCP OAuth token (mcp-route-auth tests)"
@@ -521,7 +521,7 @@ requirements:
     category: non-functional
     priority: must
     status: active
-    source: src/middleware.ts, src/lib/rate-limit.ts
+    source: src/proxy.ts, src/lib/rate-limit.ts
     acceptance:
       - "Exceeding each configured limit yields 429 with correct headers"
       - "Limits are keyed per user; Redis is used when configured, in-memory otherwise"
@@ -544,7 +544,7 @@ requirements:
     category: non-functional
     priority: should
     status: active
-    source: src/middleware.ts buildCsp
+    source: src/proxy.ts buildCsp
     acceptance:
       - "Responses carry a CSP whose script-src is 'self' plus a nonce"
       - "The app functions with that CSP (no inline-script violations in normal use)"
@@ -614,7 +614,7 @@ requirements:
     category: constraint
     priority: should
     status: active
-    source: src/__tests__/oauth-*.test.ts, src/middleware.ts PUBLIC_PATHS
+    source: src/__tests__/oauth-*.test.ts, src/proxy.ts PUBLIC_PATHS
     acceptance:
       - "Metadata, register, authorize, and token endpoints conform to the tests' expected flows"
       - "A token minted via this flow authenticates /api/mcp requests"

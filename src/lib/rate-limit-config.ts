@@ -7,6 +7,11 @@ export interface RateLimitConfig {
     limit: number;
     /** Window size in milliseconds */
     windowMs: number;
+    /**
+     * When Redis errors, enforce the limit with this process's in-memory store
+     * instead of allowing the request.
+     */
+    failOverToMemory?: boolean;
 }
 
 export const RATE_LIMITS = {
@@ -25,7 +30,7 @@ export const RATE_LIMITS = {
     /** Content report (POST /api/projects/[id]/report): 10 per hour per IP */
     report: { limit: 10, windowMs: 3_600_000 } satisfies RateLimitConfig,
     /** Auth endpoints (login, refresh, me): 5 attempts per minute per IP — brute-force protection */
-    auth: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
+    auth: { limit: 5, windowMs: 60_000, failOverToMemory: true } satisfies RateLimitConfig,
     /** OAuth token endpoint (code exchange, refresh rotation): 10 per minute per IP */
     oauthToken: { limit: 10, windowMs: 60_000 } satisfies RateLimitConfig,
     /** OAuth client registration (POST /oauth/register): 5 per hour per IP */
