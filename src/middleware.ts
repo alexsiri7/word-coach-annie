@@ -21,10 +21,10 @@ function buildCsp(nonce: string): string {
         // harper.js WorkerLinter spawns its worker from a blob: URL.
         "worker-src 'self' blob:",
         // style-src: unsafe-inline retained — 22+ inline style= attributes require it (SEC-011 note).
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
-        "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://fonts.googleapis.com https://fonts.gstatic.com",
+        "font-src 'self'",
+        "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
         "object-src 'none'",
         "frame-ancestors 'none'",
         "base-uri 'self'",

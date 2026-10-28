@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter, Manrope, Newsreader } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { OfflineIndicator } from "@/components/offline-indicator";
@@ -6,6 +7,28 @@ import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
+
+// next/font downloads these at build time and serves them from our own origin,
+// so visitors' browsers never contact Google (SEC-32).
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+const manrope = Manrope({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-manrope",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin", "latin-ext"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  display: "swap",
+  variable: "--font-newsreader",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -47,7 +70,11 @@ export default async function RootLayout({
 }) {
   const nonce = (await headers()).get("x-nonce") ?? "";
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${manrope.variable} ${newsreader.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <ThemeProvider
           attribute="class"

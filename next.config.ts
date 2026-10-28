@@ -124,36 +124,6 @@ const pwaConfig = withPWA({
           url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/api/auth/"),
         handler: "NetworkOnly" as const,
       },
-      // Cache Google Fonts stylesheets
-      {
-        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-        handler: "StaleWhileRevalidate" as const,
-        options: {
-          cacheName: "google-fonts-stylesheets",
-          expiration: {
-            maxEntries: 4,
-            maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-      // Cache Google Fonts webfont files
-      {
-        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-        handler: "CacheFirst" as const,
-        options: {
-          cacheName: "google-fonts-webfonts",
-          expiration: {
-            maxEntries: 16,
-            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
       // Navigation requests — NetworkFirst with 5s timeout so the SW serves
       // the cached shell when offline rather than waiting forever or falling
       // through to the browser's native error screen.

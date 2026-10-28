@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&display=swap');
-
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
@@ -191,7 +189,7 @@
   body {
     background: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+    font-family: var(--font-manrope), var(--font-inter), system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -345,18 +343,18 @@
 @layer components {
   /* Editorial typography classes */
   .font-editorial {
-    font-family: 'Newsreader', Georgia, Cambria, serif;
+    font-family: var(--font-newsreader), Georgia, Cambria, serif;
   }
 
   .display-lg {
-    font-family: 'Newsreader', Georgia, Cambria, serif;
+    font-family: var(--font-newsreader), Georgia, Cambria, serif;
     font-size: 3.5rem;
     line-height: 1.4;
     font-weight: 400;
   }
 
   .label-md {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-inter), system-ui, sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.75rem;
@@ -376,7 +374,7 @@
   outline: none;
   min-height: 100%;
   padding: 2rem 3rem;
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.0625rem;
   line-height: 1.8;
   color: hsl(var(--text-primary));
@@ -387,7 +385,7 @@
 }
 
 .tiptap-editor .ProseMirror h1 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.75rem;
   font-weight: 600;
   margin-bottom: 1rem;
@@ -396,7 +394,7 @@
 }
 
 .tiptap-editor .ProseMirror h2 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.375rem;
   font-weight: 500;
   margin-bottom: 0.75rem;
@@ -405,7 +403,7 @@
 }
 
 .tiptap-editor .ProseMirror h3 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.125rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
@@ -447,7 +445,7 @@
 
 /* Reader view prose — Editorial Cabin manuscript feel */
 .reader-prose {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.25rem;
   line-height: 1.7;
   font-weight: 300;
@@ -464,7 +462,7 @@
 }
 
 .reader-prose h1 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.75rem;
   font-weight: 600;
   margin-bottom: 1rem;
@@ -473,7 +471,7 @@
 }
 
 .reader-prose h2 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.375rem;
   font-weight: 500;
   margin-bottom: 0.75rem;
@@ -482,7 +480,7 @@
 }
 
 .reader-prose h3 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-size: 1.125rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
@@ -565,7 +563,7 @@
 .prose-preview h1,
 .prose-preview h2,
 .prose-preview h3 {
-  font-family: 'Newsreader', Georgia, Cambria, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif;
   font-weight: 500;
   margin-bottom: 0.5rem;
   margin-top: 0.75rem;
