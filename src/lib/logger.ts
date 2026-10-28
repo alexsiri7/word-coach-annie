@@ -21,7 +21,7 @@ function formatLog(level: LogLevel, message: string, meta?: unknown): void {
     console.error(json);
     // Report errors to Sentry with full context
     if (meta instanceof Error) {
-      Sentry.captureException(meta, { extra: { message } });
+      Sentry.captureException(meta, { extra: { label: message } });
     } else {
       Sentry.captureMessage(message, {
         level: "error",

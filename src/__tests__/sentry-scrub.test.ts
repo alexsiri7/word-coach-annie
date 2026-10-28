@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ErrorEvent } from "@sentry/nextjs";
-import { beforeSend, dataCollection } from "@/lib/sentry-scrub";
+import { beforeBreadcrumb, beforeSend, dataCollection } from "@/lib/sentry-scrub";
 
 function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
   return {
@@ -34,9 +34,9 @@ describe("sentry-scrub beforeSend", () => {
 
   it("truncates strings longer than 2000 chars", () => {
     const longString = "x".repeat(3000);
-    const event = makeEvent({ extra: { message: longString } });
+    const event = makeEvent({ extra: { detail: longString } });
     const result = beforeSend(event);
-    const truncated = result.extra!.message as string;
+    const truncated = result.extra!.detail as string;
     expect(truncated).toHaveLength(2000 + "…[truncated]".length);
     expect(truncated.endsWith("…[truncated]")).toBe(true);
   });
@@ -107,6 +107,53 @@ describe("sentry-scrub beforeSend", () => {
     expect(items[1].secret).toBe("[REDACTED]");
   });
 
+  it("redacts manuscript-derived keys under the logger's meta wrapper", () => {
+    const event = makeEvent({
+      extra: {
+        meta: { raw: "peer review", body: "{}", content: "c", message: "m", text: "t", status: 500 },
+      },
+    });
+    const meta = beforeSend(event).extra!.meta as Record<string, unknown>;
+    for (const k of ["raw", "body", "content", "message", "text"]) {
+      expect(meta[k], k).toBe("[REDACTED]");
+    }
+    expect(meta.status).toBe(500);
+  });
+
+  it("masks email addresses in event.message and exception values", () => {
+    const event = makeEvent({
+      message: "No account for jane.doe@example.com or a@x.com",
+      exception: {
+        values: [
+          { type: "Error", value: "Invite to a+b@x.co failed" },
+          { type: "Error", value: "cause: c@y.org, d@z.net" },
+        ],
+      },
+    });
+    const result = beforeSend(event);
+    expect(result.message).toBe("No account for [EMAIL] or [EMAIL]");
+    expect(result.exception!.values![0].value).toBe("Invite to [EMAIL] failed");
+    expect(result.exception!.values![1].value).toBe("cause: [EMAIL], [EMAIL]");
+  });
+
+  it("keeps the logger's diagnostic label on Error-path captures", () => {
+    const event = makeEvent({ extra: { label: "verifyRefreshToken: unexpected error" } });
+    expect(beforeSend(event).extra!.label).toBe("verifyRefreshToken: unexpected error");
+  });
+
+  it("redacts x-user-email and x-user-id headers", () => {
+    const event = makeEvent({
+      request: {
+        url: "http://localhost",
+        headers: { "x-user-email": "jane@example.com", "X-User-Id": "u1", accept: "*/*" },
+      },
+    });
+    const headers = beforeSend(event).request!.headers!;
+    expect(headers["x-user-email"]).toBe("[REDACTED]");
+    expect(headers["X-User-Id"]).toBe("[REDACTED]");
+    expect(headers.accept).toBe("*/*");
+  });
+
   it("returns empty event unchanged", () => {
     const event = makeEvent({});
     const result = beforeSend(event);
@@ -120,6 +167,24 @@ describe("sentry-scrub beforeSend", () => {
     const result = beforeSend(event);
     expect((result.contexts!.user as Record<string, unknown>).email).toBe("[REDACTED]");
     expect((result.contexts!.user as Record<string, unknown>).name).toBe("Test");
+  });
+});
+
+describe("sentry-scrub beforeBreadcrumb", () => {
+  it("drops console breadcrumbs", () => {
+    expect(beforeBreadcrumb({ category: "console", message: "body" })).toBeNull();
+  });
+
+  it("keeps other breadcrumbs", () => {
+    const crumb = { category: "navigation", data: { to: "/" } };
+    expect(beforeBreadcrumb(crumb)).toBe(crumb);
+  });
+
+  it("is passed to every Sentry.init config", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"]) {
+      expect(readFileSync(f, "utf8"), f).toMatch(/^\s*beforeBreadcrumb,\s*$/m);
+    }
   });
 });
 
