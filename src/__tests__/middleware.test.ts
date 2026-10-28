@@ -64,6 +64,7 @@ describe("middleware", () => {
     afterEach(() => {
         if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
         else delete process.env.API_TOKEN;
+        vi.unstubAllEnvs();
     });
 
     it("passes through when auth is not enabled", async () => {
@@ -450,6 +451,35 @@ describe("middleware", () => {
             expect(xNonce).toBeTruthy();
             expect(nonceMatch).not.toBeNull();
             expect(xNonce).toBe(nonceMatch![1]);
+        });
+
+        it("sets Content-Security-Policy on middleware-generated 401s and redirects", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+
+            const unauthorized = await middleware(createRequest("/api/projects"));
+            expect(unauthorized.status).toBe(401);
+            expect(unauthorized.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+
+            const redirect = await middleware(createRequest("/projects"));
+            expect(redirect.status).toBe(307);
+            expect(redirect.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+        });
+
+        it("reports violations to the Sentry CSP endpoint derived from the DSN", async () => {
+            vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://abc123@o42.ingest.us.sentry.io/7");
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/health"));
+            expect(res.headers.get("Content-Security-Policy")).toMatch(
+                /; report-uri https:\/\/o42\.ingest\.us\.sentry\.io\/api\/7\/security\/\?sentry_key=abc123$/
+            );
+        });
+
+        it("omits report-uri when no Sentry DSN is configured", async () => {
+            vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/health"));
+            expect(res.headers.get("Content-Security-Policy")).not.toContain("report-uri");
         });
     });
 

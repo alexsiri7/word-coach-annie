@@ -13,7 +13,24 @@ import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-lim
 import type { RateLimitConfig } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 
+/**
+ * Sentry's CSP report endpoint for the project named by the DSN
+ * (https://<key>@<host>/<projectId> → https://<host>/api/<projectId>/security/?sentry_key=<key>).
+ */
+function sentryCspReportUri(dsn: string | undefined): string | null {
+    if (!dsn) return null;
+    try {
+        const url = new URL(dsn);
+        const projectId = url.pathname.split("/").filter(Boolean).pop();
+        if (!url.username || !projectId) return null;
+        return `${url.protocol}//${url.host}/api/${projectId}/security/?sentry_key=${url.username}`;
+    } catch {
+        return null;
+    }
+}
+
 function buildCsp(nonce: string): string {
+    const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
@@ -30,6 +47,7 @@ function buildCsp(nonce: string): string {
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
+        ...(reportUri ? [`report-uri ${reportUri}`] : []),
     ].join("; ");
 }
 
@@ -139,9 +157,13 @@ const IDENTITY_HEADERS = ["x-user-id", "x-user-email"] as const;
 
 export async function middleware(request: NextRequest) {
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
-    const csp = buildCsp(nonce);
+    const res = await route(request, nonce);
+    res.headers.set("Content-Security-Policy", buildCsp(nonce));
+    return res;
+}
 
-    // Helper: NextResponse.next() with nonce injected into request headers + CSP on response.
+async function route(request: NextRequest, nonce: string): Promise<NextResponse> {
+    // Helper: NextResponse.next() with nonce injected into request headers.
     // Identity headers are never forwarded from the client; they are set here only from a
     // verified JWT/MCP session (SEC-03).
     function nextWithNonce(identity?: { userId: string; email: string }): NextResponse {
@@ -152,9 +174,7 @@ export async function middleware(request: NextRequest) {
             reqHeaders.set("x-user-email", identity.email);
         }
         reqHeaders.set("x-nonce", nonce);
-        const res = NextResponse.next({ request: { headers: reqHeaders } });
-        res.headers.set("Content-Security-Policy", csp);
-        return res;
+        return NextResponse.next({ request: { headers: reqHeaders } });
     }
 
     // No auth configured → pass through (local dev mode)
