@@ -61,6 +61,22 @@ describe("API Route Handlers", () => {
             expect(data.projects.length).toBeGreaterThanOrEqual(1);
         });
 
+        it("GET builds items from an explicit field list without the owner's userId", async () => {
+            const owner = await testPrisma.user.create({
+                data: { email: "owner@test.com", googleId: "g-owner" },
+            });
+            await testPrisma.project.update({ where: { id: projectId }, data: { userId: owner.id } });
+
+            const { GET } = await import("@/app/api/projects/route");
+            const res = await GET(mockReq("http://localhost/api/projects"));
+            const data = await res.json();
+            const item = data.projects.find((p: { id: string }) => p.id === projectId);
+            expect(Object.keys(item).sort()).toEqual([
+                "archivedAt", "author", "characterCount", "createdAt", "genre", "id", "isSample",
+                "nodeCount", "projectType", "sceneCount", "synopsis", "title", "updatedAt", "wordCount",
+            ]);
+        });
+
         it("POST creates a project", async () => {
             const { POST } = await import("@/app/api/projects/route");
             const req = mockReq("http://localhost/api/projects", {

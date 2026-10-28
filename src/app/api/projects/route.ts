@@ -79,7 +79,16 @@ export async function GET(request: NextRequest) {
     }
 
     const projectsWithWordCount = projects.map((project) => ({
-      ...project,
+      id: project.id,
+      title: project.title,
+      author: project.author,
+      synopsis: project.synopsis,
+      genre: project.genre,
+      projectType: project.projectType,
+      isSample: project.isSample,
+      archivedAt: project.archivedAt,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
       wordCount: projectWordCounts.get(project.id) || 0,
       nodeCount: project._count.structureNodes,
       sceneCount: projectSceneCounts.get(project.id) || 0,
