@@ -55,6 +55,20 @@ export default function PrivacyPage() {
               <li>Projects, scenes, and all manuscript content you create</li>
               <li>Universes, characters, locations, and world-building entries</li>
               <li>Version history of your writing (for the undo/version feature)</li>
+              <li>
+                Email addresses of people you share a project with. They are not
+                notified by Annie. Removing a person from a project deletes their
+                email, and when someone you shared with deletes their own account,
+                their shares are deleted too
+              </li>
+              <li>
+                Comments imported from a Google Doc you exported, with their
+                quoted text. Commenters&apos; names are not stored
+              </li>
+              <li>
+                The IP address that registered an MCP client app, kept for 24
+                hours to limit abuse and then cleared
+              </li>
             </ul>
             <p>
               We do not store passwords. Authentication is handled through Google
