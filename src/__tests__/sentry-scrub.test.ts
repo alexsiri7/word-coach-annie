@@ -122,12 +122,23 @@ describe("sentry-scrub beforeSend", () => {
 
   it("masks email addresses in event.message and exception values", () => {
     const event = makeEvent({
-      message: "No account for jane.doe@example.com",
-      exception: { values: [{ type: "Error", value: "Invite to a+b@x.co failed" }] },
+      message: "No account for jane.doe@example.com or a@x.com",
+      exception: {
+        values: [
+          { type: "Error", value: "Invite to a+b@x.co failed" },
+          { type: "Error", value: "cause: c@y.org, d@z.net" },
+        ],
+      },
     });
     const result = beforeSend(event);
-    expect(result.message).toBe("No account for [EMAIL]");
+    expect(result.message).toBe("No account for [EMAIL] or [EMAIL]");
     expect(result.exception!.values![0].value).toBe("Invite to [EMAIL] failed");
+    expect(result.exception!.values![1].value).toBe("cause: [EMAIL], [EMAIL]");
+  });
+
+  it("keeps the logger's diagnostic label on Error-path captures", () => {
+    const event = makeEvent({ extra: { label: "verifyRefreshToken: unexpected error" } });
+    expect(beforeSend(event).extra!.label).toBe("verifyRefreshToken: unexpected error");
   });
 
   it("redacts x-user-email and x-user-id headers", () => {

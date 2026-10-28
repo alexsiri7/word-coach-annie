@@ -66,7 +66,7 @@ describe("logger", () => {
         const err = new Error("sentry test");
         logger.error("crashed", err);
         expect(Sentry.captureException).toHaveBeenCalledWith(err, {
-            extra: { message: "crashed" },
+            extra: { label: "crashed" },
         });
     });
 
