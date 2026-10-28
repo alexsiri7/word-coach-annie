@@ -11,6 +11,7 @@ import {
 } from "@/lib/oauth-store";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { RATE_LIMITS } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   // Per-IP throttle to limit client registration abuse
   const ip = getClientIp(request.headers);
   if (process.env.DISABLE_RATE_LIMIT !== "true") {
-    const rl = await checkRateLimit(`oauth-register:${ip}`, { limit: 5, windowMs: 3_600_000 });
+    const rl = await checkRateLimit(`oauth-register:${ip}`, RATE_LIMITS.oauthRegister);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "rate_limited", error_description: "too many registration attempts" },
