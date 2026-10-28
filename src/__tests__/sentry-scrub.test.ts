@@ -38,7 +38,7 @@ describe("sentry-scrub beforeSend", () => {
   it("truncates strings longer than 2000 chars", () => {
     const longString = "x".repeat(3000);
     const event = makeEvent({ extra: { detail: longString } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     const truncated = result.extra!.detail as string;
     expect(truncated).toHaveLength(2000 + "…[truncated]".length);
     expect(truncated.endsWith("…[truncated]")).toBe(true);
@@ -116,7 +116,7 @@ describe("sentry-scrub beforeSend", () => {
         meta: { raw: "peer review", body: "{}", content: "c", message: "m", text: "t", status: 500 },
       },
     });
-    const meta = beforeSend(event).extra!.meta as Record<string, unknown>;
+    const meta = beforeSend(event)!.extra!.meta as Record<string, unknown>;
     for (const k of ["raw", "body", "content", "message", "text"]) {
       expect(meta[k], k).toBe("[REDACTED]");
     }
@@ -133,7 +133,7 @@ describe("sentry-scrub beforeSend", () => {
         ],
       },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.message).toBe("No account for [EMAIL] or [EMAIL]");
     expect(result.exception!.values![0].value).toBe("Invite to [EMAIL] failed");
     expect(result.exception!.values![1].value).toBe("cause: [EMAIL], [EMAIL]");
@@ -141,7 +141,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("keeps the logger's diagnostic label on Error-path captures", () => {
     const event = makeEvent({ extra: { label: "verifyRefreshToken: unexpected error" } });
-    expect(beforeSend(event).extra!.label).toBe("verifyRefreshToken: unexpected error");
+    expect(beforeSend(event)!.extra!.label).toBe("verifyRefreshToken: unexpected error");
   });
 
   it("redacts x-user-email and x-user-id headers", () => {
@@ -151,7 +151,7 @@ describe("sentry-scrub beforeSend", () => {
         headers: { "x-user-email": "jane@example.com", "X-User-Id": "u1", accept: "*/*" },
       },
     });
-    const headers = beforeSend(event).request!.headers!;
+    const headers = beforeSend(event)!.request!.headers!;
     expect(headers["x-user-email"]).toBe("[REDACTED]");
     expect(headers["X-User-Id"]).toBe("[REDACTED]");
     expect(headers.accept).toBe("*/*");
