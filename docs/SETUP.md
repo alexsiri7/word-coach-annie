@@ -48,7 +48,7 @@ Building, pushing and signing the image in CI is tracked in [#1367](https://gith
 
 ### Updating Images
 
-The third-party images (`phoenix`, `tunnel`) are pinned by digest, so `docker compose pull` only fetches what `docker-compose.yml` names; Dependabot proposes bumps for the tagged ones as PRs.
+The third-party images (`phoenix`, `tunnel`) are pinned by digest, so `docker compose pull` cannot swap them for a different image under the same tag; Dependabot proposes bumps for `tunnel`, which also carries its version tag, as PRs. `app` still runs `:latest`, so `docker compose pull` fetches whatever was last pushed there until it is pinned.
 
 To pin `app` to a pushed image, resolve its digest (requires `docker login ghcr.io`):
 
