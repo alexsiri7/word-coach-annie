@@ -30,3 +30,19 @@ describe("Google Fonts", () => {
         expect(offenders).toEqual([]);
     });
 });
+
+// CSS custom-property fallback is silent: a font variable consumed under a
+// name layout.tsx doesn't declare drops the site to fallback fonts unnoticed.
+describe("Self-hosted font variables", () => {
+    const read = (path: string) => readFileSync(join(ROOT, path), "utf-8");
+    const declared = [...read("src/app/layout.tsx").matchAll(/variable:\s*"(--font-[\w-]+)"/g)].map((m) => m[1]).sort();
+    const consumed = (path: string) => [...new Set([...read(path).matchAll(/var\((--font-[\w-]+)\)/g)].map((m) => m[1]))].sort();
+
+    it("declares the Inter, Manrope and Newsreader variables in layout.tsx", () => {
+        expect(declared).toEqual(["--font-inter", "--font-manrope", "--font-newsreader"]);
+    });
+
+    it.each(["src/app/globals.css", "tailwind.config.ts"])("are exactly the ones %s consumes", (path) => {
+        expect(consumed(path)).toEqual(declared);
+    });
+});
