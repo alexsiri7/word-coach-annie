@@ -152,10 +152,10 @@ async function applyRateLimit(
     return tryLimit(`${isRead ? "read" : "write"}:${userKey}`, config);
 }
 
-/** Request headers that only the middleware may set. Anything the client sent is dropped. */
+/** Request headers that only the proxy may set. Anything the client sent is dropped. */
 const IDENTITY_HEADERS = ["x-user-id", "x-user-email"] as const;
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
     const res = await route(request, nonce);
     res.headers.set("Content-Security-Policy", buildCsp(nonce));

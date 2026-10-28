@@ -79,7 +79,7 @@ src/
 ## Request Lifecycle
 
 1. **Client** makes HTTP request
-2. **Middleware** (`src/middleware.ts`) checks authentication (session cookie or `Authorization: Bearer <API_TOKEN>`)
+2. **Proxy** (`src/proxy.ts`, Next.js middleware on the Node.js runtime) checks authentication (session cookie or `Authorization: Bearer <API_TOKEN>`)
 3. **API Route** validates input with Zod, delegates to a **Controller**
 4. **Controller** runs business logic against **Prisma** (SQLite)
 5. Response returned as JSON

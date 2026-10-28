@@ -2,9 +2,6 @@
  * Sliding window rate limiter.
  * Uses Redis (sorted-set) when REDIS_URL is set; falls back to an in-memory
  * Map for single-instance deployments.
- *
- * ioredis is loaded lazily via dynamic import with webpackIgnore so it is NOT
- * bundled into the Edge runtime (middleware). Edge always uses in-memory mode.
  */
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -24,7 +21,14 @@ interface RateLimitResult {
 
 // ── In-Memory Store ────────────────────────────────────────────────────────────
 
+/** Insertion order doubles as recency order: each check moves its key to the end. */
 const memStore = new Map<string, RateLimitEntry>();
+
+/**
+ * Cap on tracked keys, so a flood of distinct IPs cannot grow the store without
+ * bound between cleanups. The least recently checked key is evicted first.
+ */
+export const MEM_STORE_MAX_ENTRIES = 10_000;
 
 /** Evict expired entries periodically to prevent memory leaks */
 const CLEANUP_INTERVAL_MS = 60_000;
@@ -53,11 +57,12 @@ function checkInMemory(key: string, config: RateLimitConfig): RateLimitResult {
     const windowStart = now - config.windowMs;
     memCleanup();
 
-    let entry = memStore.get(key);
-    if (!entry) {
-        entry = { timestamps: [] };
-        memStore.set(key, entry);
+    const entry = memStore.get(key) ?? { timestamps: [] };
+    memStore.delete(key);
+    if (memStore.size >= MEM_STORE_MAX_ENTRIES) {
+        memStore.delete(memStore.keys().next().value!);
     }
+    memStore.set(key, entry);
     entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
 
     if (entry.timestamps.length >= config.limit) {
@@ -119,10 +124,11 @@ let _redisPromise: Promise<Redis> | null = null;
 async function getRedis(): Promise<Redis> {
     if (!_redisPromise) {
         _redisPromise = (async () => {
-            // Dynamic import with webpackIgnore keeps ioredis out of the Edge bundle.
-            // This function is only called from checkRedis, which is guarded by useRedis().
-            const { default: RedisClass } = await import(/* webpackIgnore: true */ "ioredis") as { default: typeof Redis };
-            const client = new RedisClass(env.REDIS_URL!);
+            // Loaded only when REDIS_URL is set; checkRedis is guarded by useRedis().
+            const { default: RedisClass } = await import("ioredis");
+            // Every proxied request is rate limited, so a down Redis must fail fast rather
+            // than queue each request behind ioredis's reconnect retries.
+            const client = new RedisClass(env.REDIS_URL!, { commandTimeout: 1_000, maxRetriesPerRequest: 1 });
             client.on("error", (err) => {
                 logger.error("[rate-limit] Redis error:", err);
             });
@@ -166,6 +172,10 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
             resetMs: now + config.windowMs,
         };
     } catch (err) {
+        if (config.failOverToMemory) {
+            logger.error("[rate-limit] Redis check failed, using the in-memory limiter:", err);
+            return checkInMemory(key, config);
+        }
         // Fail open — allow the request but log the error so ops can investigate
         logger.error("[rate-limit] Redis check failed, allowing request:", err);
         return {
@@ -178,9 +188,7 @@ async function checkRedis(key: string, config: RateLimitConfig): Promise<RateLim
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
-// Edge runtime (middleware) cannot use ioredis — always falls back to in-memory.
-// Evaluated per-call so that tests can override globalThis.EdgeRuntime.
-const useRedis = () => typeof (globalThis as Record<string, unknown>).EdgeRuntime === "undefined" && Boolean(env.REDIS_URL);
+const useRedis = () => Boolean(env.REDIS_URL);
 
 /**
  * Check whether the given key has exceeded its rate limit.
@@ -217,6 +225,11 @@ export function isRateLimitBypassed(): boolean {
 /** Clear all in-memory entries (for testing — in-memory mode only) */
 export function resetRateLimitStore() {
     memStore.clear();
+}
+
+/** Number of keys in the in-memory store (for testing only) */
+export function rateLimitStoreSize(): number {
+    return memStore.size;
 }
 
 /** Reset the Redis client singleton (for testing only) */
