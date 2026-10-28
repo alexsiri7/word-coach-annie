@@ -33,3 +33,11 @@ describe('dev server binding', () => {
     expect(scripts['dev:secure']).toMatch(/ -H 127\.0\.0\.1$/);
   });
 });
+
+// docker-compose.dev.yml bind-mounts the checkout over /app, so a non-root user would not
+// own the host files on most machines.
+describe('Dockerfile.dev', () => {
+  it('keeps the dev container on root so the bind mount works on any host UID', () => {
+    expect(read('Dockerfile.dev')).not.toMatch(/^USER\s/m);
+  });
+});
