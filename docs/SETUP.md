@@ -108,7 +108,7 @@ To allow any Google account to sign in (not just test users), the OAuth consent 
 
 | Variable | Description |
 |----------|-------------|
-| `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. **Required** when storing AI API keys; set `ALLOW_PLAINTEXT_STORAGE=true` in local dev to opt out. |
+| `ENCRYPTION_KEY` | Key for encrypting AI API keys at rest. Generate: `openssl rand -hex 32`. **Required** when storing AI API keys; set `ALLOW_PLAINTEXT_STORAGE=true` in local dev to opt out. Production ignores that opt-out and refuses to start while it is set. Values stored as plaintext under the opt-out are encrypted by `scripts/reencrypt.mjs` on the next container start once `ENCRYPTION_KEY` is set. |
 | `ENCRYPTION_KEY_PREVIOUS` | Optional. Comma-separated older encryption keys, used only to decrypt values written before a rotation. See [Rotating ENCRYPTION_KEY](#rotating-encryption_key). |
 | `JWT_SECRET` | JWT signing key for Google OAuth sessions. Generate: `openssl rand -hex 32`. **Required** when auth is enabled and must be at least 32 characters; there is no fallback. Production refuses to start if `JWT_SECRET`, `API_TOKEN` or `ENCRYPTION_KEY` is set but shorter than 32 characters. |
 | `ALLOWED_EMAILS` | Comma-separated list of Google emails allowed to sign in. When unset, any Google account can sign in. |

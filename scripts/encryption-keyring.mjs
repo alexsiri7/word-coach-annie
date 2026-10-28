@@ -3,8 +3,8 @@
  * (#1282).
  *
  * The single implementation of the "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
- * format, shared by src/lib/crypto.ts (the app) and scripts/reencrypt.mjs (the
- * release-step sweep). Keep it import-free apart from Node's crypto: the
+ * format, shared by src/lib/crypto.ts (the app), scripts/reencrypt.mjs (the
+ * release-step sweep) and scripts/migrate.mjs (the startup gate). Keep it import-free apart from Node's crypto: the
  * production image runs reencrypt.mjs without src/ or node_modules beyond
  * Prisma.
  *
@@ -33,6 +33,24 @@ export const ENCRYPTED_COLUMNS = /** @type {const} */ ([
   { table: 'UserAiSettings', columns: ['apiKey'] },
   { table: 'AiSettings', columns: ['apiKey'] },
 ]);
+
+/**
+ * Report a production configuration that opts out of encryption (#1323).
+ *
+ * ALLOW_PLAINTEXT_STORAGE=true lets local dev run without ENCRYPTION_KEY.
+ * src/lib/crypto.ts ignores it in production, and the startup gate in
+ * migrate.mjs refuses to start while it is set there.
+ *
+ * @param {{ ALLOW_PLAINTEXT_STORAGE?: string }} env - Usually process.env
+ * @returns {string[]} One message per problem; empty when encryption is not opted out
+ */
+export function plaintextStorageProblems(env) {
+  if (env.ALLOW_PLAINTEXT_STORAGE !== 'true') return [];
+  return [
+    'ALLOW_PLAINTEXT_STORAGE=true is set; production never stores credentials unencrypted. ' +
+      'Unset it and set ENCRYPTION_KEY — see docs/SETUP.md.',
+  ];
+}
 
 /**
  * Derive a 256-bit key from a configured key string.

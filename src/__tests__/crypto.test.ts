@@ -113,6 +113,22 @@ describe("crypto", () => {
             expect(decrypt(plaintext)).toBe(plaintext);
         });
 
+        it("throws in production even when ALLOW_PLAINTEXT_STORAGE=true", async () => {
+            process.env.ALLOW_PLAINTEXT_STORAGE = "true";
+            vi.stubEnv("NODE_ENV", "production");
+            try {
+                expect(() => encrypt("sk-no-encryption")).toThrow("ENCRYPTION_KEY must be set");
+                expect(() => decrypt("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff")).toThrow(
+                    "ENCRYPTION_KEY must be set"
+                );
+                await expect(
+                    readEncrypted("enc:v1:aabbcc:ddeeff00112233445566778899aabbccddeeff", { field: "AiSettings.apiKey" })
+                ).rejects.toThrow("ENCRYPTION_KEY must be set");
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
         it("throws when ALLOW_PLAINTEXT_STORAGE is '1' (strict string check)", () => {
             process.env.ALLOW_PLAINTEXT_STORAGE = "1";
             expect(() => encrypt("sk-test")).toThrow("ENCRYPTION_KEY must be set");
