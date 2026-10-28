@@ -85,36 +85,36 @@ const config: Config = {
   		},
   		fontFamily: {
   			sans: [
-  				'Inter',
+  				'var(--font-inter)',
   				'system-ui',
   				'sans-serif'
   			],
   			serif: [
-  				'Newsreader',
+  				'var(--font-newsreader)',
   				'Georgia',
   				'Cambria',
   				'serif'
   			],
   			editorial: [
-  				'Newsreader',
+  				'var(--font-newsreader)',
   				'Georgia',
   				'Cambria',
   				'serif'
   			],
   			headline: [
-  				'Newsreader',
+  				'var(--font-newsreader)',
   				'Georgia',
   				'Cambria',
   				'serif'
   			],
   			body: [
-  				'Manrope',
-  				'Inter',
+  				'var(--font-manrope)',
+  				'var(--font-inter)',
   				'system-ui',
   				'sans-serif'
   			],
   			label: [
-  				'Inter',
+  				'var(--font-inter)',
   				'system-ui',
   				'sans-serif'
   			]

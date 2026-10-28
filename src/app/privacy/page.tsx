@@ -107,10 +107,6 @@ export default function PrivacyPage() {
                 when you explicitly connect an account and export to them
               </li>
               <li>
-                <strong>Google Fonts</strong> — font files are loaded from Google&apos;s
-                servers on every page
-              </li>
-              <li>
                 <strong>Sentry</strong> — error reports tagged with your internal
                 account ID (not your email) to help us fix bugs. Before sending we
                 drop request bodies and console logs, mask email addresses in error

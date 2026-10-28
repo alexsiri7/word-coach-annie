@@ -361,6 +361,13 @@ describe("middleware", () => {
             expect(csp).toMatch(/script-src[^;]*'nonce-[A-Za-z0-9+/=_-]+'/);
         });
 
+        it("does not allow Google's font hosts (fonts are self-hosted, SEC-32)", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await middleware(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy");
+            expect(csp).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+        });
+
         it("sets Content-Security-Policy on authenticated responses", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
