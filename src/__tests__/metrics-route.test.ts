@@ -34,7 +34,7 @@ function mockRequest() {
     return new NextRequest("http://localhost/api/metrics");
 }
 
-// Auth is enforced by middleware (not the route handler). These tests verify
+// Auth is enforced by middleware (see middleware.test.ts). These tests verify
 // the handler's behaviour once a request has already passed auth.
 describe("GET /api/metrics", () => {
     beforeEach(() => {
@@ -69,17 +69,6 @@ describe("GET /api/metrics", () => {
 
         const res = await GET(mockRequest());
         expect(res.headers.get("Content-Type")).toContain("text/plain");
-    });
-
-    it("returns 200 for API_TOKEN bearer sessions (no x-user-id header set by middleware)", async () => {
-        // API_TOKEN sessions: middleware authenticates and passes through without setting x-user-id.
-        // The route handler must not perform its own auth check — middleware is the gatekeeper.
-        (prisma.project.count as ReturnType<typeof vi.fn>).mockResolvedValue(3);
-        (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(5);
-
-        const req = new NextRequest("http://localhost/api/metrics"); // no Authorization header — simulates post-middleware state
-        const res = await GET(req);
-        expect(res.status).toBe(200);
     });
 
     it("returns 503 on DB error", async () => {

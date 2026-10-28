@@ -52,6 +52,8 @@ const PUBLIC_PATHS = [
     "/version.json",
 ];
 
+const METRICS_PATH = "/api/metrics";
+
 const AUTH_RATE_LIMITED_PATHS = new Set(["/api/auth/login", "/api/auth/refresh", "/api/auth/me"]);
 
 function isPublicPath(pathname: string): boolean {
@@ -178,18 +180,22 @@ export async function middleware(request: NextRequest) {
     // Check Authorization header (programmatic / MCP access)
     const apiToken = env.API_TOKEN;
     const authHeader = request.headers.get("authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks)
+    if (token && apiToken && safeEqual(token, apiToken)) {
+        const rateLimited = await applyRateLimit(request, "apitoken");
+        if (rateLimited) return rateLimited;
+        return nextWithNonce();
+    }
+
+    // Metrics expose instance-wide counts and process internals, so the API_TOKEN bearer
+    // is the only credential that may read them — no user session or MCP token (SEC-37).
+    if (pathname === METRICS_PATH) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (authHeader) {
-        const token = authHeader.startsWith("Bearer ")
-            ? authHeader.slice(7)
-            : null;
-
-        // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks)
-        if (token && apiToken && safeEqual(token, apiToken)) {
-            const rateLimited = await applyRateLimit(request, "apitoken");
-            if (rateLimited) return rateLimited;
-            return nextWithNonce();
-        }
-
         // 2. Check MCP OAuth access token (JWT with type: "mcp_access")
         if (token) {
             const mcpSession = await verifyMcpToken(token, "mcp_access");
