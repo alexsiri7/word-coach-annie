@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createCipheriv, createHash, randomBytes } from "crypto";
 import { readFileSync } from "fs";
 import { join, relative } from "path";
 import { encrypt, decrypt, isEncrypted, isUndecryptable, readEncrypted } from "@/lib/crypto";
@@ -6,6 +7,14 @@ import { logger } from "@/lib/logger";
 import { shippedFiles } from "./source-files";
 
 const SRC = join(__dirname, "..");
+
+/** A value in the pre-#1323 "enc:v1:<iv>:<payload>" format, which carries no key id. */
+function encryptV1(key: string, plaintext: string): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", createHash("sha256").update(key).digest(), iv);
+    const payload = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final(), cipher.getAuthTag()]);
+    return `enc:v1:${iv.toString("hex")}:${payload.toString("hex")}`;
+}
 
 describe("crypto", () => {
     let origEncKey: string | undefined;
@@ -54,9 +63,17 @@ describe("crypto", () => {
             expect(decrypt("")).toBe("");
         });
 
-        it("encrypted format has correct prefix", () => {
+        it("encrypted format carries the key id of the current key", () => {
             const encrypted = encrypt("test");
-            expect(encrypted.startsWith("enc:v1:")).toBe(true);
+            expect(encrypted).toMatch(/^enc:v2:[0-9a-f]{8}:[0-9a-f]+:[0-9a-f]+$/);
+            const kid = encrypted.split(":")[2];
+            expect(encrypt("other").split(":")[2]).toBe(kid);
+            process.env.ENCRYPTION_KEY = "another-encryption-key-for-unit-tests";
+            expect(encrypt("test").split(":")[2]).not.toBe(kid);
+        });
+
+        it("still decrypts legacy enc:v1: values", () => {
+            expect(decrypt(encryptV1("test-encryption-key-for-unit-tests", "sk-legacy"))).toBe("sk-legacy");
         });
 
         it("handles unicode content", () => {
@@ -189,6 +206,29 @@ describe("crypto", () => {
             expect(rewrite).toHaveBeenCalledTimes(1);
             const rewritten = rewrite.mock.calls[0][0];
             expect(decryptUnderOnly(KEY_B, rewritten)).toBe("sk-rotate-me");
+        });
+
+        it("decrypts a v1 value with a previous key and rewrites it as v2 under the current key", async () => {
+            const stored = encryptV1(KEY_A, "sk-v1-rotate");
+            process.env.ENCRYPTION_KEY = KEY_B;
+            process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
+
+            expect(decrypt(stored)).toBe("sk-v1-rotate");
+            const rewrite = vi.fn(async (_reencrypted: string) => {});
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-v1-rotate");
+
+            const rewritten = rewrite.mock.calls[0][0];
+            expect(rewritten.startsWith("enc:v2:")).toBe(true);
+            expect(decryptUnderOnly(KEY_B, rewritten)).toBe("sk-v1-rotate");
+        });
+
+        it("rewrites a v1 value under the current key as v2", async () => {
+            const stored = encryptV1(KEY_B, "sk-v1-current");
+            process.env.ENCRYPTION_KEY = KEY_B;
+            const rewrite = vi.fn(async (_reencrypted: string) => {});
+
+            await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-v1-current");
+            expect(rewrite.mock.calls[0][0].startsWith("enc:v2:")).toBe(true);
         });
 
         it("does not rewrite a value already under the current key", async () => {

@@ -11,7 +11,8 @@
  * ALLOW_PLAINTEXT_STORAGE=true; production ignores it and refuses to start
  * while it is set (scripts/migrate.mjs).
  *
- * Encrypted format: "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
+ * Encrypted format: "enc:v2:<key-id>:<iv-hex>:<ciphertext+tag-hex>"; legacy
+ * "enc:v1:<iv-hex>:<ciphertext+tag-hex>" values still decrypt
  * (implemented in scripts/encryption-keyring.mjs).
  */
 import {
@@ -21,6 +22,7 @@ import {
     deriveKey,
     encryptWithKey,
     keySources,
+    parseEncrypted,
 } from "../../scripts/encryption-keyring.mjs";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -94,10 +96,9 @@ export function decrypt(value: string): string {
     const keyring = getKeyring();
     if (!keyring) return value;
 
-    const parts = value.slice(ENCRYPTED_PREFIX.length).split(":");
-    if (parts.length !== 2) {
+    if (!parseEncrypted(value)) {
         throw new Error(
-            `[crypto] Malformed ciphertext (expected enc:v1:<iv>:<payload>, got ${parts.length} parts). ` +
+            "[crypto] Malformed ciphertext (expected enc:v2:<key-id>:<iv>:<payload> or enc:v1:<iv>:<payload>). " +
             "This may indicate data corruption or an incomplete write."
         );
     }
@@ -115,8 +116,8 @@ export function decrypt(value: string): string {
 /**
  * Read a stored secret for use. Like decrypt(), but a value no configured key
  * can decrypt resolves to null (callers treat it as disconnected / no key)
- * instead of throwing, and a value decrypted with a previous key is passed,
- * re-encrypted under the current key, to `rewrite` so the caller can persist it.
+ * instead of throwing, and a value decrypted with a previous key or stored in
+ * the legacy v1 format is passed, re-encrypted under the current key, to `rewrite` so the caller can persist it.
  * A failed rewrite is logged and does not fail the read.
  *
  * `field` names the stored column in logs; the value itself is never logged.
@@ -136,7 +137,7 @@ export async function readEncrypted(
         return null;
     }
 
-    if (result.keyIndex > 0 && opts.rewrite) {
+    if (result.stale && opts.rewrite) {
         try {
             await opts.rewrite(encryptWithKey(keyring[0], result.plaintext));
         } catch (err) {

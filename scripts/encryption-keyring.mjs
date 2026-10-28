@@ -2,8 +2,7 @@
  * AES-256-GCM cipher for secrets stored in the database, with key rotation
  * (#1282).
  *
- * The single implementation of the "enc:v1:<iv-hex>:<ciphertext+tag-hex>"
- * format, shared by src/lib/crypto.ts (the app), scripts/reencrypt.mjs (the
+ * The single implementation of the ciphertext format, shared by src/lib/crypto.ts (the app), scripts/reencrypt.mjs (the
  * release-step sweep) and scripts/migrate.mjs (the startup gate). Keep it import-free apart from Node's crypto: the
  * production image runs reencrypt.mjs without src/ or node_modules beyond
  * Prisma.
@@ -11,6 +10,11 @@
  * ENCRYPTION_KEY is the current key and the only one used to encrypt.
  * ENCRYPTION_KEY_PREVIOUS lists older keys, comma-separated, used only to
  * decrypt values written before a rotation.
+ *
+ * Format: "enc:v2:<key-id>:<iv-hex>:<ciphertext+tag-hex>", where key-id names
+ * the key that encrypted it (see keyId). Values written before #1323 use
+ * "enc:v1:<iv-hex>:<ciphertext+tag-hex>"; they still decrypt, by trying every
+ * configured key, and are rewritten as v2.
  */
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 
@@ -18,7 +22,10 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits for GCM
 const TAG_LENGTH = 16;
 
-export const ENCRYPTED_PREFIX = 'enc:v1:';
+/** Every stored value starting with this is ciphertext; anything else is plaintext. */
+export const ENCRYPTED_PREFIX = 'enc:';
+const V1_PREFIX = 'enc:v1:';
+const V2_PREFIX = 'enc:v2:';
 
 /**
  * Every column written with encrypt() must be listed here, or
@@ -77,6 +84,17 @@ export function keySources(env) {
 }
 
 /**
+ * A short public identifier for a derived key: a truncated hash of it, so it
+ * names the key without revealing it.
+ *
+ * @param {Buffer} key
+ * @returns {string} 8 hex characters
+ */
+export function keyId(key) {
+  return createHash('sha256').update('key-id:').update(key).digest('hex').slice(0, 8);
+}
+
+/**
  * @param {Buffer} key
  * @param {string} plaintext
  * @returns {string}
@@ -86,22 +104,34 @@ export function encryptWithKey(key, plaintext) {
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([encrypted, cipher.getAuthTag()]);
-  return `${ENCRYPTED_PREFIX}${iv.toString('hex')}:${payload.toString('hex')}`;
+  return `${V2_PREFIX}${keyId(key)}:${iv.toString('hex')}:${payload.toString('hex')}`;
 }
 
 /**
- * Split an "enc:v1:" value into its parts, or null when it is malformed.
+ * Split an encrypted value into its parts, or null when it is malformed or of
+ * an unknown version. kid is null for v1 values, which carry no key id.
  *
  * @param {string} value
- * @returns {{ iv: Buffer, ciphertext: Buffer, tag: Buffer } | null}
+ * @returns {{ kid: string | null, iv: Buffer, ciphertext: Buffer, tag: Buffer } | null}
  */
-function parseEncrypted(value) {
-  const parts = value.slice(ENCRYPTED_PREFIX.length).split(':');
-  if (parts.length !== 2) return null;
+export function parseEncrypted(value) {
+  let kid = null;
+  let parts;
+  if (value.startsWith(V2_PREFIX)) {
+    parts = value.slice(V2_PREFIX.length).split(':');
+    if (parts.length !== 3) return null;
+    kid = parts.shift();
+  } else if (value.startsWith(V1_PREFIX)) {
+    parts = value.slice(V1_PREFIX.length).split(':');
+    if (parts.length !== 2) return null;
+  } else {
+    return null;
+  }
   const iv = Buffer.from(parts[0], 'hex');
   const payload = Buffer.from(parts[1], 'hex');
   if (payload.length < TAG_LENGTH) return null;
   return {
+    kid,
     iv,
     ciphertext: payload.subarray(0, payload.length - TAG_LENGTH),
     tag: payload.subarray(payload.length - TAG_LENGTH),
@@ -109,24 +139,28 @@ function parseEncrypted(value) {
 }
 
 /**
- * Decrypt an "enc:v1:" value with the first key that authenticates it.
- * keyIndex 0 is the current key; a higher index means the value should be
- * rewritten under the current key.
+ * Decrypt an encrypted value. A v2 value is tried only with the configured key
+ * its key id names; a v1 value with each key in turn.
+ *
+ * keyIndex 0 is the current key. stale is true when the value should be
+ * rewritten with encryptWithKey(keys[0], plaintext): it was encrypted with a
+ * previous key, or it is in the v1 format.
  *
  * @param {string} value
  * @param {Buffer[]} keys - Current key first, then previous keys
- * @returns {{ plaintext: string, keyIndex: number } | null} null when the value
- *   is malformed or no key authenticates it
+ * @returns {{ plaintext: string, keyIndex: number, stale: boolean } | null} null
+ *   when the value is malformed or no key authenticates it
  */
 export function decryptWithKeys(value, keys) {
   const parsed = parseEncrypted(value);
   if (!parsed) return null;
   for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+    if (parsed.kid !== null && keyId(keys[keyIndex]) !== parsed.kid) continue;
     try {
       const decipher = createDecipheriv(ALGORITHM, keys[keyIndex], parsed.iv);
       decipher.setAuthTag(parsed.tag);
       const decrypted = Buffer.concat([decipher.update(parsed.ciphertext), decipher.final()]);
-      return { plaintext: decrypted.toString('utf8'), keyIndex };
+      return { plaintext: decrypted.toString('utf8'), keyIndex, stale: keyIndex > 0 || parsed.kid === null };
     } catch {
       // Wrong key (or tampered value): try the next one.
     }

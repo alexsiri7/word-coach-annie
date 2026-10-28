@@ -1,4 +1,5 @@
 import { spawnSync } from 'child_process';
+import { createCipheriv, randomBytes } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { testPrisma } from '../../src/__tests__/setup';
@@ -14,6 +15,14 @@ const quietLog = { warn: vi.fn() };
 
 function decryptUnderOnly(key: string, value: string) {
   return decryptWithKeys(value, [deriveKey(key)])?.plaintext;
+}
+
+/** A value in the pre-#1323 "enc:v1:<iv>:<payload>" format, which carries no key id. */
+function encryptV1(key: string, plaintext: string) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', deriveKey(key), iv);
+  const payload = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final(), cipher.getAuthTag()]);
+  return `enc:v1:${iv.toString('hex')}:${payload.toString('hex')}`;
 }
 
 describe('reencryptStoredValues()', () => {
@@ -85,6 +94,34 @@ describe('reencryptStoredValues()', () => {
     expect(settings.apiKey).toBe(concurrent);
   });
 
+  it('rewrites v1 values, under the current or a previous key, in the key-id format', async () => {
+    await testPrisma.aiSettings.create({ data: { id: 'default', apiKey: encryptV1(KEY_B, 'sk-v1-current') } });
+    await testPrisma.hashnodeCredential.create({
+      data: { userId: 'local', accessToken: encryptV1(KEY_A, 'hashnode-v1-previous'), publicationId: 'p', username: 'u' },
+    });
+
+    await expect(reencryptStoredValues(testPrisma, { qschema: 'public', env, log: quietLog })).resolves.toEqual({
+      rewritten: 2,
+      encrypted: 0,
+      current: 0,
+      undecryptable: 0,
+    });
+
+    const settings = await testPrisma.aiSettings.findUniqueOrThrow({ where: { id: 'default' } });
+    expect(settings.apiKey.startsWith('enc:v2:')).toBe(true);
+    expect(decryptUnderOnly(KEY_B, settings.apiKey)).toBe('sk-v1-current');
+    const hashnode = await testPrisma.hashnodeCredential.findUniqueOrThrow({ where: { userId: 'local' } });
+    expect(hashnode.accessToken.startsWith('enc:v2:')).toBe(true);
+    expect(decryptUnderOnly(KEY_B, hashnode.accessToken)).toBe('hashnode-v1-previous');
+
+    await expect(reencryptStoredValues(testPrisma, { qschema: 'public', env, log: quietLog })).resolves.toEqual({
+      rewritten: 0,
+      encrypted: 0,
+      current: 2,
+      undecryptable: 0,
+    });
+  });
+
   it('encrypts plaintext values under the current key, leaves empty ones, and is idempotent', async () => {
     const onlyCurrent = { ENCRYPTION_KEY: KEY_B };
     await testPrisma.googleCredential.create({
@@ -110,7 +147,7 @@ describe('reencryptStoredValues()', () => {
     const hashnode = await testPrisma.hashnodeCredential.findUniqueOrThrow({ where: { userId: 'local' } });
     expect(decryptUnderOnly(KEY_B, hashnode.accessToken)).toBe('hashnode-plain');
     const settings = await testPrisma.aiSettings.findUniqueOrThrow({ where: { id: 'default' } });
-    expect(settings.apiKey.startsWith('enc:v1:')).toBe(true);
+    expect(settings.apiKey.startsWith('enc:v2:')).toBe(true);
     expect(decryptUnderOnly(KEY_B, settings.apiKey)).toBe('sk-legacy-plaintext');
     const userSettings = await testPrisma.userAiSettings.findUniqueOrThrow({ where: { userId: user.id } });
     expect(userSettings.apiKey).toBe('');
@@ -149,7 +186,6 @@ describe('reencrypt.mjs as a script', () => {
     expect(result.stderr).toContain('reencrypt failed');
   });
 
-  // The CMD swallows reencrypt.mjs failures, so a missing module would fail silently.
   it('is shipped in the image with its local imports', () => {
     const dockerfile = readFileSync(join(__dirname, '../../Dockerfile'), 'utf-8');
     const imports = [...readFileSync(REENCRYPT_SCRIPT, 'utf-8').matchAll(/from '\.\/([\w-]+\.mjs)'/g)].map((m) => m[1]);
@@ -157,6 +193,6 @@ describe('reencrypt.mjs as a script', () => {
     for (const file of ['reencrypt.mjs', ...imports]) {
       expect(dockerfile).toContain(`COPY --from=builder /app/scripts/${file}`);
     }
-    expect(dockerfile).toMatch(/node scripts\/migrate\.mjs && \(node scripts\/reencrypt\.mjs \|\| true\) && exec node server\.js/);
+    expect(dockerfile).toMatch(/node scripts\/migrate\.mjs && node scripts\/reencrypt\.mjs && exec node server\.js/);
   });
 });
