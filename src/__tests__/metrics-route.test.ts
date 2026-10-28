@@ -34,7 +34,7 @@ function mockRequest() {
     return new NextRequest("http://localhost/api/metrics");
 }
 
-// Auth is enforced by middleware (see middleware.test.ts). These tests verify
+// Auth is enforced by the proxy (see proxy.test.ts). These tests verify
 // the handler's behaviour once a request has already passed auth.
 describe("GET /api/metrics", () => {
     beforeEach(() => {

@@ -614,7 +614,7 @@ requirements:
     category: constraint
     priority: should
     status: active
-    source: src/__tests__/oauth-*.test.ts, src/middleware.ts PUBLIC_PATHS
+    source: src/__tests__/oauth-*.test.ts, src/proxy.ts PUBLIC_PATHS
     acceptance:
       - "Metadata, register, authorize, and token endpoints conform to the tests' expected flows"
       - "A token minted via this flow authenticates /api/mcp requests"

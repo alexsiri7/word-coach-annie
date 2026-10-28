@@ -166,6 +166,8 @@ describe("rate-limit — Redis path", () => {
 
         // Only one Redis client created regardless of concurrency
         expect(constructorSpy.mock.calls.length).toBe(1);
+        // Fail fast on a down Redis instead of queueing behind reconnect retries
+        expect(constructorSpy.mock.calls[0][1]).toEqual({ commandTimeout: 1_000, maxRetriesPerRequest: 1 });
     });
 });
 
