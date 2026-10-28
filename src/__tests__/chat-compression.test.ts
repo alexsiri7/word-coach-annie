@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Prisma } from "@prisma/client";
 
-vi.mock("@/lib/db", () => {
+vi.mock("@/lib/db", async () => {
+  const { rawTable } = await vi.importActual<typeof import("@/lib/db")>("@/lib/db");
   const tx = {
     $executeRaw: vi.fn(async () => 1),
     chatMessage: { count: vi.fn(async () => 1) },
     conversation: { update: vi.fn() },
   };
-  return { prisma: { $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)), tx } };
+  return { rawTable, prisma: { $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)), tx } };
 });
 vi.mock("@/lib/ai/adk-agent", () => ({
   runSimpleCompletion: vi.fn(async () => "Summary of discussion."),
@@ -20,6 +22,7 @@ import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { prisma } from "@/lib/db";
 
 const { tx } = prisma as unknown as { tx: {
+  $executeRaw: ReturnType<typeof vi.fn>;
   chatMessage: { count: ReturnType<typeof vi.fn> };
   conversation: { update: ReturnType<typeof vi.fn> };
 } };
@@ -47,7 +50,12 @@ const settings = { chatWindowSize: 5, messagesUntilCompression: 15, compressionM
 const aiConfig = { apiKey: "test-key", model: "test-model" };
 
 describe("compressConversation", () => {
+  const originalSchema = process.env.DATABASE_SCHEMA;
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    if (originalSchema === undefined) delete process.env.DATABASE_SCHEMA;
+    else process.env.DATABASE_SCHEMA = originalSchema;
+  });
 
   it("calls runSimpleCompletion with messages excluding the window", async () => {
     const messages = Array.from({ length: 10 }, (_, i) =>
@@ -79,6 +87,21 @@ describe("compressConversation", () => {
         summarizedThroughMessageId: "msg-2",
       },
     });
+  });
+
+  it("locks the Conversation row in DATABASE_SCHEMA when it is set", async () => {
+    // A non-default schema: "public" would resolve identically unqualified.
+    process.env.DATABASE_SCHEMA = "annie";
+    const messages = Array.from({ length: 8 }, (_, i) =>
+      makeMessage(`msg-${i}`, "user", `content ${i}`)
+    );
+
+    await compressConversation(baseConversation, messages, settings, aiConfig);
+
+    const [strings, ...values] = tx.$executeRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const query = Prisma.sql(strings, ...values);
+    expect(query.sql).toContain('FROM "annie"."Conversation"');
+    expect(query.sql).toContain("FOR UPDATE");
   });
 
   it("uses compressionModel when set, falls back to aiConfig.model", async () => {

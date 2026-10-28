@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, rawTable } from "@/lib/db";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
 import type { Conversation, ChatMessage } from "@prisma/client";
@@ -61,7 +61,7 @@ export async function compressConversation(
   // The existence check runs only after taking the Conversation row lock, so a
   // clear still in flight finishes first and the check sees its deletion.
   const written = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT 1 FROM "Conversation" WHERE id = ${conversation.id} FOR UPDATE`;
+    await tx.$executeRaw`SELECT 1 FROM ${rawTable("Conversation")} WHERE id = ${conversation.id} FOR UPDATE`;
     const stillPresent = await tx.chatMessage.count({
       where: { id: summarizedThroughMessageId, conversationId: conversation.id },
     });
