@@ -3,24 +3,22 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 import withPWA, { runtimeCaching } from "@ducanh2912/next-pwa";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { execSync } from "child_process";
+import { randomUUID } from "crypto";
 import { writeFileSync } from "fs";
 import { join } from "path";
 
-// Generate version.json at build time for version-check polling
-function generateVersionFile() {
-  let commitSha: string;
+function commitSha(): string {
   try {
     const envSha = process.env.COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA;
-    commitSha = envSha ? envSha.substring(0, 7) : execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+    return envSha ? envSha.substring(0, 7) : execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
   } catch {
-    commitSha = "unknown";
+    return "unknown";
   }
-  const versionData = { version: commitSha, commitSha, buildTime: new Date().toISOString() };
-  writeFileSync(join(__dirname, "public", "version.json"), JSON.stringify(versionData));
-  return commitSha;
 }
 
-const buildVersion = generateVersionFile();
+// version.json lets open tabs detect a new deploy. It carries a random per-build id rather
+// than the commit SHA, so the deployed revision is not public (SEC-38).
+writeFileSync(join(__dirname, "public", "version.json"), JSON.stringify({ version: randomUUID() }));
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -55,7 +53,7 @@ const nextConfig: NextConfig = {
     },
   },
   env: {
-    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+    NEXT_PUBLIC_BUILD_VERSION: commitSha(),
   },
   webpack(config: Record<string, unknown>, { isServer }: { isServer: boolean }) {
     if (!isServer) {
