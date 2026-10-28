@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, rawTable } from "@/lib/db";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
 import type { Conversation, ChatMessage } from "@prisma/client";
@@ -55,13 +55,24 @@ export async function compressConversation(
     temperature: 0.3,
   });
 
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      summary: newSummary,
-      summarizedThroughMessageId: toCompress.at(-1)!.id,
-    },
+  const summarizedThroughMessageId = toCompress.at(-1)!.id;
+  // Clearing the chat deletes the messages this summary was built from; if that
+  // happened while the completion ran, the summary must not be written back.
+  // The existence condition is evaluated only after taking the Conversation row
+  // lock, so a clear still in flight finishes first and the write sees its deletion.
+  const { count } = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT 1 FROM ${rawTable("Conversation")} WHERE id = ${conversation.id} FOR UPDATE`;
+    return tx.conversation.updateMany({
+      where: { id: conversation.id, messages: { some: { id: summarizedThroughMessageId } } },
+      data: { summary: newSummary, summarizedThroughMessageId },
+    });
   });
+  if (count === 0) {
+    logger.info("compressConversation: history cleared during compression, summary discarded", {
+      conversationId: conversation.id,
+    });
+    return;
+  }
 
   logger.info("compressConversation: done", { conversationId: conversation.id });
 }

@@ -51,6 +51,7 @@ import { logger } from "@/lib/logger";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { loadSkill } from "@/mcp/skills";
 import { NextRequest } from "next/server";
+import type { ChatMessage } from "@prisma/client";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -405,6 +406,115 @@ describe("DELETE /api/chat", () => {
 
     const remaining = await testPrisma.chatMessage.findMany({ where: { conversationId: conversation.id } });
     expect(remaining).toHaveLength(0);
+  });
+
+  it("clears the conversation summary so the next POST sends no prior summary", async () => {
+    const project = await testPrisma.project.create({
+      data: { title: "Del Summary Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Test chat" },
+    });
+    const pivot = await testPrisma.chatMessage.create({
+      data: { conversationId: conversation.id, role: "user", content: "old msg" },
+    });
+    await testPrisma.conversation.update({
+      where: { id: conversation.id },
+      data: { summary: "The writer killed off Marcus.", summarizedThroughMessageId: pivot.id },
+    });
+
+    const { DELETE, POST } = await import("@/app/api/chat/route");
+    const res = await DELETE(makeDeleteRequest(conversation.id));
+    expect(res.status).toBe(200);
+
+    const cleared = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    expect(cleared.summary).toBeNull();
+    expect(cleared.summarizedThroughMessageId).toBeNull();
+
+    await POST(makePostRequest({ conversationId: conversation.id, message: "fresh start" }));
+    const call = vi.mocked(runChatAgent).mock.lastCall![0];
+    expect(call.systemPrompt).not.toContain("Conversation so far");
+    expect(call.systemPrompt).not.toContain("Marcus");
+  });
+
+  it("discards a summary from a compression that was running when history was cleared", async () => {
+    const { compressConversation: realCompress } = await vi.importActual<
+      typeof import("@/lib/ai/chat-compression")
+    >("@/lib/ai/chat-compression");
+    const project = await testPrisma.project.create({
+      data: { title: "Del Race Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Test chat" },
+    });
+    const messages = [];
+    for (let i = 0; i < 8; i++) {
+      messages.push(
+        await testPrisma.chatMessage.create({
+          data: { conversationId: conversation.id, role: "user", content: `msg ${i}` },
+        })
+      );
+    }
+
+    const { DELETE } = await import("@/app/api/chat/route");
+    vi.mocked(runSimpleCompletion).mockImplementationOnce(async () => {
+      await DELETE(makeDeleteRequest(conversation.id));
+      return "Summary of the cleared chat.";
+    });
+
+    await realCompress(
+      conversation,
+      messages,
+      { chatWindowSize: 5, messagesUntilCompression: 15, compressionModel: "" },
+      { apiKey: "test-key", model: "test-model" }
+    );
+
+    const after = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    expect(after.summary).toBeNull();
+    expect(after.summarizedThroughMessageId).toBeNull();
+  });
+
+  it("discards a summary whose write lands while the clear's transaction is still open", async () => {
+    const { compressConversation: realCompress } = await vi.importActual<
+      typeof import("@/lib/ai/chat-compression")
+    >("@/lib/ai/chat-compression");
+    const project = await testPrisma.project.create({
+      data: { title: "Del Race Tx Test", author: "Author" },
+    });
+    const conversation = await testPrisma.conversation.create({
+      data: { projectId: project.id, title: "Test chat" },
+    });
+    const messages: ChatMessage[] = [];
+    for (let i = 0; i < 8; i++) {
+      messages.push(
+        await testPrisma.chatMessage.create({
+          data: { conversationId: conversation.id, role: "user", content: `msg ${i}` },
+        })
+      );
+    }
+
+    // Same writes as DELETE /api/chat, held open so the compression write
+    // has to wait on the clear's row locks before it can run.
+    let compression: Promise<void> | undefined;
+    await testPrisma.$transaction(async (tx) => {
+      await tx.chatMessage.deleteMany({ where: { conversationId: conversation.id } });
+      await tx.conversation.update({
+        where: { id: conversation.id },
+        data: { summary: null, summarizedThroughMessageId: null },
+      });
+      compression = realCompress(
+        conversation,
+        messages,
+        { chatWindowSize: 5, messagesUntilCompression: 15, compressionModel: "" },
+        { apiKey: "test-key", model: "test-model" }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    await compression;
+
+    const after = await testPrisma.conversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    expect(after.summary).toBeNull();
+    expect(after.summarizedThroughMessageId).toBeNull();
   });
 });
 
