@@ -10,31 +10,7 @@ import { prisma } from "@/lib/db";
 import { buildOutlineTree, type OutlineNode } from "@/lib/outline-tree";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
-
-function stripHtml(html: string): string {
-  if (!html || html === "<p></p>") return "";
-  let text = html;
-  // Remove beat comments
-  text = text.replace(/<!--\s*beat:.*?-->/gi, "");
-  // Replace paragraphs/breaks with newlines
-  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  // Strip all remaining tags
-  text = text.replace(/<[^>]+>/g, "");
-  // Decode entities
-  text = text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&ldquo;/g, "\u201C")
-    .replace(/&rdquo;/g, "\u201D")
-    .replace(/&mdash;/g, "\u2014")
-    .replace(/&ndash;/g, "\u2013");
-  return text.replace(/\n{3,}/g, "\n\n").trim();
-}
+import { sceneHtmlToPlainText } from "@/lib/scene-text";
 
 function headingParagraph(title: string, size: number): Paragraph {
   return new Paragraph({
@@ -52,7 +28,7 @@ function buildDocxParagraphs(nodes: OutlineNode[]): Paragraph[] {
       paragraphs.push(headingParagraph(node.title, size));
       for (const child of node.children) walk(child);
     } else if (node.type === "SCENE" && node.content) {
-      const text = stripHtml(node.content);
+      const text = sceneHtmlToPlainText(node.content);
       if (text) {
         for (const block of text.split("\n\n")) {
           const trimmed = block.trim();

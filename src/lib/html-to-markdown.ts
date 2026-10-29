@@ -1,3 +1,5 @@
+import { stripBeats } from "@/lib/scene-text";
+
 export interface MarkdownOptions {
     includeBeats?: boolean;
 }
@@ -7,9 +9,8 @@ export function htmlToMarkdown(html: string, options: MarkdownOptions = {}): str
 
     let md = html;
 
-    // Valid HTML comments for beats (<!-- beat: ... -->)
     if (!options.includeBeats) {
-        md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
+        md = stripBeats(md);
     }
 
     md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");

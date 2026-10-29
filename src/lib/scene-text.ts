@@ -14,3 +14,24 @@ export function countSceneWords(html: string): number {
   const prose = stripBeats(html).replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
   return prose === "" ? 0 : prose.split(/\s+/).length;
 }
+
+/** Plain-text scene prose for the PDF and DOCX exports: beats removed, paragraphs separated by a blank line. */
+export function sceneHtmlToPlainText(html: string): string {
+  if (!html || html === "<p></p>") return "";
+  let text = stripBeats(html);
+  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<[^>]+>/g, "");
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&ldquo;/g, "\u201C")
+    .replace(/&rdquo;/g, "\u201D")
+    .replace(/&mdash;/g, "\u2014")
+    .replace(/&ndash;/g, "\u2013");
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}

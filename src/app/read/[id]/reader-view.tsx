@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { sanitizeDisplayHtml } from "@/lib/sanitize-display";
+import { stripBeats } from "@/lib/scene-text";
 import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
 import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
 
@@ -52,11 +53,6 @@ interface ReaderViewProps {
   project: Project;
   outline: OutlineNode[];
   isOwner: boolean;
-}
-
-/** Strip beat annotations from HTML content */
-function stripBeats(html: string): string {
-  return html.replace(/<!-- beat:[\s\S]*?-->/g, "");
 }
 
 /** Count total words across all scenes */
