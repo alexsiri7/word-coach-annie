@@ -447,7 +447,7 @@ export class StructureController {
 
         const version = await prisma.contentVersion.findFirst({
             where: { nodeId },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         });
 
         const annotations = await prisma.annotation.findMany({
