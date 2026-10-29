@@ -193,9 +193,11 @@ describe("Relationships Route /api/projects/[id]/relationships with a linked uni
     let projectId: string;
     let objectId: string;
     let worldObjectId: string;
+    let universeId: string;
 
     beforeEach(async () => {
         const universe = await testPrisma.universe.create({ data: { title: "Test Universe" } });
+        universeId = universe.id;
         const project = await testPrisma.project.create({
             data: { title: "Test Project", universeId: universe.id },
         });
@@ -263,5 +265,33 @@ describe("Relationships Route /api/projects/[id]/relationships with a linked uni
             mockParams({ id: created.id })
         );
         expect((await patchRes.json()).fromWorldObject.name).toBe("Universe Alice");
+    });
+
+    it("lists and reads back an edge between two world objects", async () => {
+        const otherWorldObj = await testPrisma.worldObject.create({
+            data: { universeId, type: "LOCATION", name: "Old Town" },
+        });
+        const createRes = await post({ type: "LOCATED_AT", fromObjectId: worldObjectId, toObjectId: otherWorldObj.id });
+        expect(createRes.status).toBe(201);
+        const created = await createRes.json();
+
+        const { GET: list } = await import("@/app/api/projects/[id]/relationships/route");
+        const listRes = await list(mockReq(`http://localhost/api/projects/${projectId}/relationships`) as any, mockParams({ id: projectId }));
+        const { data } = await listRes.json();
+        expect(data).toHaveLength(1);
+        expect(data[0].fromWorldObject.name).toBe("Universe Alice");
+        expect(data[0].toWorldObject.name).toBe("Old Town");
+        expect(data[0].fromObject).toBeNull();
+        expect(data[0].toObject).toBeNull();
+
+        const { GET, PATCH } = await import("@/app/api/relationships/[id]/route");
+        const getRes = await GET(mockReq(`http://localhost/api/relationships/${created.id}`) as any, mockParams({ id: created.id }));
+        expect(getRes.status).toBe(200);
+        const patchRes = await PATCH(
+            mockReq(`http://localhost/api/relationships/${created.id}`, { label: "lives in" }) as any,
+            mockParams({ id: created.id })
+        );
+        expect(patchRes.status).toBe(200);
+        expect((await patchRes.json()).label).toBe("lives in");
     });
 });
