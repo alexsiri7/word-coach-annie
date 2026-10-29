@@ -626,13 +626,25 @@ describe("READER exports omit outline scenes", () => {
     });
   });
 
-  async function exportedEpubText(opts?: { userId?: string; userEmail?: string }) {
-    const epub = (await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>;
-    const { GET } = await import("@/app/api/projects/[id]/export/epub/route");
-    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/epub`, opts);
+  // Each renderer is mocked, so its last call holds everything the route put in the file.
+  const renderedInput = {
+    epub: async () => ((await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1],
+    docx: async () => ((await import("docx")).Packer.toBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+    pdf: async () => ((await import("@react-pdf/renderer")).renderToBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+  };
+  const routes = {
+    epub: () => import("@/app/api/projects/[id]/export/epub/route"),
+    docx: () => import("@/app/api/projects/[id]/export/docx/route"),
+    pdf: () => import("@/app/api/projects/[id]/export/pdf/route"),
+  };
+  type Format = keyof typeof routes;
+
+  async function exportedText(format: Format, opts?: { userId?: string; userEmail?: string }) {
+    const { GET } = await routes[format]();
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/${format}`, opts);
     const res = await GET(req as never, mockParams({ id: projectId }));
     expect(res.status).toBe(200);
-    return JSON.stringify(epub.mock.calls.at(-1)?.[1]);
+    return JSON.stringify(await renderedInput[format]());
   }
 
   it("buildOutlineTree keeps outline scenes unless asked to exclude them", async () => {
@@ -643,22 +655,22 @@ describe("READER exports omit outline scenes", () => {
     expect(await sceneTitles(true)).toEqual(["Written"]);
   });
 
-  it("a READER's EPUB has no outline scene text", async () => {
+  it.each(Object.keys(routes) as Format[])("a READER's %s has no outline scene text", async (format) => {
     const ts = Date.now();
-    const readerEmail = `reader-outline-${ts}@example.com`;
+    const readerEmail = `reader-outline-${format}-${ts}@example.com`;
     const reader = await testPrisma.user.create({
-      data: { email: readerEmail, googleId: `google-reader-outline-${ts}`, name: "Reader" },
+      data: { email: readerEmail, googleId: `google-reader-outline-${format}-${ts}`, name: "Reader" },
     });
     await testPrisma.projectShare.create({
       data: { projectId, email: readerEmail, role: "READER" },
     });
-    const text = await exportedEpubText({ userId: reader.id, userEmail: readerEmail });
+    const text = await exportedText(format, { userId: reader.id, userEmail: readerEmail });
     expect(text).toContain("Finished prose");
     expect(text).not.toContain("Private beat notes");
   });
 
-  it("the owner's EPUB still includes outline scene text", async () => {
-    const text = await exportedEpubText({ userId: ownerId });
+  it.each(Object.keys(routes) as Format[])("the owner's %s still includes outline scene text", async (format) => {
+    const text = await exportedText(format, { userId: ownerId });
     expect(text).toContain("Finished prose");
     expect(text).toContain("Private beat notes");
   });
