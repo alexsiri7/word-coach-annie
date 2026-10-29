@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
+import { MAX_PROMPT_LENGTH } from "./limits";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
@@ -61,10 +62,6 @@ ${outlineWithContent || "(No scenes yet)"}
 
 Format as a structured report. List specific potential issues with scene references where possible. If no issues are found in a category, say so briefly. Be honest but constructive.`,
 };
-
-// Each scene contributes at most a 300-char preview, so this only bites on very
-// large projects — it bounds the AI provider cost of a single analysis.
-const MAX_PROMPT_LENGTH = 200_000;
 
 /**
  * POST /api/ai-manuscript — run manuscript-level analysis

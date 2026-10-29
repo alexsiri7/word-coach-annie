@@ -69,6 +69,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { POST } from "@/app/api/ai-manuscript/route";
+import { MAX_PROMPT_LENGTH } from "@/app/api/ai-manuscript/limits";
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/ai-manuscript", {
@@ -158,8 +159,6 @@ describe("POST /api/ai-manuscript", () => {
   });
 
   describe("gathered context size limit", () => {
-    const MAX_PROMPT_LENGTH = 200_000;
-
     async function promptLengthWithChapterSynopsis(synopsis: string) {
       const { prisma } = await import("@/lib/db");
       vi.mocked(prisma.structureNode.findMany).mockResolvedValueOnce([
