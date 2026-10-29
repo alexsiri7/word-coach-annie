@@ -596,9 +596,9 @@ Update a timeline entry. At least one field must be provided.
 ## Timeline
 
 ### `GET /api/timeline/:projectId`
-Get the timeline matrix for a project.
+Get the data behind a project's timeline matrix. Read-only.
 
-**Response**: `{ scenes: Scene[], objects: StoryObject[], matrix: { sceneId, objectId }[] }` — cross-reference of where story objects appear across scenes.
+**Response**: `{ scenes: StructureNode[], objects: StoryObject[], events: Relationship[] }` — scenes in manuscript order, the project's story objects, and every relationship linking an object to a scene (with `fromObject`, `toNode`, `fromNode`, `toObject` included). The timeline view builds the object×scene presence matrix from these client-side.
 
 ---
 
