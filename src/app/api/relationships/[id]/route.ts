@@ -3,17 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
-
-const nodeSelect = { select: { id: true, title: true, type: true } } as const;
-const objectSelect = { select: { id: true, name: true, type: true } } as const;
-const relationshipInclude = {
-  fromNode: nodeSelect,
-  fromObject: objectSelect,
-  fromWorldObject: objectSelect,
-  toNode: nodeSelect,
-  toObject: objectSelect,
-  toWorldObject: objectSelect,
-} as const;
+import { relationshipInclude } from "@/mcp/tools/relationships";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",

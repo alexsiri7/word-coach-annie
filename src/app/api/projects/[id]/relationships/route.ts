@@ -5,18 +5,7 @@ import { getCurrentUserId, verifyProjectAccess, verifyProjectWriteAccess } from 
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { RelationshipCreateSchema } from "@/schemas/relationships";
 import { NotFoundError } from "@/lib/controllers/errors";
-import { resolveObjectId } from "@/mcp/tools/relationships";
-
-const nodeSelect = { select: { id: true, title: true, type: true } } as const;
-const objectSelect = { select: { id: true, name: true, type: true } } as const;
-const relationshipInclude = {
-  fromNode: nodeSelect,
-  fromObject: objectSelect,
-  fromWorldObject: objectSelect,
-  toNode: nodeSelect,
-  toObject: objectSelect,
-  toWorldObject: objectSelect,
-} as const;
+import { relationshipInclude, resolveObjectId } from "@/mcp/tools/relationships";
 
 export async function GET(
   request: NextRequest,

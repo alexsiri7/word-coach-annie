@@ -5,8 +5,16 @@ import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 
 type RelationshipEntity = { id: string; name: string; entityType: string } | null;
 
-const nodeSelect = { id: true, title: true, type: true } as const;
-const objectSelect = { id: true, name: true, type: true } as const;
+const nodeSelect = { select: { id: true, title: true, type: true } } as const;
+const objectSelect = { select: { id: true, name: true, type: true } } as const;
+export const relationshipInclude = {
+    fromNode: nodeSelect,
+    fromObject: objectSelect,
+    fromWorldObject: objectSelect,
+    toNode: nodeSelect,
+    toObject: objectSelect,
+    toWorldObject: objectSelect,
+} as const;
 
 function resolveEntity(
     node: { id: string; title: string; type: string } | null | undefined,
@@ -86,14 +94,7 @@ export async function listRelationships(projectId: string) {
                             : []),
                     ],
                 },
-                include: {
-                    fromNode: { select: nodeSelect },
-                    fromObject: { select: objectSelect },
-                    fromWorldObject: { select: objectSelect },
-                    toNode: { select: nodeSelect },
-                    toObject: { select: objectSelect },
-                    toWorldObject: { select: objectSelect },
-                },
+                include: relationshipInclude,
                 orderBy: { createdAt: "desc" },
             });
 
@@ -174,14 +175,7 @@ export async function createRelationship(params: {
             ...(resolvedToObjectId && { toObjectId: resolvedToObjectId }),
             ...(resolvedToWorldObjectId && { toWorldObjectId: resolvedToWorldObjectId }),
         },
-        include: {
-            fromNode: { select: nodeSelect },
-            fromObject: { select: objectSelect },
-            fromWorldObject: { select: objectSelect },
-            toNode: { select: nodeSelect },
-            toObject: { select: objectSelect },
-            toWorldObject: { select: objectSelect },
-        },
+        include: relationshipInclude,
     });
 
     mcpCache.delete(`relationships:${projectId}`);
