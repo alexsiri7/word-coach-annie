@@ -26,6 +26,7 @@ import {
 import { WorldObjectPanel } from "@/components/world-object-panel";
 import { cn } from "@/lib/utils";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { linkableProjects } from "@/lib/universe-projects";
 import type { Universe } from "@/lib/types";
 
 type WorldObjectType = "CHARACTER" | "LOCATION" | "WORLD_ELEMENT";
@@ -330,7 +331,7 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                         <DialogDescription>Choose a project to link to this universe.</DialogDescription>
                     </DialogHeader>
                     <div className="py-2 max-h-[300px] overflow-y-auto space-y-1">
-                        {allProjects.filter(p => !universe.projects?.some(linked => linked.id === p.id)).map(p => (
+                        {linkableProjects(allProjects, universe).map(p => (
                             <button
                                 key={p.id}
                                 className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between"

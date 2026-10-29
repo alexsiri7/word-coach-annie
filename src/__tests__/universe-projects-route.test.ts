@@ -125,6 +125,16 @@ describe("DELETE /api/universes/[id]/projects/[projectId]", () => {
     expect(UniversesController.unlinkProjectFromUniverse).not.toHaveBeenCalled();
   });
 
+  it("refuses when the caller cannot access the universe", async () => {
+    vi.mocked(verifyUniverseAccess).mockResolvedValue(forbidden());
+    vi.mocked(prisma.project.findUnique).mockResolvedValue({ universeId: "u-1" } as never);
+
+    const res = await DELETE(makeDelete(), deleteParams);
+
+    expect(res.status).toBe(403);
+    expect(UniversesController.unlinkProjectFromUniverse).not.toHaveBeenCalled();
+  });
+
   it("refuses when the caller cannot access the project", async () => {
     vi.mocked(verifyProjectAccess).mockResolvedValue(forbidden());
 
