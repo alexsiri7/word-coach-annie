@@ -557,6 +557,22 @@ Transfer a story object from a project to a universe.
 
 ---
 
+### `POST /api/universes/:id/projects`
+Link a project to a universe (moves it if it is linked elsewhere).
+
+**Body**: `{ projectId: string }`
+
+**Errors**: `400` missing projectId, `403`/`404` for the universe or the project
+
+---
+
+### `DELETE /api/universes/:id/projects/:projectId`
+Unlink a project from this universe.
+
+**Errors**: `403`/`404` for the universe or the project, `404` if the project is not linked to this universe
+
+---
+
 ## World Objects
 
 ### `GET /api/world-objects/:id`
