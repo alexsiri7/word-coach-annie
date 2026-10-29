@@ -91,46 +91,42 @@ export class StoryObjectController {
     }
 
     static async getStoryObject(objectId: string) {
+        const nodeSelect = { select: { id: true, title: true, type: true } };
+        const objectSelect = { select: { id: true, name: true, type: true } };
         const obj = await prisma.storyObject.findUnique({
             where: { id: objectId },
             include: {
-                relationships: {
-                    include: {
-                        toNode: { select: { id: true, title: true, type: true } },
-                        toObject: { select: { id: true, name: true, type: true } },
-                    },
-                },
+                // Despite their names, `relatedBy` holds edges from this object
+                // and `relationships` holds edges to it.
                 relatedBy: {
-                    include: {
-                        fromNode: { select: { id: true, title: true, type: true } },
-                        fromObject: { select: { id: true, name: true, type: true } },
-                    },
+                    include: { toNode: nodeSelect, toObject: objectSelect, toWorldObject: objectSelect },
+                },
+                relationships: {
+                    include: { fromNode: nodeSelect, fromObject: objectSelect, fromWorldObject: objectSelect },
                 },
             },
         });
 
         if (!obj) throw new UserFacingError("Story object not found");
 
+        type Entity = { id: string; type: string } & ({ title: string } | { name: string });
+        const toTarget = (entity: Entity | null) =>
+            entity
+                ? { id: entity.id, name: "title" in entity ? entity.title : entity.name, entityType: entity.type }
+                : null;
+
         const relatedTo = [
-            ...obj.relationships.map((r) => ({
-                relationshipId: r.id,
-                type: r.type,
-                label: r.label,
-                target: r.toNode
-                    ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
-                    : r.toObject
-                        ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                        : null,
-            })),
             ...obj.relatedBy.map((r) => ({
                 relationshipId: r.id,
                 type: r.type,
                 label: r.label,
-                target: r.fromNode
-                    ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
-                    : r.fromObject
-                        ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                        : null,
+                target: toTarget(r.toNode ?? r.toObject ?? r.toWorldObject),
+            })),
+            ...obj.relationships.map((r) => ({
+                relationshipId: r.id,
+                type: r.type,
+                label: r.label,
+                target: toTarget(r.fromNode ?? r.fromObject ?? r.fromWorldObject),
             })),
         ];
 
