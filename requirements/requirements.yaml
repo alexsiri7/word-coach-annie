@@ -85,14 +85,15 @@ requirements:
 
   - id: WCA-007
     title: Scene beats
-    statement: "While a scene contains beat markers (`<!-- beat: ... -->` HTML comments), the editor shall render them as styled inline cards distinct from prose, and every export format shall strip them from output."
+    statement: "While a scene contains beat markers (`<!-- beat: ... -->` HTML comments), the editor shall render them as styled inline cards distinct from prose, and every export format shall strip them from output, except the Google Docs story-internal export, which deliberately requests the manuscript with beats included."
     category: functional
     priority: must
     status: active
     source: requirements/002, requirements/009, src/__tests__/beats.test.ts
     acceptance:
       - "A beat comment in scene HTML renders as a beat card in the editor"
-      - "Markdown, PDF, EPUB, DOCX, and Google Docs exports contain no beat text"
+      - "Markdown, PDF, EPUB, DOCX, and Google Docs reader exports contain no beat text, whether the beat is a single-line comment, a multi-line comment, or a beat-annotation div"
+      - "The Google Docs story-internal export requests the manuscript with beats included"
 
   - id: WCA-008
     title: Focus mode
