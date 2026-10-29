@@ -1,3 +1,5 @@
+import { decodeHtmlEntities, stripBeats } from "@/lib/scene-text";
+
 export interface MarkdownOptions {
     includeBeats?: boolean;
 }
@@ -7,9 +9,8 @@ export function htmlToMarkdown(html: string, options: MarkdownOptions = {}): str
 
     let md = html;
 
-    // Valid HTML comments for beats (<!-- beat: ... -->)
     if (!options.includeBeats) {
-        md = md.replace(/<!-- beat: [\s\S]*?-->/g, "");
+        md = stripBeats(md);
     }
 
     md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
@@ -29,16 +30,7 @@ export function htmlToMarkdown(html: string, options: MarkdownOptions = {}): str
     md = md.replace(/<br\s*\/?>/gi, "\n");
     md = md.replace(/<[^>]+>/g, "");
     md = md.replace(/\n{3,}/g, "\n\n");
-    md = md.replace(/&amp;/g, "&");
-    md = md.replace(/&lt;/g, "<");
-    md = md.replace(/&gt;/g, ">");
-    md = md.replace(/&quot;/g, '"');
-    md = md.replace(/&#39;/g, "'");
-    md = md.replace(/&ldquo;/g, "\u201C");
-    md = md.replace(/&rdquo;/g, "\u201D");
-    md = md.replace(/&mdash;/g, "\u2014");
-    md = md.replace(/&ndash;/g, "\u2013");
-    md = md.replace(/&nbsp;/g, " ");
+    md = decodeHtmlEntities(md);
 
     return md.trim();
 }

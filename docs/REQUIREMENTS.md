@@ -164,7 +164,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F15.1: Insert beat markers in the scene editor via toolbar button
 - F15.2: Beats stored as HTML comments (`<!-- beat: ... -->`) in scene content
 - F15.3: Rendered as styled divider cards in the editor
-- F15.4: Preserved across save/load cycles; stripped from all exports
+- F15.4: Preserved across save/load cycles; stripped from all exports except the Google Docs STORY_INTERNAL export
 
 ### F16: Google Docs Export & Bidirectional Sync
 - F16.1: Export manuscript to Google Docs via OAuth2

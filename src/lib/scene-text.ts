@@ -14,3 +14,39 @@ export function countSceneWords(html: string): number {
   const prose = stripBeats(html).replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
   return prose === "" ? 0 : prose.split(/\s+/).length;
 }
+
+/** Decodes the entities TipTap and the export helpers emit. `&amp;` goes last so `&amp;lt;` stays the literal text `&lt;`. */
+export function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&ldquo;/g, "\u201C")
+    .replace(/&rdquo;/g, "\u201D")
+    .replace(/&mdash;/g, "\u2014")
+    .replace(/&ndash;/g, "\u2013")
+    .replace(/&amp;/g, "&");
+}
+
+// Repeats until stable, the form CodeQL's multi-character sanitization check accepts.
+function stripTags(html: string): string {
+  let text = html;
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, "");
+  } while (text !== previous);
+  return text;
+}
+
+/** Plain-text scene prose for the PDF and DOCX exports: beats removed, paragraphs separated by a blank line. */
+export function sceneHtmlToPlainText(html: string): string {
+  if (!html || html === "<p></p>") return "";
+  let text = stripBeats(html);
+  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = decodeHtmlEntities(stripTags(text));
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}

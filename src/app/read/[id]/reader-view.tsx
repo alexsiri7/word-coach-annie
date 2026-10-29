@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { sanitizeDisplayHtml } from "@/lib/sanitize-display";
+import { countSceneWords, stripBeats } from "@/lib/scene-text";
 import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
 import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
 
@@ -54,18 +55,12 @@ interface ReaderViewProps {
   isOwner: boolean;
 }
 
-/** Strip beat annotations from HTML content */
-function stripBeats(html: string): string {
-  return html.replace(/<!-- beat:[\s\S]*?-->/g, "");
-}
-
 /** Count total words across all scenes */
 function countWords(outline: OutlineNode[]): number {
   let count = 0;
   for (const node of outline) {
     if (node.type === "SCENE" && node.content) {
-      const text = stripBeats(node.content).replace(/<[^>]+>/g, "");
-      count += text.split(/\s+/).filter(Boolean).length;
+      count += countSceneWords(node.content);
     }
     count += countWords(node.children);
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { testPrisma } from "./setup";
 import { buildEpubChapters, isEmptyContent } from "@/lib/epub-chapters";
-import { stripBeats } from "@/lib/scene-text";
+import { sceneHtmlToPlainText, stripBeats } from "@/lib/scene-text";
 import type { OutlineNode } from "@/lib/outline-tree";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -133,82 +133,72 @@ async function createOwnerAndProject(suffix: string = "") {
   return { owner, project };
 }
 
-// ─── Unit Tests: stripHtml (PDF utility) ─────────────────────────────────────
+// ─── Unit Tests: sceneHtmlToPlainText (PDF/DOCX utility) ─────────────────────
 
-// Inline copy of the function under test (same pattern as export.test.ts)
-function stripHtml(html: string): string {
-  if (!html || html === "<p></p>") return "";
-  let text = html;
-  // Remove beat comments
-  text = text.replace(/<!--\s*beat:.*?-->/gi, "");
-  // Replace paragraphs/breaks with newlines
-  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  // Strip all remaining tags
-  text = text.replace(/<[^>]+>/g, "");
-  // Decode entities
-  text = text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&ldquo;/g, "\u201C")
-    .replace(/&rdquo;/g, "\u201D")
-    .replace(/&mdash;/g, "\u2014")
-    .replace(/&ndash;/g, "\u2013");
-  return text.replace(/\n{3,}/g, "\n\n").trim();
-}
-
-describe("stripHtml (PDF export utility)", () => {
+describe("sceneHtmlToPlainText (PDF/DOCX export utility)", () => {
   it("returns empty for empty or minimal HTML", () => {
-    expect(stripHtml("")).toBe("");
-    expect(stripHtml("<p></p>")).toBe("");
+    expect(sceneHtmlToPlainText("")).toBe("");
+    expect(sceneHtmlToPlainText("<p></p>")).toBe("");
   });
 
   it("converts paragraphs to double-newline-separated text", () => {
-    expect(stripHtml("<p>Hello world</p>")).toBe("Hello world");
-    expect(stripHtml("<p>First</p><p>Second</p>")).toBe("First\n\nSecond");
+    expect(sceneHtmlToPlainText("<p>Hello world</p>")).toBe("Hello world");
+    expect(sceneHtmlToPlainText("<p>First</p><p>Second</p>")).toBe("First\n\nSecond");
   });
 
   it("strips beat annotation comments", () => {
     expect(
-      stripHtml("<p>Story text</p><!-- beat: Hero enters -->")
+      sceneHtmlToPlainText("<p>Story text</p><!-- beat: Hero enters -->")
     ).toBe("Story text");
     expect(
-      stripHtml("<!-- beat: some annotation --><p>Content</p>")
+      sceneHtmlToPlainText("<!-- beat: some annotation --><p>Content</p>")
     ).toBe("Content");
   });
 
+  it("strips multi-line beat comments", () => {
+    expect(
+      sceneHtmlToPlainText("<p>Story text</p><!-- beat: Hero enters >\nthe killer watches -->")
+    ).toBe("Story text");
+  });
+
+  it("strips beat annotation divs", () => {
+    expect(
+      sceneHtmlToPlainText('<p>In.</p><div data-type="beat-annotation">killer is the butler</div><p>Out.</p>')
+    ).toBe("In.\n\nOut.");
+  });
+
   it("handles line breaks", () => {
-    const result = stripHtml("<p>Line one<br/>Line two</p>");
+    const result = sceneHtmlToPlainText("<p>Line one<br/>Line two</p>");
     expect(result).toContain("Line one");
     expect(result).toContain("Line two");
   });
 
   it("decodes common HTML entities", () => {
-    expect(stripHtml("<p>A &amp; B</p>")).toBe("A & B");
-    expect(stripHtml("<p>&lt;tag&gt;</p>")).toBe("<tag>");
-    expect(stripHtml("<p>&quot;quoted&quot;</p>")).toBe('"quoted"');
+    expect(sceneHtmlToPlainText("<p>A &amp; B</p>")).toBe("A & B");
+    expect(sceneHtmlToPlainText("<p>&lt;tag&gt;</p>")).toBe("<tag>");
+    expect(sceneHtmlToPlainText("<p>&quot;quoted&quot;</p>")).toBe('"quoted"');
     // &nbsp; in a paragraph with other text is preserved as a space
-    expect(stripHtml("<p>a&nbsp;b</p>")).toBe("a b");
-    expect(stripHtml("<p>&ldquo;smart&rdquo;</p>")).toBe("\u201Csmart\u201D");
-    expect(stripHtml("<p>&mdash;</p>")).toBe("\u2014");
-    expect(stripHtml("<p>&ndash;</p>")).toBe("\u2013");
+    expect(sceneHtmlToPlainText("<p>a&nbsp;b</p>")).toBe("a b");
+    expect(sceneHtmlToPlainText("<p>&ldquo;smart&rdquo;</p>")).toBe("\u201Csmart\u201D");
+    expect(sceneHtmlToPlainText("<p>&mdash;</p>")).toBe("\u2014");
+    expect(sceneHtmlToPlainText("<p>&ndash;</p>")).toBe("\u2013");
+  });
+
+  it("decodes an escaped entity only once", () => {
+    expect(sceneHtmlToPlainText("<p>&amp;lt;b&amp;gt; and &amp;amp;</p>")).toBe("&lt;b&gt; and &amp;");
   });
 
   it("strips inline tags", () => {
-    expect(stripHtml("<p><strong>bold</strong> and <em>italic</em></p>")).toBe(
+    expect(sceneHtmlToPlainText("<p><strong>bold</strong> and <em>italic</em></p>")).toBe(
       "bold and italic"
     );
-    expect(stripHtml("<p><span class='foo'>text</span></p>")).toBe("text");
+    expect(sceneHtmlToPlainText("<p><span class='foo'>text</span></p>")).toBe("text");
   });
 
   it("collapses excess blank lines", () => {
     // Three or more consecutive newlines should collapse to two
     const html = "<p>One</p><p>Two</p><p>Three</p>";
-    const result = stripHtml(html);
+    const result = sceneHtmlToPlainText(html);
     expect(result).not.toMatch(/\n{3,}/);
     expect(result).toBe("One\n\nTwo\n\nThree");
   });
@@ -601,6 +591,31 @@ describe("GET /api/projects/[id]/export/epub — auth and 404", () => {
   });
 });
 
+// Each renderer is mocked, so its last call holds everything the route put in the file.
+const renderedInput = {
+  epub: async () => ((await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1],
+  docx: async () => ((await import("docx")).Packer.toBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+  pdf: async () => ((await import("@react-pdf/renderer")).renderToBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+};
+const routes = {
+  epub: () => import("@/app/api/projects/[id]/export/epub/route"),
+  docx: () => import("@/app/api/projects/[id]/export/docx/route"),
+  pdf: () => import("@/app/api/projects/[id]/export/pdf/route"),
+};
+type Format = keyof typeof routes;
+
+async function exportedText(
+  projectId: string,
+  format: Format,
+  opts?: { userId?: string; userEmail?: string }
+) {
+  const { GET } = await routes[format]();
+  const req = makeRequest(`http://localhost/api/projects/${projectId}/export/${format}`, opts);
+  const res = await GET(req as never, mockParams({ id: projectId }));
+  expect(res.status).toBe(200);
+  return JSON.stringify(await renderedInput[format]());
+}
+
 describe("READER exports omit outline scenes", () => {
   let ownerId: string;
   let projectId: string;
@@ -626,27 +641,6 @@ describe("READER exports omit outline scenes", () => {
     });
   });
 
-  // Each renderer is mocked, so its last call holds everything the route put in the file.
-  const renderedInput = {
-    epub: async () => ((await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1],
-    docx: async () => ((await import("docx")).Packer.toBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
-    pdf: async () => ((await import("@react-pdf/renderer")).renderToBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
-  };
-  const routes = {
-    epub: () => import("@/app/api/projects/[id]/export/epub/route"),
-    docx: () => import("@/app/api/projects/[id]/export/docx/route"),
-    pdf: () => import("@/app/api/projects/[id]/export/pdf/route"),
-  };
-  type Format = keyof typeof routes;
-
-  async function exportedText(format: Format, opts?: { userId?: string; userEmail?: string }) {
-    const { GET } = await routes[format]();
-    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/${format}`, opts);
-    const res = await GET(req as never, mockParams({ id: projectId }));
-    expect(res.status).toBe(200);
-    return JSON.stringify(await renderedInput[format]());
-  }
-
   it("buildOutlineTree keeps outline scenes unless asked to exclude them", async () => {
     const { buildOutlineTree } = await import("@/lib/outline-tree");
     const sceneTitles = async (excludeOutlineScenes?: boolean) =>
@@ -664,15 +658,37 @@ describe("READER exports omit outline scenes", () => {
     await testPrisma.projectShare.create({
       data: { projectId, email: readerEmail, role: "READER" },
     });
-    const text = await exportedText(format, { userId: reader.id, userEmail: readerEmail });
+    const text = await exportedText(projectId, format, { userId: reader.id, userEmail: readerEmail });
     expect(text).toContain("Finished prose");
     expect(text).not.toContain("Private beat notes");
   });
 
   it.each(Object.keys(routes) as Format[])("the owner's %s still includes outline scene text", async (format) => {
-    const text = await exportedText(format, { userId: ownerId });
+    const text = await exportedText(projectId, format, { userId: ownerId });
     expect(text).toContain("Finished prose");
     expect(text).toContain("Private beat notes");
+  });
+});
+
+describe("PDF and DOCX exports strip beats", () => {
+  const beatScenes = {
+    "a beat annotation div": '<p>Visible prose</p><div data-type="beat-annotation">killer is the butler</div>',
+    "a multi-line beat comment": "<p>Visible prose</p><!-- beat: suspect the maid >\nthe killer is the butler -->",
+  };
+
+  it.each((["pdf", "docx"] as const).flatMap((format) =>
+    Object.keys(beatScenes).map((form) => [format, form] as const)
+  ))("%s export omits %s", async (format, form) => {
+    const { owner, project } = await createOwnerAndProject();
+    const scene = await testPrisma.structureNode.create({
+      data: { projectId: project.id, type: "SCENE", title: "Scene", orderIndex: 0, status: "DRAFT" },
+    });
+    await testPrisma.contentVersion.create({
+      data: { nodeId: scene.id, content: beatScenes[form as keyof typeof beatScenes], wordCount: 2 },
+    });
+    const text = await exportedText(project.id, format, { userId: owner.id });
+    expect(text).toContain("Visible prose");
+    expect(text).not.toContain("butler");
   });
 });
 
@@ -781,7 +797,7 @@ describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
 
 // ─── Unit Tests: buildDocxParagraphs ─────────────────────────────────────────
 
-// Inline copy of the function under test (same pattern as stripHtml tests above).
+// Inline copy of the function under test.
 // Keep in sync with src/app/api/projects/[id]/export/docx/route.ts
 interface TestOutlineNode {
   id: string;
@@ -808,27 +824,6 @@ interface TestTextRun {
 function buildDocxParagraphsForTest(nodes: TestOutlineNode[]): TestParagraph[] {
   const paragraphs: TestParagraph[] = [];
 
-  function stripHtmlLocal(html: string): string {
-    if (!html || html === "<p></p>") return "";
-    let text = html;
-    text = text.replace(/<!--\s*beat:.*?-->/gi, "");
-    text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-    text = text.replace(/<br\s*\/?>/gi, "\n");
-    text = text.replace(/<[^>]+>/g, "");
-    text = text
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&ldquo;/g, "\u201C")
-      .replace(/&rdquo;/g, "\u201D")
-      .replace(/&mdash;/g, "\u2014")
-      .replace(/&ndash;/g, "\u2013");
-    return text.replace(/\n{3,}/g, "\n\n").trim();
-  }
-
   function walk(node: TestOutlineNode) {
     if (node.type === "PART") {
       paragraphs.push({
@@ -843,7 +838,7 @@ function buildDocxParagraphsForTest(nodes: TestOutlineNode[]): TestParagraph[] {
       });
       for (const child of node.children) walk(child);
     } else if (node.type === "SCENE" && node.content) {
-      const text = stripHtmlLocal(node.content);
+      const text = sceneHtmlToPlainText(node.content);
       if (text) {
         for (const block of text.split("\n\n")) {
           const trimmed = block.trim();
