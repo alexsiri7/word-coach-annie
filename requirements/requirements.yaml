@@ -158,14 +158,13 @@ requirements:
 
   - id: WCA-013
     title: Timeline matrix view
-    statement: "When the author opens the timeline view, the system shall render a matrix of story objects (rows) against scenes (columns) showing where each character/location appears, based on APPEARS_IN-style relationships."
+    statement: "When the author opens the timeline view, the system shall render a read-only matrix of story objects (rows) against scenes (columns) showing where each story object appears, based on the relationships linking objects to scenes."
     category: functional
     priority: should
     status: active
     source: requirements/007, src/app/api/timeline
     acceptance:
-      - "/api/timeline returns the object×scene presence matrix for a project"
-      - "Timeline supports updating/reordering entries via its PATCH/reorder endpoints"
+      - "GET /api/timeline/[projectId] returns the project's scenes in manuscript order, its story objects, and the relationships linking them, from which the timeline view builds the object×scene presence matrix"
 
   - id: WCA-014
     title: Full-text search
