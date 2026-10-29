@@ -15,14 +15,9 @@ export function countSceneWords(html: string): number {
   return prose === "" ? 0 : prose.split(/\s+/).length;
 }
 
-/** Plain-text scene prose for the PDF and DOCX exports: beats removed, paragraphs separated by a blank line. */
-export function sceneHtmlToPlainText(html: string): string {
-  if (!html || html === "<p></p>") return "";
-  let text = stripBeats(html);
-  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<[^>]+>/g, "");
-  text = text
+/** Decodes the entities TipTap and the export helpers emit. `&amp;` goes last so `&amp;lt;` stays the literal text `&lt;`. */
+export function decodeHtmlEntities(text: string): string {
+  return text
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -33,5 +28,15 @@ export function sceneHtmlToPlainText(html: string): string {
     .replace(/&mdash;/g, "\u2014")
     .replace(/&ndash;/g, "\u2013")
     .replace(/&amp;/g, "&");
+}
+
+/** Plain-text scene prose for the PDF and DOCX exports: beats removed, paragraphs separated by a blank line. */
+export function sceneHtmlToPlainText(html: string): string {
+  if (!html || html === "<p></p>") return "";
+  let text = stripBeats(html);
+  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<[^>]+>/g, "");
+  text = decodeHtmlEntities(text);
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }

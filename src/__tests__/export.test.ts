@@ -41,6 +41,10 @@ describe("HTML to Markdown conversion", () => {
     expect(htmlToMarkdown("<p>&lt;code&gt;</p>")).toBe("<code>");
   });
 
+  it("decodes an escaped entity only once", () => {
+    expect(htmlToMarkdown("<p>&amp;lt;b&amp;gt; and &amp;amp;</p>")).toBe("&lt;b&gt; and &amp;");
+  });
+
   it("handles complex content", () => {
     const html = `<h2>Chapter Title</h2><p>The <strong>brave</strong> knight entered the <em>dark</em> forest.</p><p>He carried with him:</p><ul><li>A sword</li><li>A shield</li></ul>`;
     const md = htmlToMarkdown(html);
