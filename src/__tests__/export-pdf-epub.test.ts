@@ -184,6 +184,10 @@ describe("sceneHtmlToPlainText (PDF/DOCX export utility)", () => {
     expect(sceneHtmlToPlainText("<p>&ndash;</p>")).toBe("\u2013");
   });
 
+  it("decodes an escaped entity only once", () => {
+    expect(sceneHtmlToPlainText("<p>&amp;lt;b&amp;gt; and &amp;amp;</p>")).toBe("&lt;b&gt; and &amp;");
+  });
+
   it("strips inline tags", () => {
     expect(sceneHtmlToPlainText("<p><strong>bold</strong> and <em>italic</em></p>")).toBe(
       "bold and italic"

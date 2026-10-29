@@ -23,7 +23,6 @@ export function sceneHtmlToPlainText(html: string): string {
   text = text.replace(/<br\s*\/?>/gi, "\n");
   text = text.replace(/<[^>]+>/g, "");
   text = text
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -32,6 +31,7 @@ export function sceneHtmlToPlainText(html: string): string {
     .replace(/&ldquo;/g, "\u201C")
     .replace(/&rdquo;/g, "\u201D")
     .replace(/&mdash;/g, "\u2014")
-    .replace(/&ndash;/g, "\u2013");
+    .replace(/&ndash;/g, "\u2013")
+    .replace(/&amp;/g, "&");
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
