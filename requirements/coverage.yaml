@@ -324,13 +324,13 @@ coverage:
     status: partial
     code_paths:
       - "src/app/api/ai-inline/route.ts:40-104"
-      - "src/app/api/ai-manuscript/route.ts:71-122"
+      - "src/app/api/ai-manuscript/route.ts:65-132"
       - "src/components/inline-ai-action-bar.tsx:66-127"
     test_paths:
       - "src/__tests__/input-size-limits.test.ts:91-138"
       - "src/__tests__/ai-inline-route.test.ts:44-111"
-      - "src/__tests__/ai-manuscript-route.test.ts:81-174"
-    notes: "Routes return suggestion text only and the client inserts only in the Accept handler; never-auto-edit is untested at component level and the manuscript route has no size limit at all (inputs are a project id and an enum)."
+      - "src/__tests__/ai-manuscript-route.test.ts:81-213"
+    notes: "Routes return suggestion text only and the client inserts only in the Accept handler; never-auto-edit is untested at component level. The manuscript route caps the gathered-context prompt it sends to the AI provider (its request inputs are only a project id and an enum)."
   - id: WCA-026
     status: partial
     code_paths:
