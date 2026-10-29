@@ -109,7 +109,7 @@
     "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.6.1",
     "esbuild": "^0.28.2",
-    "eslint": "^10.10.0",
+    "eslint": "^10.13.0",
     "postcss": "^8.5.15",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.2.4",
