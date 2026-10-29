@@ -130,7 +130,7 @@ Business logic is separated into controller classes under `src/lib/controllers/`
 | `ProjectsController` | Project CRUD, export (Markdown/Medium/StoryBible) |
 | `StoryObjectsController` | Character/location/plotline CRUD |
 | `UniversesController` | Universe and world object management |
-| `TimelineController` | Timeline matrix computation |
+| `TimelineController` | Timeline data: ordered scenes, story objects, and the relationships linking them |
 | `FocusController` | Focus mode scene context + related elements |
 | `GoogleAuthController` | Google OAuth flow + Docs export |
 | `WritingTaskController` | Writing task CRUD, completion tracking |
