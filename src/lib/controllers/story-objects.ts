@@ -109,24 +109,34 @@ export class StoryObjectController {
 
         if (!obj) throw new UserFacingError("Story object not found");
 
-        type Entity = { id: string; type: string } & ({ title: string } | { name: string });
-        const toTarget = (entity: Entity | null) =>
-            entity
-                ? { id: entity.id, name: "title" in entity ? entity.title : entity.name, entityType: entity.type }
-                : null;
+        type Named = { id: string; name: string; type: string };
+        // `kind` says which table `id` belongs to: story and world objects share
+        // type names, and their follow-up tools reject each other's ids.
+        const toTarget = (
+            node: { id: string; title: string; type: string } | null,
+            object: Named | null,
+            worldObject: Named | null,
+        ) => {
+            if (node) return { kind: "node" as const, id: node.id, name: node.title, entityType: node.type };
+            if (object) return { kind: "storyObject" as const, id: object.id, name: object.name, entityType: object.type };
+            if (worldObject) {
+                return { kind: "worldObject" as const, id: worldObject.id, name: worldObject.name, entityType: worldObject.type };
+            }
+            return null;
+        };
 
         const relatedTo = [
             ...obj.relatedBy.map((r) => ({
                 relationshipId: r.id,
                 type: r.type,
                 label: r.label,
-                target: toTarget(r.toNode ?? r.toObject ?? r.toWorldObject),
+                target: toTarget(r.toNode, r.toObject, r.toWorldObject),
             })),
             ...obj.relationships.map((r) => ({
                 relationshipId: r.id,
                 type: r.type,
                 label: r.label,
-                target: toTarget(r.fromNode ?? r.fromObject ?? r.fromWorldObject),
+                target: toTarget(r.fromNode, r.fromObject, r.fromWorldObject),
             })),
         ];
 
