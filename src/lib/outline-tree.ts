@@ -13,11 +13,18 @@ export interface OutlineNode {
     content?: string;
 }
 
-export async function buildOutlineTree(projectId: string): Promise<OutlineNode[]> {
-    const nodes = await prisma.structureNode.findMany({
+export async function buildOutlineTree(
+    projectId: string,
+    { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
+): Promise<OutlineNode[]> {
+    const allNodes = await prisma.structureNode.findMany({
         where: { projectId },
         orderBy: { orderIndex: "asc" },
     });
+    // READER shares never see OUTLINE scenes (#1259); same predicate as the manuscript Read view.
+    const nodes = excludeOutlineScenes
+        ? allNodes.filter((n) => n.type !== "SCENE" || n.status !== "OUTLINE")
+        : allNodes;
 
     const sceneIds = nodes.filter((n: { type: string }) => n.type === "SCENE").map((n: { id: string }) => n.id);
     const contentMap = await getLatestContent(sceneIds);

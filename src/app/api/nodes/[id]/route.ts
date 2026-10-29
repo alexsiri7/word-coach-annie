@@ -23,6 +23,9 @@ export async function GET(
     if (!node) {
       return NextResponse.json({ error: "Node not found" }, { status: 404 });
     }
+    if (access.role === "READER" && node.type === "SCENE" && node.status === "OUTLINE") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const result: Record<string, unknown> = { ...node };
 

@@ -11,7 +11,7 @@ vi.mock("@/lib/api-auth", async (importOriginal) => ({
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
 }));
 
-import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 
 vi.mock("@/lib/auth", async () => ({
   ...(await vi.importActual("@/lib/auth")),
@@ -401,6 +401,15 @@ describe("Writing Tasks API", () => {
       const res = await POST(
         makePostRequest("/api/writing-tasks", { projectId, name: "Task" })
       );
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 403 when a READER share lists /writing-tasks", async () => {
+      await testPrisma.writingTask.create({ data: { projectId, name: "Private plan" } });
+      vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({ authorized: true, role: "READER" } as never);
+
+      const { GET } = await import("@/app/api/writing-tasks/route");
+      const res = await GET(makeGetRequest(`/api/writing-tasks?projectId=${projectId}`));
       expect(res.status).toBe(403);
     });
   });

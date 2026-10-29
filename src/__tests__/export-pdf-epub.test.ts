@@ -601,6 +601,69 @@ describe("GET /api/projects/[id]/export/epub — auth and 404", () => {
   });
 });
 
+describe("READER exports omit outline scenes", () => {
+  let ownerId: string;
+  let projectId: string;
+
+  beforeEach(async () => {
+    const { owner, project } = await createOwnerAndProject();
+    ownerId = owner.id;
+    projectId = project.id;
+    const chapter = await testPrisma.structureNode.create({
+      data: { projectId, type: "CHAPTER", title: "Chapter One", orderIndex: 0 },
+    });
+    const outlined = await testPrisma.structureNode.create({
+      data: { projectId, parentId: chapter.id, type: "SCENE", title: "Planned", orderIndex: 0 },
+    });
+    const drafted = await testPrisma.structureNode.create({
+      data: { projectId, parentId: chapter.id, type: "SCENE", title: "Written", orderIndex: 1, status: "DRAFT" },
+    });
+    await testPrisma.contentVersion.createMany({
+      data: [
+        { nodeId: outlined.id, content: "<p>Private beat notes</p>", wordCount: 3 },
+        { nodeId: drafted.id, content: "<p>Finished prose</p>", wordCount: 2 },
+      ],
+    });
+  });
+
+  async function exportedEpubText(opts?: { userId?: string; userEmail?: string }) {
+    const epub = (await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>;
+    const { GET } = await import("@/app/api/projects/[id]/export/epub/route");
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/epub`, opts);
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect(res.status).toBe(200);
+    return JSON.stringify(epub.mock.calls.at(-1)?.[1]);
+  }
+
+  it("buildOutlineTree keeps outline scenes unless asked to exclude them", async () => {
+    const { buildOutlineTree } = await import("@/lib/outline-tree");
+    const sceneTitles = async (excludeOutlineScenes?: boolean) =>
+      (await buildOutlineTree(projectId, { excludeOutlineScenes }))[0].children.map((n) => n.title);
+    expect(await sceneTitles()).toEqual(["Planned", "Written"]);
+    expect(await sceneTitles(true)).toEqual(["Written"]);
+  });
+
+  it("a READER's EPUB has no outline scene text", async () => {
+    const ts = Date.now();
+    const readerEmail = `reader-outline-${ts}@example.com`;
+    const reader = await testPrisma.user.create({
+      data: { email: readerEmail, googleId: `google-reader-outline-${ts}`, name: "Reader" },
+    });
+    await testPrisma.projectShare.create({
+      data: { projectId, email: readerEmail, role: "READER" },
+    });
+    const text = await exportedEpubText({ userId: reader.id, userEmail: readerEmail });
+    expect(text).toContain("Finished prose");
+    expect(text).not.toContain("Private beat notes");
+  });
+
+  it("the owner's EPUB still includes outline scene text", async () => {
+    const text = await exportedEpubText({ userId: ownerId });
+    expect(text).toContain("Finished prose");
+    expect(text).toContain("Private beat notes");
+  });
+});
+
 describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
   let ownerId: string;
   let projectId: string;
