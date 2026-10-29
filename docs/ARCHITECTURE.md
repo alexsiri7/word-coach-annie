@@ -228,7 +228,7 @@ Handled by `ProjectsController` — templates assembled from structure nodes and
 ### DOCX
 `src/app/api/projects/[id]/export/docx/route.ts` — server-side DOCX generation using `docx`. The route fetches the project's outline tree with latest scene content, converts HTML to plain text via `stripHtml`, and renders PART/CHAPTER/SCENE nodes as Arial paragraphs (LEFT-aligned). Returns `application/vnd.openxmlformats-officedocument.wordprocessingml.document` with `Content-Disposition: attachment`.
 
-All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`).
+All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`). For READER shares, `buildOutlineTree(id, { excludeOutlineScenes: true })` drops OUTLINE scenes before their content is loaded.
 
 ### Google Docs
 `src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document. Export (creating or redirecting the mapped doc) is owner-only (`verifyProjectAccess`); editors may view export links and sync comments, and imported comment text (body, replies, quoted selection) is sanitized with `sanitizeInput` before it is stored as an annotation; commenter names are not fetched or stored — comments carry a neutral `[Google Docs comment]` / `[Reply]` label instead.

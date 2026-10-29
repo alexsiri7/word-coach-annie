@@ -301,7 +301,7 @@ Export all projects as a ZIP archive.
 ### `GET /api/projects/:id/export/pdf`
 Export the project manuscript as a PDF file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary PDF file (`Content-Type: application/pdf`, `Content-Disposition: attachment; filename="<title>.pdf"`).
 
@@ -310,7 +310,7 @@ Export the project manuscript as a PDF file.
 ### `GET /api/projects/:id/export/epub`
 Export the project manuscript as an EPUB file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary EPUB file (`Content-Type: application/epub+zip`, `Content-Disposition: attachment; filename="<title>.epub"`).
 
@@ -319,7 +319,7 @@ Export the project manuscript as an EPUB file.
 ### `GET /api/projects/:id/export/docx`
 Export the project manuscript as a DOCX file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary DOCX file (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `Content-Disposition: attachment; filename="<title>.docx"`).
 
@@ -329,6 +329,8 @@ Export the project manuscript as a DOCX file.
 
 ### `GET /api/nodes/:id`
 Get a structure node by ID.
+
+**Errors**: `403` for READER shares on an OUTLINE scene
 
 ---
 
@@ -359,6 +361,8 @@ Get a scene's content (latest version + version history + annotations).
 **Query params**: `versionId` — if provided, returns that specific version only.
 
 **Response**: `{ content, wordCount, versions[], annotations[] }`
+
+**READER shares**: `history` is empty; `versionId` and OUTLINE scenes return `403`.
 
 ---
 
@@ -817,6 +821,9 @@ preconditions are not met. Manuscript is truncated to 50,000 characters before a
 
 **Errors**: `401` unauthorized, `403` forbidden, `500` internal server error
 
+Past reviews are read with `GET /api/projects/:id/peer-review` (list) and
+`GET /api/projects/:id/peer-review/:reviewId` (full row); both return `403` for READER shares.
+
 ---
 
 ## Integrations
@@ -913,7 +920,7 @@ List writing tasks for a project.
 
 **Response**: `{ tasks: WritingTask[], total: number }`
 
-**Errors**: `400` if `projectId` missing; `401` unauthenticated
+**Errors**: `400` if `projectId` missing; `401` unauthenticated; `403` for READER shares
 
 ---
 

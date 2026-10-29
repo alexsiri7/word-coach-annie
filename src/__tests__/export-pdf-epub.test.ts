@@ -601,6 +601,81 @@ describe("GET /api/projects/[id]/export/epub — auth and 404", () => {
   });
 });
 
+describe("READER exports omit outline scenes", () => {
+  let ownerId: string;
+  let projectId: string;
+
+  beforeEach(async () => {
+    const { owner, project } = await createOwnerAndProject();
+    ownerId = owner.id;
+    projectId = project.id;
+    const chapter = await testPrisma.structureNode.create({
+      data: { projectId, type: "CHAPTER", title: "Chapter One", orderIndex: 0 },
+    });
+    const outlined = await testPrisma.structureNode.create({
+      data: { projectId, parentId: chapter.id, type: "SCENE", title: "Planned", orderIndex: 0 },
+    });
+    const drafted = await testPrisma.structureNode.create({
+      data: { projectId, parentId: chapter.id, type: "SCENE", title: "Written", orderIndex: 1, status: "DRAFT" },
+    });
+    await testPrisma.contentVersion.createMany({
+      data: [
+        { nodeId: outlined.id, content: "<p>Private beat notes</p>", wordCount: 3 },
+        { nodeId: drafted.id, content: "<p>Finished prose</p>", wordCount: 2 },
+      ],
+    });
+  });
+
+  // Each renderer is mocked, so its last call holds everything the route put in the file.
+  const renderedInput = {
+    epub: async () => ((await import("epub-gen-memory")).default as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1],
+    docx: async () => ((await import("docx")).Packer.toBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+    pdf: async () => ((await import("@react-pdf/renderer")).renderToBuffer as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0],
+  };
+  const routes = {
+    epub: () => import("@/app/api/projects/[id]/export/epub/route"),
+    docx: () => import("@/app/api/projects/[id]/export/docx/route"),
+    pdf: () => import("@/app/api/projects/[id]/export/pdf/route"),
+  };
+  type Format = keyof typeof routes;
+
+  async function exportedText(format: Format, opts?: { userId?: string; userEmail?: string }) {
+    const { GET } = await routes[format]();
+    const req = makeRequest(`http://localhost/api/projects/${projectId}/export/${format}`, opts);
+    const res = await GET(req as never, mockParams({ id: projectId }));
+    expect(res.status).toBe(200);
+    return JSON.stringify(await renderedInput[format]());
+  }
+
+  it("buildOutlineTree keeps outline scenes unless asked to exclude them", async () => {
+    const { buildOutlineTree } = await import("@/lib/outline-tree");
+    const sceneTitles = async (excludeOutlineScenes?: boolean) =>
+      (await buildOutlineTree(projectId, { excludeOutlineScenes }))[0].children.map((n) => n.title);
+    expect(await sceneTitles()).toEqual(["Planned", "Written"]);
+    expect(await sceneTitles(true)).toEqual(["Written"]);
+  });
+
+  it.each(Object.keys(routes) as Format[])("a READER's %s has no outline scene text", async (format) => {
+    const ts = Date.now();
+    const readerEmail = `reader-outline-${format}-${ts}@example.com`;
+    const reader = await testPrisma.user.create({
+      data: { email: readerEmail, googleId: `google-reader-outline-${format}-${ts}`, name: "Reader" },
+    });
+    await testPrisma.projectShare.create({
+      data: { projectId, email: readerEmail, role: "READER" },
+    });
+    const text = await exportedText(format, { userId: reader.id, userEmail: readerEmail });
+    expect(text).toContain("Finished prose");
+    expect(text).not.toContain("Private beat notes");
+  });
+
+  it.each(Object.keys(routes) as Format[])("the owner's %s still includes outline scene text", async (format) => {
+    const text = await exportedText(format, { userId: ownerId });
+    expect(text).toContain("Finished prose");
+    expect(text).toContain("Private beat notes");
+  });
+});
+
 describe("GET /api/projects/[id]/export/docx — auth and 404", () => {
   let ownerId: string;
   let projectId: string;

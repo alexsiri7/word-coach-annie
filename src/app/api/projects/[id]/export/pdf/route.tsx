@@ -111,7 +111,7 @@ export async function GET(
       );
     }
 
-    const outline = await buildOutlineTree(id);
+    const outline = await buildOutlineTree(id, { excludeOutlineScenes: access.role === "READER" });
     const contentElements = renderOutlineNodes(outline);
 
     const buffer = await renderToBuffer(

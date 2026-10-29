@@ -92,7 +92,7 @@ export async function GET(
       );
     }
 
-    const outline = await buildOutlineTree(id);
+    const outline = await buildOutlineTree(id, { excludeOutlineScenes: access.role === "READER" });
 
     const titleParagraphs: Paragraph[] = [
       headingParagraph(project.title, 32),

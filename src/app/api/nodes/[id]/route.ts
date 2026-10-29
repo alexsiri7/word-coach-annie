@@ -5,6 +5,7 @@ import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAcce
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { NodeUpdateSchema } from "@/schemas/nodes";
 import { assertValidParent, InvalidParentError } from "@/lib/node-tree";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export async function GET(
   request: NextRequest,
@@ -22,6 +23,9 @@ export async function GET(
 
     if (!node) {
       return NextResponse.json({ error: "Node not found" }, { status: 404 });
+    }
+    if (access.role === "READER" && isHiddenOutlineScene(node)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const result: Record<string, unknown> = { ...node };

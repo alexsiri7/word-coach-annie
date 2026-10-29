@@ -25,7 +25,7 @@ export async function GET(
       );
     }
 
-    const outline = await buildOutlineTree(id);
+    const outline = await buildOutlineTree(id, { excludeOutlineScenes: access.role === "READER" });
     const chapters = buildEpubChapters(outline);
 
     const buffer = await epub(

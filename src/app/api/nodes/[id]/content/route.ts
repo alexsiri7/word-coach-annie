@@ -4,6 +4,7 @@ import { StructureController, ConflictError, InputTooLargeError } from "@/lib/co
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export async function GET(
   request: NextRequest,
@@ -18,6 +19,21 @@ export async function GET(
 
     const searchParams = request.nextUrl.searchParams;
     const versionId = searchParams.get("versionId");
+
+    // READER shares see only the current text of non-outline scenes (#1259).
+    const isReader = access.role === "READER";
+    if (isReader && versionId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (isReader) {
+      const node = await prisma.structureNode.findUnique({
+        where: { id: nodeId },
+        select: { type: true, status: true },
+      });
+      if (node && isHiddenOutlineScene(node)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     // If a specific version is requested, return just that version
     if (versionId) {
@@ -35,7 +51,7 @@ export async function GET(
     // Otherwise use controller to get latest + history + annotations
     const result = await StructureController.readSceneContent(nodeId);
 
-    const versions = await prisma.contentVersion.findMany({
+    const versions = isReader ? [] : await prisma.contentVersion.findMany({
       where: { nodeId },
       orderBy: { createdAt: "desc" },
       select: { id: true, wordCount: true, createdAt: true },

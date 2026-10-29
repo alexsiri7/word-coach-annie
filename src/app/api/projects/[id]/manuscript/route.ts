@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 
@@ -60,13 +61,11 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     });
 
     // Only include scenes that are DRAFT or above (exclude OUTLINE)
-    const sceneIds = nodes.filter((n) => n.type === "SCENE" && n.status !== "OUTLINE").map((n) => n.id);
+    const sceneIds = nodes.filter((n) => n.type === "SCENE" && !isHiddenOutlineScene(n)).map((n) => n.id);
     const latestContent = await getLatestContent(sceneIds);
 
     // Exclude OUTLINE scenes from the manuscript
-    const visibleNodes = nodes.filter(
-      (n) => n.type !== "SCENE" || n.status !== "OUTLINE"
-    );
+    const visibleNodes = nodes.filter((n) => !isHiddenOutlineScene(n));
 
     // Build lookup maps
     const childrenMap = new Map<string | null, typeof visibleNodes>();

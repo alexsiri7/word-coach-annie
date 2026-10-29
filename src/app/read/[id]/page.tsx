@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth";
@@ -37,7 +38,7 @@ async function getManuscriptData(projectId: string) {
 
   // Only include scenes that are DRAFT or above (exclude OUTLINE)
   const sceneIds = nodes
-    .filter((n) => n.type === "SCENE" && n.status !== "OUTLINE")
+    .filter((n) => n.type === "SCENE" && !isHiddenOutlineScene(n))
     .map((n) => n.id);
   const contentMap = await getLatestContent(sceneIds);
 
@@ -46,9 +47,7 @@ async function getManuscriptData(projectId: string) {
   const roots: OutlineNode[] = [];
 
   // Exclude OUTLINE scenes from the tree entirely
-  const visibleNodes = nodes.filter(
-    (n) => n.type !== "SCENE" || n.status !== "OUTLINE"
-  );
+  const visibleNodes = nodes.filter((n) => !isHiddenOutlineScene(n));
 
   for (const node of visibleNodes) {
     nodeMap.set(node.id, {
