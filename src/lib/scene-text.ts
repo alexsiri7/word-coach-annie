@@ -30,13 +30,23 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&amp;/g, "&");
 }
 
+// Repeats until stable, the form CodeQL's multi-character sanitization check accepts.
+function stripTags(html: string): string {
+  let text = html;
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, "");
+  } while (text !== previous);
+  return text;
+}
+
 /** Plain-text scene prose for the PDF and DOCX exports: beats removed, paragraphs separated by a blank line. */
 export function sceneHtmlToPlainText(html: string): string {
   if (!html || html === "<p></p>") return "";
   let text = stripBeats(html);
   text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
   text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<[^>]+>/g, "");
-  text = decodeHtmlEntities(text);
+  text = decodeHtmlEntities(stripTags(text));
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
