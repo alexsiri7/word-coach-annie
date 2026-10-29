@@ -1,0 +1,875 @@
+# REGENERATED on every audit run by the archon-requirements-audit workflow. Do not hand-edit.
+meta:
+  generated: 2026-10-29
+  workflow: archon-requirements-audit
+  totals:
+    covered: 15
+    partial: 34
+    uncovered: 0
+    stale: 3
+    orphans: 24
+coverage:
+  - id: WCA-001
+    status: covered
+    code_paths:
+      - "src/app/api/projects/route.ts:13-166"
+      - "src/app/api/projects/[id]/route.ts:35-114"
+      - "src/app/api/projects/[id]/archive/route.ts:7-66"
+      - "src/app/page.tsx:113-144,227-233,605,640"
+      - "prisma/schema.prisma:30,148,171"
+    test_paths:
+      - "src/__tests__/api-handlers.test.ts:53-153"
+      - "src/__tests__/projects.test.ts:62-170"
+      - "e2e/integration.spec.ts:75-147,320-493"
+      - "e2e/smoke.spec.ts:268-353"
+    notes: "Create/rename/archive/unarchive/delete exercised end to end; cascade deletion of nodes, story objects and versions asserted. Delete additionally requires archived state plus typed-title confirmation (stricter than stated)."
+  - id: WCA-002
+    status: partial
+    code_paths:
+      - "src/schemas/projects.ts:3-19"
+      - "src/app/api/projects/route.ts:128-139"
+      - "src/lib/constants.ts:26-57"
+      - "src/components/outline-tree.tsx:44,258,263,450"
+      - "src/app/project/[id]/page.tsx:75,841-845"
+    test_paths:
+      - "src/__tests__/constants-utils.test.ts:40-49"
+    notes: "Implemented as stated; no test POSTs a projectType or asserts Article/Section vs Chapter/Scene labels (only label-key existence is checked)."
+  - id: WCA-003
+    status: partial
+    code_paths:
+      - "prisma/schema.prisma:153-176"
+      - "src/schemas/nodes.ts:3-23"
+      - "src/lib/controllers/structure.ts:219-402"
+      - "src/app/api/projects/[id]/nodes/route.ts:47-89"
+      - "src/app/api/nodes/[id]/route.ts"
+      - "src/app/api/nodes/move/route.ts:12-120"
+      - "src/components/outline-tree.tsx:70-82,233,497-520"
+    test_paths:
+      - "src/__tests__/structure-controller.test.ts:68-216"
+      - "src/__tests__/api-handlers.test.ts:186-292"
+      - "src/__tests__/api-routes.test.ts:95-210"
+      - "src/__tests__/structure.test.ts:14-140"
+    notes: "CRUD and delete-reindex tested; sibling renumbering after move and status color rendering untested. PATCH orderIndex via updateNode sets the value without renumbering siblings."
+  - id: WCA-004
+    status: partial
+    code_paths:
+      - "src/components/outline-tree.tsx:268-273"
+      - "src/app/project/[id]/page.tsx:230-247,288-294"
+      - "src/lib/controllers/structure.ts:253-264"
+      - "src/schemas/nodes.ts:14"
+    test_paths:
+      - "src/__tests__/structure-controller.test.ts:75-87"
+      - "src/__tests__/nodes-route.test.ts:38-67"
+    notes: "orderIndex = insertAfterIndex+1 with later siblings shifted is tested at controller level; the new scene becoming the selected node is untested."
+  - id: WCA-005
+    status: partial
+    code_paths:
+      - "src/components/editor/use-auto-save.ts:27-76"
+      - "src/components/scene-editor.tsx:103-119,222-247"
+      - "src/app/api/nodes/[id]/content/route.ts:61-109"
+      - "src/lib/controllers/structure.ts:486-536"
+      - "src/lib/controllers/projects.ts:92-120"
+    test_paths:
+      - "e2e/smoke.spec.ts:400-438"
+      - "src/__tests__/content-versioning.test.ts:31-43"
+      - "src/__tests__/beats.test.ts:52-128"
+      - "src/__tests__/content-route.test.ts:97-107"
+    notes: "2000 ms debounce persists without a save button (e2e, API mocked) and per-version word count is stored; project total word count after save and italic/heading/list round-trip are untested."
+  - id: WCA-006
+    status: covered
+    code_paths:
+      - "src/lib/controllers/structure.ts:47-61,518-524,567-605"
+      - "src/app/api/nodes/[id]/content/route.ts:8-59,111-141"
+      - "src/components/editor/version-history-panel.tsx"
+    test_paths:
+      - "src/__tests__/content-versioning.test.ts:31-159"
+      - "src/__tests__/structure-controller.test.ts:297-312"
+      - "src/__tests__/content-route.test.ts:97-107,191-204"
+    notes: "MAX_SCENE_VERSIONS is 50 with pruning in the same transaction and restore appends a new head; 55-to-50 prune and exactly-50 boundary are directly tested."
+  - id: WCA-007
+    status: stale
+    code_paths:
+      - "src/components/editor/extensions/beat.tsx:8-32"
+      - "src/components/editor/editor-config.ts:57-82"
+      - "src/lib/scene-text.ts:6-10"
+      - "src/lib/html-to-markdown.ts:10-12"
+      - "src/lib/epub-chapters.ts:16"
+      - "src/app/api/projects/[id]/export/pdf/route.tsx:16-20"
+      - "src/app/api/projects/[id]/export/docx/route.ts:14-18"
+      - "src/lib/export/google-docs-exporter.ts:69-74"
+    test_paths:
+      - "e2e/integration.spec.ts:505-600"
+      - "src/__tests__/beats.test.ts:141-186"
+      - "src/__tests__/export-pdf-epub.test.ts:232-248,385-407"
+      - "src/__tests__/google-docs-exporter.test.ts:42,52-68"
+    notes: "Google Docs STORY_INTERNAL mode deliberately exports with includeBeats true (and its test asserts it), so 'every export format strips beats' is false; PDF/DOCX strip with a non-dotall regex that misses multi-line and div-form beats."
+  - id: WCA-008
+    status: partial
+    code_paths:
+      - "src/app/project/[id]/scene/[sceneId]/focus/page.tsx:135-205"
+      - "src/app/api/focus/[sceneId]/route.ts:12-51"
+      - "src/lib/controllers/focus.ts:4-143"
+      - "src/components/outline-tree.tsx:283"
+      - "src/components/editor/editor-toolbar.tsx:489"
+    test_paths:
+      - "src/__tests__/focus-route.test.ts:40-61"
+      - "src/__tests__/focus-controller.test.ts:31-230"
+      - "e2e/smoke.spec.ts:400-438"
+    notes: "API criterion tested; navigating from the project view into focus mode and asserting all three panels render is untested (smoke test hits the URL directly, checks title and editor only)."
+  - id: WCA-009
+    status: partial
+    code_paths:
+      - "src/components/editor/extensions/harper-spellcheck.ts:85-325"
+      - "src/lib/linting/harper-linter.ts:11-52"
+      - "src/components/editor/harper-suggestion-popover.tsx"
+      - "src/components/scene-editor.tsx:89,335-342,612-613"
+      - "src/components/editor/editor-toolbar.tsx:413-427"
+    test_paths:
+      - "e2e/smoke.spec.ts:439-456"
+      - "src/__tests__/harper-spellcheck.test.ts:118-175"
+      - "src/__tests__/harper-linter.test.ts:33-110"
+      - "src/__tests__/harper-suggestion-popover.test.ts"
+    notes: "Flags while typing, toggle off/on, and the absolute wasm URL (Turbopack regression) are tested; click-to-suggestions, absence of network requests carrying manuscript text, and dev/prod bundler parity are untested."
+  - id: WCA-010
+    status: covered
+    code_paths:
+      - "src/schemas/story-objects.ts:3-26"
+      - "src/lib/controllers/story-objects.ts:5,9-92,151-260"
+      - "src/app/api/projects/[id]/story-objects/route.ts:8-65"
+      - "src/app/api/story-objects/[id]/route.ts:8-123"
+    test_paths:
+      - "src/__tests__/api-handlers.test.ts:294-350"
+      - "src/__tests__/story-objects-controller.test.ts:25-41,93-200"
+      - "src/__tests__/story-objects.test.ts:33-66"
+    notes: "CRUD via routes and controller, type filter, and name search all exercised; five-type enum enforced in schema and controller (route tests use CHARACTER and LOCATION only)."
+  - id: WCA-011
+    status: partial
+    code_paths:
+      - "prisma/schema.prisma:109-133"
+      - "src/schemas/relationships.ts:3-36"
+      - "src/app/api/projects/[id]/relationships/route.ts:9-193"
+      - "src/app/api/relationships/[id]/route.ts:53-179"
+      - "src/mcp/tools/relationships.ts:22-196"
+      - "src/app/api/story-objects/[id]/route.ts:14-31"
+      - "src/components/story-object-panel.tsx:113-163,244-258"
+    test_paths:
+      - "src/__tests__/relationships-route.test.ts:41-190"
+      - "src/__tests__/mcp-relationships.test.ts:48-200"
+      - "src/__tests__/story-objects-controller.test.ts:67-84"
+      - "src/__tests__/api-routes.test.ts:410-518"
+    notes: "Universe world-object edges work only through the MCP tool; the REST POST schema has no world-object id fields (returns 404), so the UI cannot create a universe edge. POST/GET on the project relationships route and the panel listing are untested."
+  - id: WCA-012
+    status: partial
+    code_paths:
+      - "src/lib/controllers/universes.ts:58-326"
+      - "src/app/api/universes/**"
+      - "src/app/api/world-objects/[id]/**"
+      - "src/mcp/index.ts:331-360"
+      - "src/app/universe/[id]/page.tsx:303-309"
+      - "src/schemas/projects.ts:13-25"
+    test_paths:
+      - "src/__tests__/universes.test.ts:40-123"
+      - "src/__tests__/mcp-tools.test.ts:543-555"
+      - "src/__tests__/timeline-post-route.test.ts"
+      - "src/__tests__/timeline-patch-route.test.ts"
+      - "src/__tests__/timeline-reorder-route.test.ts"
+      - "src/__tests__/timeline-route.test.ts"
+      - "src/__tests__/null-userid-guard.test.ts:95-135"
+    notes: "Link/unlink works via controller and MCP, but the only UI path PATCHes universeId to the project route whose Zod schema strips it and rejects with 'No fields to update', so authors cannot link from the web UI. Universe/world-object route-level CRUD untested."
+  - id: WCA-013
+    status: stale
+    code_paths:
+      - "src/app/api/timeline/[projectId]/route.ts:6-26"
+      - "src/lib/controllers/timeline.ts:12-103"
+      - "src/components/timeline/timeline-view.tsx:38-104"
+      - "src/app/project/[id]/timeline/page.tsx:9-23"
+    test_paths:
+      - "src/__tests__/timeline-controller.test.ts:15-95"
+      - "src/__tests__/timeline.test.ts"
+    notes: "Route is GET-only and returns raw scenes/objects/events of any relationship type with the matrix assembled client-side; no PATCH or reorder endpoints exist on the project timeline (the timeline-patch/reorder tests target world-object timeline entries under WCA-012)."
+  - id: WCA-014
+    status: partial
+    code_paths:
+      - "src/app/api/projects/[id]/search/route.ts:7,13-29,49-54,71-153"
+      - "src/components/search-panel.tsx:54-63"
+    test_paths:
+      - "src/__tests__/search-route.test.ts:72-135"
+    notes: "Scene and story-object hits with snippets tested; highlighting is client-side and untested, and the 200-character 413 path has no test on this route (only empty-query 400)."
+  - id: WCA-015
+    status: partial
+    code_paths:
+      - "src/app/api/nodes/[id]/annotations/route.ts:37-77"
+      - "src/lib/controllers/structure.ts:405-430"
+      - "src/app/api/annotations/[id]/route.ts:7-86"
+      - "src/app/read/[id]/reader-view.tsx:176-200,262-380,533-537"
+      - "src/components/scene-editor.tsx:251-401"
+      - "src/lib/annotation-anchoring.ts"
+    test_paths:
+      - "src/__tests__/annotations-route.test.ts:55-175"
+      - "src/__tests__/annotation-anchoring.test.ts:9-150"
+      - "src/__tests__/structure-controller.test.ts:351-380"
+    notes: "Persistence and the re-anchoring algorithm are tested; none of the three acceptance criteria has a component or e2e test (no test renders reader-view or scene-editor, no e2e visits the Read view)."
+  - id: WCA-016
+    status: partial
+    code_paths:
+      - "src/app/api/writing-tasks/route.ts:10-95"
+      - "src/app/api/writing-tasks/[id]/route.ts"
+      - "src/app/api/writing-tasks/[id]/complete/route.ts"
+      - "src/lib/controllers/writing-tasks.ts:74-175"
+      - "src/mcp/index.ts:752-840"
+      - "src/app/read/[id]/reader-view.tsx:384,675-765,905-950"
+    test_paths:
+      - "src/__tests__/writing-tasks-route.test.ts:70-400"
+      - "src/__tests__/mcp-writing-tasks.test.ts:14-170"
+    notes: "REST CRUD and MCP create/update/complete/list are tested; MCP has no delete tool so parity is incomplete, and the Read view tasks drawer is untested. Statement omits the task attributes and dashboard that now exist (see orphans)."
+  - id: WCA-017
+    status: covered
+    code_paths:
+      - "src/app/api/projects/[id]/manuscript/route.ts:32-133"
+      - "src/app/read/[id]/page.tsx:38-51"
+    test_paths:
+      - "src/__tests__/sharing.test.ts:376-520"
+    notes: "OUTLINE exclusion, DRAFT/REVISED/FINAL inclusion, and chapter-then-scene ordering asserted against the real route with DB fixtures; the Read page applies the same filter itself."
+  - id: WCA-018
+    status: covered
+    code_paths:
+      - "src/app/api/projects/[id]/share/route.ts:14-171"
+      - "src/lib/api-auth.ts:27-204"
+    test_paths:
+      - "src/__tests__/sharing.test.ts:100-417,532-660"
+      - "src/__tests__/share-route-p2002.test.ts:54-80"
+      - "e2e/sharing.spec.ts:56-440"
+    notes: "Default READER on missing/invalid role, 409 on duplicate, owner-only 403 on all four verbs, and reader-vs-unshared manuscript access each asserted directly."
+  - id: WCA-019
+    status: partial
+    code_paths:
+      - "src/app/api/projects/[id]/export/route.ts:9-288"
+      - "src/lib/html-to-markdown.ts:5-44"
+      - "src/mcp/tools/export.ts:7-124"
+    test_paths:
+      - "e2e/integration.spec.ts:723-842"
+      - "src/__tests__/mcp-export.test.ts:22-162"
+    notes: "All three modes and three toggles exist; front matter, chapter headings, story bible and chapterNumbering are tested, while includeSynopsis, includeSceneBreaks, per-chapter output and the PART heading are not (export.test.ts tests an inline copy of htmlToMarkdown)."
+  - id: WCA-020
+    status: partial
+    code_paths:
+      - "src/app/read/[id]/reader-view.tsx:773-831"
+      - "src/app/api/projects/[id]/export/pdf/route.tsx:16-147"
+      - "src/app/api/projects/[id]/export/epub/route.ts:9-53"
+      - "src/lib/epub-chapters.ts:352-396"
+      - "src/app/api/projects/[id]/export/docx/route.ts:14-134"
+    test_paths:
+      - "src/__tests__/export-pdf-epub.test.ts:272-438,440-706"
+    notes: "PDF is server-rendered and DOCX runs are Arial 12pt left-aligned; auth/404/200 for all three routes, DOCX font/alignment and EPUB beat stripping tested on real routes, while the download menu, 12pt size, PDF/DOCX beat stripping (inline copies only) and EPUB 3 version are untested."
+  - id: WCA-021
+    status: covered
+    code_paths:
+      - "src/lib/export/google-docs-exporter.ts:11-111"
+      - "src/lib/export/google-docs-comment-sync.ts:69-171"
+      - "prisma/schema.prisma:16,307-321"
+      - "src/app/api/auth/google-docs/route.ts:12-50"
+      - "src/app/api/auth/google-docs/callback/route.ts:13-70"
+      - "src/lib/controllers/google-auth.ts:38-69"
+    test_paths:
+      - "src/__tests__/google-docs-exporter.test.ts:29-144"
+      - "src/__tests__/google-docs-comment-sync.test.ts:29-195"
+      - "src/__tests__/google-auth-controller.test.ts:101-152"
+      - "src/__tests__/google-docs-oauth-initiate.test.ts:28-61"
+      - "src/__tests__/google-docs-oauth-callback.test.ts:50-107"
+      - "src/__tests__/google-docs-export-route.test.ts:74-104"
+    notes: "Idempotent re-export, externalId-based skip on second sync, and per-user credential store under a dedicated OAuth flow are all directly tested."
+  - id: WCA-022
+    status: partial
+    code_paths:
+      - "src/mcp/tools/export.ts:126-246"
+      - "src/app/project/[id]/settings/page.tsx:633"
+      - "src/lib/controllers/hashnode-auth.ts:52-121"
+      - "src/lib/controllers/hashnode-publish.ts:31-216"
+      - "prisma/schema.prisma:367-391"
+      - "src/app/api/projects/[id]/publish-to-hashnode/route.ts"
+    test_paths:
+      - "src/__tests__/mcp-export.test.ts:201-240"
+      - "src/__tests__/hashnode-publish-controller.test.ts:123-168,296-433"
+      - "src/__tests__/publish-to-hashnode-route.test.ts:42-125"
+      - "src/__tests__/encrypted-readers-rotation.test.ts"
+    notes: "No Medium-branded exporter exists (the Hashnode export tool plus a Medium import URL affordance stand in); Hashnode publish with encrypted credential and HashnodeExport status record is tested, the encrypt-on-connect path is not."
+  - id: WCA-023
+    status: partial
+    code_paths:
+      - "src/lib/export-json.ts:4-195"
+      - "src/app/api/projects/[id]/export/route.ts:242-251"
+      - "src/lib/import-json.ts:69-255"
+      - "src/app/api/projects/import/route.ts:10-85"
+    test_paths:
+      - "e2e/integration.spec.ts:603-720,895-1009"
+      - "src/__tests__/export-json.test.ts:20-267"
+      - "src/__tests__/import-json.test.ts:23-327"
+      - "src/__tests__/import-json-limits.test.ts:35-125"
+      - "src/__tests__/project-import-route.test.ts:44-91"
+    notes: "Round-trip is tested e2e for structure, content and story objects but not relationships; item-count limits are unit-tested while the route's 5 MB 413 path has no route-level test (see WCA-044)."
+  - id: WCA-024
+    status: partial
+    code_paths:
+      - "src/app/api/chat/route.ts:18-138,241-492"
+      - "src/lib/ai/chat-compression.ts:34-78"
+      - "src/app/api/conversations/route.ts:8-68"
+      - "src/app/api/conversations/[id]/route.ts:8-65"
+    test_paths:
+      - "src/__tests__/chat-route.test.ts:123-246,706-747"
+      - "src/__tests__/chat-compression.test.ts:58-120"
+      - "src/__tests__/conversations-route.test.ts"
+      - "src/__tests__/input-size-limits.test.ts:52-89"
+    notes: "Streaming, user-turn persistence, context injection, conversation CRUD and compression are tested; the assistant turn being appended and the PR #1064 client-disconnect guard are untested."
+  - id: WCA-025
+    status: partial
+    code_paths:
+      - "src/app/api/ai-inline/route.ts:40-104"
+      - "src/app/api/ai-manuscript/route.ts:71-122"
+      - "src/components/inline-ai-action-bar.tsx:66-127"
+    test_paths:
+      - "src/__tests__/input-size-limits.test.ts:91-138"
+      - "src/__tests__/ai-inline-route.test.ts:44-111"
+      - "src/__tests__/ai-manuscript-route.test.ts:81-174"
+    notes: "Routes return suggestion text only and the client inserts only in the Accept handler; never-auto-edit is untested at component level and the manuscript route has no size limit at all (inputs are a project id and an enum)."
+  - id: WCA-026
+    status: partial
+    code_paths:
+      - "src/lib/ai/peer-review-service.ts:181-248"
+      - "src/lib/review-personas.ts:11-52"
+      - "src/mcp/index.ts:2121-2173"
+      - "src/app/api/chat/route.ts:140-154"
+      - "src/app/api/projects/[id]/peer-review/route.ts:9-72"
+    test_paths:
+      - "src/__tests__/peer-review-service.test.ts:128-145"
+      - "src/__tests__/peer-review-route.test.ts:270-505"
+      - "src/__tests__/review-personas.test.ts:7-17,82-108"
+      - "src/__tests__/mcp-guardrails.test.ts:220-273"
+    notes: "Five personas run and persist with consensus and lens text lives only in review-personas.ts; no 'pending run' logic exists, run_peer_review still says 'four agents', and the MCP run/list handlers are only checked as source text."
+  - id: WCA-027
+    status: partial
+    code_paths:
+      - "src/hooks/use-writing-session.ts:22-143"
+      - "src/lib/controllers/sessions.ts:27-116"
+      - "src/app/api/projects/[id]/sessions/route.ts:8-44"
+      - "src/app/api/sessions/heatmap/route.ts:6-15"
+      - "src/app/api/projects/[id]/progress/route.ts:5-22"
+      - "src/lib/controllers/progress.ts"
+    test_paths:
+      - "src/__tests__/sessions-route.test.ts:35-74"
+      - "src/__tests__/sessions-heatmap.test.ts:19-71"
+      - "src/__tests__/sessions-controller.test.ts:15-177"
+      - "src/__tests__/sessions-progress.test.ts:61-245"
+      - "src/__tests__/progress-controller.test.ts:15-117"
+    notes: "Sessions are created when a session ends (5-minute inactivity, unmount, scene switch) rather than on save, and an existing day's record is never updated (updateSession has no caller); heatmap and progress aggregation tested, client hook untested."
+  - id: WCA-028
+    status: partial
+    code_paths:
+      - "src/mcp/index.ts:159-2216"
+      - "src/mcp/tools/*.ts"
+      - "src/app/api/mcp/route.ts:7-39"
+      - "src/proxy.ts:228-243"
+    test_paths:
+      - "src/__tests__/mcp-server.test.ts:19-67"
+      - "src/__tests__/mcp-tools.test.ts"
+      - "src/__tests__/mcp-route-auth.test.ts:40-95"
+      - "src/__tests__/mcp-cross-tenant.test.ts"
+    notes: "Every listed area has tools (97 total, plus opportunities, providers and Google Docs), but there is no categorised registry to test and no test enumerates registered tools; API/MCP parity is structural via shared controllers, with the MCP scene write checking the hash itself while the API maps ConflictError to 409."
+  - id: WCA-029
+    status: covered
+    code_paths:
+      - "src/mcp/annie-voice.ts:9-109"
+      - "src/mcp/index.ts:441-478,1848,1886,2110-2117"
+    test_paths:
+      - "src/__tests__/mcp-guardrails.test.ts:10-17,27-51,71-73,82-168"
+    notes: "No CONTENT-block guard, schema-only intent enum, and ANNIE_HARD_RULE prepended to review and plan_beats are all asserted (handler checks read index.ts as source text; constants asserted directly)."
+  - id: WCA-030
+    status: covered
+    code_paths:
+      - "src/mcp/tools/structure.ts:89-150,215-263"
+      - "src/mcp/index.ts:480-504"
+    test_paths:
+      - "src/__tests__/structure-controller.test.ts:410-566"
+    notes: "Lone BEAT between blocks and mid-block split with exact left/right CONTENT strings asserted; whitespace-only right remainder being discarded is an untested edge."
+  - id: WCA-031
+    status: covered
+    code_paths:
+      - "src/mcp/content-hash.ts:11-41"
+      - "src/mcp/tools/structure.ts:64-67,178-191,221-224,265-284"
+      - "src/app/api/nodes/[id]/content/route.ts:88-98"
+      - "src/mcp/annie-voice.ts:103-108"
+    test_paths:
+      - "src/__tests__/content-hash.test.ts:29-47"
+      - "src/__tests__/mcp-tools.test.ts:48,159,188,346,388,429,465,499"
+      - "src/__tests__/structure-controller.test.ts:478-493"
+      - "src/__tests__/content-route.test.ts:158-172"
+      - "src/__tests__/mcp-guardrails.test.ts:100-102"
+    notes: "Hash verification precedes every MCP write and the API surfaces mismatches as 409 with server content; both criteria tested across eight entity types plus the instructions text."
+  - id: WCA-032
+    status: covered
+    code_paths:
+      - "src/mcp/index.ts:149-161,202-211"
+      - "src/lib/env.ts:55-58,74-83"
+      - "src/app/api/mcp/route.ts:19"
+    test_paths:
+      - "src/__tests__/mcp-destructive-gating.test.ts:192-253"
+    notes: "Option falls back to the env flag, true only for the exact string 'true', unset is blocked; all cases exercised through real registered handlers."
+  - id: WCA-033
+    status: stale
+    code_paths:
+      - "src/mcp/snapshot.ts:12-37"
+      - "src/mcp/tools/snapshots.ts:8-42"
+      - "src/mcp/index.ts:1333-1368"
+      - "src/lib/controllers/structure.ts:375,706"
+      - "src/lib/controllers/story-objects.ts:253,367"
+      - "src/mcp/tools/relationships.ts:215"
+    test_paths:
+      - "src/__tests__/snapshot.test.ts:10-38"
+      - "src/__tests__/mcp-snapshots.test.ts:5-61"
+      - "src/__tests__/mcp-destructive-gating.test.ts:216-228"
+    notes: "Since the Supabase move snapshot_database returns a disabled notice, list_snapshots is always empty, restore_snapshot always throws and autoSnapshot is a no-op wired to only five delete paths; no shell is invoked so the CRITICAL-01 guard is vacuous and tool descriptions still promise git-commit snapshots."
+  - id: WCA-034
+    status: partial
+    code_paths:
+      - "src/mcp/skills.ts:22-130"
+      - "src/mcp/index.ts:1855-1918,2098-2106,2177-2214"
+      - ".skills/*/SKILL.md"
+    test_paths:
+      - "src/__tests__/skills.test.ts:10-133"
+      - "src/__tests__/mcp-guardrails.test.ts:54-80"
+    notes: "Skills load with parsed metadata and each is registered as a prompt; no test lists prompts through an MCP client, the list_skills handler is never invoked, and the plan_beats criterion is asserted statically."
+  - id: WCA-035
+    status: partial
+    code_paths:
+      - "prisma/schema.prisma:423-468"
+      - "src/lib/controllers/submissions.ts:22-311"
+      - "src/lib/controllers/provider-ownership.ts:11-24"
+      - "src/app/api/providers/**"
+      - "src/app/api/projects/[id]/submissions/**"
+      - "src/mcp/tools/submissions.ts:16-138"
+      - "src/mcp/index.ts:952-1055,1217-1270"
+      - "src/app/project/[id]/submissions/page.tsx"
+      - "src/components/submission-activity-summary.tsx:27-57"
+    test_paths:
+      - "src/__tests__/mcp-submissions.test.ts:32-234"
+      - "src/__tests__/contest-submissions-route.test.ts:61-112"
+      - "src/__tests__/opportunity-ownership.test.ts:120-245"
+    notes: "Providers are user-scoped and reusable and MCP parity for all three entities is tested; the dashboard shows a single 'active' count rather than separate active and pending counts, and the submissions page UI, publication-submission routes and activity summary are untested."
+  - id: WCA-036
+    status: partial
+    code_paths:
+      - "src/lib/offline/sync-queue.ts:34-270"
+      - "src/lib/offline/replay-shared.ts:4-69"
+      - "src/lib/offline/idb.ts:335-367"
+      - "src/lib/offline/cache-reads.ts:381-446"
+      - "src/lib/offline/use-sync-queue.ts:22-27"
+      - "src/lib/offline/use-sync-status.ts:47-99"
+      - "src/components/sync-status-chip.tsx:23-43"
+      - "src/components/conflict-resolver-modal.tsx:45-96"
+      - "src/worker/index.ts:37-107"
+    test_paths:
+      - "src/__tests__/sync-queue.test.ts"
+      - "src/__tests__/use-sync-status.test.ts"
+      - "src/__tests__/conflict-resolver-modal.test.ts"
+      - "src/__tests__/replay-shared.test.ts"
+      - "src/__tests__/cache-reads.test.ts"
+      - "e2e/error-scenarios.spec.ts:457-540"
+    notes: "202 queuing, GET/non-API exclusion, ordered replay, 409 conflict with server content, conflict skipping and the 3-retry cap are tested; the modal's keep-server branch and the header sync states are untested."
+  - id: WCA-037
+    status: partial
+    code_paths:
+      - "src/hooks/use-version-check.ts:12-96"
+      - "src/components/update-banner.tsx:6-29"
+      - "next.config.ts:19-21,115-125"
+    test_paths: []
+    notes: "Implemented as stated (window.location.reload appears only in the banner's refresh callback) but both acceptance criteria are untested; version-file and next-config-sw-patterns tests cover unrelated aspects."
+  - id: WCA-038
+    status: partial
+    code_paths:
+      - "src/app/api/feedback/route.ts:18-240"
+      - "src/proxy.ts:159-160"
+      - "src/lib/rate-limit-config.ts:28-29"
+    test_paths:
+      - "src/__tests__/feedback-route.test.ts:54-355"
+      - "src/__tests__/proxy.test.ts:648-695"
+      - "src/__tests__/rate-limit.test.ts:81-82"
+      - "e2e/feedback.spec.ts:86-297"
+    notes: "Issue creation, screenshot upload and the 5/hour limit are tested; 'issues:write scope only' is a code comment with no verifiable assertion and the route's own 413 branches are not tested in the feedback suite."
+  - id: WCA-039
+    status: covered
+    code_paths:
+      - "src/proxy.ts:67-104,193-303"
+      - "src/app/api/mcp/route.ts"
+    test_paths:
+      - "src/__tests__/proxy.test.ts:92-104,156-197,255-292,311-328,389-404"
+      - "src/__tests__/mcp-route-auth.test.ts:46-95"
+    notes: "Behavior matches; the real allowlist is wider than the statement (also /api/calendar, /api/auth/google, /api/auth/me, /login), and MCP token acceptance is covered by proxy and MCP route tests."
+  - id: WCA-040
+    status: partial
+    code_paths:
+      - "src/lib/auth.ts:18-19,79-129"
+      - "src/lib/auth-server.ts:60-118"
+      - "src/lib/token-blocklist.ts:25-68"
+      - "src/app/api/auth/refresh/route.ts:44-97"
+      - "src/app/api/auth/logout/route.ts:25-55"
+      - "src/hooks/use-auth.ts:22,72-112"
+      - "src/components/editor/use-auto-save.ts:50-57"
+      - "src/components/scene-editor.tsx:114-118"
+    test_paths:
+      - "src/__tests__/auth.test.ts:189-197,301-332"
+      - "src/__tests__/auth-refresh-route.test.ts:172-361"
+      - "src/__tests__/logout.test.ts:554-632"
+      - "src/__tests__/token-blocklist.test.ts"
+      - "src/__tests__/replay-shared.test.ts:435-465"
+      - "src/__tests__/sync-queue.test.ts:232-270"
+    notes: "1h session, 30d refresh, Node-only blocklist and logout revocation match and are tested; the 45-minute silent renew is untested and an online autosave that gets 401 is console.warn'd and dropped with no refresh, retry or user-visible error."
+  - id: WCA-041
+    status: covered
+    code_paths:
+      - "src/lib/auth-server.ts:34-58"
+      - "src/app/api/auth/google/callback/route.ts:109-114"
+      - "src/lib/env.ts:44"
+    test_paths:
+      - "src/__tests__/google-oauth-callback.test.ts:185-209"
+      - "src/__tests__/auth-active-user.test.ts:672-710"
+    notes: "Case-insensitive trimmed matching and the invite_only redirect with no session minted are both asserted."
+  - id: WCA-042
+    status: covered
+    code_paths:
+      - "src/lib/api-auth.ts:27-307"
+      - "src/lib/ownership.ts:11-16,82-86"
+      - "src/mcp/index.ts:151-162,216-222"
+    test_paths:
+      - "src/__tests__/mcp-destructive-gating.test.ts:256-298"
+      - "src/__tests__/mcp-cross-tenant.test.ts:50-293"
+      - "src/__tests__/ownership.test.ts:325-344"
+      - "src/__tests__/api-auth.test.ts:61-315"
+      - "src/__tests__/sharing.test.ts:522-657"
+    notes: "Both criteria exercised; MCP enforces owner-only so shared users are denied on MCP even though API routes honor shares, and MCP denials surface as tool errors rather than HTTP 403."
+  - id: WCA-043
+    status: covered
+    code_paths:
+      - "src/lib/rate-limit-config.ts:19-39"
+      - "src/proxy.ts:106-165,200-207"
+      - "src/lib/rate-limit.ts:191-223"
+    test_paths:
+      - "src/__tests__/proxy.test.ts:525-742,870-897,923-1014"
+      - "src/__tests__/rate-limit.test.ts:344-465"
+      - "src/__tests__/rate-limit-bypass.test.ts:636-653"
+      - "src/__tests__/rate-limit-auth.test.ts"
+    notes: "All six numbers match and each limit is driven to 429 with per-user keys; Retry-After asserted on chat, import and public paths, production ignore of the bypass tested at unit and proxy level. Statement omits the per-IP limits (see orphans)."
+  - id: WCA-044
+    status: partial
+    code_paths:
+      - "src/app/api/chat/route.ts:15-16,257-267"
+      - "src/app/api/ai-inline/route.ts"
+      - "src/app/api/feedback/route.ts"
+      - "src/app/api/projects/import/route.ts"
+      - "src/app/api/projects/[id]/search/route.ts"
+      - "src/lib/controllers/structure.ts:30,486-497,580"
+      - "src/lib/sanitize-server.ts:32-65"
+      - "src/lib/sanitize.ts:8-11"
+      - "src/lib/sanitize-display.ts:20-22"
+      - "src/schemas/*.ts"
+    test_paths:
+      - "src/__tests__/input-size-limits.test.ts"
+      - "src/__tests__/sanitize-server.test.ts:19-78"
+      - "src/__tests__/sanitize-display.test.ts:5-22"
+      - "src/__tests__/sanitize.test.ts:6-28"
+      - "src/__tests__/mcp-tools.test.ts:212-223"
+      - "src/__tests__/structure-controller.test.ts:314-326"
+    notes: "Both acceptance criteria are exercised; the five named endpoints use hand-rolled length checks rather than Zod (Zod is used by other routes)."
+  - id: WCA-045
+    status: covered
+    code_paths:
+      - "src/proxy.ts:43-64,170-190"
+      - "src/app/layout.tsx:72-86"
+      - "src/lib/csp-nonce.ts"
+      - "next.config.ts:25,65-105"
+    test_paths:
+      - "src/__tests__/proxy.test.ts:80-90,406-521"
+      - "src/__tests__/next-config-headers.test.ts:26-32"
+      - "e2e/smoke.spec.ts:254-266"
+      - "src/__tests__/oauth-authorize-route.test.ts:235-276"
+    notes: "script-src is self plus nonce plus wasm-unsafe-eval with no unsafe-inline, frame-ancestors none, restricted img/font/connect; the smoke suite fails any test on a CSP console violation."
+  - id: WCA-046
+    status: partial
+    code_paths:
+      - "src/lib/crypto.ts:44-125"
+      - "src/app/api/ai-settings/route.ts:23-65,84-153"
+      - "src/lib/controllers/hashnode-auth.ts:94-121"
+      - "src/app/api/integrations/hashnode/route.ts:41-50"
+      - "src/lib/sentry-scrub.ts:3-90"
+      - "sentry.client.config.ts"
+      - "sentry.server.config.ts"
+      - "sentry.edge.config.ts"
+    test_paths:
+      - "src/__tests__/crypto.test.ts:39-156"
+      - "src/__tests__/encrypted-readers-rotation.test.ts:82-154"
+      - "src/__tests__/sentry-scrub.test.ts:12-210"
+      - "src/__tests__/ai-settings-route.test.ts:49-179"
+    notes: "Sentry scrubbing is tested; criterion 1 is untested since no test calls GET on ai-settings and asserts the masked key or asserts the Hashnode token is absent from status."
+  - id: WCA-047
+    status: partial
+    code_paths:
+      - "src/app/api/auth/export-data/route.ts:17-212"
+      - "src/lib/export-account-data.ts:9-160"
+      - "src/app/api/auth/delete-account/route.ts:44-79"
+      - "src/app/api/account/consent/route.ts:7-56"
+      - "prisma/schema.prisma:54-64"
+      - "src/app/privacy/page.tsx"
+      - "src/app/terms/page.tsx"
+      - "src/app/dmca/page.tsx"
+      - "src/proxy.ts:67-84"
+    test_paths:
+      - "src/__tests__/export-data-route.test.ts:41-330"
+      - "src/__tests__/delete-account-route.test.ts:110-269"
+      - "src/__tests__/consent-route.test.ts:41-185"
+    notes: "Export and consent tested; deletion tested with revocation of only the current session's jti rather than all sessions, and /dmca is not in PUBLIC_PATHS so unauthenticated visitors are redirected to login."
+  - id: WCA-048
+    status: partial
+    code_paths:
+      - "src/app/api/health/route.ts:13-40"
+      - "src/app/api/metrics/route.ts:8-29"
+      - "src/lib/metrics.ts:20-66"
+      - "src/lib/telemetry.ts:20-47"
+      - "src/instrumentation.ts:3-20"
+      - "sentry.client.config.ts"
+      - "sentry.server.config.ts"
+      - "sentry.edge.config.ts"
+      - "next.config.ts:173-179"
+    test_paths:
+      - "src/__tests__/health-route.test.ts:25-81"
+      - "src/__tests__/proxy.test.ts:92-97"
+      - "src/__tests__/metrics-route.test.ts:44-74"
+      - "src/__tests__/metrics.test.ts:12-19"
+      - "src/__tests__/telemetry.test.ts:15-38"
+      - "src/__tests__/sentry-scrub.test.ts:183-210"
+    notes: "Health is tested unauthenticated; the HTTP request counter and duration histogram are declared with a TODO and never incremented, so request/usage aggregation holds only for default process metrics plus project and user gauges."
+  - id: WCA-049
+    status: partial
+    code_paths:
+      - "Dockerfile:38-45,73"
+      - "package.json:13"
+    test_paths: []
+    notes: "max-old-space-size 300 is set via a Dockerfile ENV inherited by the server process rather than in the npm start command; nothing asserts the pinned value or checks memory against the alert threshold."
+  - id: WCA-050
+    status: partial
+    code_paths:
+      - "prisma/schema.prisma:6"
+      - "prisma/migrations/"
+      - "Dockerfile:73"
+      - "scripts/migrate.mjs:27-48,122-245"
+      - ".github/workflows/ci.yml"
+    test_paths:
+      - "scripts/__tests__/migrate.test.ts:112-241,291-362"
+      - "scripts/__tests__/migrate-schema-resolution.test.ts:56"
+      - "scripts/__tests__/ci-migrations.test.ts:9-15"
+    notes: "Idempotent apply on start is tested against real Postgres; no test feeds a DROP TABLE or TRUNCATE migration against populated tables and asserts the abort, and docs/RULES.md still lists prisma db push as a command."
+  - id: WCA-051
+    status: partial
+    code_paths:
+      - "src/app/.well-known/oauth-authorization-server/route.ts:10-23"
+      - "src/app/oauth/register/route.ts:42-171"
+      - "src/app/oauth/authorize/route.ts:19-150"
+      - "src/app/oauth/token/route.ts:62-246"
+      - "src/lib/oauth-store.ts"
+      - "src/lib/oauth-tokens.ts"
+      - "src/proxy.ts:80-82,227-241"
+      - "src/app/api/mcp/route.ts:9-14"
+    test_paths:
+      - "src/__tests__/public-origin.test.ts:30-62"
+      - "src/__tests__/oauth-register-route.test.ts:42-200"
+      - "src/__tests__/oauth-authorize-route.test.ts:68-395"
+      - "src/__tests__/oauth-token-route.test.ts:66-400"
+      - "src/__tests__/oauth-token-exchange.test.ts:52-110"
+      - "src/__tests__/oauth-store.test.ts"
+      - "src/__tests__/oauth-tokens.test.ts"
+      - "src/__tests__/mcp-route-auth.test.ts:40-95"
+      - "src/__tests__/proxy.test.ts:311-328,389-404"
+    notes: "Each endpoint is well tested; criterion 2 is only indirect since no test mints a token through the token endpoint and presents it to /api/mcp through the real proxy and verifier chain."
+  - id: WCA-052
+    status: partial
+    code_paths:
+      - "package.json:79,118"
+      - "tsconfig.json:11"
+      - "Dockerfile"
+      - "docker-compose.yml:1-37"
+      - "docker-compose.tunnel.yml"
+      - "src/lib/env.ts:16-69"
+      - "scripts/migrate.mjs:27-48"
+      - "src/app/api/chat/route.ts:290"
+      - "src/app/api/ai-inline/route.ts:81"
+    test_paths:
+      - "scripts/__tests__/docker-compose-dev.test.ts:18-30"
+      - "scripts/__tests__/docker-compose-phoenix.test.ts"
+      - "scripts/__tests__/build-hygiene.test.ts:9-45"
+      - "scripts/__tests__/auth-configuration.test.ts"
+      - "scripts/__tests__/transport-security.test.ts"
+      - "scripts/__tests__/secret-strength.test.ts"
+      - "scripts/__tests__/migrate.test.ts:112-220"
+      - "src/__tests__/ai-inline-route.test.ts:105"
+      - "src/__tests__/proxy.test.ts:80-90"
+    notes: "Next 16.3.8 satisfies 15+; env.ts makes every key optional and never validates DATABASE_URL while docker-compose hard-requires PHOENIX_ADMIN_SECRET and production startup requires auth config, TLS URLs, strong secrets and ENCRYPTION_KEY, contradicting 'only DATABASE_URL strictly required'. Graceful degradation tested only for ai-inline."
+orphans:
+  - behavior: "Opportunity tracking with candidate entries: record contests before submitting (provider, dates, rules, fee, limits, eligibility, status found/considering/closed), attach projects as candidates, promote a chosen candidate into a contest submission, backfill unlinked submissions (API, MCP, pages; requirement doc 031)."
+    code_paths:
+      - "src/lib/controllers/opportunities.ts"
+      - "src/app/api/opportunities/**"
+      - "src/mcp/tools/opportunities.ts"
+      - "src/app/opportunities/**"
+      - "prisma/schema.prisma"
+    suggested_requirement: "When the author records an opportunity, the system shall persist it with provider, close date, rules, limits, eligibility notes and a status of found/considering/closed, shall allow zero or more projects to be attached as candidate entries with their own state and notes, and shall promote a chosen candidate into a contest submission without re-entering captured data."
+  - behavior: "Publishing hub resolving one readable state per open contest and per unarchived story from opportunities, candidates and submissions, surfacing missed deadlines, rejected-then-idle stories and simultaneous submissions (requirement doc 031)."
+    code_paths:
+      - "src/lib/opportunity-state.ts"
+      - "src/lib/story-placement.ts"
+      - "src/lib/controllers/publishing.ts"
+      - "src/app/api/publishing/route.ts"
+      - "src/app/publishing/page.tsx"
+      - "src/components/story-state-badge.tsx"
+      - "src/components/opportunity-state-badge.tsx"
+    suggested_requirement: "When the author opens the publishing hub, the system shall present each open contest and each unarchived story with a single state resolved from its opportunity, candidates and submissions, shall distinguish a missed deadline from an open or entered contest and a rejected-then-idle story from one never sent, and shall flag a story that is out with more than one provider at once."
+  - behavior: "Subscribable ICS deadline feed of non-closed opportunities as all-day events, authenticated by a per-user regenerable 256-bit token (requirement doc 031)."
+    code_paths:
+      - "src/lib/controllers/calendar-feed.ts"
+      - "src/lib/ics.ts"
+      - "src/app/api/calendar/opportunities/[token]/route.ts"
+      - "src/app/api/account/calendar-feed/route.ts"
+    suggested_requirement: "When a calendar client fetches the author's feed URL, the system shall return an iCalendar document containing every non-closed opportunity as an all-day event on its close date with a self-contained description, authenticated solely by a 256-bit token that the author can regenerate to invalidate prior subscriptions."
+  - behavior: "Cross-project writing task dashboard matched to capacity: tasks carry kind, capacity, importance, size, energy, what-is-needed and due date and may exist without a project; dashboard filters by capacity, ranks suggestions, lists upcoming deadlines, groups by project and shows done-this-week; same data via get_task_dashboard MCP tool (requirement doc 032; WCA-016 covers only name and completion)."
+    code_paths:
+      - "src/lib/controllers/task-dashboard.ts"
+      - "src/lib/writing-task-ranking.ts"
+      - "src/lib/task-dashboard-groups.ts"
+      - "src/app/api/writing-tasks/dashboard/route.ts"
+      - "src/app/tasks/page.tsx"
+      - "src/mcp/tools/writing-tasks.ts"
+    suggested_requirement: "When the writer selects a capacity on the task dashboard, the system shall show, across all projects, only tasks whose capacity fits, shall suggest up to five ranked by importance, then soonest deadline, then smallest size, shall list upcoming task and opportunity deadlines soonest first, and shall expose the same view through one MCP call."
+  - behavior: "Active project limit: project creation fails once a user owns maxActiveProjects unarchived projects (default 3), checked in a serializable transaction; archiving frees a slot."
+    code_paths:
+      - "src/lib/project-limit.ts"
+      - "src/lib/controllers/projects.ts"
+      - "src/__tests__/projects-limit-route.test.ts"
+    suggested_requirement: "When a user attempts to create a project while already owning their configured maximum of active projects (default 3), the system shall reject the creation with a user-facing error that names the limit, and concurrent creations shall not exceed it."
+  - behavior: "Sample project onboarding: new users get a Sherlock sample project imported exactly once, enforced by a partial unique index on (userId, isSample)."
+    code_paths:
+      - "src/app/api/onboarding/sample/route.ts"
+      - "src/data/sherlock-sample.json"
+      - "prisma/schema.prisma"
+    suggested_requirement: "When a new user requests the sample project, the system shall create exactly one sample project for that user from the bundled sample data, and repeated or concurrent requests shall not create duplicates."
+  - behavior: "First-run setup wizard guiding AI key configuration, backed by a setup-status check of user and global settings."
+    code_paths:
+      - "src/components/setup-wizard.tsx"
+      - "src/app/setup/page.tsx"
+      - "src/app/api/setup-status/route.ts"
+    suggested_requirement: "When a user has no AI API key configured at user or global scope, the system shall present a dismissible setup wizard leading to AI settings, and shall stop presenting it once a key is stored."
+  - behavior: "Per-user AI provider and behavior settings: own Gemini key, model chosen from a live filtered list, coaching style, response length, custom instructions, chat window size and compression parameters, resolved user then global then environment (WCA-046 covers only key masking)."
+    code_paths:
+      - "src/app/api/ai-settings/route.ts"
+      - "src/app/api/ai-settings/models/route.ts"
+      - "src/lib/ai/settings.ts"
+      - "src/components/ai-settings-dialog.tsx"
+      - "src/app/settings/page.tsx"
+    suggested_requirement: "When a user saves AI settings, the system shall store their own provider key, model, coaching style, response length, custom instructions and chat compression parameters at user scope, shall resolve configuration as user, then global, then environment, and shall list selectable models from the provider using the resolved key."
+  - behavior: "AI manuscript coaching analyses: consistency check with severity-rated alerts, character voice monitor, plot-thread status per scene, and the Annie critique panel, via dedicated routes and MCP coaching tools (WCA-025 names only ai-manuscript in general terms)."
+    code_paths:
+      - "src/app/api/projects/[id]/consistency-check/route.ts"
+      - "src/app/api/projects/[id]/voice-check/route.ts"
+      - "src/app/api/projects/[id]/plot-thread-status/route.ts"
+      - "src/mcp/tools/coaching.ts"
+      - "src/components/editor/consistency-alerts-panel.tsx"
+      - "src/components/editor/voice-monitor-panel.tsx"
+      - "src/components/editor/annie-critique-panel.tsx"
+    suggested_requirement: "When the author requests a consistency check, voice check, or plot-thread status for a project or scene, the system shall gather character profiles and scene text through the shared coaching context, return structured alerts or indicators, and degrade to non-AI profiles with an explicit warning when no AI key is configured."
+  - behavior: "In-app chat agent (Google ADK) with the full read and write tool set loaded lazily via load_toolset, including scene content, story object, universe, export, snapshot and Google auth tools; materially beyond WCA-024's context injection and in tension with WCA-025's never-auto-edit wording."
+    code_paths:
+      - "src/lib/ai/adk-tools.ts"
+      - "src/lib/ai/adk-agent.ts"
+      - "src/__tests__/chat-tools.test.ts"
+    suggested_requirement: "When the author chats in the AI panel, the agent shall be able to invoke the same read and write tools as the MCP server, loading tool groups on demand, subject to the same ownership checks, destructive gating and stale-write protection as MCP calls."
+  - behavior: "Relationship graph visualization of structure nodes, story objects and typed relationships as nodes and edges (requirement doc 005 exists but has no WCA entry)."
+    code_paths:
+      - "src/app/api/projects/[id]/graph/route.ts"
+      - "src/components/story-graph.tsx"
+      - "src/app/project/[id]/graph/page.tsx"
+    suggested_requirement: "When the author opens the graph view, the system shall render every structure node and story object in the project as graph nodes with their relationships as typed, labeled edges."
+  - behavior: "Moving objects between projects and universes: copy a world object into a project as a story object, and transfer a story object up into a universe (API and MCP; not in WCA-012)."
+    code_paths:
+      - "src/app/api/projects/[id]/copy-world-object/route.ts"
+      - "src/app/api/universes/transfer-object/route.ts"
+      - "src/lib/controllers/universes.ts"
+      - "src/mcp/tools/universes.ts"
+    suggested_requirement: "When the author copies a world object into a project or transfers a story object into a universe, the system shall verify access to both source and target and create the counterpart entity without losing description, notes or timeline data."
+  - behavior: "Public content reporting: anyone can report a project (copyright, illegal, harassment, other); IP rate-limited, Markdown-escaped, filed as a GitHub issue, identical response for unknown IDs."
+    code_paths:
+      - "src/app/api/projects/[id]/report/route.ts"
+      - "src/components/report-content-dialog.tsx"
+      - "src/__tests__/report-route.test.ts"
+    suggested_requirement: "When any visitor submits a content report for a project, the system shall file it as a GitHub issue with user fields escaped, limit reports to 10 per hour per IP, and respond identically whether or not the project exists."
+  - behavior: "Bulk ZIP export of all owned projects, streaming one JSON per project without buffering (WCA-023 covers single-project export only)."
+    code_paths:
+      - "src/app/api/projects/export-all/route.ts"
+      - "src/__tests__/export-all-route.test.ts"
+    suggested_requirement: "When the user requests an export of all projects, the system shall stream a ZIP archive containing one portable JSON file per owned project."
+  - behavior: "CSRF custom-header check on state-changing routes (x-csrf-protection) and stripping of client-supplied identity headers, which the proxy sets only from a verified identity."
+    code_paths:
+      - "src/lib/api-auth.ts"
+      - "src/proxy.ts"
+    suggested_requirement: "When a state-changing request lacks the CSRF custom header, the system shall reject it with 403; and the system shall never trust identity headers supplied by the client, setting them only after verifying the session or token."
+  - behavior: "IP-keyed rate limits on unauthenticated paths: auth 5/min with memory failover, OAuth token 10/min, OAuth register 5/hour, other public 60/min, report 10/hour (WCA-043 lists only per-user limits)."
+    code_paths:
+      - "src/lib/rate-limit-config.ts"
+      - "src/proxy.ts"
+    suggested_requirement: "When an unauthenticated request exceeds its path's per-IP limit (auth 5/min, OAuth token 10/min, OAuth register 5/hour, other public 60/min), the system shall respond 429, and auth-path limits shall still be enforced from memory when Redis is unavailable."
+  - behavior: "Production startup safety gates: container refuses to start without always-encrypting sslmode, rediss:// Redis, at least one auth method, 32+ character secrets, and no plaintext secrets without the allow flag (contradicts WCA-052's 'only DATABASE_URL strictly required')."
+    code_paths:
+      - "scripts/migrate.mjs"
+      - "scripts/transport-security.mjs"
+      - "scripts/auth-configuration.mjs"
+      - "scripts/secret-strength.mjs"
+      - "scripts/encryption-keyring.mjs"
+    suggested_requirement: "When the production container starts, the system shall refuse to serve requests if database or Redis transport is unencrypted, no authentication method is configured, or any of JWT_SECRET, API_TOKEN, ENCRYPTION_KEY is shorter than 32 characters."
+  - behavior: "Encryption key rotation: ciphertext carries a key id, ENCRYPTION_KEY_PREVIOUS decrypts old values, a startup sweep and compare-and-swap readers re-encrypt under the current key, and undecryptable values are counted, never deleted."
+    code_paths:
+      - "scripts/encryption-keyring.mjs"
+      - "scripts/reencrypt.mjs"
+      - "src/lib/crypto.ts"
+      - "src/__tests__/encrypted-readers-rotation.test.ts"
+    suggested_requirement: "When ENCRYPTION_KEY is rotated with the previous key listed in ENCRYPTION_KEY_PREVIOUS, the system shall keep decrypting existing secrets, re-encrypt them under the current key at startup and on read, and never delete a value it cannot decrypt."
+  - behavior: "Expired auth record retention: hourly pruning of expired revoked tokens and OAuth auth codes, and clearing of client registration IPs after the 24-hour window."
+    code_paths:
+      - "src/lib/expired-auth-cleanup.ts"
+      - "src/instrumentation.ts"
+    suggested_requirement: "While the server runs, the system shall delete expired revoked-token and OAuth authorization-code rows hourly and shall clear OAuth client registration IPs once the per-IP registration window has elapsed."
+  - behavior: "Database connection-fault retry: only failures proving the statement never reached Postgres are retried (two retries at 150 ms and 600 ms), never ambiguous in-flight drops."
+    code_paths:
+      - "src/lib/db-retry.ts"
+      - "src/lib/db.ts"
+    suggested_requirement: "When a database call fails before the statement is sent, the system shall retry it up to two times with backoff; it shall never retry a failure that may already have executed a write."
+  - behavior: "Logout clears device data: offline IndexedDB stores, app localStorage keys and service-worker runtime caches are removed (theme and precache kept), with unsynced ops counted to warn the user."
+    code_paths:
+      - "src/lib/offline/clear-client-data.ts"
+      - "src/components/user-menu.tsx"
+      - "src/__tests__/clear-client-data.test.ts"
+    suggested_requirement: "When a user logs out, the system shall remove that user's cached manuscript data, pending operations, app localStorage keys and runtime caches from the device, after warning when unsynced work would be lost."
+  - behavior: "Single-user API_TOKEN deployment mode: token login issues a legacy session cookie, a null userId is treated as the unscoped deployment owner, and the metrics endpoint admits only the API_TOKEN bearer."
+    code_paths:
+      - "src/app/api/auth/login/route.ts"
+      - "src/app/api/auth/me/route.ts"
+      - "src/lib/auth.ts"
+      - "src/app/api/metrics/route.ts"
+      - "src/proxy.ts"
+    suggested_requirement: "While the deployment is configured with API_TOKEN and no Google OAuth, the system shall authenticate the single owner by token login or bearer header, treat that identity as unscoped over all data, and admit only the API_TOKEN bearer to the metrics endpoint."
+  - behavior: "Theme and keyboard shortcuts: light/dark theme persisted per device; Cmd/Ctrl+K opens search, Cmd/Ctrl+/ toggles chat, Escape closes panels."
+    code_paths:
+      - "src/components/theme-provider.tsx"
+      - "src/components/theme-toggle.tsx"
+      - "src/hooks/use-keyboard-shortcuts.ts"
+      - "e2e/visual.spec.ts"
+    suggested_requirement: "The system shall offer a persisted light/dark theme and global shortcuts (Cmd/Ctrl+K search, Cmd/Ctrl+/ chat, Escape to close) on every project screen."
+  - behavior: "No third-party font or build-identity leakage: fonts are self-hosted with no shipped reference to Google font hosts, and version.json carries an opaque build id rather than the commit SHA."
+    code_paths:
+      - "src/__tests__/no-google-fonts.test.ts"
+      - "src/__tests__/version-file.test.ts"
+      - "next.config.ts"
+    suggested_requirement: "The system shall serve all fonts from its own origin and shall publish only an opaque build identifier in version.json."
