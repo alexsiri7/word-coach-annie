@@ -4,6 +4,7 @@ import { StructureController, ConflictError, InputTooLargeError } from "@/lib/co
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export async function GET(
   request: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
         where: { id: nodeId },
         select: { type: true, status: true },
       });
-      if (versionId || (node?.type === "SCENE" && node.status === "OUTLINE")) {
+      if (versionId || (node && isHiddenOutlineScene(node))) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
