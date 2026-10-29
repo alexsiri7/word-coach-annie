@@ -1,12 +1,20 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../snapshot";
 import { mcpCache } from "@/lib/cache";
-import { UserFacingError } from "@/lib/controllers/errors";
+import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 
 type RelationshipEntity = { id: string; name: string; entityType: string } | null;
 
-const nodeSelect = { id: true, title: true, type: true } as const;
-const objectSelect = { id: true, name: true, type: true } as const;
+const nodeSelect = { select: { id: true, title: true, type: true } } as const;
+const objectSelect = { select: { id: true, name: true, type: true } } as const;
+export const relationshipInclude = {
+    fromNode: nodeSelect,
+    fromObject: objectSelect,
+    fromWorldObject: objectSelect,
+    toNode: nodeSelect,
+    toObject: objectSelect,
+    toWorldObject: objectSelect,
+} as const;
 
 function resolveEntity(
     node: { id: string; title: string; type: string } | null | undefined,
@@ -19,7 +27,8 @@ function resolveEntity(
     return null;
 }
 
-async function resolveObjectId(
+/** Resolves an object id to a local story object, or failing that to a world object in the project's linked universe. */
+export async function resolveObjectId(
     objectId: string,
     fieldName: string,
     projectId: string,
@@ -29,10 +38,10 @@ async function resolveObjectId(
     if (storyObj) return { objectId };
     if (universeId) {
         const worldObj = await prisma.worldObject.findFirst({ where: { id: objectId, universeId } });
-        if (!worldObj) throw new UserFacingError(`${fieldName} not found in this project or linked universe`);
+        if (!worldObj) throw new NotFoundError(`${fieldName} not found in this project or linked universe`);
         return { worldObjectId: objectId };
     }
-    throw new UserFacingError(`${fieldName} not found in this project`);
+    throw new NotFoundError(`${fieldName} not found in this project`);
 }
 
 const VALID_RELATIONSHIP_TYPES = [
@@ -85,14 +94,7 @@ export async function listRelationships(projectId: string) {
                             : []),
                     ],
                 },
-                include: {
-                    fromNode: { select: nodeSelect },
-                    fromObject: { select: objectSelect },
-                    fromWorldObject: { select: objectSelect },
-                    toNode: { select: nodeSelect },
-                    toObject: { select: objectSelect },
-                    toWorldObject: { select: objectSelect },
-                },
+                include: relationshipInclude,
                 orderBy: { createdAt: "desc" },
             });
 
@@ -173,14 +175,7 @@ export async function createRelationship(params: {
             ...(resolvedToObjectId && { toObjectId: resolvedToObjectId }),
             ...(resolvedToWorldObjectId && { toWorldObjectId: resolvedToWorldObjectId }),
         },
-        include: {
-            fromNode: { select: nodeSelect },
-            fromObject: { select: objectSelect },
-            fromWorldObject: { select: objectSelect },
-            toNode: { select: nodeSelect },
-            toObject: { select: objectSelect },
-            toWorldObject: { select: objectSelect },
-        },
+        include: relationshipInclude,
     });
 
     mcpCache.delete(`relationships:${projectId}`);

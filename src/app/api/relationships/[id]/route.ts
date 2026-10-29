@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess, verifyUniverseAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { relationshipInclude } from "@/mcp/tools/relationships";
 
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
@@ -78,12 +79,7 @@ export async function GET(
 
     const relationship = await prisma.relationship.findUnique({
       where: { id },
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
     });
 
     if (!relationship) {
@@ -158,12 +154,7 @@ export async function PATCH(
     const relationship = await prisma.relationship.update({
       where: { id },
       data,
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
     });
 
     return NextResponse.json(relationship);
