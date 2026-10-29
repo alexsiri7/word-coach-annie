@@ -4,6 +4,17 @@ import { getCurrentUserId, verifyProjectAccess, verifyUniverseAccess } from "@/l
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 
+const nodeSelect = { select: { id: true, title: true, type: true } } as const;
+const objectSelect = { select: { id: true, name: true, type: true } } as const;
+const relationshipInclude = {
+  fromNode: nodeSelect,
+  fromObject: objectSelect,
+  fromWorldObject: objectSelect,
+  toNode: nodeSelect,
+  toObject: objectSelect,
+  toWorldObject: objectSelect,
+} as const;
+
 const VALID_RELATIONSHIP_TYPES = [
   "APPEARS_IN",
   "LOCATED_AT",
@@ -78,12 +89,7 @@ export async function GET(
 
     const relationship = await prisma.relationship.findUnique({
       where: { id },
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
     });
 
     if (!relationship) {
@@ -158,12 +164,7 @@ export async function PATCH(
     const relationship = await prisma.relationship.update({
       where: { id },
       data,
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
     });
 
     return NextResponse.json(relationship);

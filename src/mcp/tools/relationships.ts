@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { autoSnapshot } from "../snapshot";
 import { mcpCache } from "@/lib/cache";
-import { UserFacingError } from "@/lib/controllers/errors";
+import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 
 type RelationshipEntity = { id: string; name: string; entityType: string } | null;
 
@@ -19,7 +19,8 @@ function resolveEntity(
     return null;
 }
 
-async function resolveObjectId(
+/** Resolves an object id to a local story object, or failing that to a world object in the project's linked universe. */
+export async function resolveObjectId(
     objectId: string,
     fieldName: string,
     projectId: string,
@@ -29,10 +30,10 @@ async function resolveObjectId(
     if (storyObj) return { objectId };
     if (universeId) {
         const worldObj = await prisma.worldObject.findFirst({ where: { id: objectId, universeId } });
-        if (!worldObj) throw new UserFacingError(`${fieldName} not found in this project or linked universe`);
+        if (!worldObj) throw new NotFoundError(`${fieldName} not found in this project or linked universe`);
         return { worldObjectId: objectId };
     }
-    throw new UserFacingError(`${fieldName} not found in this project`);
+    throw new NotFoundError(`${fieldName} not found in this project`);
 }
 
 const VALID_RELATIONSHIP_TYPES = [

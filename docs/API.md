@@ -266,7 +266,7 @@ List all story objects in a project.
 ---
 
 ### `GET /api/projects/:id/relationships`
-List all relationships in a project.
+List all relationships in a project, including edges touching a world object of the project's linked universe.
 
 ---
 
@@ -455,6 +455,10 @@ Create a relationship between two entities.
   "toObjectId": "string"
 }
 ```
+
+`fromObjectId`/`toObjectId` resolve to a story object in this project first, then to a world object in the project's linked universe; the created edge is stored on `fromObjectId`/`fromWorldObjectId` (or the `to*` pair) accordingly. Responses include `fromNode`, `fromObject`, `fromWorldObject`, `toNode`, `toObject` and `toWorldObject`.
+
+**Errors**: `400` invalid body or not exactly one `from*`/`to*` field; `404` project, node or object not found in this project or its linked universe
 
 ---
 

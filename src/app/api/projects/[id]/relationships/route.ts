@@ -4,7 +4,19 @@ import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { RelationshipCreateSchema } from "@/schemas/relationships";
+import { NotFoundError } from "@/lib/controllers/errors";
+import { resolveObjectId } from "@/mcp/tools/relationships";
 
+const nodeSelect = { select: { id: true, title: true, type: true } } as const;
+const objectSelect = { select: { id: true, name: true, type: true } } as const;
+const relationshipInclude = {
+  fromNode: nodeSelect,
+  fromObject: objectSelect,
+  fromWorldObject: objectSelect,
+  toNode: nodeSelect,
+  toObject: objectSelect,
+  toWorldObject: objectSelect,
+} as const;
 
 export async function GET(
   request: NextRequest,
@@ -20,7 +32,7 @@ export async function GET(
     // Verify project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true },
+      select: { id: true, universeId: true },
     });
 
     if (!project) {
@@ -45,7 +57,7 @@ export async function GET(
     const nodeIds = nodes.map((n) => n.id);
     const objectIds = objects.map((o) => o.id);
 
-    // Find relationships where either the from or to side belongs to this project
+    // Find relationships where either side belongs to this project or its linked universe
     const relationships = await prisma.relationship.findMany({
       where: {
         OR: [
@@ -53,14 +65,15 @@ export async function GET(
           { fromObjectId: { in: objectIds } },
           { toNodeId: { in: nodeIds } },
           { toObjectId: { in: objectIds } },
+          ...(project.universeId
+            ? [
+                { fromWorldObject: { universeId: project.universeId } },
+                { toWorldObject: { universeId: project.universeId } },
+              ]
+            : []),
         ],
       },
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
       orderBy: { createdAt: "desc" },
     });
 
@@ -87,7 +100,7 @@ export async function POST(
     // Verify project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true },
+      select: { id: true, universeId: true },
     });
 
     if (!project) {
@@ -126,19 +139,6 @@ export async function POST(
       }
     }
 
-    if (fromObjectId) {
-      const obj = await prisma.storyObject.findFirst({
-        where: { id: fromObjectId, projectId },
-        select: { id: true },
-      });
-      if (!obj) {
-        return NextResponse.json(
-          { error: "fromObjectId not found in this project" },
-          { status: 404 }
-        );
-      }
-    }
-
     if (toNodeId) {
       const node = await prisma.structureNode.findFirst({
         where: { id: toNodeId, projectId },
@@ -152,17 +152,16 @@ export async function POST(
       }
     }
 
-    if (toObjectId) {
-      const obj = await prisma.storyObject.findFirst({
-        where: { id: toObjectId, projectId },
-        select: { id: true },
-      });
-      if (!obj) {
-        return NextResponse.json(
-          { error: "toObjectId not found in this project" },
-          { status: 404 }
-        );
+    let from: { objectId?: string; worldObjectId?: string } = {};
+    let to: { objectId?: string; worldObjectId?: string } = {};
+    try {
+      if (fromObjectId) from = await resolveObjectId(fromObjectId, "fromObjectId", projectId, project.universeId);
+      if (toObjectId) to = await resolveObjectId(toObjectId, "toObjectId", projectId, project.universeId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return NextResponse.json({ error: error.message }, { status: 404 });
       }
+      throw error;
     }
 
     const relationship = await prisma.relationship.create({
@@ -170,16 +169,13 @@ export async function POST(
         type,
         ...(label !== undefined && { label: sanitizeInput(label) }),
         ...(fromNodeId && { fromNodeId }),
-        ...(fromObjectId && { fromObjectId }),
+        ...(from.objectId && { fromObjectId: from.objectId }),
+        ...(from.worldObjectId && { fromWorldObjectId: from.worldObjectId }),
         ...(toNodeId && { toNodeId }),
-        ...(toObjectId && { toObjectId }),
+        ...(to.objectId && { toObjectId: to.objectId }),
+        ...(to.worldObjectId && { toWorldObjectId: to.worldObjectId }),
       },
-      include: {
-        fromNode: { select: { id: true, title: true, type: true } },
-        fromObject: { select: { id: true, name: true, type: true } },
-        toNode: { select: { id: true, title: true, type: true } },
-        toObject: { select: { id: true, name: true, type: true } },
-      },
+      include: relationshipInclude,
     });
 
     return NextResponse.json(relationship, { status: 201 });
