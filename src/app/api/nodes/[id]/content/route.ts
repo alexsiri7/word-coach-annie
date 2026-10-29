@@ -22,12 +22,15 @@ export async function GET(
 
     // READER shares see only the current text of non-outline scenes (#1259).
     const isReader = access.role === "READER";
+    if (isReader && versionId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     if (isReader) {
       const node = await prisma.structureNode.findUnique({
         where: { id: nodeId },
         select: { type: true, status: true },
       });
-      if (versionId || (node && isHiddenOutlineScene(node))) {
+      if (node && isHiddenOutlineScene(node)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
