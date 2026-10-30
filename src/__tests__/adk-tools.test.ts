@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getAllAdkTools,
   getAdkTools,
@@ -9,6 +9,7 @@ import {
   DynamicToolset,
   getAllTools,
   isChatExcludedTool,
+  isChatDestructiveTool,
   type ToolContext,
 } from "@/lib/ai/adk-tools";
 
@@ -343,6 +344,74 @@ describe("ADK tools", () => {
     it("allows OWNER to export_to_google_docs the pinned project", async () => {
       const tool = getAdkToolByName(ctx, "export_to_google_docs")!;
       await expect(callTool(tool, { projectId: "P", exportMode: "STORY_READER" })).resolves.toBeDefined();
+    });
+  });
+
+  describe("chat destructive gating (WCA-032 parity)", () => {
+    let saved: string | undefined;
+    beforeEach(() => {
+      saved = process.env.MCP_ALLOW_DESTRUCTIVE;
+      delete process.env.MCP_ALLOW_DESTRUCTIVE;
+    });
+    afterEach(() => {
+      if (saved === undefined) delete process.env.MCP_ALLOW_DESTRUCTIVE;
+      else process.env.MCP_ALLOW_DESTRUCTIVE = saved;
+    });
+
+    it("blocks delete_node when MCP_ALLOW_DESTRUCTIVE is unset", async () => {
+      const { deleteNode } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "delete_node")!;
+      await expect(callTool(tool, { nodeId: "node-in-P" })).rejects.toThrow(/MCP_ALLOW_DESTRUCTIVE/);
+      expect(deleteNode).not.toHaveBeenCalled();
+    });
+
+    it("allows delete_node when MCP_ALLOW_DESTRUCTIVE=true", async () => {
+      process.env.MCP_ALLOW_DESTRUCTIVE = "true";
+      const { deleteNode } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "delete_node")!;
+      await expect(callTool(tool, { nodeId: "node-in-P" })).resolves.toBeDefined();
+      expect(deleteNode).toHaveBeenCalledWith("node-in-P");
+    });
+
+    it("gates every chat delete_ tool", () => {
+      const deletes = getAllAdkTools(ctx).map((t) => t.name).filter((n) => n.startsWith("delete_"));
+      expect(deletes.length).toBeGreaterThan(0);
+      for (const name of deletes) expect(isChatDestructiveTool(name)).toBe(true);
+    });
+
+    it("leaves non-destructive writes working when the gate is off", async () => {
+      const tool = getAdkToolByName(ctx, "create_node")!;
+      await expect(callTool(tool, { projectId: "P", type: "SCENE", title: "x" })).resolves.toBeDefined();
+    });
+  });
+
+  describe("chat stale-write protection (WCA-031 parity)", () => {
+    it("passes contentHash through write_scene_content", async () => {
+      const { writeSceneContent } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "write_scene_content")!;
+      await callTool(tool, { nodeId: "node-in-P", content: "x", contentHash: "h" });
+      expect(writeSceneContent).toHaveBeenCalledWith("node-in-P", "x", "h");
+    });
+
+    it("rejects write_scene_content without contentHash", async () => {
+      const { writeSceneContent } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "write_scene_content")!;
+      await expect(callTool(tool, { nodeId: "node-in-P", content: "x" })).rejects.toThrow();
+      expect(writeSceneContent).not.toHaveBeenCalled();
+    });
+
+    it("passes contentHash to update_node separately from the update data", async () => {
+      const { updateNode } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "update_node")!;
+      await callTool(tool, { nodeId: "node-in-P", title: "t", contentHash: "h" });
+      expect(updateNode).toHaveBeenCalledWith("node-in-P", { title: "t" }, "h");
+    });
+
+    it("passes contentHash through update_project", async () => {
+      const { updateProject } = await import("@/mcp/tools/projects");
+      const tool = getAdkToolByName(ctx, "update_project")!;
+      await callTool(tool, { projectId: "P", title: "t", contentHash: "h" });
+      expect(updateProject).toHaveBeenCalledWith(null, "P", { title: "t" }, "h");
     });
   });
 

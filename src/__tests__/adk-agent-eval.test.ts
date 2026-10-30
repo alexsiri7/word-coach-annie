@@ -506,7 +506,7 @@ describe("Agent eval: multi-tool orchestration", () => {
           {
             id: "call_4",
             name: "write_scene_content",
-            args: { nodeId: "ch-1", content: "Revised opening paragraph." },
+            args: { nodeId: "ch-1", content: "Revised opening paragraph.", contentHash: "h1" },
           },
         ],
       },
