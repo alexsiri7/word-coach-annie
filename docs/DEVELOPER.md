@@ -229,15 +229,15 @@ Runs `next build` with `@next/bundle-analyzer` and opens an interactive bundle m
 
 ## AI Tool Registry (In-App Chat)
 
-The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/tool-registry.ts` in two tiers:
+The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/adk-tools.ts` in two tiers:
 
 - **Tier 1** (~8 tools): always loaded — project summary, outline, read/write scenes, story objects, relationships
 - **Tier 2** (remaining tools): loaded on demand via a `load_toolset` meta-tool when the AI needs more capability
 
 When adding a tool to the in-app chat:
-1. Define the Zod schema in `tool-registry.ts`
-2. Add the handler in `tool-executor.ts`
-3. Assign it to the correct toolset (tier 1 vs 2)
+1. Add a `ToolDefinition` entry to the `tools` array in `adk-tools.ts`, with its Zod schema and its `category` (`core` for tier 1, any other category for tier 2)
+2. Add its handler to `buildToolExecutors` in the same file
+3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and add delete tools to `CHAT_DESTRUCTIVE_TOOLS`
 
 This two-tier approach saves ~81% token overhead vs loading all tools upfront.
 
