@@ -19,7 +19,7 @@ Returns Prometheus-format metrics for the Annie service.
 - `200 text/plain` — Prometheus text format (metrics payload). Metrics include:
   - `annie_http_requests_total{method, path, status}` — request counter covering every HTTP request served, including proxy-generated 401/429 responses
   - `annie_http_request_duration_seconds{method, path}` — latency histogram
-  - `path` is the Next.js route template (for example `/api/projects/[id]`), or `other` for unmatched paths and static assets
+  - `path` is the Next.js route template (for example `/api/projects/[id]`), or `other` for unmatched paths and static assets (the templates come from `.next/routes-manifest.json`, which only `next build` writes, so under `next dev` every path is labelled `other`)
   - `annie_projects_total` — gauge: total projects in database
   - `annie_users_total` — gauge: total users in database
 - `401 Unauthorized` — auth is enabled and the request does not carry the `API_TOKEN` bearer
