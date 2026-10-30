@@ -625,7 +625,8 @@ requirements:
     category: constraint
     priority: must
     status: active
-    source: README, src/lib/env.ts, docker-compose.yml
+    source: README, src/lib/env.ts, docker-compose.yml, scripts/migrate.mjs, docs/SETUP.md
     acceptance:
-      - "docker compose up starts the app with only DATABASE_URL strictly required"
+      - "docker compose up (NODE_ENV=production) starts the app once PHOENIX_SECRET, PHOENIX_ADMIN_SECRET and an auth method (API_TOKEN or GOOGLE_CLIENT_ID) are set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
+      - "A missing DATABASE_URL does not block startup: migrate.mjs warns and skips migrations, and DB-dependent routes fail"
       - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
