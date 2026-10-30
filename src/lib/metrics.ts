@@ -2,8 +2,8 @@ import { Registry, Counter, Histogram, Gauge, collectDefaultMetrics } from "prom
 
 interface MetricsState {
   registry: Registry;
-  httpRequestCounter: Counter<string>;
-  httpRequestDuration: Histogram<string>;
+  httpRequestCounter: Counter<"method" | "path" | "status">;
+  httpRequestDuration: Histogram<"method" | "path">;
   projectsGauge: Gauge<string>;
   usersGauge: Gauge<string>;
 }
