@@ -685,3 +685,18 @@ requirements:
       - "POST /oauth/register returns 429 after 5 registrations per IP per hour, and POST /api/projects/[id]/report returns 429 with Retry-After after 10 reports per IP per hour"
       - "When a Redis check fails, the auth bucket is enforced from the in-memory limiter; the other per-IP buckets fail open"
     notes: "Complements WCA-043's per-user limits; the DISABLE_RATE_LIMIT production guard applies to these buckets too. The OAuth register route's DB-persisted 24h per-IP cap is separate from this limit. POST /api/projects/[id]/report is not a public path: the proxy rejects unauthenticated requests to it with 401, so its per-IP cap bounds reports per source across accounts rather than anonymous traffic."
+
+  - id: WCA-057
+    title: Active project limit per user
+    statement: "When an authenticated user creates a project — via POST /api/projects, JSON import, or the MCP or chat-agent create_project tool — while already owning their configured maximum of unarchived projects (UserAiSettings.maxActiveProjects, default 3), the system shall reject the creation with an error that names the limit, and concurrent creations shall not exceed it."
+    category: functional
+    priority: must
+    status: active
+    source: src/lib/project-limit.ts assertActiveProjectLimit, src/app/api/projects/route.ts, src/app/api/projects/import/route.ts, src/lib/controllers/projects.ts createProject, src/lib/import-json.ts, src/__tests__/projects-limit-route.test.ts, src/__tests__/project-limit-paths.test.ts
+    acceptance:
+      - "At the limit, POST /api/projects and POST /api/projects/import return 403 with \"You've reached your N active project limit. Archive a project to create a new one.\", and MCP/chat-agent create_project reject with the same message; no project is created"
+      - "Archived projects do not count toward the limit, so archiving a project frees a slot"
+      - "A user's maxActiveProjects setting overrides the default of 3"
+      - "The count and the create run in one Serializable transaction, so concurrent creations one slot below the limit create only one project; a serialization conflict on the REST routes returns 409"
+      - "Requests without a user id (API_TOKEN or auth-disabled mode) and the one-time onboarding sample import are not limited; the sample still counts toward the limit once created"
+    notes: "Extends WCA-001's create step. Only creation is limited: unarchiving a project (DELETE /api/projects/[id]/archive) does not check the limit, so it can leave a user above it."
