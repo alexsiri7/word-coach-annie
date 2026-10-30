@@ -8,6 +8,9 @@ export async function register() {
     const { initTelemetry } = await import("./lib/telemetry");
     initTelemetry();
 
+    const { startHttpMetrics } = await import("./lib/http-metrics");
+    startHttpMetrics();
+
     const { startExpiredAuthCleanup } = await import("./lib/expired-auth-cleanup");
     startExpiredAuthCleanup();
   }

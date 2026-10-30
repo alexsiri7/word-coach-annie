@@ -241,7 +241,7 @@ Three export modes: `UNIVERSE` (world-building bible), `STORY_INTERNAL` (full ma
 - **Error tracking**: Sentry (`sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`). Session replay is gated on user consent — users opt in via Settings → Privacy & Data, which sets `consent:sentry_replay=true` in `localStorage` and writes to the `UserConsent` DB table. Replay is disabled by default (opt-in).
 - **OpenTelemetry**: Custom spans on MCP tool calls and ADK agent operations (`src/instrumentation.ts`)
 - **Health**: `GET /api/health` returns `{"ok": true}`
-- **Metrics**: `GET /api/metrics` returns Prometheus text format (requires the `API_TOKEN` bearer when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`)
+- **Metrics**: `GET /api/metrics` returns Prometheus text format (requires the `API_TOKEN` bearer when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`). Request counts and latency come from `src/lib/http-metrics.ts`, which subscribes to Node's HTTP `diagnostics_channel` events and is started in `src/instrumentation.ts`
 
 ## Infrastructure
 
