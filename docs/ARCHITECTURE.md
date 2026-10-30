@@ -196,7 +196,7 @@ Google OAuth uses a two-token model:
 | **Session JWT** | `annie_session` | 1 hour | Edge + Node.js (`verifySessionToken`) | No — short lifetime is the compensating control |
 | **Refresh JWT** | `annie_refresh` | 30 days | Node.js only (`verifyRefreshToken`) | Yes |
 
-On logout, both tokens' `jti` claims are written to the `RevokedToken` table via `src/lib/token-blocklist.ts`. The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
+On logout and account deletion, both tokens' `jti` claims are written to the `RevokedToken` table (`src/lib/end-session.ts`). The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
 
 Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
 
