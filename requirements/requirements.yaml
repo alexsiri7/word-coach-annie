@@ -300,6 +300,7 @@ requirements:
       - "Conversations CRUD via /api/conversations scoped to a project"
       - "Long chat histories are compressed rather than failing (chat-compression tests)"
       - "A client disconnect mid-stream does not crash the stream controller (PR #1064)"
+    notes: "Tool use by the chat agent (reads, writes, deletes) is specified in WCA-053."
 
   - id: WCA-025
     title: AI inline and manuscript-level actions
@@ -309,8 +310,9 @@ requirements:
     status: active
     source: docs/REQUIREMENTS.md F8, src/app/api/ai-inline, src/app/api/ai-manuscript
     acceptance:
-      - "AI results never mutate scene content without an explicit user apply action"
+      - "Inline and manuscript AI results never mutate scene content without an explicit user apply action"
       - "/api/ai-inline and /api/ai-manuscript enforce input size limits"
+    notes: "Scoped to /api/ai-inline and /api/ai-manuscript; the AI chat agent's direct tool writes are governed by WCA-053."
 
   - id: WCA-026
     title: Peer review personas
@@ -630,3 +632,17 @@ requirements:
       - "docker compose up (NODE_ENV=production) starts the app once PHOENIX_SECRET, PHOENIX_ADMIN_SECRET and an auth method (API_TOKEN or GOOGLE_CLIENT_ID) are set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
       - "A missing DATABASE_URL does not block startup: migrate.mjs warns and skips migrations, and DB-dependent routes fail"
       - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
+
+  - id: WCA-053
+    title: In-app chat agent tool use with MCP safety parity
+    statement: "When the author chats in a project's AI panel, the agent shall be able to read and modify that project through a project-scoped subset of the MCP server's tools — structure, scene content, annotations, story objects, relationships, universes and export — loading tool categories on demand via load_toolset, subject to the same ownership checks, destructive-tool gating (MCP_ALLOW_DESTRUCTIVE) and stale-write protection (required contentHash) as MCP calls; credential and database snapshot/restore tools shall never be reachable from chat."
+    category: functional
+    priority: must
+    status: active
+    source: src/lib/ai/adk-tools.ts, src/lib/ai/adk-agent.ts, src/__tests__/adk-tools.test.ts
+    acceptance:
+      - "Every chat tool call is pinned to the conversation's project; IDs outside it are rejected (SEC-01)"
+      - "Chat delete tools error unless MCP_ALLOW_DESTRUCTIVE=true; non-destructive tools keep working"
+      - "Chat write/update tools require the contentHash from the matching read tool, and a stale hash rejects the write without changing content"
+      - "snapshot_database, list_snapshots, restore_snapshot and google_auth_* are absent from the chat toolset"
+    notes: "Unlike WCA-025's inline/manuscript actions, the chat agent writes directly (DEC-010/DEC-011); its safety contract is WCA-031/WCA-032 parity, not an apply step."
