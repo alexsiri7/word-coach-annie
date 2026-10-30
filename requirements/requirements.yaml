@@ -749,3 +749,138 @@ requirements:
       - "GET /api/metrics with auth enabled returns 401 for any credential other than the API_TOKEN bearer, including user sessions, token-login cookies and MCP access tokens"
       - "DELETE /api/auth/delete-account returns 403 when GOOGLE_CLIENT_ID is not set"
     notes: "The audit draft scoped this to deployments without Google OAuth; the proxy accepts the API_TOKEN bearer and token-login cookie whether or not GOOGLE_CLIENT_ID is set. With GOOGLE_CLIENT_ID set, routes that create or export per-user records (for example POST /api/projects, POST /api/universes, project import, export-all, account data export, providers, opportunities and the writing-task dashboard) answer a caller without a user id with 401, but per-record access checks and GET /api/projects and /api/universes stay unscoped. With neither API_TOKEN nor GOOGLE_CLIENT_ID set, auth is disabled, every request including /api/metrics passes through without a user id, and production refuses to start. Per-user project limits do not apply to this caller (WCA-057); identity-header stripping is WCA-055's."
+
+  - id: WCA-061
+    title: One sample project for new users
+    statement: "When a signed-in user with no active or archived projects opens the dashboard, the system shall create one sample project for them from the bundled Sherlock sample, and while the user already has a sample project, further sample requests — repeated or concurrent — shall create no duplicate."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/onboarding/sample/route.ts, src/data/sherlock-sample.json, src/lib/import-json.ts importProjectJson, prisma/migrations/20260515_unique_sample_project_per_user/migration.sql, src/app/page.tsx fetchProjects, src/__tests__/null-userid-guard.test.ts, src/__tests__/project-limit-paths.test.ts
+    acceptance:
+      - "POST /api/onboarding/sample imports the bundled sample \"A Study in Baker Street\" (2 chapters, 4 scenes, 4 characters, 2 locations, 1 plotline, 7 relationships and 1 annotation, all re-ided) and returns 201 with its projectId"
+      - "A second or concurrent request for a user who already has a sample (active or archived) returns 200 and creates nothing, which the partial unique index on Project(userId) WHERE isSample = true AND userId IS NOT NULL enforces"
+      - "The dashboard requests the sample only when the user has neither active nor archived projects, and shows a sample banner while any active project is a sample"
+      - "In Google auth mode, a request without a user id returns 401"
+    notes: "The audit draft said \"exactly one\"; uniqueness holds per sample at a time, so a user who deletes the sample and has no other projects gets a new one on the next dashboard load. The unique index is declared in the migration, not in schema.prisma, and excludes NULL userId, so with API_TOKEN or auth disabled every call creates another sample. The sample skips the active-project limit but counts toward it once created (WCA-057). Known gap: the repeat/race 200 path has no test, and its message says \"User already has projects\"."
+
+  - id: WCA-062
+    title: First-run AI setup wizard on the dashboard
+    statement: "When the dashboard loads in a browser where the setup wizard has not been dismissed and neither the user's AI settings nor the global AI settings hold an API key, the system shall open a setup wizard that lets the user save an AI provider key and model in place or skip, followed by a short feature tour, and shall not open it again in that browser once it is finished or dismissed."
+    category: functional
+    priority: may
+    status: active
+    source: src/components/setup-wizard.tsx, src/app/api/setup-status/route.ts, src/app/page.tsx, src/lib/offline/clear-client-data.ts
+    acceptance:
+      - "GET /api/setup-status returns {setupComplete: true} when the user's or the global AI settings row holds a non-empty key, and {setupComplete: false} otherwise"
+      - "Saving a key in the wizard stores it through PUT /api/ai-settings"
+      - "Finishing, closing or pressing Escape sets the setup-wizard-dismissed flag in localStorage, and the wizard does not reopen in that browser until logout or account deletion clears it"
+    notes: "The audit draft said the wizard \"leads to AI settings\" and stops \"once a key is stored\"; the key is entered inside the wizard, and dismissal is per browser, independent of whether a key was saved. Outside clicks do not dismiss it. Key resolution is WCA-058's. /setup is a separate \"Connect Claude Code\" MCP instructions page, not this wizard. Known gaps: setup-status ignores environment-variable keys, so an env-only deployment shows the wizard even though AI works; the wizard has no unit tests."
+
+  - id: WCA-063
+    title: Story graph view
+    statement: "When the project owner opens a project's story graph, the system shall draw every structure node and story object in the project as a node and every relationship between them as an edge, and shall open a scene when its node is clicked."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/005, src/app/api/projects/[id]/graph/route.ts, src/components/story-graph.tsx, src/app/project/[id]/graph/page.tsx, src/__tests__/graph-route.test.ts
+    acceptance:
+      - "GET /api/projects/[id]/graph returns nodes for all of the project's structure nodes (PART, CHAPTER, SCENE) and story objects, and edges carrying each relationship's type and label"
+      - "It returns 404 for an unknown project and 403 for a user who does not own it, including shared readers and editors"
+      - "Clicking a scene node navigates to /project/[id]/scene/[sceneId]; other nodes do nothing"
+    notes: "Requirement doc 005's relationship model is WCA-011's; this entry covers the visualization only. The audit draft said \"typed, labeled edges\"; the 2D force-directed graph shows node labels on hover or zoom, edge labels only past 2.5x zoom, and never draws the edge type. There are no structural parent/child edges, and universe world objects are not nodes. Known gap: a relationship to a linked universe's world object yields an edge with an empty-string endpoint."
+
+  - id: WCA-064
+    title: Copy a world object into a project and move a story object into a universe
+    statement: "When the author copies a universe world object into a project, the system shall create a story object in that project with the world object's type, name, description, notes and tags and keep the original; and when the author transfers a story object into a universe, the system shall move it — creating a world object with those fields and an initial timeline entry, re-pointing its relationships to the new world object and deleting the story object — in one transaction, after checking access to both source and target."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/[id]/copy-world-object/route.ts, src/app/api/universes/transfer-object/route.ts, src/lib/controllers/universes.ts copyWorldObjectToProject, src/mcp/index.ts transfer_story_object_to_universe, src/mcp/tools/universes.ts, src/lib/ai/adk-tools.ts, src/components/world-object-panel.tsx, src/components/story-object-panel.tsx, src/__tests__/mcp-tools.test.ts
+    acceptance:
+      - "Copy (POST /api/projects/[id]/copy-world-object) requires write access (owner or EDITOR) to the project and ownership of the world object's universe; it returns 404 for an unknown world object and 400 without worldObjectId"
+      - "Copy leaves the world object and its timeline in place and does not copy timeline entries"
+      - "Transfer (POST /api/universes/transfer-object, or the MCP/chat tool transfer_story_object_to_universe) requires ownership of both the story object's project and the target universe, and returns 400 when either id is missing"
+      - "After a transfer the story object no longer exists, and the new world object has an \"Initial State (Transferred)\" timeline entry and the story object's former relationships"
+    notes: "Extends WCA-012. The audit draft said nothing is lost, \"including timeline data\"; copy drops the timeline, transfer is a move, and the two directions check access asymmetrically. Neither route checks that the project is linked to the universe; the UI offers Transfer only for a linked universe. Copy has no MCP tool. Known gap: copy's relationship loop maps the world object's incoming relationships as outgoing from the copy, so the new edges point at the original world object instead of reproducing its counterparts; no test covers copy."
+
+  - id: WCA-065
+    title: Export all projects as a ZIP
+    statement: "When a user requests an export of all their projects, the system shall respond with a ZIP archive, streamed as it is built, containing one file per project they own — archived projects included — in the same portable JSON format as single-project export."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/export-all/route.ts, src/lib/export-json.ts exportProjectJson, src/app/project/[id]/settings/page.tsx handleExportAll, src/__tests__/export-all-route.test.ts
+    acceptance:
+      - "GET /api/projects/export-all returns application/zip as an attachment named annie-export-<date>.zip, with one <sanitized title>.json per owned project, non-alphanumeric title characters replaced by _"
+      - "Each file's content equals exportProjectJson for that project"
+      - "With no owned projects it returns 404 {error: \"No projects found\"}"
+      - "In Google auth mode, a request without a user id returns 401"
+    notes: "Extends WCA-023 (single-project JSON). Shared projects are not included. With no user id (API_TOKEN or auth disabled), every project in the database is exported (WCA-060). The button is \"Export All Projects (ZIP)\" in project settings. Known gaps: two titles that sanitize the same produce duplicate entry names; a mid-stream failure leaves a truncated archive after a 200; the settings button ignores error responses silently."
+
+  - id: WCA-066
+    title: Pruning of expired auth records
+    statement: "While the server runs in the Node.js runtime, the system shall, at startup and hourly thereafter, delete expired revoked-token and OAuth authorization-code rows and clear the registration IP of OAuth clients registered more than 24 hours ago, keeping the client records."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/expired-auth-cleanup.ts pruneExpiredAuthRows/startExpiredAuthCleanup, src/instrumentation.ts, src/lib/oauth-store.ts IP_WINDOW_MS, src/__tests__/expired-auth-cleanup.test.ts
+    acceptance:
+      - "A run deletes RevokedToken and OAuthAuthCode rows whose expiresAt has passed and keeps the unexpired ones"
+      - "A run nulls registrationIp on OAuthClient rows created more than 24 hours ago without deleting them"
+      - "A database error during a run is logged and does not stop the server"
+    notes: "Complements WCA-040 (revocation) and WCA-051 (OAuth server). The 24-hour window is the per-IP registration window in src/lib/oauth-store.ts. The hourly timer is unref'd, and the three operations do not share a transaction. Scheduling via instrumentation has no test."
+
+  - id: WCA-067
+    title: Retry of database connection failures
+    statement: "When a database operation fails with an error showing the connection to the database was never established, the system shall retry it up to two times, after 150 ms and 600 ms, and shall never retry a failure where the statement may already have run, such as a dropped connection or socket timeout."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/db-retry.ts, src/lib/db.ts connectionRetry extension, src/__tests__/db-retry.test.ts
+    acceptance:
+      - "DatabaseNotReachable, TlsConnectionError, PrismaClientInitializationError and \"failed to connect to database\" errors, including when wrapped (for example P1001), are retried at most twice, then the original error is thrown"
+      - "ConnectionClosed, SocketTimeout (also when wrapped as P2010), TooManyConnections, \"Tenant or user not found\" and ordinary query errors such as P2002 are thrown without retry"
+      - "Each retry logs a warning with the model, operation, attempt and delay, without the query arguments"
+    notes: "The audit draft said \"fails before the statement is sent\"; the code decides by an allowlist of connection-establishment error shapes, found by walking up to 5 links of .cause / meta.driverAdapterError, not by tracking whether a statement was sent. Delays have no jitter. Behaviour inside interactive transactions is per statement and untested."
+
+  - id: WCA-068
+    title: Sign-out clears device data
+    statement: "When a user signs out, the system shall first try to sync pending offline changes and, if any remain or cannot be counted, warn and let the user cancel; on sign-out it shall revoke the session on the server and then remove the device's offline database contents, the app's own localStorage keys and the service worker's runtime caches, keeping the theme preference and the precache."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/offline/clear-client-data.ts clearClientData/countUnsyncedOps/hasUnsyncedWork, src/lib/offline/idb.ts, src/components/user-menu.tsx handleSignOut, src/hooks/use-auth.ts logout, src/app/settings/page.tsx, src/__tests__/clear-client-data.test.ts
+    acceptance:
+      - "With unsynced or uncountable pending ops, Sign out shows an \"Unsynced changes\" dialog with Cancel and \"Sign out anyway\""
+      - "After sign-out, every annie-offline object store is empty, consent:sentry_replay and setup-wizard-dismissed are gone, and no cache other than workbox-precache* remains"
+      - "The theme localStorage key and the workbox precache survive"
+      - "A failure in one clearing step is logged and the remaining steps still run"
+      - "Deleting the account also clears device data"
+    notes: "The audit draft said \"that user's cached data\"; the whole device store is cleared. Logout posts /api/auth/logout, then clears, then redirects to /login. Offline queue semantics are WCA-036's; token revocation on logout is WCA-040's. Known gaps: session expiry (a silent-renew 401) redirects to /login without clearing device data; if the logout request rejects with a network error, nothing is cleared."
+
+  - id: WCA-069
+    title: Theme choice and workspace keyboard shortcuts
+    statement: "The system shall apply a light, dark or system theme — following the operating system until the user picks light or dark with the header toggle — persisted per browser and applied before first paint; and in the project workspace Cmd/Ctrl+K shall toggle search, Cmd/Ctrl+/ shall toggle the sidebar and Escape shall close the open panel, with Cmd/Ctrl+/ and Escape also controlling the side panels in focus mode."
+    category: functional
+    priority: may
+    status: active
+    source: src/components/theme-provider.tsx, src/components/theme-toggle.tsx, src/app/layout.tsx, src/hooks/use-keyboard-shortcuts.ts, src/app/project/[id]/page.tsx, src/app/project/[id]/scene/[sceneId]/focus/page.tsx
+    acceptance:
+      - "With no stored choice, the theme follows the OS setting; a toggled choice persists in the theme localStorage key across reloads"
+      - "In the project workspace, Cmd/Ctrl+K opens and closes search and Cmd/Ctrl+/ shows and hides the sidebar"
+      - "In the project workspace, Escape closes the search panel, then the selected object, then the mobile sidebar"
+    notes: "The audit draft said \"Cmd/Ctrl+/ chat\" and \"every project screen\"; no shortcut opens chat, and the hook runs only in the workspace and focus mode (which has no Cmd/Ctrl+K). The shortcuts also fire while typing in inputs and the editor. The theme survives sign-out (WCA-068). Known gap: no automated tests cover the theme or shortcuts, and the visual suite (e2e/visual.spec.ts) has no dark-theme run."
+
+  - id: WCA-070
+    title: Self-hosted fonts and an opaque version file
+    statement: "The system shall serve its web fonts from its own origin, with no reference to Google font hosts in shipped code or its Content-Security-Policy, and shall publish in /version.json only a random build identifier, never the commit SHA."
+    category: non-functional
+    priority: should
+    status: active
+    source: src/app/layout.tsx, src/proxy.ts CSP font-src, next.config.ts, src/hooks/use-version-check.ts, src/__tests__/no-google-fonts.test.ts, src/__tests__/version-file.test.ts, src/__tests__/proxy.test.ts
+    acceptance:
+      - "No file under src, public or root config references fonts.googleapis.com or fonts.gstatic.com, and the CSP font-src is 'self'"
+      - "/version.json contains only {\"version\": <UUID>} and does not contain the commit SHA"
+      - "A changed version value raises the update banner (WCA-037)"
+    notes: "Inter, Manrope and Newsreader come through next/font/google, which fetches them from Google at build time, not at runtime. The version UUID is regenerated each time next.config loads, not strictly once per commit, and public/version.json is gitignored. The commit SHA is still exposed to the build as NEXT_PUBLIC_BUILD_VERSION, which is safe while only server telemetry reads it."
