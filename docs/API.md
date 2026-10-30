@@ -804,6 +804,8 @@ Run a manuscript-level AI analysis across the full project.
 
 **Response**: `{ result: "string" }` — the analysis report as Markdown text.
 
+**Errors**: `413` if the gathered manuscript context exceeds 200,000 characters
+
 ---
 
 ## Peer Review
