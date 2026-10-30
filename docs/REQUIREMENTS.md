@@ -210,8 +210,8 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F22.2: Dynamic system prompt built from project structure, story objects, and user preferences
 - F22.3: Chat history (last 20 messages) maintained per project
 - F22.4: Optional scene context injection for scene-specific coaching
-- F22.5: Coaching styles: balanced, mentor, critic, cheerleader
-- F22.6: Response lengths: brief, moderate, detailed
+- F22.5: Coaching styles: gentle, balanced, direct
+- F22.6: Response lengths: concise, moderate, detailed
 - F22.7: Custom system instructions per user
 - F22.8: Markdown rendering with DOMPurify sanitization
 - F22.9: The chat agent reads and modifies the current project through tools loaded on demand (`load_toolset`), pinned to that project; delete tools are blocked unless `MCP_ALLOW_DESTRUCTIVE=true`, and writes require the `contentHash` from a prior read (stale-write protection)
