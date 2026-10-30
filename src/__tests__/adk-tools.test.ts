@@ -385,7 +385,7 @@ describe("ADK tools", () => {
     });
   });
 
-  describe("chat stale-write protection (WCA-031 parity)", () => {
+  describe("chat stale-write protection (WCA-053)", () => {
     it("passes contentHash through write_scene_content", async () => {
       const { writeSceneContent } = await import("@/mcp/tools/structure");
       const tool = getAdkToolByName(ctx, "write_scene_content")!;
@@ -412,6 +412,34 @@ describe("ADK tools", () => {
       const tool = getAdkToolByName(ctx, "update_project")!;
       await callTool(tool, { projectId: "P", title: "t", contentHash: "h" });
       expect(updateProject).toHaveBeenCalledWith(null, "P", { title: "t" }, "h");
+    });
+
+    it("passes contentHash to update_story_object separately from the update data", async () => {
+      const { updateStoryObject } = await import("@/mcp/tools/story-objects");
+      const tool = getAdkToolByName(ctx, "update_story_object")!;
+      await callTool(tool, { objectId: "obj-1", name: "n", contentHash: "h" });
+      expect(updateStoryObject).toHaveBeenCalledWith("obj-1", { name: "n" }, "h");
+    });
+
+    it("passes contentHash to update_universe separately from the update data", async () => {
+      const { updateUniverse } = await import("@/mcp/tools/universes");
+      const tool = getAdkToolByName(ctx, "update_universe")!;
+      await callTool(tool, { universeId: "U", title: "t", contentHash: "h" });
+      expect(updateUniverse).toHaveBeenCalledWith("U", { title: "t" }, "h");
+    });
+
+    it("passes contentHash to update_world_object separately from the update data", async () => {
+      const { updateWorldObject } = await import("@/mcp/tools/universes");
+      const tool = getAdkToolByName(ctx, "update_world_object")!;
+      await callTool(tool, { objectId: "wo-1", name: "n", contentHash: "h" });
+      expect(updateWorldObject).toHaveBeenCalledWith("wo-1", { name: "n" }, "h");
+    });
+
+    it("passes contentHash to update_timeline_entry separately from the update data", async () => {
+      const { updateTimelineEntry } = await import("@/mcp/tools/universes");
+      const tool = getAdkToolByName(ctx, "update_timeline_entry")!;
+      await callTool(tool, { entryId: "te-1", label: "l", contentHash: "h" });
+      expect(updateTimelineEntry).toHaveBeenCalledWith("te-1", { label: "l" }, "h");
     });
   });
 

@@ -11,6 +11,7 @@ import type { BaseTool, ToolPredicate, ToolInputParameters } from "@google/adk";
 import type { ReadonlyContext } from "@google/adk";
 import { z, ZodObject, ZodRawShape } from "zod";
 import { NodeOrderIndex } from "@/schemas/nodes";
+import { ContentHash } from "@/schemas/content-hash";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -172,7 +173,7 @@ const tools: ToolDefinition[] = [
         category: "structure",
         parameters: z.object({
             nodeId: z.string().describe("The node ID to update"),
-            contentHash: z.string().describe("The contentHash for this node from get_outline — ensures you are updating the version you read"),
+            contentHash: ContentHash.node,
             title: z.string().optional().describe("New title"),
             synopsis: z.string().optional().describe("New synopsis"),
             status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
@@ -194,7 +195,7 @@ const tools: ToolDefinition[] = [
         category: "structure",
         parameters: z.object({
             nodeId: z.string().describe("The scene node ID"),
-            contentHash: z.string().describe("The contentHash from read_scene_content — ensures you are writing over the version you read"),
+            contentHash: ContentHash.scene,
             content: z.string().optional().describe("The HTML content to write"),
             blocks: z.array(z.object({
                 type: z.enum(["CONTENT", "BEAT"]),
@@ -288,7 +289,7 @@ const tools: ToolDefinition[] = [
         category: "characters",
         parameters: z.object({
             objectId: z.string().describe("The story object ID"),
-            contentHash: z.string().describe("The contentHash from get_story_object — ensures you are updating the version you read"),
+            contentHash: ContentHash.storyObject,
             name: z.string().optional().describe("New name"),
             description: z.string().optional().describe("New description"),
             notes: z.string().optional().describe("New notes"),
@@ -365,7 +366,7 @@ const tools: ToolDefinition[] = [
         category: "world_building",
         parameters: z.object({
             universeId: z.string().describe("The universe ID"),
-            contentHash: z.string().describe("The contentHash from get_universe — ensures you are updating the version you read"),
+            contentHash: ContentHash.universe,
             title: z.string().optional().describe("New title"),
             description: z.string().optional().describe("New description"),
         }),
@@ -414,7 +415,7 @@ const tools: ToolDefinition[] = [
         category: "world_building",
         parameters: z.object({
             objectId: z.string().describe("The world object ID"),
-            contentHash: z.string().describe("The contentHash from get_world_object — ensures you are updating the version you read"),
+            contentHash: ContentHash.worldObject,
             name: z.string().optional().describe("New name"),
             description: z.string().optional().describe("New description"),
             notes: z.string().optional().describe("New notes"),
@@ -449,7 +450,7 @@ const tools: ToolDefinition[] = [
         category: "world_building",
         parameters: z.object({
             entryId: z.string().describe("The entry ID"),
-            contentHash: z.string().describe("The contentHash for this entry from get_world_object — ensures you are updating the version you read"),
+            contentHash: ContentHash.timelineEntry,
             label: z.string().optional().describe("New period or event label"),
             description: z.string().optional().describe("Updated description of what is true at this point"),
             attributes: z.string().optional().describe("New JSON blob"),
@@ -555,7 +556,7 @@ const tools: ToolDefinition[] = [
         category: "admin",
         parameters: z.object({
             projectId: z.string().describe("The project ID"),
-            contentHash: z.string().describe("The contentHash from get_project — ensures you are updating the version you read"),
+            contentHash: ContentHash.project,
             title: z.string().optional().describe("New project title"),
             author: z.string().optional().describe("New author name"),
             synopsis: z.string().optional().describe("New synopsis"),

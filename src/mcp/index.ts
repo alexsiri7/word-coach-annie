@@ -57,6 +57,7 @@ import {
 } from "./tools/writing-tasks";
 import { WritingTaskCapacity, WritingTaskDueDate, WritingTaskKind } from "@/schemas/writing-tasks";
 import { NodeOrderIndex } from "@/schemas/nodes";
+import { ContentHash } from "@/schemas/content-hash";
 import {
     listRelationships,
     createRelationship,
@@ -288,7 +289,7 @@ server.tool(
     "Update a project's metadata (title, author, synopsis, genre). Requires contentHash from get_project to prevent stale overwrites.",
     {
         projectId: z.string().describe("The project ID"),
-        contentHash: z.string().describe("The contentHash from get_project — ensures you are updating the version you read"),
+        contentHash: ContentHash.project,
         title: z.string().optional().describe("New project title"),
         author: z.string().optional().describe("New author name"),
         synopsis: z.string().optional().describe("New synopsis"),
@@ -395,7 +396,7 @@ server.tool(
     "Update a structure node's title, synopsis, status, order, or parent. Requires contentHash from get_outline to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The node ID to update"),
-        contentHash: z.string().describe("The contentHash for this node from get_outline — ensures you are updating the version you read"),
+        contentHash: ContentHash.node,
         title: z.string().optional().describe("New title"),
         synopsis: z.string().optional().describe("New synopsis"),
         status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
@@ -443,7 +444,7 @@ server.tool(
     "Write new content to a scene. Provide either 'content' (HTML string for author-written prose) or 'blocks' (structured beat array). Annie uses BEAT blocks by default; CONTENT blocks are permitted only when the author explicitly requests prose. Creates a new version. Requires contentHash from read_scene_content to prevent stale overwrites.",
     {
         nodeId: z.string().describe("The scene node ID"),
-        contentHash: z.string().describe("The contentHash from read_scene_content — ensures you are writing over the version you read"),
+        contentHash: ContentHash.scene,
         content: z.string().optional().describe("The HTML content to write"),
         blocks: z.array(z.object({
             type: z.enum(["CONTENT", "BEAT"]),
@@ -659,7 +660,7 @@ server.tool(
     "Update a story object's fields (name, description, notes, role, tags). Requires contentHash from get_story_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The story object ID"),
-        contentHash: z.string().describe("The contentHash from get_story_object — ensures you are updating the version you read"),
+        contentHash: ContentHash.storyObject,
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
@@ -1410,7 +1411,7 @@ server.tool(
     "Update a universe's metadata. Requires contentHash from get_universe to prevent stale overwrites.",
     {
         universeId: z.string().describe("The universe ID"),
-        contentHash: z.string().describe("The contentHash from get_universe — ensures you are updating the version you read"),
+        contentHash: ContentHash.universe,
         title: z.string().optional().describe("New title"),
         description: z.string().optional().describe("New description"),
     },
@@ -1485,7 +1486,7 @@ server.tool(
     "Update a world object's fields. Requires contentHash from get_world_object to prevent stale overwrites.",
     {
         objectId: z.string().describe("The world object ID"),
-        contentHash: z.string().describe("The contentHash from get_world_object — ensures you are updating the version you read"),
+        contentHash: ContentHash.worldObject,
         name: z.string().optional().describe("New name"),
         description: z.string().optional().describe("New description"),
         notes: z.string().optional().describe("New notes"),
@@ -1537,7 +1538,7 @@ server.tool(
     "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time — use this to correct or expand what is true about the object at a given period. Requires contentHash from get_world_object (the entry's contentHash in the timeline array) to prevent stale overwrites.",
     {
         entryId: z.string().describe("The entry ID"),
-        contentHash: z.string().describe("The contentHash for this entry from get_world_object's timeline array — ensures you are updating the version you read"),
+        contentHash: ContentHash.timelineEntry,
         label: z.string().optional().describe("New period or event label"),
         description: z.string().optional().describe("Updated description of what is true at this point"),
         attributes: z.string().optional().describe("New JSON blob"),
