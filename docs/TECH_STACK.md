@@ -163,7 +163,7 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543); production requires `sslmode=require&uselibpqcompat=true` | Yes |
+| `DATABASE_URL` | PostgreSQL connection (Supabase, port 6543); production requires `sslmode=require&uselibpqcompat=true` | For data access (startup does not refuse a missing value: migrations are skipped with a warning and database-backed routes fail) |
 | `GOOGLE_CLIENT_ID` | OAuth for Docs export | No (production requires it unless `API_TOKEN` is set) |
 | `GOOGLE_CLIENT_SECRET` | OAuth secret | No |
 | `GOOGLE_REDIRECT_URI` | OAuth callback | No |
