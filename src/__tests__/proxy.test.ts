@@ -138,6 +138,13 @@ describe("proxy", () => {
             expect(res.status).toBe(401);
         });
 
+        it("rejects a valid API_TOKEN login cookie", async () => {
+            const res = await proxy(createRequest("/api/metrics", {
+                cookies: { annie_session: await createLegacySessionCookie("my-token") },
+            }));
+            expect(res.status).toBe(401);
+        });
+
         it("rejects an MCP access token", async () => {
             vi.mocked(verifyMcpToken).mockResolvedValue({
                 userId: "mcp-user",
