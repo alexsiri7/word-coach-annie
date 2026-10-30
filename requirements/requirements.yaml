@@ -719,7 +719,7 @@ requirements:
 
   - id: WCA-059
     title: Content reporting from the reader view
-    statement: "When a signed-in reader submits a content report for a project from the reader view, with a category of copyright, illegal, harassment or other, optional details and the page URL, the system shall file it as a GitHub issue labeled content-report in GITHUB_FEEDBACK_REPO containing the category, the project id, the URL's pathname and the sanitized details, and shall answer 201 whether or not the project exists."
+    statement: "When a signed-in reader submits a content report for a project from the reader view, with a category of copyright, illegal, harassment or other, optional details and the page URL, the system shall file it as a GitHub issue labeled content-report in GITHUB_FEEDBACK_REPO containing the category, the project id, the URL's pathname and the sanitized details, and shall answer an unknown project id with the same 201 as a filed report."
     category: functional
     priority: should
     status: active
@@ -729,6 +729,6 @@ requirements:
       - "For an unknown project id the route returns 201 without filing an issue, the same response as a filed report"
       - "The filed issue is titled \"Content Report: <category label> — ID: <project id>\"; details are stripped of HTML and truncated to 4000 characters, and the URL is reduced to its http(s) pathname with markdown characters escaped, dropping its query and hash"
       - "The filed issue contains no reporter email or user id and no project title or author name"
-      - "Without GITHUB_FEEDBACK_TOKEN or GITHUB_FEEDBACK_REPO the route returns 503 \"Content reporting is not configured.\"; a GitHub API failure returns 502"
+      - "For an existing project, without GITHUB_FEEDBACK_TOKEN or GITHUB_FEEDBACK_REPO the route returns 503 \"Content reporting is not configured.\"; a GitHub API failure returns 502"
       - "The dialog shows the route's error message on failure and a thank-you confirmation on success"
-    notes: "The route is not a public path: the proxy requires a session, API token or MCP identity before it runs, and it does not check that the reporter can read the project. The 10/hour per-IP limit is WCA-056's."
+    notes: "The route is not a public path: the proxy requires a session, API token or MCP identity before it runs, and it does not check that the reporter can read the project. The 10/hour per-IP limit is WCA-056's. Known gap: the existence check runs before the configuration check and the GitHub call, so when reporting is unconfigured or GitHub fails, an existing project gets 503/502 while an unknown id still gets 201, revealing existence by status code."
