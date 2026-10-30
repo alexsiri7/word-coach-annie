@@ -732,3 +732,20 @@ requirements:
       - "For an existing project, without GITHUB_FEEDBACK_TOKEN or GITHUB_FEEDBACK_REPO the route returns 503 \"Content reporting is not configured.\"; a GitHub API failure returns 502"
       - "The dialog shows the route's error message on failure and a thank-you confirmation on success"
     notes: "The route is not a public path: the proxy requires a session, API token or MCP identity before it runs, and it does not check that the reporter can read the project. The 10/hour per-IP limit is WCA-056's. Known gap: the existence check runs before the configuration check and the GitHub call, so when reporting is unconfigured or GitHub fails, an existing project gets 503/502 while an unknown id still gets 201, revealing existence by status code."
+
+  - id: WCA-060
+    title: Single-owner API_TOKEN authentication
+    statement: "While API_TOKEN is configured, the system shall authenticate the deployment owner by the API_TOKEN bearer header or by a token login that issues a signed session cookie, shall treat that owner as a caller without a user id who is unscoped over all projects, universes and tasks, and shall admit only the API_TOKEN bearer to the metrics endpoint."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/app/api/auth/login/route.ts, src/app/api/auth/me/route.ts, src/lib/auth.ts createLegacySessionCookie/verifyLegacySessionCookie, src/proxy.ts, src/lib/api-auth.ts, src/app/api/metrics/route.ts, src/__tests__/auth.test.ts, src/__tests__/auth-me-route.test.ts, src/__tests__/proxy.test.ts, src/__tests__/metrics-route.test.ts
+    acceptance:
+      - "POST /api/auth/login with a body token equal to API_TOKEN (constant-time compare) returns {ok: true} and sets an httpOnly, SameSite=Strict annie_session cookie (Secure in production); a wrong, missing or non-string token returns 401, and without API_TOKEN the route returns 501"
+      - "The session cookie is v1.<issuedAt>.<nonce>.<HMAC keyed by API_TOKEN>, unique per login; the server rejects it after one hour regardless of the browser's maxAge, and rotating API_TOKEN invalidates every outstanding cookie"
+      - "GET /api/auth/me with a valid token-login cookie returns {authenticated: true, user: null}"
+      - "A request carrying Authorization: Bearer <API_TOKEN> or a valid token-login cookie passes the proxy without x-user-id or x-user-email and is rate limited under one shared apitoken key"
+      - "With no user id, project, universe and writing-task access checks grant every record, and project listing and export return every user's data"
+      - "GET /api/metrics with auth enabled returns 401 for any credential other than the API_TOKEN bearer, including user sessions, token-login cookies and MCP access tokens"
+      - "DELETE /api/auth/delete-account returns 403 when GOOGLE_CLIENT_ID is not set"
+    notes: "The audit draft scoped this to deployments without Google OAuth; the proxy accepts the API_TOKEN bearer and token-login cookie whether or not GOOGLE_CLIENT_ID is set. With GOOGLE_CLIENT_ID set, routes that create or export per-user records (for example POST /api/projects, POST /api/universes, project import, export-all, account data export, providers, opportunities and the writing-task dashboard) answer a caller without a user id with 401, but per-record access checks and GET /api/projects and /api/universes stay unscoped. With neither API_TOKEN nor GOOGLE_CLIENT_ID set, auth is disabled, every request including /api/metrics passes through without a user id, and production refuses to start. Per-user project limits do not apply to this caller (WCA-057); identity-header stripping is WCA-055's."
