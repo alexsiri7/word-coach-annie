@@ -716,3 +716,19 @@ requirements:
       - "Without user settings, AI calls use the balanced coaching style, moderate response length, no custom instructions, a chat window of 5 and compression after 15 messages; no global row supplies these"
       - "GET /api/ai-settings/models calls the provider's model list with the resolved key and returns only generateContent models, minus tts, image, robotics, computer-use, deep-research, nano- and lyria variants, sorted by id; with no resolved key it returns 400"
     notes: "Key encryption and masking on read are WCA-046's. A user's own model applies only alongside their own key; without one, the global row's model is used even if the user saved a model. Known gaps: behavior fields sent on a user's first save are dropped, and a no-user save that sends behavior fields (as the /settings page always does) fails with 500."
+
+  - id: WCA-059
+    title: Content reporting from the reader view
+    statement: "When a signed-in reader submits a content report for a project from the reader view, with a category of copyright, illegal, harassment or other, optional details and the page URL, the system shall file it as a GitHub issue labeled content-report in GITHUB_FEEDBACK_REPO containing the category, the project id, the URL's pathname and the sanitized details, and shall answer 201 whether or not the project exists."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/[id]/report/route.ts, src/components/report-content-dialog.tsx, src/app/read/[id]/reader-view.tsx, src/__tests__/report-route.test.ts
+    acceptance:
+      - "POST /api/projects/[id]/report returns 400 for a body that is not JSON or a category outside copyright/illegal/harassment/other"
+      - "For an unknown project id the route returns 201 without filing an issue, the same response as a filed report"
+      - "The filed issue is titled \"Content Report: <category label> — ID: <project id>\"; details are stripped of HTML and truncated to 4000 characters, and the URL is reduced to its http(s) pathname with markdown characters escaped, dropping its query and hash"
+      - "The filed issue contains no reporter email or user id and no project title or author name"
+      - "Without GITHUB_FEEDBACK_TOKEN or GITHUB_FEEDBACK_REPO the route returns 503 \"Content reporting is not configured.\"; a GitHub API failure returns 502"
+      - "The dialog shows the route's error message on failure and a thank-you confirmation on success"
+    notes: "The route is not a public path: the proxy requires a session, API token or MCP identity before it runs, and it does not check that the reporter can read the project. The 10/hour per-IP limit is WCA-056's."
