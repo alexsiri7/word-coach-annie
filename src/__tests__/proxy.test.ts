@@ -284,6 +284,12 @@ describe("proxy", () => {
         expect(location).not.toContain("from=");
     });
 
+    it.each(["/privacy", "/terms", "/dmca"])("serves %s to anonymous visitors", async (path) => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const res = await proxy(createRequest(path));
+        expect(res.status).toBe(200);
+    });
+
     it("allows /landing path without auth", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/landing");
