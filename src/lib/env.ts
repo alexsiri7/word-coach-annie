@@ -68,6 +68,10 @@ export type Env = z.infer<typeof envSchema>;
 // Validate once at startup to fail fast on bad values.
 envSchema.parse(process.env);
 
+/** Shared by the MCP server and the in-app chat tools, which apply the same MCP_ALLOW_DESTRUCTIVE gate. */
+export const DESTRUCTIVE_TOOL_DISABLED_MESSAGE =
+  "This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable.";
+
 /**
  * Proxy that reads from `process.env` on every access so that test-time
  * mutations of `process.env` are reflected without module re-imports.

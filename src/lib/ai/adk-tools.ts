@@ -11,6 +11,7 @@ import type { BaseTool, ToolPredicate, ToolInputParameters } from "@google/adk";
 import type { ReadonlyContext } from "@google/adk";
 import { z, ZodObject, ZodRawShape } from "zod";
 import { NodeOrderIndex } from "@/schemas/nodes";
+import { ContentHash } from "@/schemas/content-hash";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
 
@@ -168,10 +169,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_node",
-        description: "Update a structure node's title, synopsis, status, order, or parent",
+        description: "Update a structure node's title, synopsis, status, order, or parent. Requires contentHash from get_outline to prevent stale overwrites.",
         category: "structure",
         parameters: z.object({
             nodeId: z.string().describe("The node ID to update"),
+            contentHash: ContentHash.node,
             title: z.string().optional().describe("New title"),
             synopsis: z.string().optional().describe("New synopsis"),
             status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
@@ -189,10 +191,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "write_scene_content",
-        description: "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array)",
+        description: "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array). Requires contentHash from read_scene_content to prevent stale overwrites.",
         category: "structure",
         parameters: z.object({
             nodeId: z.string().describe("The scene node ID"),
+            contentHash: ContentHash.scene,
             content: z.string().optional().describe("The HTML content to write"),
             blocks: z.array(z.object({
                 type: z.enum(["CONTENT", "BEAT"]),
@@ -282,10 +285,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_story_object",
-        description: "Update a story object's fields",
+        description: "Update a story object's fields. Requires contentHash from get_story_object to prevent stale overwrites.",
         category: "characters",
         parameters: z.object({
             objectId: z.string().describe("The story object ID"),
+            contentHash: ContentHash.storyObject,
             name: z.string().optional().describe("New name"),
             description: z.string().optional().describe("New description"),
             notes: z.string().optional().describe("New notes"),
@@ -358,10 +362,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_universe",
-        description: "Update a universe's metadata",
+        description: "Update a universe's metadata. Requires contentHash from get_universe to prevent stale overwrites.",
         category: "world_building",
         parameters: z.object({
             universeId: z.string().describe("The universe ID"),
+            contentHash: ContentHash.universe,
             title: z.string().optional().describe("New title"),
             description: z.string().optional().describe("New description"),
         }),
@@ -406,10 +411,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_world_object",
-        description: "Update a world object's fields",
+        description: "Update a world object's fields. Requires contentHash from get_world_object to prevent stale overwrites.",
         category: "world_building",
         parameters: z.object({
             objectId: z.string().describe("The world object ID"),
+            contentHash: ContentHash.worldObject,
             name: z.string().optional().describe("New name"),
             description: z.string().optional().describe("New description"),
             notes: z.string().optional().describe("New notes"),
@@ -440,10 +446,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_timeline_entry",
-        description: "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time.",
+        description: "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time. Requires contentHash from get_world_object (the entry's contentHash in the timeline array) to prevent stale overwrites.",
         category: "world_building",
         parameters: z.object({
             entryId: z.string().describe("The entry ID"),
+            contentHash: ContentHash.timelineEntry,
             label: z.string().optional().describe("New period or event label"),
             description: z.string().optional().describe("Updated description of what is true at this point"),
             attributes: z.string().optional().describe("New JSON blob"),
@@ -545,10 +552,11 @@ const tools: ToolDefinition[] = [
     },
     {
         name: "update_project",
-        description: "Update a project's metadata",
+        description: "Update a project's metadata. Requires contentHash from get_project to prevent stale overwrites.",
         category: "admin",
         parameters: z.object({
             projectId: z.string().describe("The project ID"),
+            contentHash: ContentHash.project,
             title: z.string().optional().describe("New project title"),
             author: z.string().optional().describe("New author name"),
             synopsis: z.string().optional().describe("New synopsis"),
@@ -681,6 +689,7 @@ import {
 } from "@/mcp/tools/coaching";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
 import { prisma } from "@/lib/db";
+import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
 import {
   assertUniverseOwner,
   projectIdForNode,
@@ -709,6 +718,20 @@ const CHAT_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
 
 export function isChatExcludedTool(name: string): boolean {
   return CHAT_EXCLUDED_TOOLS.has(name);
+}
+
+/** Destructive tools — every chat `delete_*` tool, blocked unless MCP_ALLOW_DESTRUCTIVE=true, the same gate as MCP (WCA-032). */
+export function isChatDestructiveTool(name: string): boolean {
+  return name.startsWith("delete_");
+}
+
+function guardDestructive(executor: (args: Args) => Promise<unknown>): (args: Args) => Promise<unknown> {
+  return async (args) => {
+    if (!env.MCP_ALLOW_DESTRUCTIVE) {
+      throw new Error(DESTRUCTIVE_TOOL_DISABLED_MESSAGE);
+    }
+    return executor(args);
+  };
 }
 
 // ─── Handler dispatch map ────────────────────────────────────────────────────
@@ -777,10 +800,10 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
       return createNode(a as Parameters<typeof createNode>[0]);
     },
     update_node: async (a) => {
-      const { nodeId, ...data } = a;
+      const { nodeId, contentHash, ...data } = a;
       await requireNode(nodeId as string);
       if (data.parentId) await requireNode(data.parentId as string);
-      return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1]);
+      return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1], contentHash as string);
     },
     delete_node: async (a) => { await requireNode(a.nodeId as string); return deleteNode(a.nodeId as string); },
     write_scene_content: async (a) => {
@@ -789,9 +812,10 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
         return writeSceneContentFromBlocks(
           a.nodeId as string,
           a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
+          a.contentHash as string,
         );
       }
-      return writeSceneContent(a.nodeId as string, a.content as string);
+      return writeSceneContent(a.nodeId as string, a.content as string, a.contentHash as string);
     },
     get_scene_versions: async (a) => { await requireNode(a.nodeId as string); return getSceneVersions(a.nodeId as string, a.limit as number); },
     restore_scene_version: async (a) => { await requireNode(a.nodeId as string); return restoreSceneVersion(a.nodeId as string, a.versionId as string); },
@@ -811,9 +835,9 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
     get_story_object: async (a) => { await requireStoryObject(a.objectId as string); return getStoryObject(a.objectId as string); },
     create_story_object: async (a) => { requireProject(a.projectId); return createStoryObject(a as Parameters<typeof createStoryObject>[0]); },
     update_story_object: async (a) => {
-      const { objectId, ...data } = a;
+      const { objectId, contentHash, ...data } = a;
       await requireStoryObject(objectId as string);
-      return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1]);
+      return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1], contentHash as string);
     },
     delete_story_object: async (a) => { await requireStoryObject(a.objectId as string); return deleteStoryObject(a.objectId as string); },
     list_relationships: async (a) => { requireProject(a.projectId); return listRelationships(pid); },
@@ -830,18 +854,18 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
     get_universe: async (a) => { await requireUniverse(a.universeId as string); return getUniverse(a.universeId as string); },
     create_universe: async (a) => createUniverse(a as Parameters<typeof createUniverse>[0], ctx.userId),
     update_universe: async (a) => {
-      const { universeId, ...data } = a;
+      const { universeId, contentHash, ...data } = a;
       await requireUniverse(universeId as string);
-      return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1]);
+      return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1], contentHash as string);
     },
     delete_universe: async (a) => { await requireUniverse(a.universeId as string); return deleteUniverse(a.universeId as string); },
     list_world_objects: async (a) => { await requireUniverse(a.universeId as string); return listWorldObjects(a.universeId as string, a.type as string | undefined); },
     get_world_object: async (a) => { await requireWorldObject(a.objectId as string); return getWorldObject(a.objectId as string); },
     create_world_object: async (a) => { await requireUniverse(a.universeId as string); return createWorldObject(a as Parameters<typeof createWorldObject>[0]); },
     update_world_object: async (a) => {
-      const { objectId, ...data } = a;
+      const { objectId, contentHash, ...data } = a;
       await requireWorldObject(objectId as string);
-      return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1]);
+      return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1], contentHash as string);
     },
     delete_world_object: async (a) => { await requireWorldObject(a.objectId as string); return deleteWorldObject(a.objectId as string); },
     add_timeline_entry: async (a) => {
@@ -850,9 +874,9 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
       return addTimelineEntry(a as Parameters<typeof addTimelineEntry>[0]);
     },
     update_timeline_entry: async (a) => {
-      const { entryId, ...data } = a;
+      const { entryId, contentHash, ...data } = a;
       await requireTimelineEntry(entryId as string);
-      return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1]);
+      return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1], contentHash as string);
     },
     delete_timeline_entry: async (a) => { await requireTimelineEntry(a.entryId as string); return deleteTimelineEntry(a.entryId as string); },
     reorder_timeline_entries: async (a) => {
@@ -950,7 +974,7 @@ function buildAdkToolMaps(ctx: ToolContext): {
     if (CHAT_EXCLUDED_TOOLS.has(def.name)) continue;
     const executor = executors[def.name];
     if (!executor) throw new Error(`No executor found for tool: ${def.name}`);
-    const tool = toAdkTool(def, executor);
+    const tool = toAdkTool(def, isChatDestructiveTool(def.name) ? guardDestructive(executor) : executor);
     byName.set(def.name, tool);
     const list = byCategory.get(def.category) ?? [];
     list.push(tool);

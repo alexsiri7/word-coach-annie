@@ -147,7 +147,7 @@ The chat endpoint (`POST /api/chat`) uses OpenAI-compatible streaming with dynam
 
 This saves ~81% of token overhead vs loading all 48 tools upfront.
 
-Tools are registered in `src/lib/ai/tool-registry.ts` using Zod schemas (shared with controllers) and executed via `src/lib/ai/tool-executor.ts`.
+Tools are defined and executed in `src/lib/ai/adk-tools.ts`, built per chat turn and pinned to the conversation's project. Delete tools follow the MCP destructive gate (`MCP_ALLOW_DESTRUCTIVE`), and writes require the `contentHash` from a prior read (WCA-053).
 
 ### Prompt Security (Prompt Injection Mitigation)
 

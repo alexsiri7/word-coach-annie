@@ -149,7 +149,7 @@ A stored value that no configured key can decrypt is treated as disconnected: th
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for public access |
 | `PHOENIX_SECRET` | Signs Phoenix auth tokens. Required when running `docker-compose.yml`; generate with `openssl rand -hex 32` |
 | `PHOENIX_ADMIN_SECRET` | Bearer token the app sends to Phoenix on trace export. Required when running `docker-compose.yml`; generate separately from `PHOENIX_SECRET` |
-| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive MCP tools (delete, restore_snapshot). Default: `false` |
+| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive tools (delete, restore_snapshot) in MCP and delete tools in the in-app AI chat. Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
 
@@ -375,6 +375,8 @@ By default, destructive MCP tools (delete operations, `restore_snapshot`) are hi
 ```
 MCP_ALLOW_DESTRUCTIVE=true
 ```
+
+This flag also gates the in-app AI chat's delete tools.
 
 ---
 
