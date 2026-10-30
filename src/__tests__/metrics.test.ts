@@ -5,7 +5,7 @@
  * Note: metrics-route.test.ts mocks @/lib/metrics wholesale; this file must
  * not be merged with that test file or the mock would shadow the real module.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { registry } from "@/lib/metrics";
 
 describe("metrics registry (integration)", () => {
@@ -20,5 +20,17 @@ describe("metrics registry (integration)", () => {
         const output = await registry.metrics();
         expect(output).toContain("annie_projects_total");
         expect(output).toContain("annie_users_total");
+    });
+
+    it("separately evaluated copies of the module share one registry", async () => {
+        // Next evaluates this module once per server bundle (instrumentation,
+        // each route); request counters only reach /api/metrics if they share state.
+        vi.resetModules();
+        const first = await import("@/lib/metrics");
+        vi.resetModules();
+        const second = await import("@/lib/metrics");
+        expect(second).not.toBe(first);
+        expect(second.registry).toBe(first.registry);
+        expect(second.httpRequestCounter).toBe(first.httpRequestCounter);
     });
 });
