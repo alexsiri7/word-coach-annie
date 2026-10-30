@@ -659,3 +659,16 @@ requirements:
       - "Container start runs scripts/reencrypt.mjs before the app, rewriting previous-key values under ENCRYPTION_KEY and logging rewritten/encrypted/current/undecryptable counts; a failed sweep stops startup"
       - "Readers rewrite a previous-key value under the current key with a compare-and-swap, leaving a value replaced since the read untouched"
       - "A value no configured key decrypts is counted and reported as disconnected, never deleted, so restoring its key recovers it"
+
+  - id: WCA-055
+    title: CSRF header check and client identity-header stripping
+    statement: "When an account or integration request that deletes the account, changes consent, rotates the calendar feed, or disconnects an integration lacks the CSRF custom header, the system shall reject it with 403; and the system shall never trust identity headers supplied by the client, setting them only after verifying the session or token."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/api-auth.ts validateCsrfHeader, src/proxy.ts IDENTITY_HEADERS
+    acceptance:
+      - "DELETE /api/auth/delete-account, PUT /api/account/consent, POST /api/account/calendar-feed, DELETE /api/integrations/google-docs and DELETE /api/integrations/hashnode return 403 unless x-csrf-protection is exactly \"1\""
+      - "The proxy drops client-supplied x-user-id and x-user-email on every path, including public paths, API_TOKEN branches and auth-disabled mode"
+      - "x-user-id and x-user-email reach a route only as set by the proxy from a verified JWT or MCP session"
+    notes: "The CSRF header check guards only the five listed handlers; other state-changing routes rely on proxy authentication and are not covered by this requirement."
