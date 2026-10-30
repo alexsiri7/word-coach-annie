@@ -800,9 +800,9 @@ requirements:
     acceptance:
       - "Copy (POST /api/projects/[id]/copy-world-object) requires write access (owner or EDITOR) to the project and ownership of the world object's universe; it returns 404 for an unknown world object and 400 without worldObjectId"
       - "Copy leaves the world object and its timeline in place and does not copy timeline entries"
-      - "Transfer (POST /api/universes/transfer-object, or the MCP/chat tool transfer_story_object_to_universe) requires ownership of both the story object's project and the target universe, and returns 400 when either id is missing"
+      - "Transfer through POST /api/universes/transfer-object or the MCP tool transfer_story_object_to_universe requires ownership of both the story object's project and the target universe; the route returns 400 when either id is missing"
       - "After a transfer the story object no longer exists, and the new world object has an \"Initial State (Transferred)\" timeline entry and the story object's former relationships"
-    notes: "Extends WCA-012. The audit draft said nothing is lost, \"including timeline data\"; copy drops the timeline, transfer is a move, and the two directions check access asymmetrically. Neither route checks that the project is linked to the universe; the UI offers Transfer only for a linked universe. Copy has no MCP tool. Known gap: copy's relationship loop maps the world object's incoming relationships as outgoing from the copy, so the new edges point at the original world object instead of reproducing its counterparts; no test covers copy."
+    notes: "Extends WCA-012. The audit draft said nothing is lost, \"including timeline data\"; copy drops the timeline, transfer is a move, and the two directions check access asymmetrically. Neither route checks that the project is linked to the universe; the UI offers Transfer only for a linked universe. Copy has no MCP tool. Known gap: the in-app chat tool transfer_story_object_to_universe only checks that the story object is in the chat's project and that the universe is that project's linked universe or one the caller owns, so an EDITOR of a shared project can transfer the owner's story object. Known gap: copy's relationship loop maps the world object's incoming relationships as outgoing from the copy, so the new edges point at the original world object instead of reproducing its counterparts; no test covers copy."
 
   - id: WCA-065
     title: Export all projects as a ZIP
@@ -870,7 +870,7 @@ requirements:
       - "With no stored choice, the theme follows the OS setting; a toggled choice persists in the theme localStorage key across reloads"
       - "In the project workspace, Cmd/Ctrl+K opens and closes search and Cmd/Ctrl+/ shows and hides the sidebar"
       - "In the project workspace, Escape closes the search panel, then the selected object, then the mobile sidebar"
-    notes: "The audit draft said \"Cmd/Ctrl+/ chat\" and \"every project screen\"; no shortcut opens chat, and the hook runs only in the workspace and focus mode (which has no Cmd/Ctrl+K). The shortcuts also fire while typing in inputs and the editor. The theme survives sign-out (WCA-068). Known gap: no automated tests cover the theme or shortcuts, and the visual suite (e2e/visual.spec.ts) has no dark-theme run."
+    notes: "The audit draft said \"Cmd/Ctrl+/ chat\" and \"every project screen\"; no shortcut opens chat, and the hook runs only in the workspace and focus mode (which has no Cmd/Ctrl+K). The shortcuts also fire while typing in inputs and the editor. The theme survives sign-out (WCA-068). Known gap: no test covers the toggle, its persistence or the shortcuts; the dark-desktop screenshot run (e2e/visual.spec.ts) covers only following an OS dark preference."
 
   - id: WCA-070
     title: Self-hosted fonts and an opaque version file
