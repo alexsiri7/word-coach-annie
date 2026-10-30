@@ -689,7 +689,7 @@ import {
 } from "@/mcp/tools/coaching";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
+import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
 import {
   assertUniverseOwner,
   projectIdForNode,
@@ -720,20 +720,15 @@ export function isChatExcludedTool(name: string): boolean {
   return CHAT_EXCLUDED_TOOLS.has(name);
 }
 
-/** Destructive tools — blocked in chat unless MCP_ALLOW_DESTRUCTIVE=true, the same gate as MCP (WCA-032). */
-const CHAT_DESTRUCTIVE_TOOLS: ReadonlySet<string> = new Set([
-  "delete_node", "delete_annotation", "delete_story_object", "delete_relationship",
-  "delete_universe", "delete_world_object", "delete_timeline_entry",
-]);
-
+/** Destructive tools — every chat `delete_*` tool, blocked unless MCP_ALLOW_DESTRUCTIVE=true, the same gate as MCP (WCA-032). */
 export function isChatDestructiveTool(name: string): boolean {
-  return CHAT_DESTRUCTIVE_TOOLS.has(name);
+  return name.startsWith("delete_");
 }
 
 function guardDestructive(executor: (args: Args) => Promise<unknown>): (args: Args) => Promise<unknown> {
   return async (args) => {
     if (!env.MCP_ALLOW_DESTRUCTIVE) {
-      throw new Error("This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable.");
+      throw new Error(DESTRUCTIVE_TOOL_DISABLED_MESSAGE);
     }
     return executor(args);
   };
@@ -979,7 +974,7 @@ function buildAdkToolMaps(ctx: ToolContext): {
     if (CHAT_EXCLUDED_TOOLS.has(def.name)) continue;
     const executor = executors[def.name];
     if (!executor) throw new Error(`No executor found for tool: ${def.name}`);
-    const tool = toAdkTool(def, CHAT_DESTRUCTIVE_TOOLS.has(def.name) ? guardDestructive(executor) : executor);
+    const tool = toAdkTool(def, isChatDestructiveTool(def.name) ? guardDestructive(executor) : executor);
     byName.set(def.name, tool);
     const list = byCategory.get(def.category) ?? [];
     list.push(tool);

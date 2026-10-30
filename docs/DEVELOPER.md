@@ -237,7 +237,7 @@ The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/adk-tools.ts`
 When adding a tool to the in-app chat:
 1. Add a `ToolDefinition` entry to the `tools` array in `adk-tools.ts`, with its Zod schema and its `category` (`core` for tier 1, any other category for tier 2)
 2. Add its handler to `buildToolExecutors` in the same file
-3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and add delete tools to `CHAT_DESTRUCTIVE_TOOLS`
+3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and name delete tools `delete_*` so `isChatDestructiveTool` gates them behind `MCP_ALLOW_DESTRUCTIVE`
 
 This two-tier approach saves ~81% token overhead vs loading all tools upfront.
 

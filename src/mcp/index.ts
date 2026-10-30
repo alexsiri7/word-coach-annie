@@ -4,7 +4,7 @@ import { HttpUrl } from "@/schemas/http-url";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
-import { env } from "@/lib/env";
+import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
 import { logger } from "@/lib/logger";
 import { mcpRun, toolError, type McpResult } from "@/mcp/tool-errors";
@@ -204,7 +204,7 @@ server.tool = ((...args: unknown[]) => {
 function destructiveGuard(): McpResult | null {
     if (!allowDestructive) {
         return {
-            content: [{ type: "text", text: "This destructive tool is disabled. Set MCP_ALLOW_DESTRUCTIVE=true to enable." }],
+            content: [{ type: "text", text: DESTRUCTIVE_TOOL_DISABLED_MESSAGE }],
             isError: true,
         };
     }
