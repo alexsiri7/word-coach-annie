@@ -672,3 +672,16 @@ requirements:
       - "The proxy drops client-supplied x-user-id and x-user-email on every path, including public paths, API_TOKEN branches and auth-disabled mode"
       - "x-user-id and x-user-email reach a route only as set by the proxy from a verified JWT or MCP session"
     notes: "The CSRF header check guards only the five listed handlers; other state-changing routes rely on proxy authentication and are not covered by this requirement."
+
+  - id: WCA-056
+    title: Per-IP rate limiting on public paths and content reports
+    statement: "When requests from one client IP exceed their path's per-IP limit — auth login/refresh/me 5/min, OAuth token 10/min, OAuth client registration 5/hour, content report 10/hour, any other public path 60/min — the system shall respond 429; and auth-path limits shall still be enforced from memory when Redis is unavailable."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/rate-limit-config.ts RATE_LIMITS, src/proxy.ts publicPathLimit, src/app/oauth/register/route.ts, src/app/api/projects/[id]/report/route.ts
+    acceptance:
+      - "Public paths are throttled per client IP before reaching the route: /api/auth/login, /api/auth/refresh and /api/auth/me share the auth bucket (5/min), /oauth/token uses its own (10/min), every other public path the generic one (60/min); the 429 carries Retry-After and X-RateLimit-* headers"
+      - "POST /oauth/register returns 429 after 5 registrations per IP per hour, and POST /api/projects/[id]/report returns 429 with Retry-After after 10 reports per IP per hour"
+      - "When a Redis check fails, the auth bucket is enforced from the in-memory limiter; the other per-IP buckets fail open"
+    notes: "Complements WCA-043's per-user limits; the DISABLE_RATE_LIMIT production guard applies to these buckets too. The OAuth register route's DB-persisted 24h per-IP cap is separate from this limit. POST /api/projects/[id]/report is not a public path: the proxy rejects unauthenticated requests to it with 401, so its per-IP cap bounds reports per source across accounts rather than anonymous traffic."
