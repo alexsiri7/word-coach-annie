@@ -119,7 +119,7 @@ Permanently delete the authenticated user's account and all associated data (GDP
 The `email` field must exactly match the authenticated user's email as a confirmation step.
 
 **Response**:
-- `200 OK` — `{ "ok": true }`. Session cookie is cleared (`Max-Age=0`).
+- `200 OK` — `{ "ok": true }`. Session and refresh token JTIs are revoked (via blocklist) and both `annie_session` and `annie_refresh` cookies are cleared (`Max-Age=0`).
 - `400 Bad Request` — missing/invalid email, or email does not match (`{ "error": "Email does not match" }`)
 - `401 Unauthorized` — not authenticated or user not found
 - `403 Forbidden` — missing CSRF header, or API_TOKEN mode

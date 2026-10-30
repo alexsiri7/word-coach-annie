@@ -77,6 +77,7 @@ const PUBLIC_PATHS = [
     "/landing",
     "/privacy",
     "/terms",
+    "/dmca",
     "/.well-known/oauth-authorization-server",
     "/oauth/register",
     "/oauth/token",
