@@ -1,5 +1,8 @@
 // Shared by the page (sync-queue.ts) and the service worker (src/worker/index.ts).
-// Keep this module import-free: the worker bundle is compiled separately.
+// The worker bundle is compiled separately: import only import-free modules,
+// by relative path.
+
+import { RATE_LIMITS } from "../rate-limit-config";
 
 export const MAX_REPLAY_RETRIES = 3;
 export const REPLAY_LOCK_NAME = "annie-replay";
@@ -41,11 +44,11 @@ export function createSessionRefresher(): () => Promise<boolean> {
 }
 
 /**
- * How long a streak of failing autosaves reuses one refresher. Matches the
- * auth rate-limit window, so a refresh that failed for a transient reason
+ * How long a streak of failing autosaves reuses one refresher: one auth
+ * rate-limit window, so a refresh that failed for a transient reason
  * (429, 5xx, network) is retried once the window has passed.
  */
-export const STREAK_REFRESH_RETRY_MS = 60_000;
+export const STREAK_REFRESH_RETRY_MS = RATE_LIMITS.auth.windowMs;
 
 export interface StreakRefresher {
   refresh: () => Promise<boolean>;
