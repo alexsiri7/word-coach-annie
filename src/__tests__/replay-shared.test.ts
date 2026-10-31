@@ -78,6 +78,20 @@ describe("replay-shared", () => {
   });
 
   describe("streakRefresher", () => {
+    it("retries on the auth rate-limit window", async () => {
+      vi.resetModules();
+      vi.doMock("@/lib/rate-limit-config", () => ({
+        RATE_LIMITS: { auth: { limit: 1, windowMs: 1234 } },
+      }));
+      try {
+        const shared = await import("@/lib/offline/replay-shared");
+        expect(shared.STREAK_REFRESH_RETRY_MS).toBe(1234);
+      } finally {
+        vi.doUnmock("@/lib/rate-limit-config");
+        vi.resetModules();
+      }
+    });
+
     it("reuses the streak's refresher within the retry window", () => {
       const first = streakRefresher(null, 1000);
       expect(streakRefresher(first, 1000 + STREAK_REFRESH_RETRY_MS - 1)).toBe(first);
