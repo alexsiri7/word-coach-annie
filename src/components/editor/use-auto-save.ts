@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import { beatsToComments } from "./editor-config";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { computeOfflineContentHash } from "@/lib/offline/content-hash";
-import { createSessionRefresher, sendWithSessionRetry } from "@/lib/offline/replay-shared";
+import { sendWithSessionRetry, streakRefresher, type StreakRefresher } from "@/lib/offline/replay-shared";
 
 interface UseAutoSaveOptions {
   nodeId: string;
@@ -25,16 +25,16 @@ export function useAutoSave({
   const contentRef = useRef<string>("");
   const baseHashRef = useRef<string | null>(null);
   // Autosave fires every few seconds while typing; refreshing on each failing
-  // save would trip the refresh rate limit, so one refresher spans the whole
-  // streak of failures and is dropped once a save gets past auth.
-  const refreshSessionRef = useRef<(() => Promise<boolean>) | null>(null);
+  // save would trip the refresh rate limit, so a streak of failures shares a
+  // refresher, dropped once a save gets past auth.
+  const refresherRef = useRef<StreakRefresher | null>(null);
 
   const saveContent = useCallback(
     async (content: string) => {
       onSaveStart();
       try {
         const body = JSON.stringify({ content: beatsToComments(content), contentHash: baseHashRef.current });
-        refreshSessionRef.current ??= createSessionRefresher();
+        const refresher = (refresherRef.current = streakRefresher(refresherRef.current, Date.now()));
         const res = await sendWithSessionRetry(
           () =>
             offlineFetch(`/api/nodes/${nodeId}/content`, {
@@ -42,10 +42,10 @@ export function useAutoSave({
               headers: { "Content-Type": "application/json" },
               body,
             }),
-          refreshSessionRef.current
+          refresher.refresh
         );
 
-        if (res.status !== 401) refreshSessionRef.current = null;
+        if (res.status !== 401) refresherRef.current = null;
 
         if (res.ok) {
           const newVersion = await res.json();

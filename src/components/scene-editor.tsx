@@ -11,6 +11,7 @@ import { computeOfflineContentHash } from "@/lib/offline/content-hash";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { saveErrorToast } from "@/components/editor/save-error";
 import {
   Popover,
   PopoverContent,
@@ -101,8 +102,10 @@ export function SceneEditor({
 
   const session = useWritingSession({ projectId, nodeId: node.id });
   const { error: toastError } = useToast();
-  // Autosave retries on every edit; only the first failure in a streak is announced.
+  // Autosave retries on every edit; only the first failure in a streak is
+  // toasted, while saveFailed keeps the toolbar and status bar honest.
   const saveFailingRef = useRef(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef, setBaseHash } = useAutoSave({
     nodeId: node.id,
@@ -110,6 +113,7 @@ export function SceneEditor({
     onSaveEnd: () => setSaving(false),
     onVersionCreated: (v) => {
       saveFailingRef.current = false;
+      setSaveFailed(false);
       setLatestVersionId(v.id);
       setLastSaved(new Date().toLocaleTimeString());
       setExternalChangeDetected(false);
@@ -118,13 +122,10 @@ export function SceneEditor({
     onNodeUpdated,
     onSaveError: (err) => {
       if (err.status !== 409) {
-        if (saveFailingRef.current) return;
+        const message = saveErrorToast(err.status, saveFailingRef.current);
         saveFailingRef.current = true;
-        toastError(
-          err.status === 401
-            ? "Your changes aren't being saved: your session has expired. Sign in again in another tab, then keep editing."
-            : `Your changes aren't being saved (HTTP ${err.status}). Annie will retry on your next edit.`
-        );
+        setSaveFailed(true);
+        if (message) toastError(message);
         return;
       }
       const data = err.data as { content?: string; contentHash?: string } | null;
@@ -602,6 +603,7 @@ export function SceneEditor({
         onStatusChange={handleStatusChange}
         saving={saving}
         lastSaved={lastSaved}
+        saveFailed={saveFailed}
         onManualSave={saveNow}
         onToggleVersions={loadVersionHistory}
         showVersions={showVersions}
@@ -736,6 +738,7 @@ export function SceneEditor({
             wordCount={wordCount}
             saving={saving}
             lastSaved={lastSaved}
+            saveFailed={saveFailed}
             sessionWordsWritten={session.wordsWritten}
             sessionDurationSeconds={session.durationSeconds}
             sessionWordsPerHour={session.wordsPerHour}

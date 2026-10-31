@@ -25,7 +25,7 @@ export async function withReplayLock<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * Returns a function that refreshes the session at most once per replay run
- * (or, for live autosave, per streak of failing saves).
+ * (or, for live autosave, per streakRefresher window).
  * /api/auth/refresh is rate-limited per IP and rotates the refresh token, so
  * refreshing once per failing op would trip the limit or revoke itself.
  */
@@ -38,6 +38,24 @@ export function createSessionRefresher(): () => Promise<boolean> {
     );
     return pending;
   };
+}
+
+/**
+ * How long a streak of failing autosaves reuses one refresher. Matches the
+ * auth rate-limit window, so a refresh that failed for a transient reason
+ * (429, 5xx, network) is retried once the window has passed.
+ */
+export const STREAK_REFRESH_RETRY_MS = 60_000;
+
+export interface StreakRefresher {
+  refresh: () => Promise<boolean>;
+  startedAt: number;
+}
+
+/** The streak's current refresher, or a fresh one once it has expired. */
+export function streakRefresher(current: StreakRefresher | null, now: number): StreakRefresher {
+  if (current && now - current.startedAt < STREAK_REFRESH_RETRY_MS) return current;
+  return { refresh: createSessionRefresher(), startedAt: now };
 }
 
 export interface ReplayableOp {
