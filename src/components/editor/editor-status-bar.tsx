@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, Clock, Zap } from "lucide-react";
+import { AlertTriangle, Check, Clock, Zap } from "lucide-react";
 
 interface EditorStatusBarProps {
   wordCount: number;
   saving: boolean;
   lastSaved: string | null;
+  saveFailed: boolean;
   sessionWordsWritten?: number;
   sessionDurationSeconds?: number;
   sessionWordsPerHour?: number;
@@ -16,6 +17,7 @@ export function EditorStatusBar({
   wordCount,
   saving,
   lastSaved,
+  saveFailed,
   sessionWordsWritten = 0,
   sessionDurationSeconds = 0,
   sessionWordsPerHour = 0,
@@ -75,6 +77,11 @@ export function EditorStatusBar({
             <>
               <div className="h-2.5 w-2.5 border border-accent border-t-transparent rounded-full animate-spin" />
               <span className="text-text-muted">Saving...</span>
+            </>
+          ) : saveFailed ? (
+            <>
+              <AlertTriangle className="h-3 w-3 text-danger" aria-hidden="true" />
+              <span className="text-danger">Not saved</span>
             </>
           ) : lastSaved ? (
             <>

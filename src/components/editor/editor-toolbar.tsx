@@ -62,6 +62,7 @@ interface EditorToolbarProps {
   onStatusChange: (status: string) => void;
   saving: boolean;
   lastSaved: string | null;
+  saveFailed: boolean;
   onManualSave: () => void;
   onToggleVersions: () => void;
   showVersions: boolean;
@@ -97,6 +98,7 @@ export function EditorToolbar({
   onStatusChange,
   saving,
   lastSaved,
+  saveFailed,
   onManualSave,
   onToggleVersions,
   showVersions,
@@ -541,12 +543,14 @@ export function EditorToolbar({
         >
           {saving ? (
             <div className="h-3 w-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          ) : saveFailed ? (
+            <AlertTriangle className="h-3 w-3 text-danger" />
           ) : lastSaved ? (
             <Check className="h-3 w-3 text-success" />
           ) : (
             <Save className="h-3 w-3" />
           )}
-          {saving ? "Saving..." : lastSaved ? `Saved` : "Save"}
+          {saving ? "Saving..." : saveFailed ? "Not saved" : lastSaved ? `Saved` : "Save"}
         </Button>
 
         <Tooltip>
