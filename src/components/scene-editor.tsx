@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -10,6 +10,7 @@ import { cacheContentVersion, getCachedContent } from "@/lib/offline/cache-reads
 import { computeOfflineContentHash } from "@/lib/offline/content-hash";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import {
   Popover,
   PopoverContent,
@@ -99,12 +100,16 @@ export function SceneEditor({
   const [contentFromCache, setContentFromCache] = useState(fromCacheProp);
 
   const session = useWritingSession({ projectId, nodeId: node.id });
+  const { error: toastError } = useToast();
+  // Autosave retries on every edit; only the first failure in a streak is announced.
+  const saveFailingRef = useRef(false);
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef, setBaseHash } = useAutoSave({
     nodeId: node.id,
     onSaveStart: () => setSaving(true),
     onSaveEnd: () => setSaving(false),
     onVersionCreated: (v) => {
+      saveFailingRef.current = false;
       setLatestVersionId(v.id);
       setLastSaved(new Date().toLocaleTimeString());
       setExternalChangeDetected(false);
@@ -112,7 +117,16 @@ export function SceneEditor({
     },
     onNodeUpdated,
     onSaveError: (err) => {
-      if (err.status !== 409) return;
+      if (err.status !== 409) {
+        if (saveFailingRef.current) return;
+        saveFailingRef.current = true;
+        toastError(
+          err.status === 401
+            ? "Your changes aren't being saved: your session has expired. Sign in again in another tab, then keep editing."
+            : `Your changes aren't being saved (HTTP ${err.status}). Annie will retry on your next edit.`
+        );
+        return;
+      }
       const data = err.data as { content?: string; contentHash?: string } | null;
       setSaveConflict({ content: data?.content ?? "", contentHash: data?.contentHash ?? null });
     },

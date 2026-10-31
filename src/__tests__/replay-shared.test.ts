@@ -3,6 +3,7 @@ import {
   REPLAY_LOCK_NAME,
   createSessionRefresher,
   replayFetch,
+  sendWithSessionRetry,
   withReplayLock,
 } from "@/lib/offline/replay-shared";
 
@@ -58,6 +59,19 @@ describe("replay-shared", () => {
 
       expect(res.status).toBe(401);
       expect(opFetchCount(fetchMock)).toBe(2);
+    });
+  });
+
+  describe("sendWithSessionRetry", () => {
+    it("re-sends through the caller's send function after a refresh", async () => {
+      const send = vi.fn()
+        .mockResolvedValueOnce(new Response("{}", { status: 401 }))
+        .mockResolvedValueOnce(new Response("{}", { status: 201 }));
+
+      const res = await sendWithSessionRetry(send, async () => true);
+
+      expect(res.status).toBe(201);
+      expect(send).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -24,7 +24,8 @@ export async function withReplayLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Returns a function that refreshes the session at most once per replay run.
+ * Returns a function that refreshes the session at most once per replay run
+ * (or, for live autosave, per streak of failing saves).
  * /api/auth/refresh is rate-limited per IP and rotates the refresh token, so
  * refreshing once per failing op would trip the limit or revoke itself.
  */
@@ -54,16 +55,24 @@ function sendOp(op: ReplayableOp): Promise<Response> {
 }
 
 /**
- * Sends a queued op. On 401 it refreshes the session and re-sends once; if the
+ * Calls `send`. On 401 it refreshes the session and re-sends once; if the
  * refresh fails or the re-send is also 401, the 401 is returned for the
  * caller's normal failure handling. Network errors propagate.
  */
-export async function replayFetch(
+export async function sendWithSessionRetry(
+  send: () => Promise<Response>,
+  refreshSession: () => Promise<boolean>
+): Promise<Response> {
+  const res = await send();
+  if (res.status !== 401) return res;
+  if (!(await refreshSession())) return res;
+  return send();
+}
+
+/** Sends a queued op, refreshing the session and re-sending once on 401. */
+export function replayFetch(
   op: ReplayableOp,
   refreshSession: () => Promise<boolean>
 ): Promise<Response> {
-  const res = await sendOp(op);
-  if (res.status !== 401) return res;
-  if (!(await refreshSession())) return res;
-  return sendOp(op);
+  return sendWithSessionRetry(() => sendOp(op), refreshSession);
 }
