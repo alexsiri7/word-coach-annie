@@ -68,6 +68,9 @@ export function useAutoSave({
           console.warn("[auto-save] save failed", { status: res.status, data });
           onSaveError?.({ status: res.status, data });
         }
+      } catch (err) {
+        console.warn("[auto-save] save failed", err);
+        onSaveError?.({ status: 0, data: null });
       } finally {
         onSaveEnd();
       }
