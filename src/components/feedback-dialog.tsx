@@ -44,6 +44,7 @@ export function FeedbackDialog({
   } | null>(null);
 
   // Screenshot state
+  const [includeScreenshot, setIncludeScreenshot] = useState(false);
   const [screenshotRaw, setScreenshotRaw] = useState<string | null>(null);
   const [screenshotEdited, setScreenshotEdited] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -54,6 +55,7 @@ export function FeedbackDialog({
     setMessage("");
     setResult(null);
     setSubmitting(false);
+    setIncludeScreenshot(false);
     setScreenshotRaw(null);
     setScreenshotEdited(null);
     setShowEditor(false);
@@ -117,6 +119,11 @@ export function FeedbackDialog({
     setScreenshotEdited(null);
   };
 
+  const handleIncludeScreenshotChange = (checked: boolean) => {
+    setIncludeScreenshot(checked);
+    if (!checked) handleRemoveScreenshot();
+  };
+
   const handleEditScreenshot = () => {
     if (screenshotRaw) {
       setShowEditor(true);
@@ -154,6 +161,7 @@ export function FeedbackDialog({
           issueUrl: data.issueUrl,
         });
         setMessage("");
+        setIncludeScreenshot(false);
         setScreenshotRaw(null);
         setScreenshotEdited(null);
       } else {
@@ -263,10 +271,18 @@ export function FeedbackDialog({
 
               {/* Screenshot section */}
               <div>
-                <label className="text-sm font-medium text-text-secondary mb-2 block">
-                  Screenshot
+                <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeScreenshot}
+                    onChange={(e) =>
+                      handleIncludeScreenshotChange(e.target.checked)
+                    }
+                    className="rounded-sm border-text-muted text-accent focus:ring-0 focus:ring-offset-0"
+                  />
+                  Attach a screenshot
                 </label>
-                {screenshotAttached ? (
+                {!includeScreenshot ? null : screenshotAttached ? (
                   <div className="relative rounded border border-border/15 overflow-hidden bg-surface-overlay">
                     <img
                       src={screenshotEdited!}
@@ -305,12 +321,17 @@ export function FeedbackDialog({
                     Capture Screenshot
                   </Button>
                 )}
-                {!screenshotAttached && (
+                {includeScreenshot && !screenshotAttached && (
                   <p className="text-xs text-text-secondary mt-1">
                     Sensitive content can be redacted before submitting.
                   </p>
                 )}
               </div>
+
+              <p className="text-xs text-text-secondary">
+                Your feedback, any attached screenshot, and basic page and
+                browser details will be posted publicly as a GitHub issue.
+              </p>
 
               {result && !result.success && (
                 <p className="text-sm text-danger">{result.message}</p>
