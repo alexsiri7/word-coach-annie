@@ -107,7 +107,7 @@
     "@typescript-eslint/eslint-plugin": "^8.71.2",
     "@typescript-eslint/parser": "^8.72.1",
     "@vitest/coverage-v8": "^5.0.5",
-    "autoprefixer": "^10.6.1",
+    "autoprefixer": "^10.6.2",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
     "postcss": "^8.5.15",
