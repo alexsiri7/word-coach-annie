@@ -7,7 +7,7 @@ meta:
     partial: 34
     uncovered: 0
     stale: 3
-    orphans: 24
+    orphans: 25
 coverage:
   - id: WCA-001
     status: covered
@@ -870,3 +870,9 @@ orphans:
       - "src/__tests__/version-file.test.ts"
       - "next.config.ts"
     suggested_requirement: "The system shall serve all fonts from its own origin and shall publish only an opaque build identifier in version.json."
+  - behavior: "Optional Cloudflare Tunnel overlay for the dev stack: docker-compose.tunnel.yml publishes the dev server through cloudflared, refuses to start without API_TOKEN and CLOUDFLARE_TUNNEL_TOKEN, and hands API_TOKEN to the app so the tunnel never exposes it with auth disabled."
+    code_paths:
+      - "docker-compose.tunnel.yml"
+      - "scripts/__tests__/docker-compose-dev.test.ts:18-30"
+      - "docs/SETUP.md"
+    suggested_requirement: "When the dev server is published through the Cloudflare Tunnel overlay, the system shall refuse to start unless API_TOKEN is set and passed to the app."
