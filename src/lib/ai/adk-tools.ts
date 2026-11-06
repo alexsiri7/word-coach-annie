@@ -564,30 +564,6 @@ const tools: ToolDefinition[] = [
         }),
     },
     {
-        name: "snapshot_database",
-        description: "Create a named snapshot of the current database state",
-        category: "admin",
-        parameters: z.object({
-            message: z.string().describe("Description of what's about to change"),
-        }),
-    },
-    {
-        name: "list_snapshots",
-        description: "List recent database snapshots with timestamps and messages",
-        category: "admin",
-        parameters: z.object({
-            limit: z.number().optional().describe("Max snapshots to return (default 20)"),
-        }),
-    },
-    {
-        name: "restore_snapshot",
-        description: "Restore the database to a previous snapshot",
-        category: "admin",
-        parameters: z.object({
-            commitHash: z.string().describe("The snapshot commit hash to restore"),
-        }),
-    },
-    {
         name: "google_auth_status",
         description: "Check if Google credentials are configured and valid",
         category: "admin",
@@ -710,9 +686,8 @@ export interface ToolContext {
   role: "OWNER" | "EDITOR" | null;
 }
 
-/** Tools that must never be reachable from the web chat (credentials, DB snapshot/restore). */
+/** Tools that must never be reachable from the web chat (credentials). */
 const CHAT_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
-  "snapshot_database", "list_snapshots", "restore_snapshot",
   "google_auth_status", "google_auth_connect", "google_auth_callback", "google_auth_disconnect",
 ]);
 
@@ -915,7 +890,7 @@ function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Pr
       return GoogleDocsExporter.exportToGoogleDocs(pid, exportMode, ctx.userId);
     },
 
-    // Admin (project-level only; credential + snapshot tools are excluded from chat)
+    // Admin (project-level only; credential tools are excluded from chat)
     create_project: async (a) => createProject({ ...(a as Parameters<typeof createProject>[0]), userId: ctx.userId }),
     update_project: async (a) => {
       const { projectId, contentHash, ...data } = a;

@@ -168,12 +168,6 @@ vi.mock("@/mcp/tools/export", () => ({
   getProjectSummary: vi.fn().mockResolvedValue({ title: "Test", wordCount: 1000 }),
 }));
 
-vi.mock("@/mcp/tools/snapshots", () => ({
-  snapshotDatabase: vi.fn().mockResolvedValue({ hash: "abc123" }),
-  listDatabaseSnapshots: vi.fn().mockResolvedValue([]),
-  restoreDatabaseSnapshot: vi.fn().mockResolvedValue({ success: true }),
-}));
-
 vi.mock("@/mcp/tools/universes", () => ({
   listUniverses: vi.fn().mockResolvedValue([]),
   getUniverse: vi.fn().mockResolvedValue({ id: "u-1", name: "Test Universe" }),
@@ -660,8 +654,8 @@ describe("Agent eval: export workflow", () => {
 });
 
 describe("Agent eval: admin tools", () => {
-  // snapshot_database/restore_snapshot and the google_auth_* tools are excluded
-  // from the chat toolset entirely (SEC-01) — only project-level admin tools
+  // The google_auth_* tools are excluded from the chat toolset entirely
+  // (SEC-01) — only project-level admin tools
   // (create_project/update_project) remain reachable from the "admin" category.
   it("loads admin category and updates the project", async () => {
     const result = await runWithScript([

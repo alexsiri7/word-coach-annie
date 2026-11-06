@@ -84,8 +84,6 @@ src/
 4. **Controller** runs business logic against **Prisma** (SQLite)
 5. Response returned as JSON
 
-Most write operations (scene save, node create) trigger an automatic **git snapshot** of the database via `autoSnapshot()` for agentic safety.
-
 ## Data Model
 
 ### Core Entities
@@ -210,7 +208,7 @@ Every scene save creates a new `ContentVersion` record. The controller keeps the
 
 ## Database Safety
 
-The database at `data/word-coach-annie.db` is volume-mounted. Git-based snapshots are taken automatically before write operations from the MCP server. This enables rollback via `restore_snapshot` MCP tool.
+The database at `data/word-coach-annie.db` is volume-mounted. The MCP server does not snapshot the database: agents undo scene edits through per-scene version history (`get_scene_versions` / `restore_scene_version`), and whole-database recovery is Supabase point-in-time recovery.
 
 **Never run `prisma db push` or `prisma migrate reset`** — these can drop tables. See [SETUP.md](SETUP.md) for safe schema migration procedure.
 

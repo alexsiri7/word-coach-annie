@@ -99,7 +99,7 @@ A stored value that no configured key can decrypt is treated as disconnected: th
 |----------|-------------|
 | `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. Production requires `rediss://` (startup refuses `redis://`). The server must speak RESP3 (Redis 6+ / `HELLO 3`): ioredis 6 negotiates RESP3 by default and does not fall back, and because the limiter fails open (only the auth bucket falls back to the in-memory store) a RESP2-only server would silently disable most rate limiting. |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for public access |
-| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive tools (delete, restore_snapshot) in MCP and delete tools in the in-app AI chat. Default: `false` |
+| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive tools (delete tools) in MCP and delete tools in the in-app AI chat. Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
 
@@ -163,7 +163,7 @@ docker compose -f docker-compose.dev.yml exec app npx prisma studio     # Databa
 
 ### Location
 
-`./data/word-coach-annie.db` — SQLite file persisted via Docker volume mount. The `data/` directory is also a git repo (`data/.git`) for snapshot management.
+`./data/word-coach-annie.db` — SQLite file persisted via Docker volume mount.
 
 ### Schema Changes (CRITICAL)
 
@@ -232,15 +232,9 @@ Manual backup:
 cp data/word-coach-annie.db data/word-coach-annie.db.bak
 ```
 
-### Git Snapshots (for MCP safety)
+### Recovering from agent edits
 
-The MCP server takes automatic git snapshots of `data/` before write operations. List and restore snapshots via MCP tools:
-
-```bash
-# Via Gemini CLI
-gemini -m "@word-coach-annie list_snapshots"
-gemini -m "@word-coach-annie restore_snapshot --snapshotId <id>"
-```
+The MCP server does not snapshot the database. Undo an agent's edit to a scene with `get_scene_versions` / `restore_scene_version`; whole-database recovery is Supabase point-in-time recovery (Supabase Dashboard → Database → Backups).
 
 ---
 
@@ -317,7 +311,7 @@ For web-based MCP clients, the app exposes an HTTP MCP proxy at `POST /api/mcp`.
 
 ### Destructive Tools
 
-By default, destructive MCP tools (delete operations, `restore_snapshot`) are hidden. Enable them:
+By default, destructive MCP tools (delete operations) are hidden. Enable them:
 
 ```
 MCP_ALLOW_DESTRUCTIVE=true

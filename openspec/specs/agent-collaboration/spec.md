@@ -58,14 +58,14 @@ Destructive tools — deletes and restores — SHALL be refused unless destructi
 - THEN the call is refused
 - AND read and create tools still work
 
-### Requirement: Agent work is recoverable by snapshot
+### Requirement: Agent work is recoverable through scene version history
 
-Agents SHALL be able to snapshot the database, list snapshots and restore one, and write operations SHALL take automatic snapshots so any agent session can be rolled back. Snapshot inputs SHALL be validated so they cannot inject commands.
+Per-session database snapshotting is unsupported: the server SHALL NOT offer tools that snapshot, list snapshots of, or restore the whole database, because a whole-database restore would roll back every user's data. Agents SHALL recover their own edits through per-scene version history (`get_scene_versions` / `restore_scene_version`); whole-database recovery is Supabase point-in-time recovery, operated by the owner outside the server.
 
-#### Scenario: Roll back an agent session
-- GIVEN a snapshot taken before an agent reorganised the outline
-- WHEN the author restores that snapshot
-- THEN the outline is as it was before
+#### Scenario: Undo an agent's rewrite of a scene
+- GIVEN an agent rewrote a scene's content
+- WHEN the author lists that scene's versions and restores the version before the rewrite
+- THEN the scene's content is as it was before
 
 ### Requirement: Coaching context and writing skills
 

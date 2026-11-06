@@ -206,4 +206,4 @@ For schema changes, use Prisma migrations:
 3. The runner refuses destructive DDL (DROP/TRUNCATE) if the database has data
 4. Run `npx prisma generate` to regenerate the client after schema changes
 
-For emergencies: use the `snapshot_database` MCP tool to create a database backup before any significant data operation.
+For emergencies: whole-database recovery is Supabase point-in-time recovery; there is no MCP snapshot tool.

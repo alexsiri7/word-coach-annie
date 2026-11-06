@@ -122,7 +122,6 @@ claude   # Run from project root; auto-connects to MCP
 | Relationships | 3 | list, create, delete |
 | Universes | 14 | CRUD for universes, world objects, timeline entries, reorder |
 | Export | 5 | manuscript, story bible, Hashnode, Google Docs, project summary |
-| Database Safety | 3 | snapshot, list snapshots, restore |
 | Google Auth | 5 | status, connect, callback, disconnect, export to Google Docs |
 | Coaching & Analysis | 6 | plot thread status, scene focus, manuscript context, consistency, story bible cross-reference, voice context |
 | Skills | 1 | list available writing skills |
