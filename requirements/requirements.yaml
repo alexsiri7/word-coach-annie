@@ -623,13 +623,13 @@ requirements:
 
   - id: WCA-052
     title: Deployment and integration surface
-    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployable behind a Cloudflare Tunnel, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
+    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployed to Railway from the root Dockerfile, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
     category: constraint
     priority: must
     status: active
-    source: README, src/lib/env.ts, docker-compose.yml, scripts/migrate.mjs, docs/SETUP.md
+    source: README, src/lib/env.ts, Dockerfile, scripts/migrate.mjs, docs/SETUP.md, docs/TECH_STACK.md
     acceptance:
-      - "docker compose up (NODE_ENV=production) starts the app once PHOENIX_SECRET, PHOENIX_ADMIN_SECRET and an auth method (API_TOKEN or GOOGLE_CLIENT_ID) are set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
+      - "The production container (NODE_ENV=production) starts the app once an auth method (API_TOKEN or GOOGLE_CLIENT_ID) is set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
       - "A missing DATABASE_URL does not block startup: migrate.mjs warns and skips migrations, and DB-dependent routes fail"
       - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
 

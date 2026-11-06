@@ -60,7 +60,7 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 git clone https://github.com/alexsiri7/annie.git
 cd annie
 cp .env.example .env   # Configure API keys
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -151,12 +151,12 @@ Eight curated instruction sets registered as MCP Prompts, plus 5 built-in coachi
 ## Development
 
 ```bash
-docker compose up              # Start with logs
-docker compose exec app npm run test:run     # Run tests
-docker compose exec app npm run typecheck    # TypeScript check
-docker compose exec app npm run lint         # ESLint
-docker compose exec app npm run build        # Production build
-docker compose exec app npx prisma studio    # Database browser (port 5555)
+docker compose -f docker-compose.dev.yml up              # Start with logs
+docker compose -f docker-compose.dev.yml exec app npm run test:run     # Run tests
+docker compose -f docker-compose.dev.yml exec app npm run typecheck    # TypeScript check
+docker compose -f docker-compose.dev.yml exec app npm run lint         # ESLint
+docker compose -f docker-compose.dev.yml exec app npm run build        # Production build
+docker compose -f docker-compose.dev.yml exec app npx prisma studio    # Database browser (port 5555)
 ```
 
 ### Database Safety
@@ -164,7 +164,7 @@ docker compose exec app npx prisma studio    # Database browser (port 5555)
 **NEVER run `prisma db push` or `prisma migrate reset` on the production database.** These can drop and recreate tables, destroying all data.
 
 For schema changes:
-1. Create migration: `docker compose exec app npx prisma migrate dev --name <description>`
+1. Create migration: `docker compose -f docker-compose.dev.yml exec app npx prisma migrate dev --name <description>`
 2. The migration runner (`scripts/migrate.mjs`) applies it on container start
 3. Run `npx prisma generate` to regenerate the client
 

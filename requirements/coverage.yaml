@@ -694,15 +694,11 @@ coverage:
       - "package.json:79,118"
       - "tsconfig.json:11"
       - "Dockerfile"
-      - "docker-compose.yml:1-37"
-      - "docker-compose.tunnel.yml"
       - "src/lib/env.ts:16-69"
       - "scripts/migrate.mjs:27-48"
       - "src/app/api/chat/route.ts:290"
       - "src/app/api/ai-inline/route.ts:81"
     test_paths:
-      - "scripts/__tests__/docker-compose-dev.test.ts:18-30"
-      - "scripts/__tests__/docker-compose-phoenix.test.ts"
       - "scripts/__tests__/build-hygiene.test.ts:9-45"
       - "scripts/__tests__/auth-configuration.test.ts"
       - "scripts/__tests__/transport-security.test.ts"
@@ -710,7 +706,7 @@ coverage:
       - "scripts/__tests__/migrate.test.ts:112-220"
       - "src/__tests__/ai-inline-route.test.ts:105"
       - "src/__tests__/proxy.test.ts:80-90"
-    notes: "Next 16.3.8 satisfies 15+; env.ts makes every key optional and never validates DATABASE_URL while docker-compose hard-requires PHOENIX_ADMIN_SECRET and production startup requires auth config, TLS URLs, strong secrets and ENCRYPTION_KEY, contradicting 'only DATABASE_URL strictly required'. Graceful degradation tested only for ai-inline."
+    notes: "Next 16.3.8 satisfies 15+; env.ts makes every key optional and never validates DATABASE_URL while production startup requires auth config, TLS URLs, strong secrets and ENCRYPTION_KEY, contradicting 'only DATABASE_URL strictly required'. Graceful degradation tested only for ai-inline."
 orphans:
   - behavior: "Opportunity tracking with candidate entries: record contests before submitting (provider, dates, rules, fee, limits, eligibility, status found/considering/closed), attach projects as candidates, promote a chosen candidate into a contest submission, backfill unlinked submissions (API, MCP, pages; requirement doc 031)."
     code_paths:
