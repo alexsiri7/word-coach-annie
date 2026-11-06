@@ -309,6 +309,9 @@ async function mockProjectEditorApi(page: Page) {
   await page.route('**/api/chat', route =>
     route.fulfill({ json: { message: 'Mock response' }, status: 200 })
   )
+  await page.route('**/api/health', route =>
+    route.fulfill({ json: { status: 'ok' }, status: 200 })
+  )
   // Use function matcher for exact project endpoint to avoid intercepting sub-routes
   await page.route(
     url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
@@ -821,8 +824,8 @@ test.describe('Visual regression – Annie', () => {
       await sceneItem.waitFor({ state: 'visible', timeout: 5_000 })
     }
     await sceneItem.click()
-    // Wait for the editor to load the scene (breadcrumb updates)
-    await page.getByText('Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+    // SceneEditor is a dynamic import that shows a spinner until its chunk loads
+    await page.getByRole('toolbar', { name: 'Text formatting' }).waitFor({ state: 'visible', timeout: 10_000 })
 
     await expect(page).toHaveScreenshot('project-editor.png', {
       animations: 'disabled',
