@@ -2,15 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-// Mock snapshot module to avoid filesystem operations
-vi.mock("../mcp/snapshot", () => ({
-    initSnapshotRepo: vi.fn(),
-    createSnapshot: vi.fn(() => ({ hash: "abc123", message: "test" })),
-    listSnapshots: vi.fn(() => []),
-    restoreSnapshot: vi.fn(() => ({ hash: "def456", message: "restored" })),
-    autoSnapshot: vi.fn(),
-}));
-
 describe("MCP Server", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -20,6 +11,17 @@ describe("MCP Server", () => {
         const { createServer } = await import("../mcp/index");
         const server = createServer({ allowDestructive: true });
         expect(server).toBeDefined();
+    });
+
+    it("does not register database snapshot/restore tools", async () => {
+        const { createServer } = await import("../mcp/index");
+        const server = createServer({ allowDestructive: true });
+        const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+        for (const name of ["snapshot_database", "list_snapshots", "restore_snapshot"]) {
+            expect(tools).not.toHaveProperty(name);
+        }
+        expect(tools).toHaveProperty("get_scene_versions");
+        expect(tools).toHaveProperty("restore_scene_version");
     });
 
     it("creates a server with destructive tools disabled", async () => {

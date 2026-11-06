@@ -113,7 +113,6 @@ Controllers live in `src/lib/controllers/` and contain all business logic. They 
 
 - Keep controllers free of HTTP concerns (no `NextRequest`, no response objects)
 - Return plain objects or throw `Error` on failure
-- Use `autoSnapshot()` from `src/lib/db.ts` before any write that an agent might trigger
 
 ---
 

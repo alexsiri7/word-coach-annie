@@ -15,8 +15,9 @@ For schema changes:
 2. Review the generated SQL in `prisma/migrations/`
 3. Run `npx prisma generate` to regenerate the client
 
-The production database contains real creative work. Always create a database snapshot
-(`snapshot_database` MCP tool) before making significant changes.
+The production database contains real creative work. There is no MCP database snapshot
+tool: before significant changes, make sure a Supabase point-in-time recovery backup covers
+the change; undo scene edits with `get_scene_versions` / `restore_scene_version`.
 
 ## Screenshot Tests (Visual Regression)
 

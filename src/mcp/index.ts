@@ -2,7 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { HttpUrl } from "@/schemas/http-url";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { initSnapshotRepo } from "./snapshot";
 import { listSkills, loadSkill } from "./skills";
 import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
 import { getTracer } from "@/lib/telemetry";
@@ -95,11 +94,6 @@ import {
     getProjectSummary,
 } from "./tools/export";
 import {
-    snapshotDatabase,
-    listDatabaseSnapshots,
-    restoreDatabaseSnapshot,
-} from "./tools/snapshots";
-import {
     listUniverses,
     getUniverse,
     createUniverse,
@@ -139,13 +133,6 @@ import {
     universeIdForWorldObject,
     universeIdForTimelineEntry,
 } from "@/lib/ownership";
-
-// Initialize snapshot repo on startup
-try {
-    initSnapshotRepo();
-} catch (e) {
-    console.error("Warning: Could not initialize snapshot repo:", e);
-}
 
 interface McpServerOptions {
     /** Allow destructive tools (delete, restore). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
@@ -412,7 +399,7 @@ server.tool(
 
 server.tool(
     "delete_node",
-    "Delete a structure node and all its children, content versions, and relationships. A database snapshot is automatically created before deletion.",
+    "Delete a structure node and all its children, content versions, and relationships.",
     {
         nodeId: z.string().describe("The node ID to delete"),
     },
@@ -676,7 +663,7 @@ server.tool(
 
 server.tool(
     "delete_story_object",
-    "Delete a story object and all its relationships. A database snapshot is automatically created before deletion.",
+    "Delete a story object and all its relationships.",
     {
         objectId: z.string().describe("The story object ID to delete"),
     },
@@ -734,7 +721,7 @@ server.tool(
 
 server.tool(
     "batch_delete_story_objects",
-    "Delete multiple story objects and their relationships in a single operation. A snapshot is created before deletion. Max 50 per batch.",
+    "Delete multiple story objects and their relationships in a single operation. Max 50 per batch.",
     {
         objectIds: z.array(z.string()).describe("Array of story object IDs to delete"),
     },
@@ -884,7 +871,7 @@ server.tool(
 
 server.tool(
     "batch_delete_nodes",
-    "Delete multiple structure nodes and their children in a single operation. A snapshot is created before deletion. Max 50 per batch.",
+    "Delete multiple structure nodes and their children in a single operation. Max 50 per batch.",
     {
         nodeIds: z.array(z.string()).describe("Array of node IDs to delete"),
     },
@@ -933,7 +920,7 @@ server.tool(
 
 server.tool(
     "delete_relationship",
-    "Delete a relationship between two entities. A database snapshot is automatically created before deletion.",
+    "Delete a relationship between two entities.",
     {
         relationshipId: z.string().describe("The relationship ID to delete"),
     },
@@ -1325,45 +1312,6 @@ server.tool(
     async ({ projectId }) => {
         await verifyProjectOwnership(projectId, userId);
         const result = await getProjectSummary(projectId);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
-);
-
-// ─── Database Safety Tools ───────────────────────────────────────────────────
-
-server.tool(
-    "snapshot_database",
-    "Create a named snapshot (git commit) of the current database state. Use this before making significant changes as a safety checkpoint.",
-    {
-        message: z.string().describe("Description of what's about to change or why you're taking this snapshot"),
-    },
-    async ({ message }) => {
-        const result = await snapshotDatabase(message);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
-);
-
-server.tool(
-    "list_snapshots",
-    "List recent database snapshots (git commits) with timestamps and messages",
-    {
-        limit: z.number().optional().describe("Max snapshots to return (default 20)"),
-    },
-    async ({ limit }) => {
-        const result = await listDatabaseSnapshots(limit);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
-);
-
-server.tool(
-    "restore_snapshot",
-    "Restore the database to a previous snapshot. Creates a new snapshot of the restored state. WARNING: This replaces the current database contents.",
-    {
-        commitHash: z.string().describe("The snapshot commit hash to restore (from list_snapshots)"),
-    },
-    async ({ commitHash }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        const result = await restoreDatabaseSnapshot(commitHash);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 );

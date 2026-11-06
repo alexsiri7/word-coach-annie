@@ -341,7 +341,7 @@ requirements:
 
   - id: WCA-028
     title: MCP server tool coverage
-    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and database snapshots — full read/write parity with the web UI's core data."
+    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and scene version history — full read/write parity with the web UI's core data."
     category: functional
     priority: must
     status: active
@@ -399,14 +399,15 @@ requirements:
 
   - id: WCA-033
     title: Database snapshot and restore
-    statement: "When significant data changes occur or an agent requests it, the system shall support creating a database snapshot, listing snapshots, and restoring one via MCP tools, and most write operations shall trigger an automatic snapshot for agentic safety."
+    statement: "The system shall not offer per-session database snapshotting: the MCP server shall register no tool that snapshots, lists snapshots of, or restores the whole database. Agents shall recover their own edits through per-scene version history (get_scene_versions / restore_scene_version), and whole-database recovery is Supabase point-in-time recovery, operated by the owner outside the server."
     category: functional
     priority: should
     status: active
-    source: requirements/014, src/mcp/snapshot.ts
+    source: requirements/014, openspec/specs/agent-collaboration/spec.md, src/mcp/index.ts
     acceptance:
-      - "snapshot_database / list_snapshots / restore_snapshot round-trip"
-      - "Snapshot inputs (message, limit, hash) are validated/escaped before reaching any shell (SECURITY-AUDIT CRITICAL-01 regression guard)"
+      - "snapshot_database, list_snapshots and restore_snapshot are not registered on the MCP server"
+      - "get_scene_versions and restore_scene_version are registered on the MCP server"
+    notes: "Owner decision on #1379: the git-based snapshot tools became no-ops after the move to Supabase PostgreSQL and a whole-database restore would roll back every tenant, so the tools and the no-op autoSnapshot calls were removed rather than rebuilt."
 
   - id: WCA-034
     title: Writing skills as MCP prompts

@@ -84,8 +84,6 @@ src/
 4. **Controller** runs business logic against **Prisma** (SQLite)
 5. Response returned as JSON
 
-Most write operations (scene save, node create) trigger an automatic **git snapshot** of the database via `autoSnapshot()` for agentic safety.
-
 ## Data Model
 
 ### Core Entities
@@ -171,7 +169,7 @@ See `src/lib/sanitize-server.ts` for `wrapUserContent` and `src/lib/ai/peer-revi
 
 ### MCP Server (external agents)
 
-`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, DatabaseSafety, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
+`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
 
 Six writing skills are registered as **MCP Prompts** (discoverable via `list_prompts`, invocable via `get_prompt`).
 
@@ -210,7 +208,7 @@ Every scene save creates a new `ContentVersion` record. The controller keeps the
 
 ## Database Safety
 
-The database at `data/word-coach-annie.db` is volume-mounted. Git-based snapshots are taken automatically before write operations from the MCP server. This enables rollback via `restore_snapshot` MCP tool.
+The database at `data/word-coach-annie.db` is volume-mounted. The MCP server does not snapshot the database: agents undo scene edits through per-scene version history (`get_scene_versions` / `restore_scene_version`), and whole-database recovery is Supabase point-in-time recovery.
 
 **Never run `prisma db push` or `prisma migrate reset`** — these can drop tables. See [SETUP.md](SETUP.md) for safe schema migration procedure.
 

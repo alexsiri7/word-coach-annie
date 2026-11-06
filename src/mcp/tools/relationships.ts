@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { autoSnapshot } from "../snapshot";
 import { mcpCache } from "@/lib/cache";
 import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 
@@ -206,8 +205,6 @@ export async function deleteRelationship(relationshipId: string) {
 
     const fromName = existing.fromNode?.title || existing.fromObject?.name || existing.fromWorldObject?.name || "?";
     const toName = existing.toNode?.title || existing.toObject?.name || existing.toWorldObject?.name || "?";
-
-    autoSnapshot("delete_relationship", `${fromName} → ${toName}`);
 
     await prisma.relationship.delete({ where: { id: relationshipId } });
 
