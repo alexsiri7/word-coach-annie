@@ -8,7 +8,7 @@ Annie exposes the whole writing workspace to AI agents through an MCP server, so
 
 ### Requirement: Agents have parity with the web UI
 
-The MCP server SHALL be reachable locally over stdio and remotely over HTTP, and SHALL offer tools covering projects, structure, scene content, annotations, story objects, relationships, universes and world objects, writing tasks, submissions, opportunities, export, Google Docs connection, coaching context and snapshots. A change made through a tool SHALL persist exactly as the same change made in the web UI, and every project-scoped tool SHALL enforce the same access rules.
+The MCP server SHALL be reachable locally over stdio and remotely over HTTP, and SHALL offer tools covering projects, structure, scene content, annotations, story objects, relationships, universes and world objects, writing tasks, submissions, opportunities, export, Google Docs connection, coaching context and scene version history. A change made through a tool SHALL persist exactly as the same change made in the web UI, and every project-scoped tool SHALL enforce the same access rules.
 
 #### Scenario: Same result either way
 - GIVEN an agent creates a character through the MCP server

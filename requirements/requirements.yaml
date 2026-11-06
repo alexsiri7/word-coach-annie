@@ -341,7 +341,7 @@ requirements:
 
   - id: WCA-028
     title: MCP server tool coverage
-    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and database snapshots — full read/write parity with the web UI's core data."
+    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and scene version history — full read/write parity with the web UI's core data."
     category: functional
     priority: must
     status: active

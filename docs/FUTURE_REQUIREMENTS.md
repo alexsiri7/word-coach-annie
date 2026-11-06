@@ -497,7 +497,7 @@ These handle 80% of writing conversations:
 | `characters` | 6 | CRUD story objects + relationships |
 | `world_building` | 14 | Universes, world objects, timeline entries |
 | `export` | 6 | Manuscript, bible, medium, Google Docs |
-| `admin` | 7 | Database snapshots, Google auth |
+| `admin` | 7 | Google auth |
 | `skills` | 1 | Writing skills as MCP Prompts |
 
 **How it works:**
