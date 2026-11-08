@@ -252,12 +252,15 @@ const MOCK_ANNOTATIONS = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function disableAnimations(page: Page) {
-  await page.addStyleTag({
-    content: `*, *::before, *::after {
+  // A constructable stylesheet: the CSP blocks the <style> tag addStyleTag would insert.
+  await page.evaluate(() => {
+    const sheet = new CSSStyleSheet()
+    sheet.replaceSync(`*, *::before, *::after {
       animation-duration: 0s !important;
       animation-delay: 0s !important;
       transition-duration: 0s !important;
-    }`,
+    }`)
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
   })
 }
 
@@ -305,6 +308,9 @@ async function mockProjectEditorApi(page: Page) {
   )
   await page.route('**/api/chat', route =>
     route.fulfill({ json: { message: 'Mock response' }, status: 200 })
+  )
+  await page.route('**/api/health', route =>
+    route.fulfill({ json: { status: 'ok' }, status: 200 })
   )
   // Use function matcher for exact project endpoint to avoid intercepting sub-routes
   await page.route(
@@ -818,8 +824,8 @@ test.describe('Visual regression – Annie', () => {
       await sceneItem.waitFor({ state: 'visible', timeout: 5_000 })
     }
     await sceneItem.click()
-    // Wait for the editor to load the scene (breadcrumb updates)
-    await page.getByText('Throne Room').nth(1).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+    // SceneEditor is a dynamic import that shows a spinner until its chunk loads
+    await page.getByRole('toolbar', { name: 'Text formatting' }).waitFor({ state: 'visible', timeout: 10_000 })
 
     await expect(page).toHaveScreenshot('project-editor.png', {
       animations: 'disabled',

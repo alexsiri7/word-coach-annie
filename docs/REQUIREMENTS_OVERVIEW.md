@@ -23,7 +23,7 @@ Word Coach Annie is a local-first, distraction-free writing tool for novelists, 
 ### 4. Agentic Interaction (MCP)
 - Full project access for AI agents via Model Context Protocol (MCP).
 - Tools for automated CRUD, structure manipulation, and export.
-- Git-based database snapshots for safe agentic edits.
+- Per-scene version history (`get_scene_versions` / `restore_scene_version`) to undo agentic edits; whole-database recovery is Supabase point-in-time recovery.
 
 ### 5. Export & Search
 - Full manuscript export to clean Markdown.

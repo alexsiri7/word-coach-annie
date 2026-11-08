@@ -26,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { sanitizeDisplayHtml } from "@/lib/sanitize-display";
+import { countSceneWords, stripBeats } from "@/lib/scene-text";
 import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
 import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
 
@@ -53,18 +55,12 @@ interface ReaderViewProps {
   isOwner: boolean;
 }
 
-/** Strip beat annotations from HTML content */
-function stripBeats(html: string): string {
-  return html.replace(/<!-- beat:[\s\S]*?-->/g, "");
-}
-
 /** Count total words across all scenes */
 function countWords(outline: OutlineNode[]): number {
   let count = 0;
   for (const node of outline) {
     if (node.type === "SCENE" && node.content) {
-      const text = stripBeats(node.content).replace(/<[^>]+>/g, "");
-      count += text.split(/\s+/).filter(Boolean).length;
+      count += countSceneWords(node.content);
     }
     count += countWords(node.children);
   }
@@ -495,14 +491,10 @@ function SceneContent({
   const cleaned = stripBeats(content);
 
   // Sanitize HTML to prevent XSS — content may come from another user via sharing.
-  // isomorphic-dompurify works on both SSR and client, so no window guard needed.
-  // ADD_TAGS: ["mark"] allows the <mark> elements already embedded in saved
-  // content (from the editor's native annotation mark) plus the ones we
-  // inject client-side below for annotations that aren't embedded.
-  const sanitized = useMemo(() => {
-    const DOMPurify = require("isomorphic-dompurify");
-    return DOMPurify.sanitize(cleaned, { ADD_TAGS: ["mark"] });
-  }, [cleaned]);
+  // <mark> is allowed for the elements already embedded in saved content (from
+  // the editor's native annotation mark) plus the ones we inject client-side
+  // below for annotations that aren't embedded.
+  const sanitized = useMemo(() => sanitizeDisplayHtml(cleaned, ["mark"]), [cleaned]);
 
   // `dangerouslySetInnerHTML` MUST receive a referentially-stable object, not
   // a fresh `{ __html: sanitized }` literal on every render. This component

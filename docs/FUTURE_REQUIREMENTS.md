@@ -497,7 +497,7 @@ These handle 80% of writing conversations:
 | `characters` | 6 | CRUD story objects + relationships |
 | `world_building` | 14 | Universes, world objects, timeline entries |
 | `export` | 6 | Manuscript, bible, medium, Google Docs |
-| `admin` | 7 | Database snapshots, Google auth |
+| `admin` | 7 | Google auth |
 | `skills` | 1 | Writing skills as MCP Prompts |
 
 **How it works:**
@@ -511,13 +511,12 @@ These handle 80% of writing conversations:
 
 ### Implementation (does NOT use MCP protocol)
 The in-app chat calls controllers directly (same code the MCP tools wrap). No stdio,
-no MCP client needed. Tool definitions are OpenAI function-calling schemas generated
-from the same Zod schemas the MCP server uses.
+no MCP client needed. Tool definitions are ADK `FunctionTool`s built from Zod schemas
+that mirror the MCP server's.
 
 | File | Purpose |
 |------|---------|
-| `src/lib/ai/tool-registry.ts` | Tool category definitions, Zod→OpenAI schema conversion |
-| `src/lib/ai/tool-executor.ts` | Execute tool calls by routing to controllers |
+| `src/lib/ai/adk-tools.ts` | Tool category definitions, Zod schemas, and executors that route tool calls to controllers |
 | `src/app/api/chat/route.ts` | Add tool use loop with streaming |
 | `src/components/ai-chat-panel.tsx` | Show tool use indicators in UI |
 

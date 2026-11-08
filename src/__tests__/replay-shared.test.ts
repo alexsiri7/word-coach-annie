@@ -3,6 +3,9 @@ import {
   REPLAY_LOCK_NAME,
   createSessionRefresher,
   replayFetch,
+  STREAK_REFRESH_RETRY_MS,
+  sendWithSessionRetry,
+  streakRefresher,
   withReplayLock,
 } from "@/lib/offline/replay-shared";
 
@@ -58,6 +61,55 @@ describe("replay-shared", () => {
 
       expect(res.status).toBe(401);
       expect(opFetchCount(fetchMock)).toBe(2);
+    });
+  });
+
+  describe("sendWithSessionRetry", () => {
+    it("re-sends through the caller's send function after a refresh", async () => {
+      const send = vi.fn()
+        .mockResolvedValueOnce(new Response("{}", { status: 401 }))
+        .mockResolvedValueOnce(new Response("{}", { status: 201 }));
+
+      const res = await sendWithSessionRetry(send, async () => true);
+
+      expect(res.status).toBe(201);
+      expect(send).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("streakRefresher", () => {
+    it("retries on the auth rate-limit window", async () => {
+      vi.resetModules();
+      vi.doMock("@/lib/rate-limit-config", () => ({
+        RATE_LIMITS: { auth: { limit: 1, windowMs: 1234 } },
+      }));
+      try {
+        const shared = await import("@/lib/offline/replay-shared");
+        expect(shared.STREAK_REFRESH_RETRY_MS).toBe(1234);
+      } finally {
+        vi.doUnmock("@/lib/rate-limit-config");
+        vi.resetModules();
+      }
+    });
+
+    it("reuses the streak's refresher within the retry window", () => {
+      const first = streakRefresher(null, 1000);
+      expect(streakRefresher(first, 1000 + STREAK_REFRESH_RETRY_MS - 1)).toBe(first);
+    });
+
+    it("tries the refresh again once the window has passed, even after a failed refresh", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(new Response("{}", { status: 429 }))
+        .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const first = streakRefresher(null, 1000);
+      expect(await first.refresh()).toBe(false);
+      expect(await first.refresh()).toBe(false);
+
+      const next = streakRefresher(first, 1000 + STREAK_REFRESH_RETRY_MS);
+      expect(await next.refresh()).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
 

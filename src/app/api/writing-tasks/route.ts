@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         const userId = getCurrentUserId(request);
         const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
+        if (access.role === "READER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
         const importance = searchParams.get("importance");
         const size = searchParams.get("size");

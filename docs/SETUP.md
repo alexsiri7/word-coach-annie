@@ -13,42 +13,7 @@ That's it — everything runs inside the container. Do not run `npm` or `node` c
 
 ## Production Deployment
 
-### Quick Start (recommended)
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/alexsiri7/word-coach-annie.git
-cd word-coach-annie
-
-# 2. Configure environment
-cp .env.example .env.local
-# Edit .env.local — at minimum set API_TOKEN and AI_API_KEY
-# Phoenix tracing secrets, read by Docker Compose from .env (see "Tracing (Phoenix)")
-printf 'PHOENIX_SECRET=%s\nPHOENIX_ADMIN_SECRET=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
-
-# 3. Start
-docker compose up -d
-
-# 4. Verify
-curl http://localhost:3000/api/health   # → {"ok":true}
-```
-
-The app runs on `http://localhost:3000`. The database is at `./data/word-coach-annie.db` (persisted via volume mount).
-
-### Image Source
-
-Production uses a pre-built image from GitHub Container Registry:
-```
-ghcr.io/alexsiri7/word-coach-annie:latest
-```
-
-CI builds and pushes this image on every commit to `main` that passes quality gates.
-
-### Updating to Latest
-
-```bash
-docker compose pull && docker compose up -d
-```
+Production and staging run on Railway, which builds the root `Dockerfile` from source; see [TECH_STACK.md](TECH_STACK.md#hosting). There is no self-hosted production stack.
 
 ---
 
@@ -132,11 +97,9 @@ A stored value that no configured key can decrypt is treated as disconnected: th
 
 | Variable | Description |
 |----------|-------------|
-| `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. Production requires `rediss://` (startup refuses `redis://`). The server must speak RESP3 (Redis 6+ / `HELLO 3`): ioredis 6 negotiates RESP3 by default and does not fall back, and because the limiter fails open a RESP2-only server would silently disable rate limiting. |
+| `REDIS_URL` | Redis connection URL for distributed rate limiting (e.g. `redis://localhost:6379`). When unset, rate limiting uses a per-process in-memory store. Production requires `rediss://` (startup refuses `redis://`). The server must speak RESP3 (Redis 6+ / `HELLO 3`): ioredis 6 negotiates RESP3 by default and does not fall back, and because the limiter fails open (only the auth bucket falls back to the in-memory store) a RESP2-only server would silently disable most rate limiting. |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for public access |
-| `PHOENIX_SECRET` | Signs Phoenix auth tokens. Required when running `docker-compose.yml`; generate with `openssl rand -hex 32` |
-| `PHOENIX_ADMIN_SECRET` | Bearer token the app sends to Phoenix on trace export. Required when running `docker-compose.yml`; generate separately from `PHOENIX_SECRET` |
-| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive MCP tools (delete, restore_snapshot). Default: `false` |
+| `MCP_ALLOW_DESTRUCTIVE` | Set `true` to enable destructive tools (delete tools) in MCP and delete tools in the in-app AI chat. Default: `false` |
 | `GITHUB_FEEDBACK_TOKEN` | GitHub personal access token with `issues:write` for the feedback repo |
 | `GITHUB_FEEDBACK_REPO` | GitHub repo for feedback issues (e.g., `myorg/myrepo`) |
 
@@ -147,22 +110,19 @@ A stored value that no configured key can decrypt is treated as disconnected: th
 The app binds only to `127.0.0.1:3000` by default. For secure public access without opening a firewall port:
 
 1. Create a tunnel at the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
-2. Set `CLOUDFLARE_TUNNEL_TOKEN` in `.env.local`
+2. Set `CLOUDFLARE_TUNNEL_TOKEN` and `API_TOKEN` in your shell environment or `.env` (Compose reads them, not the app's `.env.local`)
 3. Configure the tunnel to route to `http://localhost:3000`
 4. Set `APP_BASE_URL` to the tunnel's public origin (e.g., `https://annie.yourdomain.com`) — the calendar feed and MCP OAuth discovery metadata build their links from it, not from forwarded request headers
 
-The `tunnel` service in `docker-compose.yml` starts automatically alongside the app.
+Start it with the dev tunnel overlay (see [Development](#development)).
 
 ---
 
 ## Tracing (Phoenix)
 
-The `phoenix` service in `docker-compose.yml` collects OpenTelemetry traces with auth enabled:
+The `phoenix` service in `docker-compose.dev.yml` collects OpenTelemetry traces from the dev server:
 
-- The app authenticates its trace export with `PHOENIX_ADMIN_SECRET`; Phoenix signs sessions with `PHOENIX_SECRET`. Compose refuses to start until both are set.
-- Both come from Docker Compose variable interpolation: your shell environment, a `.env` file beside `docker-compose.yml`, or `docker compose --env-file .env.local`. They are not read from the app's `env_file`.
-- The UI is at `http://127.0.0.1:6006`. The default login is `admin@localhost` / `admin`; Phoenix makes you change the password at first login.
-- Phoenix sits on a private `telemetry` network shared only with the app, so the tunnel container cannot reach it.
+- The UI is at `http://127.0.0.1:6006`.
 - Tool-call spans record tool name, category, status, and input/output lengths — never tool content.
 
 ---
@@ -181,14 +141,20 @@ docker compose -f docker-compose.dev.yml up -d
 
 The dev setup mounts the source directory into the container, so file changes are reflected immediately without rebuilding.
 
+The dev stack does not start a Cloudflare tunnel. To expose the dev server publicly, add the tunnel overlay; Compose refuses to start it unless `API_TOKEN` and `CLOUDFLARE_TUNNEL_TOKEN` are set (shell environment or `.env`), and the app receives that `API_TOKEN` so auth is on:
+
+```bash
+docker compose -f docker-compose.dev.yml -f docker-compose.tunnel.yml up
+```
+
 **Run commands inside the container:**
 
 ```bash
-docker compose exec app npm run test:run      # Tests
-docker compose exec app npm run typecheck     # TypeScript
-docker compose exec app npm run lint          # ESLint
-docker compose exec app npm run build         # Production build check
-docker compose exec app npx prisma studio     # Database browser (port 5555)
+docker compose -f docker-compose.dev.yml exec app npm run test:run      # Tests
+docker compose -f docker-compose.dev.yml exec app npm run typecheck     # TypeScript
+docker compose -f docker-compose.dev.yml exec app npm run lint          # ESLint
+docker compose -f docker-compose.dev.yml exec app npm run build         # Production build check
+docker compose -f docker-compose.dev.yml exec app npx prisma studio     # Database browser (port 5555)
 ```
 
 ---
@@ -197,7 +163,7 @@ docker compose exec app npx prisma studio     # Database browser (port 5555)
 
 ### Location
 
-`./data/word-coach-annie.db` — SQLite file persisted via Docker volume mount. The `data/` directory is also a git repo (`data/.git`) for snapshot management.
+`./data/word-coach-annie.db` — SQLite file persisted via Docker volume mount.
 
 ### Schema Changes (CRITICAL)
 
@@ -211,12 +177,12 @@ ALTER TABLE "SomeTable" ADD COLUMN "newColumn" TEXT;
 EOF
 
 # 2. Apply it
-docker compose exec app sqlite3 data/word-coach-annie.db < migration.sql
+docker compose -f docker-compose.dev.yml exec app sqlite3 data/word-coach-annie.db < migration.sql
 
 # 3. Update prisma/schema.prisma to match
 
 # 4. Regenerate the client (safe — does not touch the DB)
-docker compose exec app npx prisma generate
+docker compose -f docker-compose.dev.yml exec app npx prisma generate
 ```
 
 ### Staging database role
@@ -266,15 +232,9 @@ Manual backup:
 cp data/word-coach-annie.db data/word-coach-annie.db.bak
 ```
 
-### Git Snapshots (for MCP safety)
+### Recovering from agent edits
 
-The MCP server takes automatic git snapshots of `data/` before write operations. List and restore snapshots via MCP tools:
-
-```bash
-# Via Gemini CLI
-gemini -m "@word-coach-annie list_snapshots"
-gemini -m "@word-coach-annie restore_snapshot --snapshotId <id>"
-```
+The MCP server does not snapshot the database. Undo an agent's edit to a scene with `get_scene_versions` / `restore_scene_version`; whole-database recovery is Supabase point-in-time recovery (Supabase Dashboard → Database → Backups).
 
 ---
 
@@ -351,17 +311,19 @@ For web-based MCP clients, the app exposes an HTTP MCP proxy at `POST /api/mcp`.
 
 ### Destructive Tools
 
-By default, destructive MCP tools (delete operations, `restore_snapshot`) are hidden. Enable them:
+By default, destructive MCP tools (delete operations) are hidden. Enable them:
 
 ```
 MCP_ALLOW_DESTRUCTIVE=true
 ```
 
+This flag also gates the in-app AI chat's delete tools.
+
 ---
 
 ## Troubleshooting
 
-**Container won't start**: Check `docker compose logs app`. Most common cause: missing required env vars.
+**Container won't start**: Check `docker compose -f docker-compose.dev.yml logs app`. Most common cause: missing required env vars.
 
 **Database errors**: Ensure `./data/` directory exists and is writable. The container creates `word-coach-annie.db` on first start.
 

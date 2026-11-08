@@ -17,6 +17,10 @@ import { logger } from "@/lib/logger";
  * If logged in, renders an HTML consent page with Approve / Deny buttons.
  */
 export async function GET(request: NextRequest) {
+  const nonce = request.headers.get("x-nonce") ?? "";
+  if (!nonce) {
+    logger.warn("GET /oauth/authorize: x-nonce header missing — inline styles will be CSP-blocked");
+  }
   const { error, clientName, params } = await validateRequest(request);
   if (error) return error;
 
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
     code_challenge: params!.codeChallenge,
     code_challenge_method: params!.codeChallengeMethod,
     csrf_token: csrfToken,
-  });
+  }, nonce);
 
   response.cookies.set("csrf_oauth", csrfToken, {
     httpOnly: true,
@@ -299,7 +303,7 @@ function renderCodePage(code: string, redirectUrl: string, nonce: string): NextR
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Authorization Code - Annie</title>
-  <style>
+  <style nonce="${nonce}">
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -391,6 +395,7 @@ function renderConsentPage(
   clientName: string,
   redirectUri: string,
   hiddenFields: Record<string, string>,
+  nonce: string,
 ): NextResponse {
   const escapedName = escapeHtml(clientName);
   const escapedRedirectHost = escapeHtml(new URL(redirectUri).host);
@@ -405,7 +410,7 @@ function renderConsentPage(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Authorize - Annie</title>
-  <style>
+  <style nonce="${nonce}">
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

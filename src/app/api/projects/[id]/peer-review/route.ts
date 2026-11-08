@@ -39,6 +39,7 @@ export async function GET(
   const userId = getCurrentUserId(request);
   const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
   if (!access.authorized) return access.response;
+  if (access.role === "READER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const { searchParams } = request.nextUrl;

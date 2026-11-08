@@ -1,5 +1,8 @@
 // Shared by the page (sync-queue.ts) and the service worker (src/worker/index.ts).
-// Keep this module import-free: the worker bundle is compiled separately.
+// The worker bundle is compiled separately: import only import-free modules,
+// by relative path.
+
+import { RATE_LIMITS } from "../rate-limit-config";
 
 export const MAX_REPLAY_RETRIES = 3;
 export const REPLAY_LOCK_NAME = "annie-replay";
@@ -24,7 +27,8 @@ export async function withReplayLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Returns a function that refreshes the session at most once per replay run.
+ * Returns a function that refreshes the session at most once per replay run
+ * (or, for live autosave, per streakRefresher window).
  * /api/auth/refresh is rate-limited per IP and rotates the refresh token, so
  * refreshing once per failing op would trip the limit or revoke itself.
  */
@@ -37,6 +41,24 @@ export function createSessionRefresher(): () => Promise<boolean> {
     );
     return pending;
   };
+}
+
+/**
+ * How long a streak of failing autosaves reuses one refresher: one auth
+ * rate-limit window, so a refresh that failed for a transient reason
+ * (429, 5xx, network) is retried once the window has passed.
+ */
+export const STREAK_REFRESH_RETRY_MS = RATE_LIMITS.auth.windowMs;
+
+export interface StreakRefresher {
+  refresh: () => Promise<boolean>;
+  startedAt: number;
+}
+
+/** The streak's current refresher, or a fresh one once it has expired. */
+export function streakRefresher(current: StreakRefresher | null, now: number): StreakRefresher {
+  if (current && now - current.startedAt < STREAK_REFRESH_RETRY_MS) return current;
+  return { refresh: createSessionRefresher(), startedAt: now };
 }
 
 export interface ReplayableOp {
@@ -54,16 +76,24 @@ function sendOp(op: ReplayableOp): Promise<Response> {
 }
 
 /**
- * Sends a queued op. On 401 it refreshes the session and re-sends once; if the
+ * Calls `send`. On 401 it refreshes the session and re-sends once; if the
  * refresh fails or the re-send is also 401, the 401 is returned for the
  * caller's normal failure handling. Network errors propagate.
  */
-export async function replayFetch(
+export async function sendWithSessionRetry(
+  send: () => Promise<Response>,
+  refreshSession: () => Promise<boolean>
+): Promise<Response> {
+  const res = await send();
+  if (res.status !== 401) return res;
+  if (!(await refreshSession())) return res;
+  return send();
+}
+
+/** Sends a queued op, refreshing the session and re-sending once on 401. */
+export function replayFetch(
   op: ReplayableOp,
   refreshSession: () => Promise<boolean>
 ): Promise<Response> {
-  const res = await sendOp(op);
-  if (res.status !== 401) return res;
-  if (!(await refreshSession())) return res;
-  return sendOp(op);
+  return sendWithSessionRetry(() => sendOp(op), refreshSession);
 }

@@ -622,8 +622,7 @@ export function AIChatPanel({ projectId, sceneContext, initialMessage, onPromptC
             placeholder={isOnline ? "Ask about your story..." : "AI chat unavailable offline"}
             aria-label="Chat message"
             rows={1}
-            className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted border border-border focus:outline-none focus:ring-1 focus:ring-accent max-h-24 overflow-y-auto"
-            style={{ minHeight: "36px" }}
+            className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted border border-border focus:outline-none focus:ring-1 focus:ring-accent min-h-9 max-h-24 overflow-y-auto"
             disabled={isStreaming || !isOnline}
           />
           <Button

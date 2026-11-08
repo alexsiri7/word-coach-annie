@@ -22,6 +22,7 @@ writeFileSync(join(__dirname, "public", "version.json"), JSON.stringify({ versio
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  poweredByHeader: false,
   // isomorphic-dompurify: externalized because its ESM/CJS hybrid does not bundle correctly
   // under webpack in Next.js 16 (peer issue with dompurify's jsdom path).
   // ioredis: uses node:diagnostics_channel (Node.js built-in) which webpack cannot bundle
@@ -92,6 +93,14 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
+          {
+            key: "Cross-Origin-Resource-Policy",
+            value: "same-origin",
           },
         ],
       },

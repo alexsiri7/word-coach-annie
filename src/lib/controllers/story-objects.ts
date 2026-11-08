@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { autoSnapshot } from "../../mcp/snapshot";
 import { UserFacingError } from "@/lib/controllers/errors";
 
 const VALID_TYPES = ["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"] as const;
@@ -91,46 +90,52 @@ export class StoryObjectController {
     }
 
     static async getStoryObject(objectId: string) {
+        const nodeSelect = { select: { id: true, title: true, type: true } };
+        const objectSelect = { select: { id: true, name: true, type: true } };
         const obj = await prisma.storyObject.findUnique({
             where: { id: objectId },
             include: {
-                relationships: {
-                    include: {
-                        toNode: { select: { id: true, title: true, type: true } },
-                        toObject: { select: { id: true, name: true, type: true } },
-                    },
-                },
+                // Despite their names, `relatedBy` holds edges from this object
+                // and `relationships` holds edges to it.
                 relatedBy: {
-                    include: {
-                        fromNode: { select: { id: true, title: true, type: true } },
-                        fromObject: { select: { id: true, name: true, type: true } },
-                    },
+                    include: { toNode: nodeSelect, toObject: objectSelect, toWorldObject: objectSelect },
+                },
+                relationships: {
+                    include: { fromNode: nodeSelect, fromObject: objectSelect, fromWorldObject: objectSelect },
                 },
             },
         });
 
         if (!obj) throw new UserFacingError("Story object not found");
 
+        type Named = { id: string; name: string; type: string };
+        // `kind` says which table `id` belongs to: story and world objects share
+        // type names, and their follow-up tools reject each other's ids.
+        const toTarget = (
+            node: { id: string; title: string; type: string } | null,
+            object: Named | null,
+            worldObject: Named | null,
+        ) => {
+            if (node) return { kind: "node" as const, id: node.id, name: node.title, entityType: node.type };
+            if (object) return { kind: "storyObject" as const, id: object.id, name: object.name, entityType: object.type };
+            if (worldObject) {
+                return { kind: "worldObject" as const, id: worldObject.id, name: worldObject.name, entityType: worldObject.type };
+            }
+            return null;
+        };
+
         const relatedTo = [
-            ...obj.relationships.map((r) => ({
-                relationshipId: r.id,
-                type: r.type,
-                label: r.label,
-                target: r.toNode
-                    ? { id: r.toNode.id, name: r.toNode.title, entityType: r.toNode.type }
-                    : r.toObject
-                        ? { id: r.toObject.id, name: r.toObject.name, entityType: r.toObject.type }
-                        : null,
-            })),
             ...obj.relatedBy.map((r) => ({
                 relationshipId: r.id,
                 type: r.type,
                 label: r.label,
-                target: r.fromNode
-                    ? { id: r.fromNode.id, name: r.fromNode.title, entityType: r.fromNode.type }
-                    : r.fromObject
-                        ? { id: r.fromObject.id, name: r.fromObject.name, entityType: r.fromObject.type }
-                        : null,
+                target: toTarget(r.toNode, r.toObject, r.toWorldObject),
+            })),
+            ...obj.relationships.map((r) => ({
+                relationshipId: r.id,
+                type: r.type,
+                label: r.label,
+                target: toTarget(r.fromNode, r.fromObject, r.fromWorldObject),
             })),
         ];
 
@@ -249,12 +254,6 @@ export class StoryObjectController {
         const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
         if (!obj) throw new UserFacingError("Story object not found");
 
-        try {
-            autoSnapshot("delete_story_object", obj.name);
-        } catch {
-            // ignore snapshot issues in pure execution context if necessary
-        }
-
         await prisma.storyObject.delete({ where: { id: objectId } });
 
         return { deleted: true, id: objectId, name: obj.name, type: obj.type };
@@ -362,12 +361,6 @@ export class StoryObjectController {
     static async batchDeleteStoryObjects(objectIds: string[]) {
         if (objectIds.length === 0) throw new UserFacingError("objectIds array must not be empty");
         if (objectIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
-
-        try {
-            autoSnapshot("batch_delete_story_objects", `${objectIds.length} objects`);
-        } catch {
-            // ignore snapshot issues
-        }
 
         const results = [];
         const errors = [];

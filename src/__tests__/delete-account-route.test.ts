@@ -11,8 +11,13 @@ vi.mock("@/lib/api-auth", () => ({
 vi.mock("@/lib/auth", () => ({
   isGoogleAuthMode: vi.fn(() => true),
   SESSION_COOKIE_NAME: "session",
+  REFRESH_COOKIE_NAME: "refresh",
   SESSION_MAX_AGE: 3600,
-  verifySessionToken: vi.fn(() => null),
+  REFRESH_MAX_AGE: 2592000,
+}));
+vi.mock("@/lib/auth-server", () => ({
+  verifySessionTokenNode: vi.fn(async () => null),
+  verifyRefreshToken: vi.fn(async () => null),
 }));
 vi.mock("@/lib/token-blocklist", () => ({
   revokeToken: vi.fn(),
@@ -22,7 +27,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
-import { isGoogleAuthMode, verifySessionToken } from "@/lib/auth";
+import { isGoogleAuthMode } from "@/lib/auth";
+import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -46,6 +52,8 @@ describe("DELETE /api/auth/delete-account", () => {
     vi.mocked(getCurrentUserId).mockReturnValue(null);
     vi.mocked(isGoogleAuthMode).mockReturnValue(true);
     vi.mocked(validateCsrfHeader).mockReturnValue(null);
+    vi.mocked(verifySessionTokenNode).mockResolvedValue(null);
+    vi.mocked(verifyRefreshToken).mockResolvedValue(null);
   });
 
   it("returns 403 without CSRF header", async () => {
@@ -125,7 +133,7 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(deleted).toBeNull();
   });
 
-  it("clears session cookie in response", async () => {
+  it("clears session and refresh cookies in response", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u4", email: "del4@test.com", googleId: "g-del4" },
     });
@@ -138,6 +146,7 @@ describe("DELETE /api/auth/delete-account", () => {
     const setCookie = res.headers.get("set-cookie");
     expect(setCookie).toBeTruthy();
     expect(setCookie).toContain("session=");
+    expect(setCookie).toContain("refresh=");
     expect(setCookie).toContain("Max-Age=0");
   });
 
@@ -146,7 +155,7 @@ describe("DELETE /api/auth/delete-account", () => {
       data: { id: "del-u5", email: "del5@test.com", googleId: "g-del5" },
     });
     vi.mocked(getCurrentUserId).mockReturnValue(user.id);
-    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-abc", userId: user.id, email: "del5@test.com", name: "Test" });
+    vi.mocked(verifySessionTokenNode).mockResolvedValue({ jti: "jti-abc", userId: user.id, email: "del5@test.com", name: "Test" });
 
     const { DELETE } = await import("@/app/api/auth/delete-account/route");
     const req = new NextRequest("http://localhost/api/auth/delete-account", {
@@ -160,12 +169,31 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("jti-abc", user.id, expect.any(Date));
   });
 
+  it("revokes refresh token on successful deletion", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-u12", email: "del12@test.com", googleId: "g-del12" },
+    });
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+    vi.mocked(verifyRefreshToken).mockResolvedValue({ jti: "jti-refresh", userId: user.id, email: "del12@test.com", name: "Test" });
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const req = new NextRequest("http://localhost/api/auth/delete-account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "X-CSRF-Protection": "1", Cookie: "refresh=tok789" },
+      body: JSON.stringify({ email: "del12@test.com" }),
+    });
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(revokeToken)).toHaveBeenCalledWith("jti-refresh", user.id, expect.any(Date));
+  });
+
   it("still returns 200 when revokeToken throws (best-effort)", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-u6", email: "del6@test.com", googleId: "g-del6" },
     });
     vi.mocked(getCurrentUserId).mockReturnValue(user.id);
-    vi.mocked(verifySessionToken).mockResolvedValue({ jti: "jti-xyz", userId: user.id, email: "del6@test.com", name: "Test" });
+    vi.mocked(verifySessionTokenNode).mockResolvedValue({ jti: "jti-xyz", userId: user.id, email: "del6@test.com", name: "Test" });
     vi.mocked(revokeToken).mockRejectedValue(new Error("DB down"));
 
     const { DELETE } = await import("@/app/api/auth/delete-account/route");

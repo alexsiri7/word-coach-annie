@@ -122,7 +122,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F8.2: Summarize: generate synopsis for a scene or chapter from its content
 - F8.3: Consistency check: ask Gemini to review scenes for character/plot consistency
 - F8.4: AI results shown in a side panel; user explicitly applies or discards suggestions
-- F8.5: All AI interactions are non-destructive (never auto-edit content)
+- F8.5: AI assistance actions (F8.1–F8.3, F8.6) are non-destructive (never auto-edit content); the AI Chat agent (F22) may modify the project directly, under F22.9's safeguards
 - F8.6: AI inline action bar: text-selection-based brainstorm/expand/summarize
 
 ### F9: Search
@@ -164,7 +164,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F15.1: Insert beat markers in the scene editor via toolbar button
 - F15.2: Beats stored as HTML comments (`<!-- beat: ... -->`) in scene content
 - F15.3: Rendered as styled divider cards in the editor
-- F15.4: Preserved across save/load cycles; stripped from all exports
+- F15.4: Preserved across save/load cycles; stripped from all exports except the Google Docs STORY_INTERNAL export
 
 ### F16: Google Docs Export & Bidirectional Sync
 - F16.1: Export manuscript to Google Docs via OAuth2
@@ -210,10 +210,11 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 - F22.2: Dynamic system prompt built from project structure, story objects, and user preferences
 - F22.3: Chat history (last 20 messages) maintained per project
 - F22.4: Optional scene context injection for scene-specific coaching
-- F22.5: Coaching styles: balanced, mentor, critic, cheerleader
-- F22.6: Response lengths: brief, moderate, detailed
+- F22.5: Coaching styles: gentle, balanced, direct
+- F22.6: Response lengths: concise, moderate, detailed
 - F22.7: Custom system instructions per user
 - F22.8: Markdown rendering with DOMPurify sanitization
+- F22.9: The chat agent reads and modifies the current project through tools loaded on demand (`load_toolset`), pinned to that project; delete tools are blocked unless `MCP_ALLOW_DESTRUCTIVE=true`, and writes require the `contentHash` from a prior read (stale-write protection)
 
 ### F23: Read View (Reader Mode)
 - F23.1: Clean reading view without editing UI (`/read/[id]`)

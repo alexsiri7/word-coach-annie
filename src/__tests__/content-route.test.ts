@@ -93,6 +93,86 @@ describe("Content Route /api/nodes/[id]/content", () => {
         });
     });
 
+    describe("GET by a project share", () => {
+        let versionId: string;
+
+        beforeEach(async () => {
+            const owner = await testPrisma.user.create({
+                data: { email: "owner@example.com", googleId: "google-owner", name: "Owner" },
+            });
+            await testPrisma.project.update({ where: { id: projectId }, data: { userId: owner.id } });
+            await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Abandoned draft</p>", wordCount: 2 },
+            });
+            const latest = await testPrisma.contentVersion.create({
+                data: { nodeId, content: "<p>Current text</p>", wordCount: 2 },
+            });
+            versionId = latest.id;
+        });
+
+        async function shareAs(role: "READER" | "EDITOR") {
+            const email = `${role.toLowerCase()}@example.com`;
+            const user = await testPrisma.user.create({
+                data: { email, googleId: `google-${role}`, name: role },
+            });
+            await testPrisma.projectShare.create({ data: { projectId, email, role } });
+            return (url: string) => {
+                const req = mockReq(url);
+                req.headers.set("x-user-id", user.id);
+                req.headers.set("x-user-email", email);
+                return req;
+            };
+        }
+
+        async function setStatus(status: string) {
+            await testPrisma.structureNode.update({ where: { id: nodeId }, data: { status } });
+        }
+
+        it("gives a READER the current text of a drafted scene without history", async () => {
+            await setStatus("DRAFT");
+            const req = (await shareAs("READER"))(`http://localhost/api/nodes/${nodeId}/content`);
+            const { GET } = await import("@/app/api/nodes/[id]/content/route");
+            const res = await GET(req as never, mockParams({ id: nodeId }));
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.latest.content).toBe("<p>Current text</p>");
+            expect(data.history).toEqual([]);
+        });
+
+        it("refuses a READER a version by id", async () => {
+            await setStatus("DRAFT");
+            const req = (await shareAs("READER"))(
+                `http://localhost/api/nodes/${nodeId}/content?versionId=${versionId}`
+            );
+            const { GET } = await import("@/app/api/nodes/[id]/content/route");
+            const res = await GET(req as never, mockParams({ id: nodeId }));
+            expect(res.status).toBe(403);
+        });
+
+        it("refuses a READER an outline scene", async () => {
+            const req = (await shareAs("READER"))(`http://localhost/api/nodes/${nodeId}/content`);
+            const { GET } = await import("@/app/api/nodes/[id]/content/route");
+            const res = await GET(req as never, mockParams({ id: nodeId }));
+            expect(res.status).toBe(403);
+        });
+
+        it("still gives an EDITOR the history and any version of an outline scene", async () => {
+            const asEditor = await shareAs("EDITOR");
+            const { GET } = await import("@/app/api/nodes/[id]/content/route");
+            const res = await GET(
+                asEditor(`http://localhost/api/nodes/${nodeId}/content`) as never,
+                mockParams({ id: nodeId })
+            );
+            expect(res.status).toBe(200);
+            expect((await res.json()).history).toHaveLength(2);
+            const versionRes = await GET(
+                asEditor(`http://localhost/api/nodes/${nodeId}/content?versionId=${versionId}`) as never,
+                mockParams({ id: nodeId })
+            );
+            expect(versionRes.status).toBe(200);
+        });
+    });
+
     describe("POST", () => {
         it("creates a new content version", async () => {
             const { POST } = await import("@/app/api/nodes/[id]/content/route");

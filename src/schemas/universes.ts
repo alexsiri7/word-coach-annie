@@ -16,3 +16,9 @@ export const UniverseUpdateSchema = z
 
 export type UniverseCreateInput = z.infer<typeof UniverseCreateSchema>;
 export type UniverseUpdateInput = z.infer<typeof UniverseUpdateSchema>;
+
+export const UniverseLinkProjectSchema = z.object({
+  projectId: z.string({ error: "projectId is required" }).min(1, "projectId is required"),
+});
+
+export type UniverseLinkProjectInput = z.infer<typeof UniverseLinkProjectSchema>;

@@ -85,14 +85,15 @@ requirements:
 
   - id: WCA-007
     title: Scene beats
-    statement: "While a scene contains beat markers (`<!-- beat: ... -->` HTML comments), the editor shall render them as styled inline cards distinct from prose, and every export format shall strip them from output."
+    statement: "While a scene contains beat markers (`<!-- beat: ... -->` HTML comments), the editor shall render them as styled inline cards distinct from prose, and every export format shall strip them from output, except the Google Docs story-internal export, which deliberately requests the manuscript with beats included."
     category: functional
     priority: must
     status: active
     source: requirements/002, requirements/009, src/__tests__/beats.test.ts
     acceptance:
       - "A beat comment in scene HTML renders as a beat card in the editor"
-      - "Markdown, PDF, EPUB, DOCX, and Google Docs exports contain no beat text"
+      - "Markdown, PDF, EPUB, DOCX, and Google Docs reader exports contain no beat text, whether the beat is a single-line comment, a multi-line comment, or a beat-annotation div"
+      - "The Google Docs story-internal export requests the manuscript with beats included"
 
   - id: WCA-008
     title: Focus mode
@@ -157,14 +158,13 @@ requirements:
 
   - id: WCA-013
     title: Timeline matrix view
-    statement: "When the author opens the timeline view, the system shall render a matrix of story objects (rows) against scenes (columns) showing where each character/location appears, based on APPEARS_IN-style relationships."
+    statement: "When the author opens the timeline view, the system shall render a read-only matrix of story objects (rows) against scenes (columns) showing where each story object appears, based on the relationships linking objects to scenes."
     category: functional
     priority: should
     status: active
     source: requirements/007, src/app/api/timeline
     acceptance:
-      - "/api/timeline returns the object×scene presence matrix for a project"
-      - "Timeline supports updating/reordering entries via its PATCH/reorder endpoints"
+      - "GET /api/timeline/[projectId] returns the project's scenes in manuscript order, its story objects, and the relationships linking them, from which the timeline view builds the object×scene presence matrix"
 
   - id: WCA-014
     title: Full-text search
@@ -300,6 +300,7 @@ requirements:
       - "Conversations CRUD via /api/conversations scoped to a project"
       - "Long chat histories are compressed rather than failing (chat-compression tests)"
       - "A client disconnect mid-stream does not crash the stream controller (PR #1064)"
+    notes: "Tool use by the chat agent (reads, writes, deletes) is specified in WCA-053."
 
   - id: WCA-025
     title: AI inline and manuscript-level actions
@@ -309,8 +310,9 @@ requirements:
     status: active
     source: docs/REQUIREMENTS.md F8, src/app/api/ai-inline, src/app/api/ai-manuscript
     acceptance:
-      - "AI results never mutate scene content without an explicit user apply action"
+      - "Inline and manuscript AI results never mutate scene content without an explicit user apply action"
       - "/api/ai-inline and /api/ai-manuscript enforce input size limits"
+    notes: "Scoped to /api/ai-inline and /api/ai-manuscript; the AI chat agent's direct tool writes are governed by WCA-053."
 
   - id: WCA-026
     title: Peer review personas
@@ -339,7 +341,7 @@ requirements:
 
   - id: WCA-028
     title: MCP server tool coverage
-    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and database snapshots — full read/write parity with the web UI's core data."
+    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and scene version history — full read/write parity with the web UI's core data."
     category: functional
     priority: must
     status: active
@@ -397,14 +399,15 @@ requirements:
 
   - id: WCA-033
     title: Database snapshot and restore
-    statement: "When significant data changes occur or an agent requests it, the system shall support creating a database snapshot, listing snapshots, and restoring one via MCP tools, and most write operations shall trigger an automatic snapshot for agentic safety."
+    statement: "The system shall not offer per-session database snapshotting: the MCP server shall register no tool that snapshots, lists snapshots of, or restores the whole database. Agents shall recover their own edits through per-scene version history (get_scene_versions / restore_scene_version), and whole-database recovery is Supabase point-in-time recovery, operated by the owner outside the server."
     category: functional
     priority: should
     status: active
-    source: requirements/014, src/mcp/snapshot.ts
+    source: requirements/014, openspec/specs/agent-collaboration/spec.md, src/mcp/index.ts
     acceptance:
-      - "snapshot_database / list_snapshots / restore_snapshot round-trip"
-      - "Snapshot inputs (message, limit, hash) are validated/escaped before reaching any shell (SECURITY-AUDIT CRITICAL-01 regression guard)"
+      - "snapshot_database, list_snapshots and restore_snapshot are not registered on the MCP server"
+      - "get_scene_versions and restore_scene_version are registered on the MCP server"
+    notes: "Owner decision on #1379: the git-based snapshot tools became no-ops after the move to Supabase PostgreSQL and a whole-database restore would roll back every tenant, so the tools and the no-op autoSnapshot calls were removed rather than rebuilt."
 
   - id: WCA-034
     title: Writing skills as MCP prompts
@@ -475,7 +478,7 @@ requirements:
     category: non-functional
     priority: must
     status: active
-    source: src/middleware.ts, src/__tests__/middleware.test.ts
+    source: src/proxy.ts, src/__tests__/proxy.test.ts
     acceptance:
       - "Unauthenticated request to a protected /api route is rejected; public paths pass"
       - "/api/mcp accepts a verified MCP OAuth token (mcp-route-auth tests)"
@@ -521,7 +524,7 @@ requirements:
     category: non-functional
     priority: must
     status: active
-    source: src/middleware.ts, src/lib/rate-limit.ts
+    source: src/proxy.ts, src/lib/rate-limit.ts
     acceptance:
       - "Exceeding each configured limit yields 429 with correct headers"
       - "Limits are keyed per user; Redis is used when configured, in-memory otherwise"
@@ -544,7 +547,7 @@ requirements:
     category: non-functional
     priority: should
     status: active
-    source: src/middleware.ts buildCsp
+    source: src/proxy.ts buildCsp
     acceptance:
       - "Responses carry a CSP whose script-src is 'self' plus a nonce"
       - "The app functions with that CSP (no inline-script violations in normal use)"
@@ -614,18 +617,286 @@ requirements:
     category: constraint
     priority: should
     status: active
-    source: src/__tests__/oauth-*.test.ts, src/middleware.ts PUBLIC_PATHS
+    source: src/__tests__/oauth-*.test.ts, src/proxy.ts PUBLIC_PATHS
     acceptance:
       - "Metadata, register, authorize, and token endpoints conform to the tests' expected flows"
       - "A token minted via this flow authenticates /api/mcp requests"
 
   - id: WCA-052
     title: Deployment and integration surface
-    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployable behind a Cloudflare Tunnel, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
+    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployed to Railway from the root Dockerfile, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
     category: constraint
     priority: must
     status: active
-    source: README, src/lib/env.ts, docker-compose.yml
+    source: README, src/lib/env.ts, Dockerfile, scripts/migrate.mjs, docs/SETUP.md, docs/TECH_STACK.md
     acceptance:
-      - "docker compose up starts the app with only DATABASE_URL strictly required"
+      - "The production container (NODE_ENV=production) starts the app once an auth method (API_TOKEN or GOOGLE_CLIENT_ID) is set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
+      - "A missing DATABASE_URL does not block startup: migrate.mjs warns and skips migrations, and DB-dependent routes fail"
       - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
+
+  - id: WCA-053
+    title: In-app chat agent tool use with MCP safety parity
+    statement: "When the author chats in a project's AI panel, the agent shall be able to read and modify that project through a project-scoped subset of the MCP server's tools — structure, scene content, annotations, story objects, relationships, universes and export — loading tool categories on demand via load_toolset, subject to the same ownership checks, destructive-tool gating (MCP_ALLOW_DESTRUCTIVE) and stale-write protection (required contentHash) as MCP calls; credential and database snapshot/restore tools shall never be reachable from chat."
+    category: functional
+    priority: must
+    status: active
+    source: src/lib/ai/adk-tools.ts, src/lib/ai/adk-agent.ts, src/__tests__/adk-tools.test.ts
+    acceptance:
+      - "Every chat tool call is pinned to the conversation's project; IDs outside it are rejected (SEC-01)"
+      - "Chat delete tools error unless MCP_ALLOW_DESTRUCTIVE=true; non-destructive tools keep working"
+      - "Chat write/update tools require the contentHash from the matching read tool, and a stale hash rejects the write without changing content"
+      - "snapshot_database, list_snapshots, restore_snapshot and google_auth_* are absent from the chat toolset"
+    notes: "Unlike WCA-025's inline/manuscript actions, the chat agent writes directly (DEC-010/DEC-011); its safety contract is MCP's own, not an apply step: the destructive gate (WCA-032) and the contentHash stale-write check that MCP applies to every guarded write (WCA-031 states it for scenes)."
+
+  - id: WCA-054
+    title: Encryption key rotation without data loss
+    statement: "When ENCRYPTION_KEY is rotated with the previous key listed in ENCRYPTION_KEY_PREVIOUS, the system shall keep decrypting existing secrets, re-encrypt them under the current key at startup and on read, and never delete a value it cannot decrypt."
+    category: non-functional
+    priority: must
+    status: active
+    source: scripts/encryption-keyring.mjs, scripts/reencrypt.mjs, src/lib/crypto.ts, Dockerfile CMD, docs/SETUP.md "Rotating ENCRYPTION_KEY"
+    acceptance:
+      - "Ciphertext carries the id of the key that encrypted it, and a value under any key in ENCRYPTION_KEY_PREVIOUS still decrypts"
+      - "Container start runs scripts/reencrypt.mjs before the app, rewriting previous-key values under ENCRYPTION_KEY and logging rewritten/encrypted/current/undecryptable counts; a failed sweep stops startup"
+      - "Readers rewrite a previous-key value under the current key with a compare-and-swap, leaving a value replaced since the read untouched"
+      - "A value no configured key decrypts is counted and reported as disconnected, never deleted, so restoring its key recovers it"
+
+  - id: WCA-055
+    title: CSRF header check and client identity-header stripping
+    statement: "When an account or integration request that deletes the account, changes consent, rotates the calendar feed, or disconnects an integration lacks the CSRF custom header, the system shall reject it with 403; and the system shall never trust identity headers supplied by the client, setting them only after verifying the session or token."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/api-auth.ts validateCsrfHeader, src/proxy.ts IDENTITY_HEADERS
+    acceptance:
+      - "DELETE /api/auth/delete-account, PUT /api/account/consent, POST /api/account/calendar-feed, DELETE /api/integrations/google-docs and DELETE /api/integrations/hashnode return 403 unless x-csrf-protection is exactly \"1\""
+      - "The proxy drops client-supplied x-user-id and x-user-email on every path, including public paths, API_TOKEN branches and auth-disabled mode"
+      - "x-user-id and x-user-email reach a route only as set by the proxy from a verified JWT or MCP session"
+    notes: "The CSRF header check guards only the five listed handlers; other state-changing routes rely on proxy authentication and are not covered by this requirement."
+
+  - id: WCA-056
+    title: Per-IP rate limiting on public paths and content reports
+    statement: "When requests from one client IP exceed their path's per-IP limit — auth login/refresh/me 5/min, OAuth token 10/min, OAuth client registration 5/hour, content report 10/hour, any other public path 60/min — the system shall respond 429; and auth-path limits shall still be enforced from memory when Redis is unavailable."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/rate-limit-config.ts RATE_LIMITS, src/proxy.ts publicPathLimit, src/app/oauth/register/route.ts, src/app/api/projects/[id]/report/route.ts
+    acceptance:
+      - "Public paths are throttled per client IP before reaching the route: /api/auth/login, /api/auth/refresh and /api/auth/me share the auth bucket (5/min), /oauth/token uses its own (10/min), every other public path the generic one (60/min); the 429 carries Retry-After and X-RateLimit-* headers"
+      - "POST /oauth/register returns 429 after 5 registrations per IP per hour, and POST /api/projects/[id]/report returns 429 with Retry-After after 10 reports per IP per hour"
+      - "When a Redis check fails, the auth bucket is enforced from the in-memory limiter; the other per-IP buckets fail open"
+    notes: "Complements WCA-043's per-user limits; the DISABLE_RATE_LIMIT production guard applies to these buckets too. The OAuth register route's DB-persisted 24h per-IP cap is separate from this limit. POST /api/projects/[id]/report is not a public path: the proxy rejects unauthenticated requests to it with 401, so its per-IP cap bounds reports per source across accounts rather than anonymous traffic."
+
+  - id: WCA-057
+    title: Active project limit per user
+    statement: "When an authenticated user creates a project — via POST /api/projects, JSON import, or the MCP or chat-agent create_project tool — while already owning their configured maximum of unarchived projects (UserAiSettings.maxActiveProjects, default 3), the system shall reject the creation with an error that names the limit, and concurrent creations shall not exceed it."
+    category: functional
+    priority: must
+    status: active
+    source: src/lib/project-limit.ts assertActiveProjectLimit, src/app/api/projects/route.ts, src/app/api/projects/import/route.ts, src/lib/controllers/projects.ts createProject, src/lib/import-json.ts, src/__tests__/projects-limit-route.test.ts, src/__tests__/project-limit-paths.test.ts
+    acceptance:
+      - "At the limit, POST /api/projects and POST /api/projects/import return 403 with \"You've reached your N active project limit. Archive a project to create a new one.\", and MCP/chat-agent create_project reject with the same message; no project is created"
+      - "Archived projects do not count toward the limit, so archiving a project frees a slot"
+      - "A user's maxActiveProjects setting overrides the default of 3"
+      - "The count and the create run in one Serializable transaction, so concurrent creations one slot below the limit create only one project; a serialization conflict on the REST routes returns 409"
+      - "Requests without a user id (API_TOKEN or auth-disabled mode) and the one-time onboarding sample import are not limited; the sample still counts toward the limit once created"
+    notes: "Extends WCA-001's create step. Only creation is limited: unarchiving a project (DELETE /api/projects/[id]/archive) does not check the limit, so it can leave a user above it."
+
+  - id: WCA-058
+    title: Per-user AI provider and behavior settings
+    statement: "When an authenticated user saves AI settings, the system shall store their provider API key, model, coaching style, response length, custom instructions and chat compression parameters (chatWindowSize, messagesUntilCompression, compressionModel) at user scope, a user's first save storing only the key and model; shall resolve the provider key and model as user, then the global settings row, then environment variables; shall apply coaching style, response length, custom instructions and compression from the user's settings or else fixed defaults; and shall list selectable models from the provider using the resolved key."
+    category: functional
+    priority: should
+    status: active
+    source: src/lib/ai/settings.ts getAiConfig/getAiPreferences/getCompressionSettings, src/app/api/ai-settings/route.ts, src/app/api/ai-settings/models/route.ts, src/components/ai-settings-dialog.tsx, src/components/ai-model-select.tsx, src/app/settings/page.tsx, src/__tests__/ai-settings.test.ts, src/__tests__/ai-settings-route.test.ts, src/__tests__/ai-settings-models-route.test.ts
+    acceptance:
+      - "PUT /api/ai-settings rejects with 400 a coaching style outside gentle/balanced/direct, a response length outside concise/moderate/detailed, a chatWindowSize outside 3-20 or a messagesUntilCompression outside 5-50"
+      - "PUT /api/ai-settings by an authenticated user with an existing UserAiSettings row updates only the sent fields; a user's first save creates the row with only the key and model, leaving the behavior fields at their defaults"
+      - "PUT /api/ai-settings without a user writes the key and model to the global AiSettings row, which has no behavior fields"
+      - "A user with a stored key gets that key and their model (or the environment model when theirs is blank); a user without a key gets the global row's key and model, each falling back to GEMINI_API_KEY/AI_API_KEY/REQUESTY_API_KEY and AI_MODEL/REQUESTY_MODEL/gemini-2.0-flash-001"
+      - "Without user settings, AI calls use the balanced coaching style, moderate response length, no custom instructions, a chat window of 5 and compression after 15 messages; no global row supplies these"
+      - "GET /api/ai-settings/models calls the provider's model list with the resolved key and returns only generateContent models, minus tts, image, robotics, computer-use, deep-research, nano- and lyria variants, sorted by id; with no resolved key it returns 400"
+    notes: "Key encryption and masking on read are WCA-046's. A user's own model applies only alongside their own key; without one, the global row's model is used even if the user saved a model. Known gaps: behavior fields sent on a user's first save are dropped, and a no-user save that sends behavior fields (as the /settings page always does) fails with 500."
+
+  - id: WCA-059
+    title: Content reporting from the reader view
+    statement: "When a signed-in reader submits a content report for a project from the reader view, with a category of copyright, illegal, harassment or other, optional details and the page URL, the system shall file it as a GitHub issue labeled content-report in GITHUB_FEEDBACK_REPO containing the category, the project id, the URL's pathname and the sanitized details, and shall answer an unknown project id with the same 201 as a filed report."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/[id]/report/route.ts, src/components/report-content-dialog.tsx, src/app/read/[id]/reader-view.tsx, src/__tests__/report-route.test.ts
+    acceptance:
+      - "POST /api/projects/[id]/report returns 400 for a body that is not JSON or a category outside copyright/illegal/harassment/other"
+      - "For an unknown project id the route returns 201 without filing an issue, the same response as a filed report"
+      - "The filed issue is titled \"Content Report: <category label> — ID: <project id>\"; details are stripped of HTML and truncated to 4000 characters, and the URL is reduced to its http(s) pathname with markdown characters escaped, dropping its query and hash"
+      - "The filed issue contains no reporter email or user id and no project title or author name"
+      - "For an existing project, without GITHUB_FEEDBACK_TOKEN or GITHUB_FEEDBACK_REPO the route returns 503 \"Content reporting is not configured.\"; a GitHub API failure returns 502"
+      - "The dialog shows the route's error message on failure and a thank-you confirmation on success"
+    notes: "The route is not a public path: the proxy requires a session, API token or MCP identity before it runs, and it does not check that the reporter can read the project. The 10/hour per-IP limit is WCA-056's. Known gap: the existence check runs before the configuration check and the GitHub call, so when reporting is unconfigured or GitHub fails, an existing project gets 503/502 while an unknown id still gets 201, revealing existence by status code."
+
+  - id: WCA-060
+    title: Single-owner API_TOKEN authentication
+    statement: "While API_TOKEN is configured, the system shall authenticate the deployment owner by the API_TOKEN bearer header or by a token login that issues a signed session cookie, shall treat that owner as a caller without a user id who is unscoped over all projects, universes and tasks, and shall admit only the API_TOKEN bearer to the metrics endpoint."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/app/api/auth/login/route.ts, src/app/api/auth/me/route.ts, src/lib/auth.ts createLegacySessionCookie/verifyLegacySessionCookie, src/proxy.ts, src/lib/api-auth.ts, src/app/api/metrics/route.ts, src/__tests__/auth.test.ts, src/__tests__/auth-me-route.test.ts, src/__tests__/proxy.test.ts, src/__tests__/metrics-route.test.ts
+    acceptance:
+      - "POST /api/auth/login with a body token equal to API_TOKEN (constant-time compare) returns {ok: true} and sets an httpOnly, SameSite=Strict annie_session cookie (Secure in production); a wrong, missing or non-string token returns 401, and without API_TOKEN the route returns 501"
+      - "The session cookie is v1.<issuedAt>.<nonce>.<HMAC keyed by API_TOKEN>, unique per login; the server rejects it after one hour regardless of the browser's maxAge, and rotating API_TOKEN invalidates every outstanding cookie"
+      - "GET /api/auth/me with a valid token-login cookie returns {authenticated: true, user: null}"
+      - "A request carrying Authorization: Bearer <API_TOKEN> or a valid token-login cookie passes the proxy without x-user-id or x-user-email and is rate limited under one shared apitoken key"
+      - "With no user id, project, universe and writing-task access checks grant every record, and project listing and export return every user's data"
+      - "GET /api/metrics with auth enabled returns 401 for any credential other than the API_TOKEN bearer, including user sessions, token-login cookies and MCP access tokens"
+      - "DELETE /api/auth/delete-account returns 403 when GOOGLE_CLIENT_ID is not set"
+    notes: "The audit draft scoped this to deployments without Google OAuth; the proxy accepts the API_TOKEN bearer and token-login cookie whether or not GOOGLE_CLIENT_ID is set. With GOOGLE_CLIENT_ID set, routes that create or export per-user records (for example POST /api/projects, POST /api/universes, project import, export-all, account data export, providers, opportunities and the writing-task dashboard) answer a caller without a user id with 401, but per-record access checks and GET /api/projects and /api/universes stay unscoped. With neither API_TOKEN nor GOOGLE_CLIENT_ID set, auth is disabled, every request including /api/metrics passes through without a user id, and production refuses to start. Per-user project limits do not apply to this caller (WCA-057); identity-header stripping is WCA-055's."
+
+  - id: WCA-061
+    title: One sample project for new users
+    statement: "When a signed-in user with no active or archived projects opens the dashboard, the system shall create one sample project for them from the bundled Sherlock sample, and while the user already has a sample project, further sample requests — repeated or concurrent — shall create no duplicate."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/onboarding/sample/route.ts, src/data/sherlock-sample.json, src/lib/import-json.ts importProjectJson, prisma/migrations/20260515_unique_sample_project_per_user/migration.sql, src/app/page.tsx fetchProjects, src/__tests__/null-userid-guard.test.ts, src/__tests__/project-limit-paths.test.ts
+    acceptance:
+      - "POST /api/onboarding/sample imports the bundled sample \"A Study in Baker Street\" (2 chapters, 4 scenes, 4 characters, 2 locations, 1 plotline, 7 relationships and 1 annotation, all re-ided) and returns 201 with its projectId"
+      - "A second or concurrent request for a user who already has a sample (active or archived) returns 200 and creates nothing, which the partial unique index on Project(userId) WHERE isSample = true AND userId IS NOT NULL enforces"
+      - "The dashboard requests the sample only when the user has neither active nor archived projects, and shows a sample banner while any active project is a sample"
+      - "In Google auth mode, a request without a user id returns 401"
+    notes: "The audit draft said \"exactly one\"; uniqueness holds per sample at a time, so a user who deletes the sample and has no other projects gets a new one on the next dashboard load. The unique index is declared in the migration, not in schema.prisma, and excludes NULL userId, so with API_TOKEN or auth disabled every call creates another sample. The sample skips the active-project limit but counts toward it once created (WCA-057). Known gap: the repeat/race 200 path has no test, and its message says \"User already has projects\"."
+
+  - id: WCA-062
+    title: First-run AI setup wizard on the dashboard
+    statement: "When the dashboard loads in a browser where the setup wizard has not been dismissed and neither the user's AI settings nor the global AI settings hold an API key, the system shall open a setup wizard that lets the user save an AI provider key and model in place or skip, followed by a short feature tour, and shall not open it again in that browser once it is finished or dismissed."
+    category: functional
+    priority: may
+    status: active
+    source: src/components/setup-wizard.tsx, src/app/api/setup-status/route.ts, src/app/page.tsx, src/lib/offline/clear-client-data.ts
+    acceptance:
+      - "GET /api/setup-status returns {setupComplete: true} when the user's or the global AI settings row holds a non-empty key, and {setupComplete: false} otherwise"
+      - "Saving a key in the wizard stores it through PUT /api/ai-settings"
+      - "Finishing, closing or pressing Escape sets the setup-wizard-dismissed flag in localStorage, and the wizard does not reopen in that browser until logout or account deletion clears it"
+    notes: "The audit draft said the wizard \"leads to AI settings\" and stops \"once a key is stored\"; the key is entered inside the wizard, and dismissal is per browser, independent of whether a key was saved. Outside clicks do not dismiss it. Key resolution is WCA-058's. /setup is a separate \"Connect Claude Code\" MCP instructions page, not this wizard. Known gaps: setup-status ignores environment-variable keys, so an env-only deployment shows the wizard even though AI works; the wizard has no unit tests."
+
+  - id: WCA-063
+    title: Story graph view
+    statement: "When the project owner opens a project's story graph, the system shall draw every structure node and story object in the project as a node and every relationship between them as an edge, and shall open a scene when its node is clicked."
+    category: functional
+    priority: should
+    status: active
+    source: requirements/005, src/app/api/projects/[id]/graph/route.ts, src/components/story-graph.tsx, src/app/project/[id]/graph/page.tsx, src/__tests__/graph-route.test.ts
+    acceptance:
+      - "GET /api/projects/[id]/graph returns nodes for all of the project's structure nodes (PART, CHAPTER, SCENE) and story objects, and edges carrying each relationship's type and label"
+      - "It returns 404 for an unknown project and 403 for a user who does not own it, including shared readers and editors"
+      - "Clicking a scene node navigates to /project/[id]/scene/[sceneId]; other nodes do nothing"
+    notes: "Requirement doc 005's relationship model is WCA-011's; this entry covers the visualization only. The audit draft said \"typed, labeled edges\"; the 2D force-directed graph shows node labels on hover or zoom, edge labels only past 2.5x zoom, and never draws the edge type. There are no structural parent/child edges, and universe world objects are not nodes. Known gap: a relationship to a linked universe's world object yields an edge with an empty-string endpoint."
+
+  - id: WCA-064
+    title: Copy a world object into a project and move a story object into a universe
+    statement: "When the author copies a universe world object into a project, the system shall create a story object in that project with the world object's type, name, description, notes and tags and keep the original; and when the author transfers a story object into a universe, the system shall move it — creating a world object with those fields and an initial timeline entry, re-pointing its relationships to the new world object and deleting the story object — in one transaction, after checking access to both source and target."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/[id]/copy-world-object/route.ts, src/app/api/universes/transfer-object/route.ts, src/lib/controllers/universes.ts copyWorldObjectToProject, src/mcp/index.ts transfer_story_object_to_universe, src/mcp/tools/universes.ts, src/lib/ai/adk-tools.ts, src/components/world-object-panel.tsx, src/components/story-object-panel.tsx, src/__tests__/mcp-tools.test.ts
+    acceptance:
+      - "Copy (POST /api/projects/[id]/copy-world-object) requires write access (owner or EDITOR) to the project and ownership of the world object's universe; it returns 404 for an unknown world object and 400 without worldObjectId"
+      - "Copy leaves the world object and its timeline in place and does not copy timeline entries"
+      - "Transfer through POST /api/universes/transfer-object or the MCP tool transfer_story_object_to_universe requires ownership of both the story object's project and the target universe; the route returns 400 when either id is missing"
+      - "After a transfer the story object no longer exists, and the new world object has an \"Initial State (Transferred)\" timeline entry and the story object's former relationships"
+    notes: "Extends WCA-012. The audit draft said nothing is lost, \"including timeline data\"; copy drops the timeline, transfer is a move, and the two directions check access asymmetrically. Neither route checks that the project is linked to the universe; the UI offers Transfer only for a linked universe. Copy has no MCP tool. Known gap: the in-app chat tool transfer_story_object_to_universe only checks that the story object is in the chat's project and that the universe is that project's linked universe or one the caller owns, so an EDITOR of a shared project can transfer the owner's story object. Known gap: copy's relationship loop maps the world object's incoming relationships as outgoing from the copy, so the new edges point at the original world object instead of reproducing its counterparts; no test covers copy."
+
+  - id: WCA-065
+    title: Export all projects as a ZIP
+    statement: "When a user requests an export of all their projects, the system shall respond with a ZIP archive, streamed as it is built, containing one file per project they own — archived projects included — in the same portable JSON format as single-project export."
+    category: functional
+    priority: should
+    status: active
+    source: src/app/api/projects/export-all/route.ts, src/lib/export-json.ts exportProjectJson, src/app/project/[id]/settings/page.tsx handleExportAll, src/__tests__/export-all-route.test.ts
+    acceptance:
+      - "GET /api/projects/export-all returns application/zip as an attachment named annie-export-<date>.zip, with one <sanitized title>.json per owned project, non-alphanumeric title characters replaced by _"
+      - "Each file's content equals exportProjectJson for that project"
+      - "With no owned projects it returns 404 {error: \"No projects found\"}"
+      - "In Google auth mode, a request without a user id returns 401"
+    notes: "Extends WCA-023 (single-project JSON). Shared projects are not included. With no user id (API_TOKEN or auth disabled), every project in the database is exported (WCA-060). The button is \"Export All Projects (ZIP)\" in project settings. Known gaps: two titles that sanitize the same produce duplicate entry names; a mid-stream failure leaves a truncated archive after a 200; the settings button ignores error responses silently."
+
+  - id: WCA-066
+    title: Pruning of expired auth records
+    statement: "While the server runs in the Node.js runtime, the system shall, at startup and hourly thereafter, delete expired revoked-token and OAuth authorization-code rows and clear the registration IP of OAuth clients registered more than 24 hours ago, keeping the client records."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/expired-auth-cleanup.ts pruneExpiredAuthRows/startExpiredAuthCleanup, src/instrumentation.ts, src/lib/oauth-store.ts IP_WINDOW_MS, src/__tests__/expired-auth-cleanup.test.ts
+    acceptance:
+      - "A run deletes RevokedToken and OAuthAuthCode rows whose expiresAt has passed and keeps the unexpired ones"
+      - "A run nulls registrationIp on OAuthClient rows created more than 24 hours ago without deleting them"
+      - "A database error during a run is logged and does not stop the server"
+    notes: "Complements WCA-040 (revocation) and WCA-051 (OAuth server). The 24-hour window is the per-IP registration window in src/lib/oauth-store.ts. The hourly timer is unref'd, and the three operations do not share a transaction. Scheduling via instrumentation has no test."
+
+  - id: WCA-067
+    title: Retry of database connection failures
+    statement: "When a database operation fails with an error showing the connection to the database was never established, the system shall retry it up to two times, after 150 ms and 600 ms, and shall never retry a failure where the statement may already have run, such as a dropped connection or socket timeout."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/db-retry.ts, src/lib/db.ts connectionRetry extension, src/__tests__/db-retry.test.ts
+    acceptance:
+      - "DatabaseNotReachable, TlsConnectionError, PrismaClientInitializationError and \"failed to connect to database\" errors, including when wrapped (for example P1001), are retried at most twice, then the original error is thrown"
+      - "ConnectionClosed, SocketTimeout (also when wrapped as P2010), TooManyConnections, \"Tenant or user not found\" and ordinary query errors such as P2002 are thrown without retry"
+      - "Each retry logs a warning with the model, operation, attempt and delay, without the query arguments"
+    notes: "The audit draft said \"fails before the statement is sent\"; the code decides by an allowlist of connection-establishment error shapes, found by walking up to 5 links of .cause / meta.driverAdapterError, not by tracking whether a statement was sent. Delays have no jitter. Behaviour inside interactive transactions is per statement and untested."
+
+  - id: WCA-068
+    title: Sign-out clears device data
+    statement: "When a user signs out, the system shall first try to sync pending offline changes and, if any remain or cannot be counted, warn and let the user cancel; on sign-out it shall revoke the session on the server and then remove the device's offline database contents, the app's own localStorage keys and the service worker's runtime caches, keeping the theme preference and the precache."
+    category: non-functional
+    priority: must
+    status: active
+    source: src/lib/offline/clear-client-data.ts clearClientData/countUnsyncedOps/hasUnsyncedWork, src/lib/offline/idb.ts, src/components/user-menu.tsx handleSignOut, src/hooks/use-auth.ts logout, src/app/settings/page.tsx, src/__tests__/clear-client-data.test.ts
+    acceptance:
+      - "With unsynced or uncountable pending ops, Sign out shows an \"Unsynced changes\" dialog with Cancel and \"Sign out anyway\""
+      - "After sign-out, every annie-offline object store is empty, consent:sentry_replay and setup-wizard-dismissed are gone, and no cache other than workbox-precache* remains"
+      - "The theme localStorage key and the workbox precache survive"
+      - "A failure in one clearing step is logged and the remaining steps still run"
+      - "Deleting the account also clears device data"
+    notes: "The audit draft said \"that user's cached data\"; the whole device store is cleared. Logout posts /api/auth/logout, then clears, then redirects to /login. Offline queue semantics are WCA-036's; token revocation on logout is WCA-040's. Known gaps: session expiry (a silent-renew 401) redirects to /login without clearing device data; if the logout request rejects with a network error, nothing is cleared."
+
+  - id: WCA-069
+    title: Theme choice and workspace keyboard shortcuts
+    statement: "The system shall apply a light, dark or system theme — following the operating system until the user picks light or dark with the header toggle — persisted per browser and applied before first paint; and in the project workspace Cmd/Ctrl+K shall toggle search, Cmd/Ctrl+/ shall toggle the sidebar and Escape shall close the open panel, with Cmd/Ctrl+/ and Escape also controlling the side panels in focus mode."
+    category: functional
+    priority: may
+    status: active
+    source: src/components/theme-provider.tsx, src/components/theme-toggle.tsx, src/app/layout.tsx, src/hooks/use-keyboard-shortcuts.ts, src/app/project/[id]/page.tsx, src/app/project/[id]/scene/[sceneId]/focus/page.tsx
+    acceptance:
+      - "With no stored choice, the theme follows the OS setting; a toggled choice persists in the theme localStorage key across reloads"
+      - "In the project workspace, Cmd/Ctrl+K opens and closes search and Cmd/Ctrl+/ shows and hides the sidebar"
+      - "In the project workspace, Escape closes the search panel, then the selected object, then the mobile sidebar"
+    notes: "The audit draft said \"Cmd/Ctrl+/ chat\" and \"every project screen\"; no shortcut opens chat, and the hook runs only in the workspace and focus mode (which has no Cmd/Ctrl+K). The shortcuts also fire while typing in inputs and the editor. The theme survives sign-out (WCA-068). Known gap: no test covers the toggle, its persistence or the shortcuts; the dark-desktop screenshot run (e2e/visual.spec.ts) covers only following an OS dark preference."
+
+  - id: WCA-070
+    title: Self-hosted fonts and an opaque version file
+    statement: "The system shall serve its web fonts from its own origin, with no reference to Google font hosts in shipped code or its Content-Security-Policy, and shall publish in /version.json only a random build identifier, never the commit SHA."
+    category: non-functional
+    priority: should
+    status: active
+    source: src/app/layout.tsx, src/proxy.ts CSP font-src, next.config.ts, src/hooks/use-version-check.ts, src/__tests__/no-google-fonts.test.ts, src/__tests__/version-file.test.ts, src/__tests__/proxy.test.ts
+    acceptance:
+      - "No file under src, public or root config references fonts.googleapis.com or fonts.gstatic.com, and the CSP font-src is 'self'"
+      - "/version.json contains only {\"version\": <UUID>} and does not contain the commit SHA"
+      - "A changed version value raises the update banner (WCA-037)"
+    notes: "Inter, Manrope and Newsreader come through next/font/google, which fetches them from Google at build time, not at runtime. The version UUID is regenerated each time next.config loads, not strictly once per commit, and public/version.json is gitignored. The commit SHA is still exposed to the build as NEXT_PUBLIC_BUILD_VERSION, which is safe while only server telemetry reads it."
+
+  - id: WCA-071
+    title: Manuscript coaching checks
+    statement: "When the author runs a consistency check or voice check from the scene editor, the system shall send the project's character profiles and scene text to the configured AI and show the result as dismissible severity-rated contradiction alerts or as character voice profiles with flagged dialogue, without editing scene content; and the outline shall mark, for each scene, which plotlines it advances or first mentions and which earlier plotlines have gone dormant."
+    category: functional
+    priority: may
+    status: active
+    source: src/app/api/projects/[id]/consistency-check/route.ts, src/app/api/projects/[id]/voice-check/route.ts, src/app/api/projects/[id]/plot-thread-status/route.ts, src/mcp/tools/coaching.ts getConsistencyContext/getVoiceContext/getPlotThreadStatus, src/mcp/index.ts get_consistency_context/get_voice_context/get_plot_thread_status, src/components/editor/consistency-alerts-panel.tsx, src/components/editor/voice-monitor-panel.tsx, src/components/outline-tree.tsx PlotThreadDots, src/__tests__/plot-thread-status.test.ts, src/__tests__/coaching.test.ts
+    acceptance:
+      - "POST /api/projects/{id}/consistency-check returns at most 20 alerts, each typed CHARACTER_ATTRIBUTE, PLOT_CONTRADICTION, TIMELINE or OTHER with severity high, medium or low; with no characters or no scene over 50 characters of text it returns no alerts, and with no AI key it returns no alerts and the warning \"AI not configured\""
+      - "POST /api/projects/{id}/voice-check requires a sceneId of a scene in the project, analyses the selected text if given or else the scene text, and returns voice profiles for the CHARACTER objects linked to that scene plus feedback on dialogue that sounds like another character; with no AI key it returns profiles built from the characters' descriptions and no feedback"
+      - "GET /api/projects/{id}/plot-thread-status returns, for each scene in story order, every PLOTLINE linked to it as mentioned on its first linked scene and advancing afterwards, and every earlier-linked plotline absent from it as dormant with the title of the scene where it was last seen"
+      - "The MCP tools get_consistency_context, get_voice_context and get_plot_thread_status return the same gathered context to an MCP client that owns the project"
+      - "Neither check changes scene content"
+    notes: "The consistency and voice checks require project write access; plot-thread status requires read access. The consistency check reads up to 20 scenes (or only the focused scene), each cut to 800 characters of text; the voice check reads 1,500 characters of the latest version and sends at most 1,000. Results are not stored: dismissing an alert hides it until the next run. The audit draft also listed an Annie critique panel; it called a route that never existed and was removed rather than built (#1397), so AI scene feedback outside these checks stays with peer review. Known gaps: the consistency-check and voice-check routes have no test, the voice check gives no warning when AI is not configured, and it answers a scene outside the project with 500 rather than 404."

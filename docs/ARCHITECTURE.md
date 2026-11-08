@@ -79,12 +79,10 @@ src/
 ## Request Lifecycle
 
 1. **Client** makes HTTP request
-2. **Middleware** (`src/middleware.ts`) checks authentication (session cookie or `Authorization: Bearer <API_TOKEN>`)
+2. **Proxy** (`src/proxy.ts`, Next.js middleware on the Node.js runtime) checks authentication (session cookie or `Authorization: Bearer <API_TOKEN>`)
 3. **API Route** validates input with Zod, delegates to a **Controller**
 4. **Controller** runs business logic against **Prisma** (SQLite)
 5. Response returned as JSON
-
-Most write operations (scene save, node create) trigger an automatic **git snapshot** of the database via `autoSnapshot()` for agentic safety.
 
 ## Data Model
 
@@ -130,7 +128,7 @@ Business logic is separated into controller classes under `src/lib/controllers/`
 | `ProjectsController` | Project CRUD, export (Markdown/Medium/StoryBible) |
 | `StoryObjectsController` | Character/location/plotline CRUD |
 | `UniversesController` | Universe and world object management |
-| `TimelineController` | Timeline matrix computation |
+| `TimelineController` | Timeline data: ordered scenes, story objects, and the relationships linking them |
 | `FocusController` | Focus mode scene context + related elements |
 | `GoogleAuthController` | Google OAuth flow + Docs export |
 | `WritingTaskController` | Writing task CRUD, completion tracking |
@@ -147,7 +145,7 @@ The chat endpoint (`POST /api/chat`) uses OpenAI-compatible streaming with dynam
 
 This saves ~81% of token overhead vs loading all 48 tools upfront.
 
-Tools are registered in `src/lib/ai/tool-registry.ts` using Zod schemas (shared with controllers) and executed via `src/lib/ai/tool-executor.ts`.
+Tools are defined and executed in `src/lib/ai/adk-tools.ts`, built per chat turn and pinned to the conversation's project. Delete tools follow the MCP destructive gate (`MCP_ALLOW_DESTRUCTIVE`), and writes require the `contentHash` from a prior read (WCA-053).
 
 ### Prompt Security (Prompt Injection Mitigation)
 
@@ -171,7 +169,7 @@ See `src/lib/sanitize-server.ts` for `wrapUserContent` and `src/lib/ai/peer-revi
 
 ### MCP Server (external agents)
 
-`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, DatabaseSafety, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
+`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
 
 Six writing skills are registered as **MCP Prompts** (discoverable via `list_prompts`, invocable via `get_prompt`).
 
@@ -196,7 +194,7 @@ Google OAuth uses a two-token model:
 | **Session JWT** | `annie_session` | 1 hour | Edge + Node.js (`verifySessionToken`) | No — short lifetime is the compensating control |
 | **Refresh JWT** | `annie_refresh` | 30 days | Node.js only (`verifyRefreshToken`) | Yes |
 
-On logout, both tokens' `jti` claims are written to the `RevokedToken` table via `src/lib/token-blocklist.ts`. The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
+On logout and account deletion, both tokens' `jti` claims are written to the `RevokedToken` table (`src/lib/end-session.ts`). The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
 
 Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
 
@@ -210,7 +208,7 @@ Every scene save creates a new `ContentVersion` record. The controller keeps the
 
 ## Database Safety
 
-The database at `data/word-coach-annie.db` is volume-mounted. Git-based snapshots are taken automatically before write operations from the MCP server. This enables rollback via `restore_snapshot` MCP tool.
+The database at `data/word-coach-annie.db` is volume-mounted. The MCP server does not snapshot the database: agents undo scene edits through per-scene version history (`get_scene_versions` / `restore_scene_version`), and whole-database recovery is Supabase point-in-time recovery.
 
 **Never run `prisma db push` or `prisma migrate reset`** — these can drop tables. See [SETUP.md](SETUP.md) for safe schema migration procedure.
 
@@ -228,7 +226,7 @@ Handled by `ProjectsController` — templates assembled from structure nodes and
 ### DOCX
 `src/app/api/projects/[id]/export/docx/route.ts` — server-side DOCX generation using `docx`. The route fetches the project's outline tree with latest scene content, converts HTML to plain text via `stripHtml`, and renders PART/CHAPTER/SCENE nodes as Arial paragraphs (LEFT-aligned). Returns `application/vnd.openxmlformats-officedocument.wordprocessingml.document` with `Content-Disposition: attachment`.
 
-All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`).
+All three export routes (PDF, EPUB, DOCX) require project owner or shared reader access (`verifyProjectReadAccess`). For READER shares, `buildOutlineTree(id, { excludeOutlineScenes: true })` drops OUTLINE scenes before their content is loaded.
 
 ### Google Docs
 `src/lib/export/google-docs.ts` implements idempotent sync: each (entity + mode) pair maps to exactly one Google Doc ID stored in `GoogleDocExport`. Re-exporting updates the document body in place rather than creating a new document. Export (creating or redirecting the mapped doc) is owner-only (`verifyProjectAccess`); editors may view export links and sync comments, and imported comment text (body, replies, quoted selection) is sanitized with `sanitizeInput` before it is stored as an annotation; commenter names are not fetched or stored — comments carry a neutral `[Google Docs comment]` / `[Reply]` label instead.
@@ -241,7 +239,7 @@ Three export modes: `UNIVERSE` (world-building bible), `STORY_INTERNAL` (full ma
 - **Error tracking**: Sentry (`sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`). Session replay is gated on user consent — users opt in via Settings → Privacy & Data, which sets `consent:sentry_replay=true` in `localStorage` and writes to the `UserConsent` DB table. Replay is disabled by default (opt-in).
 - **OpenTelemetry**: Custom spans on MCP tool calls and ADK agent operations (`src/instrumentation.ts`)
 - **Health**: `GET /api/health` returns `{"ok": true}`
-- **Metrics**: `GET /api/metrics` returns Prometheus text format (requires the `API_TOKEN` bearer when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`)
+- **Metrics**: `GET /api/metrics` returns Prometheus text format (requires the `API_TOKEN` bearer when `AUTH_ENABLED=true`; see `src/lib/metrics.ts`). Request counts and latency come from `src/lib/http-metrics.ts`, which subscribes to Node's HTTP `diagnostics_channel` events and is started in `src/instrumentation.ts`
 
 ## Infrastructure
 

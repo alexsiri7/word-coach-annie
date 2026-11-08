@@ -53,7 +53,7 @@ extra_deny_paths:
   - "src/lib/env.ts"             # reads and validates every env var, incl. keys
   - "src/lib/ai/settings.ts"     # resolves and decrypts AI provider API keys
   - "src/lib/google-api.ts"      # Google API client (OAuth access tokens)
-  - "src/middleware.ts"          # request gate in front of every route
+  - "src/proxy.ts"               # request gate in front of every route
   - "src/lib/rate-limit.ts"      # per-user API rate limiter (abuse guard)
   - "src/instrumentation.ts"     # server startup hook (Sentry init)
   - "src/lib/sentry-scrub.ts"    # strips secrets/PII before events leave

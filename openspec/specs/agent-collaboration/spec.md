@@ -8,7 +8,7 @@ Annie exposes the whole writing workspace to AI agents through an MCP server, so
 
 ### Requirement: Agents have parity with the web UI
 
-The MCP server SHALL be reachable locally over stdio and remotely over HTTP, and SHALL offer tools covering projects, structure, scene content, annotations, story objects, relationships, universes and world objects, writing tasks, submissions, opportunities, export, Google Docs connection, coaching context and snapshots. A change made through a tool SHALL persist exactly as the same change made in the web UI, and every project-scoped tool SHALL enforce the same access rules.
+The MCP server SHALL be reachable locally over stdio and remotely over HTTP, and SHALL offer tools covering projects, structure, scene content, annotations, story objects, relationships, universes and world objects, writing tasks, submissions, opportunities, export, Google Docs connection, coaching context and scene version history. A change made through a tool SHALL persist exactly as the same change made in the web UI, and every project-scoped tool SHALL enforce the same access rules.
 
 #### Scenario: Same result either way
 - GIVEN an agent creates a character through the MCP server
@@ -58,14 +58,14 @@ Destructive tools — deletes and restores — SHALL be refused unless destructi
 - THEN the call is refused
 - AND read and create tools still work
 
-### Requirement: Agent work is recoverable by snapshot
+### Requirement: Agent work is recoverable through scene version history
 
-Agents SHALL be able to snapshot the database, list snapshots and restore one, and write operations SHALL take automatic snapshots so any agent session can be rolled back. Snapshot inputs SHALL be validated so they cannot inject commands.
+Per-session database snapshotting is unsupported: the server SHALL NOT offer tools that snapshot, list snapshots of, or restore the whole database, because a whole-database restore would roll back every user's data. Agents SHALL recover their own edits through per-scene version history (`get_scene_versions` / `restore_scene_version`); whole-database recovery is Supabase point-in-time recovery, operated by the owner outside the server.
 
-#### Scenario: Roll back an agent session
-- GIVEN a snapshot taken before an agent reorganised the outline
-- WHEN the author restores that snapshot
-- THEN the outline is as it was before
+#### Scenario: Undo an agent's rewrite of a scene
+- GIVEN an agent rewrote a scene's content
+- WHEN the author lists that scene's versions and restores the version before the rewrite
+- THEN the scene's content is as it was before
 
 ### Requirement: Coaching context and writing skills
 
