@@ -1005,4 +1005,35 @@ test.describe('Integration tests — real server, real data', () => {
       if (sourceProjectId) await deleteProject(request, sourceProjectId)
     }
   })
+
+  // ── m) No CSP eval violations (regression: #1448) ──────────────────
+  // /tasks builds zod object schemas client-side; zod must already be jitless by then.
+  test('client-side zod schemas do not trigger a CSP eval violation', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const blocked: string[] = []
+      ;(window as unknown as { __evalViolations: string[] }).__evalViolations =
+        blocked
+      document.addEventListener('securitypolicyviolation', (e) => {
+        if (e.blockedURI === 'eval') blocked.push(e.sourceFile)
+      })
+    })
+
+    await page.goto('/tasks', { waitUntil: 'load' })
+    const violations = await page.evaluate(
+      () =>
+        new Promise<string[]>((resolve) =>
+          setTimeout(
+            () =>
+              resolve(
+                (window as unknown as { __evalViolations: string[] })
+                  .__evalViolations,
+              ),
+            500,
+          ),
+        ),
+    )
+    expect(violations).toEqual([])
+  })
 })
