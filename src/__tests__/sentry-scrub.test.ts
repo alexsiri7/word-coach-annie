@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import type { ErrorEvent } from "@sentry/nextjs";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { beforeBreadcrumb, beforeSend, dataCollection } from "@/lib/sentry-scrub";
+import { mcpTransportOptions } from "@/mcp/transport-options";
 
 function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
   return {
@@ -12,21 +15,21 @@ function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
 describe("sentry-scrub beforeSend", () => {
   it("redacts password fields in extra", () => {
     const event = makeEvent({ extra: { password: "hunter2", safe: "ok" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.password).toBe("[REDACTED]");
     expect(result.extra!.safe).toBe("ok");
   });
 
   it("redacts token fields case-insensitively", () => {
     const event = makeEvent({ extra: { Token: "abc", ACCESS_TOKEN: "xyz" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.Token).toBe("[REDACTED]");
     expect(result.extra!.ACCESS_TOKEN).toBe("[REDACTED]");
   });
 
   it("redacts api_key and apiKey variants", () => {
     const event = makeEvent({ extra: { api_key: "k1", apiKey: "k2", "API-KEY": "k3" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.api_key).toBe("[REDACTED]");
     expect(result.extra!.apiKey).toBe("[REDACTED]");
     expect(result.extra!["API-KEY"]).toBe("[REDACTED]");
@@ -35,7 +38,7 @@ describe("sentry-scrub beforeSend", () => {
   it("truncates strings longer than 2000 chars", () => {
     const longString = "x".repeat(3000);
     const event = makeEvent({ extra: { detail: longString } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     const truncated = result.extra!.detail as string;
     expect(truncated).toHaveLength(2000 + "…[truncated]".length);
     expect(truncated.endsWith("…[truncated]")).toBe(true);
@@ -48,7 +51,7 @@ describe("sentry-scrub beforeSend", () => {
       obj = { nested: obj };
     }
     const event = makeEvent({ extra: { deep: obj } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
 
     // Walk down to find the deepest object
     let current: unknown = result.extra!.deep;
@@ -63,7 +66,7 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       request: { url: "http://localhost", cookies: { session: "abc" } },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.request!.cookies).toBe("[REDACTED]");
   });
 
@@ -74,7 +77,7 @@ describe("sentry-scrub beforeSend", () => {
         headers: { authorization: "Bearer secret", cookie: "session=abc", "content-type": "text/html" },
       },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.request!.headers!.authorization).toBe("[REDACTED]");
     expect(result.request!.headers!.cookie).toBe("[REDACTED]");
     expect(result.request!.headers!["content-type"]).toBe("text/html");
@@ -82,7 +85,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("preserves non-sensitive keys untouched", () => {
     const event = makeEvent({ extra: { userId: "u1", action: "click", count: 42 } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.userId).toBe("u1");
     expect(result.extra!.action).toBe("click");
     expect(result.extra!.count).toBe(42);
@@ -90,7 +93,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("handles null/undefined values in extra without throwing", () => {
     const event = makeEvent({ extra: { a: null, b: undefined, c: "ok" } });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.extra!.a).toBeNull();
     expect(result.extra!.b).toBeUndefined();
     expect(result.extra!.c).toBe("ok");
@@ -100,7 +103,7 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       extra: { items: [{ token: "abc", name: "foo" }, { secret: "xyz" }] },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     const items = result.extra!.items as Array<Record<string, unknown>>;
     expect(items[0].token).toBe("[REDACTED]");
     expect(items[0].name).toBe("foo");
@@ -113,7 +116,7 @@ describe("sentry-scrub beforeSend", () => {
         meta: { raw: "peer review", body: "{}", content: "c", message: "m", text: "t", status: 500 },
       },
     });
-    const meta = beforeSend(event).extra!.meta as Record<string, unknown>;
+    const meta = beforeSend(event)!.extra!.meta as Record<string, unknown>;
     for (const k of ["raw", "body", "content", "message", "text"]) {
       expect(meta[k], k).toBe("[REDACTED]");
     }
@@ -130,7 +133,7 @@ describe("sentry-scrub beforeSend", () => {
         ],
       },
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.message).toBe("No account for [EMAIL] or [EMAIL]");
     expect(result.exception!.values![0].value).toBe("Invite to [EMAIL] failed");
     expect(result.exception!.values![1].value).toBe("cause: [EMAIL], [EMAIL]");
@@ -138,7 +141,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("keeps the logger's diagnostic label on Error-path captures", () => {
     const event = makeEvent({ extra: { label: "verifyRefreshToken: unexpected error" } });
-    expect(beforeSend(event).extra!.label).toBe("verifyRefreshToken: unexpected error");
+    expect(beforeSend(event)!.extra!.label).toBe("verifyRefreshToken: unexpected error");
   });
 
   it("redacts x-user-email and x-user-id headers", () => {
@@ -148,7 +151,7 @@ describe("sentry-scrub beforeSend", () => {
         headers: { "x-user-email": "jane@example.com", "X-User-Id": "u1", accept: "*/*" },
       },
     });
-    const headers = beforeSend(event).request!.headers!;
+    const headers = beforeSend(event)!.request!.headers!;
     expect(headers["x-user-email"]).toBe("[REDACTED]");
     expect(headers["X-User-Id"]).toBe("[REDACTED]");
     expect(headers.accept).toBe("*/*");
@@ -156,7 +159,7 @@ describe("sentry-scrub beforeSend", () => {
 
   it("returns empty event unchanged", () => {
     const event = makeEvent({});
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect(result.event_id).toBe("test-event");
   });
 
@@ -164,7 +167,7 @@ describe("sentry-scrub beforeSend", () => {
     const event = makeEvent({
       contexts: { user: { email: "user@example.com", name: "Test" } } as ErrorEvent["contexts"],
     });
-    const result = beforeSend(event);
+    const result = beforeSend(event)!;
     expect((result.contexts!.user as Record<string, unknown>).email).toBe("[REDACTED]");
     expect((result.contexts!.user as Record<string, unknown>).name).toBe("Test");
   });
@@ -185,6 +188,70 @@ describe("sentry-scrub beforeBreadcrumb", () => {
     for (const f of ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"]) {
       expect(readFileSync(f, "utf8"), f).toMatch(/^\s*beforeBreadcrumb,\s*$/m);
     }
+  });
+});
+
+describe("sentry-scrub beforeSend MCP protocol-version negotiation", () => {
+  // Generated by the installed SDK rather than hand-typed, so an SDK release
+  // that rewords the message fails these tests instead of silently reopening #1291.
+  let mismatch: string;
+  let responseMessage: string;
+
+  beforeAll(async () => {
+    const transport = new WebStandardStreamableHTTPServerTransport(mcpTransportOptions);
+    const errors: Error[] = [];
+    transport.onerror = (e) => errors.push(e);
+    const server = new McpServer({ name: "sentry-scrub-test", version: "1.0.0" });
+    await server.connect(transport);
+    const response = await transport.handleRequest(
+      new Request("http://localhost/api/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "Mcp-Protocol-Version": "1999-01-01",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      }),
+    );
+    await server.close();
+    expect(response.status).toBe(400);
+    expect(errors).toHaveLength(1);
+    mismatch = errors[0].message;
+    responseMessage = ((await response.json()) as { error: { message: string } }).error.message;
+  });
+
+  it("drops the SDK's unsupported-protocol-version exception", () => {
+    const event = makeEvent({ exception: { values: [{ type: "Error", value: mismatch }] } });
+    expect(beforeSend(event)).toBeNull();
+  });
+
+  it("drops the unsupported-protocol-version message event", () => {
+    expect(beforeSend(makeEvent({ message: mismatch }))).toBeNull();
+  });
+
+  it("drops the SDK's JSON-RPC error response message", () => {
+    const event = makeEvent({ exception: { values: [{ type: "Error", value: responseMessage }] } });
+    expect(beforeSend(event)).toBeNull();
+  });
+
+  it("drops the mismatch when it is not the first exception value", () => {
+    const event = makeEvent({
+      exception: {
+        values: [
+          { type: "Error", value: "some wrapping error" },
+          { type: "Error", value: mismatch },
+        ],
+      },
+    });
+    expect(beforeSend(event)).toBeNull();
+  });
+
+  it("keeps other MCP transport errors", () => {
+    const event = makeEvent({
+      exception: { values: [{ type: "Error", value: "Invalid Host header: evil.com" }] },
+    });
+    expect(beforeSend(event)).toBe(event);
   });
 });
 

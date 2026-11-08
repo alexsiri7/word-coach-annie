@@ -341,7 +341,7 @@ requirements:
 
   - id: WCA-028
     title: MCP server tool coverage
-    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and database snapshots — full read/write parity with the web UI's core data."
+    statement: "When an AI agent connects to the MCP server (stdio, or HTTP at /api/mcp with a valid token), the system shall expose tools covering projects, structure, scene content, annotations, story objects, relationships, universes, writing tasks, submissions, export, coaching, and scene version history — full read/write parity with the web UI's core data."
     category: functional
     priority: must
     status: active
@@ -399,14 +399,15 @@ requirements:
 
   - id: WCA-033
     title: Database snapshot and restore
-    statement: "When significant data changes occur or an agent requests it, the system shall support creating a database snapshot, listing snapshots, and restoring one via MCP tools, and most write operations shall trigger an automatic snapshot for agentic safety."
+    statement: "The system shall not offer per-session database snapshotting: the MCP server shall register no tool that snapshots, lists snapshots of, or restores the whole database. Agents shall recover their own edits through per-scene version history (get_scene_versions / restore_scene_version), and whole-database recovery is Supabase point-in-time recovery, operated by the owner outside the server."
     category: functional
     priority: should
     status: active
-    source: requirements/014, src/mcp/snapshot.ts
+    source: requirements/014, openspec/specs/agent-collaboration/spec.md, src/mcp/index.ts
     acceptance:
-      - "snapshot_database / list_snapshots / restore_snapshot round-trip"
-      - "Snapshot inputs (message, limit, hash) are validated/escaped before reaching any shell (SECURITY-AUDIT CRITICAL-01 regression guard)"
+      - "snapshot_database, list_snapshots and restore_snapshot are not registered on the MCP server"
+      - "get_scene_versions and restore_scene_version are registered on the MCP server"
+    notes: "Owner decision on #1379: the git-based snapshot tools became no-ops after the move to Supabase PostgreSQL and a whole-database restore would roll back every tenant, so the tools and the no-op autoSnapshot calls were removed rather than rebuilt."
 
   - id: WCA-034
     title: Writing skills as MCP prompts
@@ -623,13 +624,13 @@ requirements:
 
   - id: WCA-052
     title: Deployment and integration surface
-    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployable behind a Cloudflare Tunnel, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
+    statement: "The system shall run as a Docker-contained Next.js 15+ App Router application (TypeScript strict) deployed to Railway from the root Dockerfile, with Google (OAuth + Docs) and the model provider configured via validated environment variables; features whose env vars are absent shall degrade gracefully rather than crash."
     category: constraint
     priority: must
     status: active
-    source: README, src/lib/env.ts, docker-compose.yml, scripts/migrate.mjs, docs/SETUP.md
+    source: README, src/lib/env.ts, Dockerfile, scripts/migrate.mjs, docs/SETUP.md, docs/TECH_STACK.md
     acceptance:
-      - "docker compose up (NODE_ENV=production) starts the app once PHOENIX_SECRET, PHOENIX_ADMIN_SECRET and an auth method (API_TOKEN or GOOGLE_CLIENT_ID) are set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
+      - "The production container (NODE_ENV=production) starts the app once an auth method (API_TOKEN or GOOGLE_CLIENT_ID) is set; scripts/migrate.mjs refuses startup if DATABASE_URL lacks an always-encrypting sslmode, REDIS_URL is not rediss://, JWT_SECRET/API_TOKEN/ENCRYPTION_KEY is set but shorter than 32 characters, or ALLOW_PLAINTEXT_STORAGE=true"
       - "A missing DATABASE_URL does not block startup: migrate.mjs warns and skips migrations, and DB-dependent routes fail"
       - "Missing GEMINI_API_KEY/GOOGLE_* disables the dependent feature with a clear message instead of a crash"
 
@@ -884,3 +885,18 @@ requirements:
       - "/version.json contains only {\"version\": <UUID>} and does not contain the commit SHA"
       - "A changed version value raises the update banner (WCA-037)"
     notes: "Inter, Manrope and Newsreader come through next/font/google, which fetches them from Google at build time, not at runtime. The version UUID is regenerated each time next.config loads, not strictly once per commit, and public/version.json is gitignored. The commit SHA is still exposed to the build as NEXT_PUBLIC_BUILD_VERSION, which is safe while only server telemetry reads it."
+
+  - id: WCA-071
+    title: Manuscript coaching checks
+    statement: "When the author runs a consistency check or voice check from the scene editor, the system shall send the project's character profiles and scene text to the configured AI and show the result as dismissible severity-rated contradiction alerts or as character voice profiles with flagged dialogue, without editing scene content; and the outline shall mark, for each scene, which plotlines it advances or first mentions and which earlier plotlines have gone dormant."
+    category: functional
+    priority: may
+    status: active
+    source: src/app/api/projects/[id]/consistency-check/route.ts, src/app/api/projects/[id]/voice-check/route.ts, src/app/api/projects/[id]/plot-thread-status/route.ts, src/mcp/tools/coaching.ts getConsistencyContext/getVoiceContext/getPlotThreadStatus, src/mcp/index.ts get_consistency_context/get_voice_context/get_plot_thread_status, src/components/editor/consistency-alerts-panel.tsx, src/components/editor/voice-monitor-panel.tsx, src/components/outline-tree.tsx PlotThreadDots, src/__tests__/plot-thread-status.test.ts, src/__tests__/coaching.test.ts
+    acceptance:
+      - "POST /api/projects/{id}/consistency-check returns at most 20 alerts, each typed CHARACTER_ATTRIBUTE, PLOT_CONTRADICTION, TIMELINE or OTHER with severity high, medium or low; with no characters or no scene over 50 characters of text it returns no alerts, and with no AI key it returns no alerts and the warning \"AI not configured\""
+      - "POST /api/projects/{id}/voice-check requires a sceneId of a scene in the project, analyses the selected text if given or else the scene text, and returns voice profiles for the CHARACTER objects linked to that scene plus feedback on dialogue that sounds like another character; with no AI key it returns profiles built from the characters' descriptions and no feedback"
+      - "GET /api/projects/{id}/plot-thread-status returns, for each scene in story order, every PLOTLINE linked to it as mentioned on its first linked scene and advancing afterwards, and every earlier-linked plotline absent from it as dormant with the title of the scene where it was last seen"
+      - "The MCP tools get_consistency_context, get_voice_context and get_plot_thread_status return the same gathered context to an MCP client that owns the project"
+      - "Neither check changes scene content"
+    notes: "The consistency and voice checks require project write access; plot-thread status requires read access. The consistency check reads up to 20 scenes (or only the focused scene), each cut to 800 characters of text; the voice check reads 1,500 characters of the latest version and sends at most 1,000. Results are not stored: dismissing an alert hides it until the next run. The audit draft also listed an Annie critique panel; it called a route that never existed and was removed rather than built (#1397), so AI scene feedback outside these checks stays with peer review. Known gaps: the consistency-check and voice-check routes have no test, the voice check gives no warning when AI is not configured, and it answers a scene outside the project with 500 rather than 404."

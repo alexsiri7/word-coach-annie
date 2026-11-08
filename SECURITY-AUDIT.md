@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-Annie is designed as a **local-first, single-user application** with no authentication by design. This is explicitly documented in `docs/memory-bank/decisionLog.md`. The findings below should be interpreted in that context — many are acceptable for localhost use but become critical if the app is exposed to a network (e.g., via the Cloudflare tunnel in `docker-compose.yml`).
+Annie is designed as a **local-first, single-user application** with no authentication by design. This is explicitly documented in `docs/memory-bank/decisionLog.md`. The findings below should be interpreted in that context — many are acceptable for localhost use but become critical if the app is exposed to a network (e.g., via the Cloudflare tunnel overlay in `docker-compose.tunnel.yml`).
 
-**Key concern:** The `docker-compose.yml` includes a Cloudflare tunnel service, which means this app *is* designed to be network-accessible. Combined with zero authentication, this makes several findings genuinely critical.
+**Key concern:** The `docker-compose.tunnel.yml` overlay adds a Cloudflare tunnel service, which means this app *is* designed to be network-accessible. Combined with zero authentication, this makes several findings genuinely critical.
 
 ---
 
@@ -53,7 +53,7 @@ Annie is designed as a **local-first, single-user application** with no authenti
 **Severity:** CRITICAL (when network-accessible via Cloudflare tunnel)
 **Files:** All 30+ route files in `src/app/api/`
 
-**Description:** Zero authentication or authorization on any endpoint. All API routes are publicly accessible. This is by design for local use, but the presence of a Cloudflare tunnel in `docker-compose.yml` means the app can be exposed to the internet.
+**Description:** Zero authentication or authorization on any endpoint. All API routes are publicly accessible. This is by design for local use, but the Cloudflare tunnel overlay in `docker-compose.tunnel.yml` means the app can be exposed to the internet.
 
 **Impact when tunneled:**
 - Anyone can read all projects, scenes, and story content
@@ -202,9 +202,9 @@ USER nextjs
 ### LOW-02: Cloudflare Tunnel Token in Environment
 
 **Severity:** LOW
-**File:** `docker-compose.yml:20`
+**File:** `docker-compose.tunnel.yml:14`
 
-**Description:** `CLOUDFLARE_TUNNEL_TOKEN` is passed via environment variable interpolation from the host's `.env.local`. This is standard practice but the token appears in `docker inspect` output and container process listing.
+**Description:** `CLOUDFLARE_TUNNEL_TOKEN` is passed via environment variable interpolation from the host's shell environment or `.env`. This is standard practice but the token appears in `docker inspect` output and container process listing.
 
 **Recommended fix:** Use Docker secrets or a secrets manager for production deployments.
 

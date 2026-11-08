@@ -150,6 +150,11 @@ export function ReportContentDialog({
                 />
               </div>
 
+              <p className="text-xs text-text-secondary">
+                Your report, including any details and this project&apos;s ID,
+                will be posted publicly as a GitHub issue.
+              </p>
+
               {result && !result.success && (
                 <p className="text-sm text-danger">{result.message}</p>
               )}

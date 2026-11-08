@@ -30,7 +30,6 @@ import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
 import { TimelineStrip } from "@/components/timeline/timeline-strip";
 import { InlineAiActionBar } from "@/components/inline-ai-action-bar";
 import { EditorStatusBar } from "@/components/editor/editor-status-bar";
-import { AnnieCritiquePanel } from "@/components/editor/annie-critique-panel";
 import { SceneContextSidebar } from "@/components/editor/scene-context-sidebar";
 import { useWritingSession } from "@/hooks/use-writing-session";
 import type { LintResult, SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
@@ -86,7 +85,6 @@ export function SceneEditor({
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
   const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
-  const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
   const [spellCheckEnabled, setSpellCheckEnabled] = useState(true);
   const [activeLint, setActiveLint] = useState<LintResult | null>(null);
@@ -621,8 +619,6 @@ export function SceneEditor({
         consistencyAlertCount={consistencyAlertCount}
         onToggleVoiceMonitor={() => setShowVoiceMonitor((v) => !v)}
         showVoiceMonitor={showVoiceMonitor}
-        onToggleCritiquePanel={() => setShowCritiquePanel((v) => !v)}
-        showCritiquePanel={showCritiquePanel}
         onToggleSceneContext={() => setShowSceneContext((v) => !v)}
         showSceneContext={showSceneContext}
         onToggleSpellCheck={() => setSpellCheckEnabled((v) => !v)}
@@ -790,15 +786,6 @@ export function SceneEditor({
           visible={showSceneContext}
         />
       </div>
-
-      {/* Annie's Critique Floating Panel */}
-      <AnnieCritiquePanel
-        projectId={projectId}
-        sceneId={node.id}
-        sceneContent={contentRef.current?.replace(/<[^>]+>/g, " ").trim()}
-        visible={showCritiquePanel}
-        onClose={() => setShowCritiquePanel(false)}
-      />
 
       {/* Timeline Strip */}
       {timelineScenes && timelineScenes.length > 0 && (

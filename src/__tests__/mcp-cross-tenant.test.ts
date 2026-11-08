@@ -2,14 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { prisma } from "@/lib/db";
 
-vi.mock("../mcp/snapshot", () => ({
-    initSnapshotRepo: vi.fn(),
-    createSnapshot: vi.fn(() => ({ hash: "abc123", message: "test" })),
-    listSnapshots: vi.fn(() => []),
-    restoreSnapshot: vi.fn(() => ({ hash: "def456", message: "restored" })),
-    autoSnapshot: vi.fn(),
-}));
-
 vi.mock("../lib/controllers/google-auth", () => ({
     GoogleAuthController: {
         getStatus: vi.fn(async () => ({ connected: false })),

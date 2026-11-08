@@ -23,7 +23,7 @@ cat docs/REQUIREMENTS.md
 // turbo
 3. Run the full test suite to confirm the app is stable:
 ```bash
-docker compose exec app npm run test:run
+docker compose -f docker-compose.dev.yml exec app npm run test:run
 ```
 
 ## Implementation Rules
@@ -56,13 +56,13 @@ For each feature, follow this order:
 // turbo
 1. Run the full test suite:
 ```bash
-docker compose exec app npm run test:run
+docker compose -f docker-compose.dev.yml exec app npm run test:run
 ```
 
 // turbo
 2. Run a build:
 ```bash
-docker compose exec app npm run build
+docker compose -f docker-compose.dev.yml exec app npm run build
 ```
 
 3. Update `docs/memory-bank/progress.md` with what was completed

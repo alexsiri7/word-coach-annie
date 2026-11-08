@@ -113,9 +113,9 @@ The container runs migrations on startup (`node scripts/migrate.mjs`)
 then starts the app (`node server.js`). The migration runner refuses
 destructive DDL (DROP/TRUNCATE) if the database has live data.
 
-Docker Compose adds:
-- **Phoenix** (arizephoenix/phoenix:6006) — OpenTelemetry tracing, auth enabled, on an isolated `telemetry` network
-- **Cloudflare Tunnel** — Public access for local dev
+The local dev stack (`docker-compose.dev.yml`) adds:
+- **Phoenix** (arizephoenix/phoenix:6006) — OpenTelemetry tracing
+- **Cloudflare Tunnel** — Public access for local dev, via the `docker-compose.tunnel.yml` overlay
 
 ### CI/CD (GitHub Actions)
 
@@ -194,7 +194,7 @@ See `.env.example` for the full list.
 | Medium | Story publishing | Self-issued integration token |
 | Sentry | Error tracking | Auth token |
 | Cloudflare Tunnel | Local dev public access | Tunnel token |
-| Phoenix | OpenTelemetry tracing (local) | `PHOENIX_SECRET` / `PHOENIX_ADMIN_SECRET` (bearer token) |
+| Phoenix | OpenTelemetry tracing (local) | None |
 
 ## Database Safety Rules
 
@@ -206,4 +206,4 @@ For schema changes, use Prisma migrations:
 3. The runner refuses destructive DDL (DROP/TRUNCATE) if the database has data
 4. Run `npx prisma generate` to regenerate the client after schema changes
 
-For emergencies: use the `snapshot_database` MCP tool to create a database backup before any significant data operation.
+For emergencies: whole-database recovery is Supabase point-in-time recovery; there is no MCP snapshot tool.
