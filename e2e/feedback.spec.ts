@@ -67,7 +67,7 @@ async function mockCommonApis(page: Page) {
 /** Open the feedback dialog via the user menu */
 async function openFeedbackDialog(page: Page) {
   // Click the user avatar button to open dropdown
-  const userButton = page.locator('button.rounded-full').first()
+  const userButton = page.locator('button.rounded-full[aria-haspopup="menu"]').first()
   await userButton.waitFor({ state: 'visible', timeout: 10_000 })
   await userButton.click()
 
@@ -112,6 +112,19 @@ test.describe('E2E feedback/bug report flow', () => {
       page.locator('text=Send Feedback').first(),
     ).toBeVisible()
 
+    // The public-posting notice is shown before submitting
+    await expect(
+      page.locator('text=posted publicly as a GitHub issue'),
+    ).toBeVisible()
+
+    // Screenshots are opt-in: unticked by default, no capture button yet
+    await expect(
+      page.getByRole('checkbox', { name: 'Attach a screenshot' }),
+    ).not.toBeChecked()
+    await expect(
+      page.getByRole('button', { name: /Capture Screenshot/i }),
+    ).toHaveCount(0)
+
     // Submit button should be disabled when message is empty
     const submitButton = page.getByRole('button', { name: 'Submit' })
     await expect(submitButton).toBeDisabled()
@@ -151,6 +164,7 @@ test.describe('E2E feedback/bug report flow', () => {
     expect(payload.context).toBeDefined()
     expect(payload.context.url).toBeDefined()
     expect(payload.context.screenSize).toBeDefined()
+    expect(payload.screenshot).toBeUndefined()
   })
 
   test('capture screenshot, annotate, submit, and verify GitHub issue created', async ({
@@ -180,7 +194,8 @@ test.describe('E2E feedback/bug report flow', () => {
     const textarea = page.locator('textarea')
     await textarea.fill('Button alignment is broken on the dashboard')
 
-    // Click "Capture Screenshot"
+    // Opt in to attaching a screenshot, then click "Capture Screenshot"
+    await page.getByRole('checkbox', { name: 'Attach a screenshot' }).check()
     const captureButton = page.getByRole('button', {
       name: /Capture Screenshot/i,
     })

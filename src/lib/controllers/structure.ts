@@ -1,7 +1,5 @@
 import { prisma, type DbClient } from "@/lib/db";
-import { autoSnapshot } from "../../mcp/snapshot";
 import type { SceneBlock } from "@/lib/types";
-import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
@@ -366,17 +364,6 @@ export class StructureController {
         const node = await prisma.structureNode.findUnique({ where: { id: nodeId } });
         if (!node) throw new UserFacingError("Node not found");
 
-        // Note: autoSnapshot might need to be passed in or handled differently if we want to isolate dependencies
-        // For now, we assume this is running in an environment where autoSnapshot works or handles itself gracefully.
-        // If this is running in pure Next.js API, we might need to adjust or make snapshot optional/backend-only.
-        try {
-            // We can keep it if it's safe, or conditionally run it.
-            // Given the repo structure, mcp code is imported in standard code.
-            autoSnapshot("delete_node", node.title);
-        } catch (e) {
-            logger.warn("Snapshot failed or not available", e);
-        }
-
         await Promise.all([
             prisma.structureNode.delete({ where: { id: nodeId } }),
             prisma.project.update({
@@ -701,12 +688,6 @@ export class StructureController {
     static async batchDeleteNodes(nodeIds: string[]) {
         if (nodeIds.length === 0) throw new UserFacingError("nodeIds array must not be empty");
         if (nodeIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
-
-        try {
-            autoSnapshot("batch_delete_nodes", `${nodeIds.length} nodes`);
-        } catch (e) {
-            logger.warn("Snapshot failed or not available", e);
-        }
 
         const results = [];
         const errors = [];

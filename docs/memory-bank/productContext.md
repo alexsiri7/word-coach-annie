@@ -30,7 +30,7 @@ word-coach-annie/
       tools/           # Tool implementations
   data/
     word-coach-annie.db  # SQLite database
-  docker-compose.yml
+  docker-compose.dev.yml
   CLAUDE.md            # Redirect (root)
   GEMINI.md            # Redirect (root)
 ```
@@ -47,7 +47,7 @@ word-coach-annie/
 - API routes via Next.js App Router (`src/app/api/...`)
 - SQLite file persisted via Docker volume mount to `./data/`
 - Source mounted into container for hot reload
-- Commands run inside container: `docker compose exec app <cmd>`
+- Commands run inside container: `docker compose -f docker-compose.dev.yml exec app <cmd>`
 - MCP server runs inside Docker for shared environment/schema
 
 ## Conventions

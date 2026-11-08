@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **100 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **97 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -32,7 +32,7 @@ Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for detai
 
 Set `API_TOKEN` in your environment. MCP clients must send `Authorization: Bearer <API_TOKEN>`.
 
-To enable destructive tools (delete, restore_snapshot, etc.), set `MCP_ALLOW_DESTRUCTIVE=true`.
+To enable destructive tools (delete tools), set `MCP_ALLOW_DESTRUCTIVE=true`.
 
 ---
 
@@ -177,7 +177,7 @@ Update a structure node's title, synopsis, status, order, or parent.
 ---
 
 #### `delete_node`
-Delete a structure node and all children, content, and relationships. Auto-snapshots before deletion. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete a structure node and all children, content, and relationships. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -205,7 +205,7 @@ Update multiple nodes in one operation (max 50).
 ---
 
 #### `batch_delete_nodes`
-Delete multiple nodes in one operation (max 50). Auto-snapshots before deletion. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete multiple nodes in one operation (max 50). Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -394,7 +394,7 @@ Update a story object's fields.
 ---
 
 #### `delete_story_object`
-Delete a story object and all relationships. Auto-snapshots. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete a story object and all relationships. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -422,7 +422,7 @@ Update multiple story objects in one operation (max 50).
 ---
 
 #### `batch_delete_story_objects`
-Delete multiple story objects in one operation (max 50). Auto-snapshots. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete multiple story objects in one operation (max 50). Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -457,7 +457,7 @@ Create a typed relationship between two entities. Provide exactly one from-field
 ---
 
 #### `delete_relationship`
-Delete a relationship. Auto-snapshots. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete a relationship. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -492,35 +492,6 @@ Export a specific node or the entire project in Hashnode-ready Markdown with fro
 |-------|------|-------------|
 | `projectId` | string | The project ID |
 | `nodeId` | string? | Specific node ID to export (omit to export all) |
-
----
-
-### Database Safety
-
-#### `snapshot_database`
-Create a named snapshot (git commit) of the database. Use before significant changes.
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `message` | string | Description of what's changing or why |
-
----
-
-#### `list_snapshots`
-List recent database snapshots with timestamps and messages.
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `limit` | number? | Max snapshots (default 20) |
-
----
-
-#### `restore_snapshot`
-Restore the database to a previous snapshot. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `commitHash` | string | Snapshot commit hash from `list_snapshots` |
 
 ---
 

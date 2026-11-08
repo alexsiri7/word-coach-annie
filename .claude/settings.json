@@ -77,9 +77,7 @@
       "mcp__word-coach-annie__export_manuscript",
       "mcp__word-coach-annie__export_story_bible",
       "mcp__word-coach-annie__export_to_google_docs",
-      "mcp__word-coach-annie__export_hashnode",
-      "mcp__word-coach-annie__list_snapshots",
-      "mcp__word-coach-annie__snapshot_database"
+      "mcp__word-coach-annie__export_hashnode"
     ],
     "deny": []
   }
