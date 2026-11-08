@@ -58,7 +58,7 @@
     "@tiptap/extension-placeholder": "^3.32.2",
     "@tiptap/extension-underline": "^3.32.2",
     "@tiptap/pm": "^3.32.2",
-    "@tiptap/react": "^3.32.2",
+    "@tiptap/react": "^3.32.3",
     "@tiptap/starter-kit": "^3.32.2",
     "archiver": "^7.0.1",
     "class-variance-authority": "^0.7.1",
