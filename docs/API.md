@@ -17,8 +17,9 @@ Returns Prometheus-format metrics for the Annie service.
 
 **Response**:
 - `200 text/plain` — Prometheus text format (metrics payload). Metrics include:
-  - `annie_http_requests_total{method, path, status}` — request counter
+  - `annie_http_requests_total{method, path, status}` — request counter covering every HTTP request served, including proxy-generated 401/429 responses
   - `annie_http_request_duration_seconds{method, path}` — latency histogram
+  - `path` is the Next.js route template (for example `/api/projects/[id]`), or `other` for unmatched paths and static assets (the templates come from `.next/routes-manifest.json`, which only `next build` writes, so under `next dev` every path is labelled `other`)
   - `annie_projects_total` — gauge: total projects in database
   - `annie_users_total` — gauge: total users in database
 - `401 Unauthorized` — auth is enabled and the request does not carry the `API_TOKEN` bearer
@@ -118,7 +119,7 @@ Permanently delete the authenticated user's account and all associated data (GDP
 The `email` field must exactly match the authenticated user's email as a confirmation step.
 
 **Response**:
-- `200 OK` — `{ "ok": true }`. Session cookie is cleared (`Max-Age=0`).
+- `200 OK` — `{ "ok": true }`. Session and refresh token JTIs are revoked (via blocklist) and both `annie_session` and `annie_refresh` cookies are cleared (`Max-Age=0`).
 - `400 Bad Request` — missing/invalid email, or email does not match (`{ "error": "Email does not match" }`)
 - `401 Unauthorized` — not authenticated or user not found
 - `403 Forbidden` — missing CSRF header, or API_TOKEN mode
@@ -266,7 +267,7 @@ List all story objects in a project.
 ---
 
 ### `GET /api/projects/:id/relationships`
-List all relationships in a project.
+List all relationships in a project, including edges touching a world object of the project's linked universe.
 
 ---
 
@@ -301,7 +302,7 @@ Export all projects as a ZIP archive.
 ### `GET /api/projects/:id/export/pdf`
 Export the project manuscript as a PDF file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary PDF file (`Content-Type: application/pdf`, `Content-Disposition: attachment; filename="<title>.pdf"`).
 
@@ -310,7 +311,7 @@ Export the project manuscript as a PDF file.
 ### `GET /api/projects/:id/export/epub`
 Export the project manuscript as an EPUB file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary EPUB file (`Content-Type: application/epub+zip`, `Content-Disposition: attachment; filename="<title>.epub"`).
 
@@ -319,7 +320,7 @@ Export the project manuscript as an EPUB file.
 ### `GET /api/projects/:id/export/docx`
 Export the project manuscript as a DOCX file.
 
-**Auth**: Project owner or shared reader access required.
+**Auth**: Project owner or shared reader access required. OUTLINE scenes are omitted for READER shares.
 
 **Response**: Binary DOCX file (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `Content-Disposition: attachment; filename="<title>.docx"`).
 
@@ -329,6 +330,8 @@ Export the project manuscript as a DOCX file.
 
 ### `GET /api/nodes/:id`
 Get a structure node by ID.
+
+**Errors**: `403` for READER shares on an OUTLINE scene
 
 ---
 
@@ -359,6 +362,8 @@ Get a scene's content (latest version + version history + annotations).
 **Query params**: `versionId` — if provided, returns that specific version only.
 
 **Response**: `{ content, wordCount, versions[], annotations[] }`
+
+**READER shares**: `history` is empty; `versionId` and OUTLINE scenes return `403`.
 
 ---
 
@@ -451,6 +456,10 @@ Create a relationship between two entities.
   "toObjectId": "string"
 }
 ```
+
+`fromObjectId`/`toObjectId` resolve to a story object in this project first, then to a world object in the project's linked universe; the created edge is stored on `fromObjectId`/`fromWorldObjectId` (or the `to*` pair) accordingly. Responses include `fromNode`, `fromObject`, `fromWorldObject`, `toNode`, `toObject` and `toWorldObject`.
+
+**Errors**: `400` invalid body or not exactly one `from*`/`to*` field; `404` project, node or object not found in this project or its linked universe
 
 ---
 
@@ -549,6 +558,22 @@ Transfer a story object from a project to a universe.
 
 ---
 
+### `POST /api/universes/:id/projects`
+Link a project to a universe (moves it if it is linked elsewhere).
+
+**Body**: `{ projectId: string }`
+
+**Errors**: `400` missing projectId, `403`/`404` for the universe or the project
+
+---
+
+### `DELETE /api/universes/:id/projects/:projectId`
+Unlink a project from this universe.
+
+**Errors**: `403`/`404` for the universe or the project, `404` if the project is not linked to this universe
+
+---
+
 ## World Objects
 
 ### `GET /api/world-objects/:id`
@@ -592,9 +617,9 @@ Update a timeline entry. At least one field must be provided.
 ## Timeline
 
 ### `GET /api/timeline/:projectId`
-Get the timeline matrix for a project.
+Get the data behind a project's timeline matrix. Read-only.
 
-**Response**: `{ scenes: Scene[], objects: StoryObject[], matrix: { sceneId, objectId }[] }` — cross-reference of where story objects appear across scenes.
+**Response**: `{ scenes: StructureNode[], objects: StoryObject[], events: Relationship[] }` — scenes in manuscript order, the project's story objects, and every relationship linking an object to a scene (with `fromObject`, `toNode`, `fromNode`, `toObject` included). The timeline view builds the object×scene presence matrix from these client-side.
 
 ---
 
@@ -780,6 +805,8 @@ Run a manuscript-level AI analysis across the full project.
 
 **Response**: `{ result: "string" }` — the analysis report as Markdown text.
 
+**Errors**: `413` if the gathered manuscript context exceeds 200,000 characters
+
 ---
 
 ## Peer Review
@@ -816,6 +843,9 @@ Returns `{ warning: "AI not configured" }` or `{ warning: "Manuscript is empty" 
 preconditions are not met. Manuscript is truncated to 50,000 characters before analysis.
 
 **Errors**: `401` unauthorized, `403` forbidden, `500` internal server error
+
+Past reviews are read with `GET /api/projects/:id/peer-review` (list) and
+`GET /api/projects/:id/peer-review/:reviewId` (full row); both return `403` for READER shares.
 
 ---
 
@@ -913,7 +943,7 @@ List writing tasks for a project.
 
 **Response**: `{ tasks: WritingTask[], total: number }`
 
-**Errors**: `400` if `projectId` missing; `401` unauthenticated
+**Errors**: `400` if `projectId` missing; `401` unauthenticated; `403` for READER shares
 
 ---
 

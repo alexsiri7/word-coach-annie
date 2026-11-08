@@ -515,6 +515,13 @@ describe("GET /api/projects/:id/peer-review (list)", () => {
     expect(res.status).toBe(403);
     expect(vi.mocked(prisma.peerReview.findMany)).not.toHaveBeenCalled();
   });
+  it("refuses a READER share", async () => {
+    vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({ authorized: true, role: "READER" } as never);
+
+    const res = await GET_LIST(makeListRequest(), makeParams());
+    expect(res.status).toBe(403);
+    expect(vi.mocked(prisma.peerReview.findMany)).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/projects/:id/peer-review/:reviewId (detail)", () => {
@@ -556,5 +563,13 @@ describe("GET /api/projects/:id/peer-review/:reviewId (detail)", () => {
     await GET_DETAIL(makeDetailRequest("proj-A", "rev-from-B"), makeDetailParams("proj-A", "rev-from-B"));
     const where = vi.mocked(prisma.peerReview.findFirst).mock.calls[0][0]?.where;
     expect(where).toEqual({ id: "rev-from-B", projectId: "proj-A" });
+  });
+
+  it("refuses a READER share", async () => {
+    vi.mocked(verifyProjectReadAccess).mockResolvedValueOnce({ authorized: true, role: "READER" } as never);
+
+    const res = await GET_DETAIL(makeDetailRequest(), makeDetailParams());
+    expect(res.status).toBe(403);
+    expect(vi.mocked(prisma.peerReview.findFirst)).not.toHaveBeenCalled();
   });
 });

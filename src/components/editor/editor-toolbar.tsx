@@ -24,7 +24,6 @@ import {
   WifiOff,
   AlertTriangle,
   Mic,
-  Sparkles,
   PanelRight,
   ClipboardCheck,
   LayoutList,
@@ -62,6 +61,7 @@ interface EditorToolbarProps {
   onStatusChange: (status: string) => void;
   saving: boolean;
   lastSaved: string | null;
+  saveFailed: boolean;
   onManualSave: () => void;
   onToggleVersions: () => void;
   showVersions: boolean;
@@ -79,8 +79,6 @@ interface EditorToolbarProps {
   consistencyAlertCount?: number;
   onToggleVoiceMonitor?: () => void;
   showVoiceMonitor?: boolean;
-  onToggleCritiquePanel?: () => void;
-  showCritiquePanel?: boolean;
   onToggleSceneContext?: () => void;
   showSceneContext?: boolean;
   onToggleSpellCheck?: () => void;
@@ -97,6 +95,7 @@ export function EditorToolbar({
   onStatusChange,
   saving,
   lastSaved,
+  saveFailed,
   onManualSave,
   onToggleVersions,
   showVersions,
@@ -114,8 +113,6 @@ export function EditorToolbar({
   consistencyAlertCount = 0,
   onToggleVoiceMonitor,
   showVoiceMonitor,
-  onToggleCritiquePanel,
-  showCritiquePanel,
   onToggleSceneContext,
   showSceneContext,
   onToggleSpellCheck,
@@ -149,7 +146,6 @@ export function EditorToolbar({
   const annotationsLabel = `${showAnnotations ? "Hide" : "Show"} annotations${annotationCount > 0 ? ` (${annotationCount})` : ""}`;
   const consistencyAlertsLabel = `${showConsistencyAlerts ? "Hide" : "Show"} consistency alerts${consistencyAlertCount > 0 ? ` (${consistencyAlertCount})` : ""}`;
   const voiceMonitorLabel = `${showVoiceMonitor ? "Hide" : "Show"} voice monitor`;
-  const critiquePanelLabel = `${showCritiquePanel ? "Hide" : "Show"} Annie's critique`;
   const sceneContextLabel = `${showSceneContext ? "Hide" : "Show"} scene context sidebar`;
   const spellCheckLabel = `${spellCheckEnabled ? "Disable" : "Enable"} spelling and grammar checking`;
 
@@ -374,24 +370,6 @@ export function EditorToolbar({
           </Tooltip>
         )}
 
-        {onToggleCritiquePanel && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-8 w-8", showCritiquePanel && "bg-accent/15 text-accent")}
-                onClick={onToggleCritiquePanel}
-                aria-label={critiquePanelLabel}
-                aria-pressed={showCritiquePanel}
-              >
-                <Sparkles className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{critiquePanelLabel}</TooltipContent>
-          </Tooltip>
-        )}
-
         {onToggleSceneContext && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -541,12 +519,14 @@ export function EditorToolbar({
         >
           {saving ? (
             <div className="h-3 w-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          ) : saveFailed ? (
+            <AlertTriangle className="h-3 w-3 text-danger" />
           ) : lastSaved ? (
             <Check className="h-3 w-3 text-success" />
           ) : (
             <Save className="h-3 w-3" />
           )}
-          {saving ? "Saving..." : lastSaved ? `Saved` : "Save"}
+          {saving ? "Saving..." : saveFailed ? "Not saved" : lastSaved ? `Saved` : "Save"}
         </Button>
 
         <Tooltip>

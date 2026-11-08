@@ -7,6 +7,7 @@ import { SyncToast } from "@/components/sync-toast";
 import { UpdateBanner } from "@/components/update-banner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { CspNonce } from "@/components/csp-nonce";
 
 // next/font downloads these at build time and serves them from our own origin,
 // so visitors' browsers never contact Google (SEC-32).
@@ -76,6 +77,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body>
+        <CspNonce />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -21,21 +21,21 @@ docker compose -f docker-compose.dev.yml up -d
 ### Run Commands
 
 ```bash
-docker compose exec app npm run test:run       # Unit tests (once)
-docker compose exec app npm run test           # Unit tests (watch mode)
-docker compose exec app npm run test:coverage  # With coverage
-docker compose exec app npm run typecheck      # TypeScript check
-docker compose exec app npm run lint           # ESLint
-docker compose exec app npm run build          # Production build
-docker compose exec app npx prisma studio      # DB browser (port 5555)
+docker compose -f docker-compose.dev.yml exec app npm run test:run       # Unit tests (once)
+docker compose -f docker-compose.dev.yml exec app npm run test           # Unit tests (watch mode)
+docker compose -f docker-compose.dev.yml exec app npm run test:coverage  # With coverage
+docker compose -f docker-compose.dev.yml exec app npm run typecheck      # TypeScript check
+docker compose -f docker-compose.dev.yml exec app npm run lint           # ESLint
+docker compose -f docker-compose.dev.yml exec app npm run build          # Production build
+docker compose -f docker-compose.dev.yml exec app npx prisma studio      # DB browser (port 5555)
 ```
 
 ### E2E / Screenshot Tests
 
 ```bash
-docker compose exec app npm run e2e                        # All Playwright tests
-docker compose exec app npm run test:screenshots           # Visual regression only
-docker compose exec app npm run test:screenshots:update    # Update baseline PNGs
+docker compose -f docker-compose.dev.yml exec app npm run e2e                        # All Playwright tests
+docker compose -f docker-compose.dev.yml exec app npm run test:screenshots           # Visual regression only
+docker compose -f docker-compose.dev.yml exec app npm run test:screenshots:update    # Update baseline PNGs
 ```
 
 After UI changes: run `test:screenshots:update`, then inspect every updated PNG in `e2e/visual.spec.ts-snapshots/` before committing.
@@ -113,7 +113,6 @@ Controllers live in `src/lib/controllers/` and contain all business logic. They 
 
 - Keep controllers free of HTTP concerns (no `NextRequest`, no response objects)
 - Return plain objects or throw `Error` on failure
-- Use `autoSnapshot()` from `src/lib/db.ts` before any write that an agent might trigger
 
 ---
 
@@ -143,8 +142,8 @@ if (process.env.MCP_ALLOW_DESTRUCTIVE === "true") {
 Tests live in `src/__tests__/`. Each API handler, controller, and non-trivial utility should have a test file.
 
 ```bash
-docker compose exec app npm run test:run            # All tests
-docker compose exec app npm run test:run -- cache   # Filter by name
+docker compose -f docker-compose.dev.yml exec app npm run test:run            # All tests
+docker compose -f docker-compose.dev.yml exec app npm run test:run -- cache   # Filter by name
 ```
 
 Test setup: `src/__tests__/globalSetup.ts` — creates a fresh in-memory SQLite DB for each run.
@@ -154,7 +153,7 @@ Test setup: `src/__tests__/globalSetup.ts` — creates a fresh in-memory SQLite 
 ### TypeScript
 
 ```bash
-docker compose exec app npm run typecheck
+docker compose -f docker-compose.dev.yml exec app npm run typecheck
 ```
 
 Errors block CI. Fix them before committing.
@@ -162,7 +161,7 @@ Errors block CI. Fix them before committing.
 ### Lint
 
 ```bash
-docker compose exec app npm run lint
+docker compose -f docker-compose.dev.yml exec app npm run lint
 ```
 
 The project uses ESLint with Next.js defaults. Auto-fix: `npm run lint -- --fix`.
@@ -182,12 +181,12 @@ ALTER TABLE "SomeTable" ADD COLUMN "newColumn" TEXT;
 EOF
 
 # 2. Apply to running DB
-docker compose exec app sqlite3 data/word-coach-annie.db < migration.sql
+docker compose -f docker-compose.dev.yml exec app sqlite3 data/word-coach-annie.db < migration.sql
 
 # 3. Update prisma/schema.prisma to match
 
 # 4. Regenerate client (does NOT touch the DB)
-docker compose exec app npx prisma generate
+docker compose -f docker-compose.dev.yml exec app npx prisma generate
 ```
 
 ---
@@ -220,7 +219,7 @@ A separate **scheduled workflow** (`supabase-disk-monitor.yml`) checks Supabase 
 ## Bundle Analysis
 
 ```bash
-docker compose exec app npm run analyze
+docker compose -f docker-compose.dev.yml exec app npm run analyze
 ```
 
 Runs `next build` with `@next/bundle-analyzer` and opens an interactive bundle map. Use this before shipping large dependency additions.
@@ -229,15 +228,15 @@ Runs `next build` with `@next/bundle-analyzer` and opens an interactive bundle m
 
 ## AI Tool Registry (In-App Chat)
 
-The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/tool-registry.ts` in two tiers:
+The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/adk-tools.ts` in two tiers:
 
 - **Tier 1** (~8 tools): always loaded — project summary, outline, read/write scenes, story objects, relationships
 - **Tier 2** (remaining tools): loaded on demand via a `load_toolset` meta-tool when the AI needs more capability
 
 When adding a tool to the in-app chat:
-1. Define the Zod schema in `tool-registry.ts`
-2. Add the handler in `tool-executor.ts`
-3. Assign it to the correct toolset (tier 1 vs 2)
+1. Add a `ToolDefinition` entry to the `tools` array in `adk-tools.ts`, with its Zod schema and its `category` (`core` for tier 1, any other category for tier 2)
+2. Add its handler to `buildToolExecutors` in the same file
+3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and name delete tools `delete_*` so `isChatDestructiveTool` gates them behind `MCP_ALLOW_DESTRUCTIVE`
 
 This two-tier approach saves ~81% token overhead vs loading all tools upfront.
 

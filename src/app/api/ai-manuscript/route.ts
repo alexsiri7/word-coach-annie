@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
+import { MAX_PROMPT_LENGTH } from "./limits";
 
 export type ManuscriptAnalysisType =
   | "plot-threads"
@@ -102,6 +103,12 @@ export async function POST(request: NextRequest) {
 
     const ctx = await getManuscriptContext(projectId);
     const prompt = promptFn(ctx);
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Manuscript is too large to analyze (maximum ${MAX_PROMPT_LENGTH} characters of gathered context)` },
+        { status: 413 }
+      );
+    }
 
     // Load user preferences for system-level behavior guidance
     const prefs = await getAiPreferences(userId);

@@ -1,14 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock all heavy dependencies to avoid DB/filesystem calls
-vi.mock("../mcp/snapshot", () => ({
-  initSnapshotRepo: vi.fn(),
-  createSnapshot: vi.fn(() => ({ hash: "abc123", message: "test" })),
-  listSnapshots: vi.fn(() => []),
-  restoreSnapshot: vi.fn(() => ({ hash: "def456", message: "restored" })),
-  autoSnapshot: vi.fn(),
-}));
-
 vi.mock("../mcp/tools/projects", () => ({
   listProjects: vi.fn(async () => []),
   getProject: vi.fn(async () => ({})),
@@ -67,12 +59,6 @@ vi.mock("../mcp/tools/export", () => ({
   exportStoryBible: vi.fn(async () => ""),
   exportHashnode: vi.fn(async () => ""),
   getProjectSummary: vi.fn(async () => ({})),
-}));
-
-vi.mock("../mcp/tools/snapshots", () => ({
-  snapshotDatabase: vi.fn(async () => ({})),
-  listDatabaseSnapshots: vi.fn(async () => []),
-  restoreDatabaseSnapshot: vi.fn(async () => ({ restored: true })),
 }));
 
 vi.mock("../mcp/tools/universes", () => ({
@@ -165,7 +151,6 @@ vi.mock("../lib/export/google-docs-exporter", () => ({
 
 import { deleteNode } from "../mcp/tools/structure";
 import { listProjects } from "../mcp/tools/projects";
-import { restoreDatabaseSnapshot } from "../mcp/tools/snapshots";
 import { deleteRelationship } from "../mcp/tools/relationships";
 import { prisma } from "@/lib/db";
 
@@ -218,13 +203,13 @@ describe("MCP destructive tool gating", () => {
     const { createServer } = await import("../mcp/index");
     const server = createServer();
 
-    const tool = getToolHandler(server, "restore_snapshot");
+    const tool = getToolHandler(server, "delete_node");
     expect(tool).toBeDefined();
 
-    const result = await tool.handler({ commitHash: "abc123" }) as { isError?: boolean; content: Array<{ text: string }> };
+    const result = await tool.handler({ nodeId: "test-id" }) as { isError?: boolean; content: Array<{ text: string }> };
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("destructive tool is disabled");
-    expect(restoreDatabaseSnapshot).not.toHaveBeenCalled();
+    expect(deleteNode).not.toHaveBeenCalled();
   });
 
   it("respects MCP_ALLOW_DESTRUCTIVE=true env when no option provided", async () => {

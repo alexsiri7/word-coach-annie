@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { getCspNonce } from "@/lib/csp-nonce";
 import { offlineFetch } from "@/lib/offline/sync-queue";
 import { cacheContentVersion, getCachedContent } from "@/lib/offline/cache-reads";
 import { computeOfflineContentHash } from "@/lib/offline/content-hash";
 import { MessageSquare, AlertTriangle, RefreshCw, Check, ArrowRight, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { saveErrorToast } from "@/components/editor/save-error";
 import {
   Popover,
   PopoverContent,
@@ -27,7 +30,6 @@ import { VoiceMonitorPanel } from "@/components/editor/voice-monitor-panel";
 import { TimelineStrip } from "@/components/timeline/timeline-strip";
 import { InlineAiActionBar } from "@/components/inline-ai-action-bar";
 import { EditorStatusBar } from "@/components/editor/editor-status-bar";
-import { AnnieCritiquePanel } from "@/components/editor/annie-critique-panel";
 import { SceneContextSidebar } from "@/components/editor/scene-context-sidebar";
 import { useWritingSession } from "@/hooks/use-writing-session";
 import type { LintResult, SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
@@ -83,7 +85,6 @@ export function SceneEditor({
   const [showConsistencyAlerts, setShowConsistencyAlerts] = useState(false);
   const [consistencyAlertCount, setConsistencyAlertCount] = useState(0);
   const [showVoiceMonitor, setShowVoiceMonitor] = useState(false);
-  const [showCritiquePanel, setShowCritiquePanel] = useState(false);
   const [showSceneContext, setShowSceneContext] = useState(false);
   const [spellCheckEnabled, setSpellCheckEnabled] = useState(true);
   const [activeLint, setActiveLint] = useState<LintResult | null>(null);
@@ -98,12 +99,19 @@ export function SceneEditor({
   const [contentFromCache, setContentFromCache] = useState(fromCacheProp);
 
   const session = useWritingSession({ projectId, nodeId: node.id });
+  const { error: toastError } = useToast();
+  // Autosave retries on every edit; only the first failure in a streak is
+  // toasted, while saveFailed keeps the toolbar and status bar honest.
+  const saveFailingRef = useRef(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const { scheduleSave, saveNow, saveContent, cleanup, contentRef, setBaseHash } = useAutoSave({
     nodeId: node.id,
     onSaveStart: () => setSaving(true),
     onSaveEnd: () => setSaving(false),
     onVersionCreated: (v) => {
+      saveFailingRef.current = false;
+      setSaveFailed(false);
       setLatestVersionId(v.id);
       setLastSaved(new Date().toLocaleTimeString());
       setExternalChangeDetected(false);
@@ -111,7 +119,13 @@ export function SceneEditor({
     },
     onNodeUpdated,
     onSaveError: (err) => {
-      if (err.status !== 409) return;
+      if (err.status !== 409) {
+        const message = saveErrorToast(err.status, saveFailingRef.current);
+        saveFailingRef.current = true;
+        setSaveFailed(true);
+        if (message) toastError(message);
+        return;
+      }
       const data = err.data as { content?: string; contentHash?: string } | null;
       setSaveConflict({ content: data?.content ?? "", contentHash: data?.contentHash ?? null });
     },
@@ -217,6 +231,7 @@ export function SceneEditor({
         },
       },
       immediatelyRender: false,
+      injectNonce: getCspNonce(),
       onUpdate: ({ editor, transaction }) => {
         // Annotation-reconciliation transactions (below) mark themselves
         // "silent" — they only add display-only marks for annotations that
@@ -586,6 +601,7 @@ export function SceneEditor({
         onStatusChange={handleStatusChange}
         saving={saving}
         lastSaved={lastSaved}
+        saveFailed={saveFailed}
         onManualSave={saveNow}
         onToggleVersions={loadVersionHistory}
         showVersions={showVersions}
@@ -603,8 +619,6 @@ export function SceneEditor({
         consistencyAlertCount={consistencyAlertCount}
         onToggleVoiceMonitor={() => setShowVoiceMonitor((v) => !v)}
         showVoiceMonitor={showVoiceMonitor}
-        onToggleCritiquePanel={() => setShowCritiquePanel((v) => !v)}
-        showCritiquePanel={showCritiquePanel}
         onToggleSceneContext={() => setShowSceneContext((v) => !v)}
         showSceneContext={showSceneContext}
         onToggleSpellCheck={() => setSpellCheckEnabled((v) => !v)}
@@ -720,6 +734,7 @@ export function SceneEditor({
             wordCount={wordCount}
             saving={saving}
             lastSaved={lastSaved}
+            saveFailed={saveFailed}
             sessionWordsWritten={session.wordsWritten}
             sessionDurationSeconds={session.durationSeconds}
             sessionWordsPerHour={session.wordsPerHour}
@@ -771,15 +786,6 @@ export function SceneEditor({
           visible={showSceneContext}
         />
       </div>
-
-      {/* Annie's Critique Floating Panel */}
-      <AnnieCritiquePanel
-        projectId={projectId}
-        sceneId={node.id}
-        sceneContent={contentRef.current?.replace(/<[^>]+>/g, " ").trim()}
-        visible={showCritiquePanel}
-        onClose={() => setShowCritiquePanel(false)}
-      />
 
       {/* Timeline Strip */}
       {timelineScenes && timelineScenes.length > 0 && (

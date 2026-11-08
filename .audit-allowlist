@@ -10,3 +10,26 @@
 #
 # Stale entries: scripts/audit-filter.mjs fails the gate on any entry that
 # `npm audit` no longer reports. Delete such entries rather than keeping them.
+#
+# Last reviewed: 2026-10-31
+#
+# Source: glob (via @sentry/bundler-plugins, archiver-utils, workbox-build transitive chains)
+# Justification: AbortSignal cancellation bypass requires calling glob() with an
+# AbortSignal-based timeout against attacker-influenced filesystem paths. This app's
+# only runtime use of archiver (src/app/api/auth/export-data, src/app/api/projects/export-all)
+# calls archive.append() with in-memory JSON strings, never archiver's glob-based directory
+# add. The other consumers (Sentry source-map upload, workbox service-worker build) run
+# build-time only, over the app's own source tree.
+# Upgrade path: no fix available without --force; resolves only via a major downgrade of
+# @sentry/nextjs (11.x -> 10.x) or a major bump of archiver (7.x -> 8.x).
+# App risk: LOW — no runtime glob-pattern filesystem traversal in this app's code paths.
+GHSA-3g3m-2fjr-6pw4
+#
+# Source: minimatch (via eslint, @typescript-eslint/typescript-estree, and the same
+# glob/archiver-utils/workbox-build chains as above)
+# Justification: DoS via crafted glob-pattern amplification. eslint and typescript-estree
+# use minimatch only to match the app's own config-declared lint globs at lint time, not
+# against user input. The archiver/workbox chains are build-time-only as above.
+# Upgrade path: no fix available without --force; same breaking downgrades/bumps as above.
+# App risk: LOW — no user-controlled glob patterns are evaluated at runtime.
+GHSA-g3hv-75wg-m249

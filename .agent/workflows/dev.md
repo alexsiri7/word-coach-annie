@@ -17,7 +17,7 @@ Before writing any code:
 ## Step 1: Run Tests Before You Start
 // turbo
 ```bash
-docker compose exec app npm run test:run
+docker compose -f docker-compose.dev.yml exec app npm run test:run
 ```
 If any tests fail, **STOP**. Fix them before making changes. Never start work on a failing test suite.
 
@@ -31,14 +31,14 @@ If any tests fail, **STOP**. Fix them before making changes. Never start work on
 ## Step 3: Run TypeScript Check
 // turbo
 ```bash
-docker compose exec app npx tsc --noEmit
+docker compose -f docker-compose.dev.yml exec app npx tsc --noEmit
 ```
 If there are type errors, fix them. Do NOT suppress with `any` or `@ts-ignore`.
 
 ## Step 4: Run Tests Again
 // turbo
 ```bash
-docker compose exec app npm run test:run
+docker compose -f docker-compose.dev.yml exec app npm run test:run
 ```
 All tests must pass. If a test fails:
 - If your change intentionally changes behavior, update the test to match
@@ -47,7 +47,7 @@ All tests must pass. If a test fails:
 ## Step 5: Verify the App Builds
 // turbo
 ```bash
-docker compose exec app npm run build
+docker compose -f docker-compose.dev.yml exec app npm run build
 ```
 If the build fails, fix it before committing. Common issues:
 - Server components importing client-only code (Tiptap, hooks)
@@ -57,7 +57,7 @@ If the build fails, fix it before committing. Common issues:
 ## Step 6: Smoke Test the Running App
 // turbo
 ```bash
-docker compose exec app curl -s http://localhost:3000/api/projects | head -c 200
+docker compose -f docker-compose.dev.yml exec app curl -s http://localhost:3000/api/projects | head -c 200
 ```
 Verify the app responds. If using the browser, check:
 - Dashboard loads
@@ -83,19 +83,19 @@ If you modify `prisma/schema.prisma`:
 // turbo
 1. Regenerate the Prisma client:
 ```bash
-docker compose exec app npx prisma generate
+docker compose -f docker-compose.dev.yml exec app npx prisma generate
 ```
 
 // turbo
 2. Push the schema to the database:
 ```bash
-docker compose exec app npx prisma db push
+docker compose -f docker-compose.dev.yml exec app npx prisma db push
 ```
 
 // turbo
 3. Restart the app to pick up the new client:
 ```bash
-docker compose restart app
+docker compose -f docker-compose.dev.yml restart app
 ```
 
 4. Wait for the app to be ready (~10 seconds), then run the full test suite (Step 4).

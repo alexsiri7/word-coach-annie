@@ -10,6 +10,7 @@ import {
     Globe,
     Pencil,
     Link as LinkIcon,
+    Unlink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
 import { WorldObjectPanel } from "@/components/world-object-panel";
 import { cn } from "@/lib/utils";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { linkableProjects } from "@/lib/universe-projects";
 import type { Universe } from "@/lib/types";
 
 type WorldObjectType = "CHARACTER" | "LOCATION" | "WORLD_ELEMENT";
@@ -104,6 +106,27 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
         if (res.ok) {
             setAddObjectOpen(false);
             setNewObjectName("");
+            fetchUniverse();
+        }
+    };
+
+    const handleLinkProject = async (projectId: string) => {
+        const res = await offlineFetch(`/api/universes/${universeId}/projects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectId }),
+        });
+        if (res.ok) {
+            setLinkProjectOpen(false);
+            fetchUniverse();
+        }
+    };
+
+    const handleUnlinkProject = async (projectId: string) => {
+        const res = await offlineFetch(`/api/universes/${universeId}/projects/${projectId}`, {
+            method: "DELETE",
+        });
+        if (res.ok) {
             fetchUniverse();
         }
     };
@@ -222,9 +245,21 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                                         <p className="text-xs uppercase tracking-widest text-text-muted mb-4 font-medium">Linked Projects</p>
                                         <div className="flex flex-wrap justify-center gap-2">
                                             {universe.projects.map(p => (
-                                                <Button key={p.id} variant="outline" size="sm" className="h-7 text-xs bg-surface-raised" onClick={() => router.push(`/project/${p.id}`)}>
-                                                    {p.title}
-                                                </Button>
+                                                <div key={p.id} className="flex items-center gap-0.5">
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs bg-surface-raised" onClick={() => router.push(`/project/${p.id}`)}>
+                                                        {p.title}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-text-muted hover:text-text-primary"
+                                                        aria-label={`Unlink ${p.title}`}
+                                                        title="Unlink project"
+                                                        onClick={() => handleUnlinkProject(p.id)}
+                                                    >
+                                                        <Unlink className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
@@ -296,19 +331,11 @@ export default function UniversePage({ params }: { params: Promise<{ id: string 
                         <DialogDescription>Choose a project to link to this universe.</DialogDescription>
                     </DialogHeader>
                     <div className="py-2 max-h-[300px] overflow-y-auto space-y-1">
-                        {allProjects.filter(p => p.id !== universeId).map(p => ( // Filter projects not in this universe (simplified check)
+                        {linkableProjects(allProjects, universe).map(p => (
                             <button
                                 key={p.id}
                                 className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-overlay text-sm flex items-center justify-between"
-                                onClick={async () => {
-                                    await offlineFetch(`/api/projects/${p.id}`, {
-                                        method: "PATCH",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ universeId })
-                                    });
-                                    setLinkProjectOpen(false);
-                                    fetchUniverse();
-                                }}
+                                onClick={() => handleLinkProject(p.id)}
                             >
                                 {p.title}
                                 <Plus className="h-3 w-3" />

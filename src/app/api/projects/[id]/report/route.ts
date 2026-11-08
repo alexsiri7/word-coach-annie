@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
 
 const VALID_CATEGORIES = ["copyright", "illegal", "harassment", "other"] as const;
@@ -22,7 +22,7 @@ export async function POST(
   const { id: projectId } = await params;
 
   // IP-based rate limit to prevent enumeration and report spam
-  if (process.env.DISABLE_RATE_LIMIT !== "true") {
+  if (!isRateLimitBypassed()) {
     const ip = getClientIp(request.headers);
     const rl = await checkRateLimit(`report:${ip}`, RATE_LIMITS.report);
     if (!rl.allowed) {

@@ -9,11 +9,39 @@ import {
 } from "@/lib/auth";
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 import { env } from "@/lib/env";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-limit";
 import type { RateLimitConfig } from "@/lib/rate-limit-config";
 import { getClientIp } from "@/lib/client-ip";
 
+/**
+ * Sentry's CSP report endpoint for the project named by the DSN
+ * (https://<key>@<host>/<projectId> → https://<host>/api/<projectId>/security/?sentry_key=<key>).
+ */
+function sentryCspReportUri(dsn: string | undefined): string | null {
+    if (!dsn) return null;
+    try {
+        const url = new URL(dsn);
+        const projectId = url.pathname.split("/").filter(Boolean).pop();
+        if (!url.username || !projectId) return null;
+        return `${url.protocol}//${url.host}/api/${projectId}/security/?sentry_key=${url.username}`;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * force-graph and float-tooltip (story graph) inject their CSS through rollup's styleInject,
+ * which offers no nonce hook and inserts an empty <style> before filling it. proxy.test.ts
+ * recomputes these from node_modules, so a library upgrade that changes the CSS fails there.
+ */
+const LIBRARY_STYLE_HASHES = [
+    "'sha256-jtRRMYY2VbEXuBKbHvqM1/fPT8vazFrEooXdvwUK4y8='", // force-graph dist/force-graph.mjs css_248z
+    "'sha256-9xjtvxMT1ApHlgn9ohbh2FNfvK5Tqtzy94BjfXBeMSY='", // float-tooltip dist/float-tooltip.mjs css_248z
+    "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='", // the empty string styleInject inserts first
+];
+
 function buildCsp(nonce: string): string {
+    const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
@@ -21,8 +49,9 @@ function buildCsp(nonce: string): string {
         `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`,
         // harper.js WorkerLinter spawns its worker from a blob: URL.
         "worker-src 'self' blob:",
-        // style-src: unsafe-inline retained — 22+ inline style= attributes require it (SEC-011 note).
-        "style-src 'self' 'unsafe-inline'",
+        // No style= in server-rendered markup (client-side style props go through the CSSOM,
+        // which CSP does not govern); library <style> tags carry the nonce or a pinned hash.
+        `style-src 'self' 'nonce-${nonce}' ${LIBRARY_STYLE_HASHES.join(" ")}`,
         "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
         "font-src 'self'",
         "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
@@ -30,6 +59,7 @@ function buildCsp(nonce: string): string {
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
+        ...(reportUri ? [`report-uri ${reportUri}`] : []),
     ].join("; ");
 }
 
@@ -47,6 +77,7 @@ const PUBLIC_PATHS = [
     "/landing",
     "/privacy",
     "/terms",
+    "/dmca",
     "/.well-known/oauth-authorization-server",
     "/oauth/register",
     "/oauth/token",
@@ -116,14 +147,7 @@ async function applyRateLimit(
     const pathname = request.nextUrl.pathname;
     if (!pathname.startsWith("/api/")) return null;
 
-    // Allow E2E / CI environments to bypass rate limiting (not honoured in production)
-    if (process.env.DISABLE_RATE_LIMIT === "true") {
-        if (process.env.NODE_ENV === "production") {
-            console.error("[middleware] DISABLE_RATE_LIMIT=true is ignored in production");
-        } else {
-            return null;
-        }
-    }
+    if (isRateLimitBypassed()) return null;
 
     const method = request.method;
 
@@ -141,14 +165,18 @@ async function applyRateLimit(
     return tryLimit(`${isRead ? "read" : "write"}:${userKey}`, config);
 }
 
-/** Request headers that only the middleware may set. Anything the client sent is dropped. */
+/** Request headers that only the proxy may set. Anything the client sent is dropped. */
 const IDENTITY_HEADERS = ["x-user-id", "x-user-email"] as const;
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
-    const csp = buildCsp(nonce);
+    const res = await route(request, nonce);
+    res.headers.set("Content-Security-Policy", buildCsp(nonce));
+    return res;
+}
 
-    // Helper: NextResponse.next() with nonce injected into request headers + CSP on response.
+async function route(request: NextRequest, nonce: string): Promise<NextResponse> {
+    // Helper: NextResponse.next() with nonce injected into request headers.
     // Identity headers are never forwarded from the client; they are set here only from a
     // verified JWT/MCP session (SEC-03).
     function nextWithNonce(identity?: { userId: string; email: string }): NextResponse {
@@ -159,9 +187,7 @@ export async function middleware(request: NextRequest) {
             reqHeaders.set("x-user-email", identity.email);
         }
         reqHeaders.set("x-nonce", nonce);
-        const res = NextResponse.next({ request: { headers: reqHeaders } });
-        res.headers.set("Content-Security-Policy", csp);
-        return res;
+        return NextResponse.next({ request: { headers: reqHeaders } });
     }
 
     // No auth configured → pass through (local dev mode)
@@ -173,8 +199,7 @@ export async function middleware(request: NextRequest) {
 
     // Public paths skip authentication, so they are throttled per IP before being let through.
     if (isPublicPath(pathname)) {
-        const rateLimitBypassed = process.env.DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production";
-        if (!rateLimitBypassed) {
+        if (!isRateLimitBypassed()) {
             const { bucket, config } = publicPathLimit(pathname);
             const rateLimited = await tryLimit(`${bucket}:${getClientIp(request.headers)}`, config);
             if (rateLimited) return rateLimited;

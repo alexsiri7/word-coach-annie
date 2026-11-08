@@ -22,6 +22,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
+  isRateLimitBypassed: () => false,
   RATE_LIMITS: { report: { limit: 10, windowMs: 3_600_000 } },
 }));
 

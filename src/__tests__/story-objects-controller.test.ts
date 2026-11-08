@@ -80,6 +80,42 @@ describe("StoryObjectController", () => {
             expect(result.description).toBe("Hero");
             expect(result.relationships).toHaveLength(1);
             expect(result.relationships[0].type).toBe("APPEARS_IN");
+            expect(result.relationships[0].target).toEqual({ kind: "node", id: scene.id, name: "Scene 1", entityType: "SCENE" });
+        });
+
+        it("resolves a story-object counterpart in both directions", async () => {
+            const alice = await StoryObjectController.createStoryObject({ projectId, type: "CHARACTER", name: "Alice" });
+            const bob = await StoryObjectController.createStoryObject({ projectId, type: "CHARACTER", name: "Bob" });
+            await testPrisma.relationship.create({
+                data: { type: "RELATED_TO", fromObjectId: alice.id, toObjectId: bob.id },
+            });
+
+            const fromAlice = await StoryObjectController.getStoryObject(alice.id);
+            const fromBob = await StoryObjectController.getStoryObject(bob.id);
+            expect(fromAlice.relationships.map((r) => r.target)).toEqual([
+                { kind: "storyObject", id: bob.id, name: "Bob", entityType: "CHARACTER" },
+            ]);
+            expect(fromBob.relationships.map((r) => r.target)).toEqual([
+                { kind: "storyObject", id: alice.id, name: "Alice", entityType: "CHARACTER" },
+            ]);
+        });
+
+        it("resolves a world-object counterpart in both directions", async () => {
+            const universe = await testPrisma.universe.create({ data: { title: "Universe" } });
+            const obj = await StoryObjectController.createStoryObject({ projectId, type: "CHARACTER", name: "Alice" });
+            const worldObj = await testPrisma.worldObject.create({
+                data: { universeId: universe.id, type: "LOCATION", name: "Old Town" },
+            });
+            await testPrisma.relationship.createMany({
+                data: [
+                    { type: "LOCATED_AT", fromObjectId: obj.id, toWorldObjectId: worldObj.id },
+                    { type: "RELATED_TO", fromWorldObjectId: worldObj.id, toObjectId: obj.id },
+                ],
+            });
+
+            const result = await StoryObjectController.getStoryObject(obj.id);
+            const expected = { kind: "worldObject", id: worldObj.id, name: "Old Town", entityType: "LOCATION" };
+            expect(result.relationships.map((r) => r.target)).toEqual([expected, expected]);
         });
 
         it("throws for non-existent object", async () => {

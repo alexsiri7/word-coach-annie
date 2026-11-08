@@ -132,12 +132,7 @@ export default function FocusModePage() {
     }
 
     return (
-        <div
-            className="flex h-screen w-full overflow-hidden"
-            style={{
-                background: 'radial-gradient(ellipse 80% 60% at 50% -10%, hsl(var(--accent)/0.06) 0%, hsl(var(--surface)) 70%)',
-            }}
-        >
+        <div className="flex h-screen w-full overflow-hidden focus-backdrop">
             <SceneInfoSidebar
                 scene={{ ...sceneContext, wordCount: sceneContext.wordCount ?? 0 }}
                 navigation={{

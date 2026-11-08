@@ -1,36 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// Test the HTML-to-Markdown conversion logic used in export
-function htmlToMarkdown(html: string): string {
-  if (!html || html === "<p></p>") return "";
-
-  let md = html;
-  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
-  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
-  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");
-  md = md.replace(/<strong>(.*?)<\/strong>/gi, "**$1**");
-  md = md.replace(/<b>(.*?)<\/b>/gi, "**$1**");
-  md = md.replace(/<em>(.*?)<\/em>/gi, "*$1*");
-  md = md.replace(/<i>(.*?)<\/i>/gi, "*$1*");
-  md = md.replace(/<u>(.*?)<\/u>/gi, "$1");
-  md = md.replace(/<ul[^>]*>/gi, "");
-  md = md.replace(/<\/ul>/gi, "\n");
-  md = md.replace(/<ol[^>]*>/gi, "");
-  md = md.replace(/<\/ol>/gi, "\n");
-  md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
-  md = md.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-  md = md.replace(/<br\s*\/?>/gi, "\n");
-  md = md.replace(/<[^>]+>/g, "");
-  md = md.replace(/\n{3,}/g, "\n\n");
-  md = md.replace(/&amp;/g, "&");
-  md = md.replace(/&lt;/g, "<");
-  md = md.replace(/&gt;/g, ">");
-  md = md.replace(/&quot;/g, '"');
-  md = md.replace(/&#39;/g, "'");
-  md = md.replace(/&nbsp;/g, " ");
-
-  return md.trim();
-}
+import { htmlToMarkdown } from "@/lib/html-to-markdown";
 
 describe("HTML to Markdown conversion", () => {
   it("converts empty or minimal HTML", () => {
@@ -72,6 +41,10 @@ describe("HTML to Markdown conversion", () => {
     expect(htmlToMarkdown("<p>&lt;code&gt;</p>")).toBe("<code>");
   });
 
+  it("decodes an escaped entity only once", () => {
+    expect(htmlToMarkdown("<p>&amp;lt;b&amp;gt; and &amp;amp;</p>")).toBe("&lt;b&gt; and &amp;");
+  });
+
   it("handles complex content", () => {
     const html = `<h2>Chapter Title</h2><p>The <strong>brave</strong> knight entered the <em>dark</em> forest.</p><p>He carried with him:</p><ul><li>A sword</li><li>A shield</li></ul>`;
     const md = htmlToMarkdown(html);
@@ -80,5 +53,15 @@ describe("HTML to Markdown conversion", () => {
     expect(md).toContain("*dark*");
     expect(md).toContain("- A sword");
     expect(md).toContain("- A shield");
+  });
+
+  it("strips beats in both storage forms, including multi-line ones", () => {
+    const html =
+      '<p>Kept</p><!-- beat: comment beat >\nspanning lines --><div data-type="beat-annotation">div beat</div>';
+    expect(htmlToMarkdown(html)).toBe("Kept");
+  });
+
+  it("keeps beat-annotation div text when asked to include beats", () => {
+    expect(htmlToMarkdown('<div data-type="beat-annotation">div beat</div>', { includeBeats: true })).toBe("div beat");
   });
 });

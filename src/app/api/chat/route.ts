@@ -134,7 +134,7 @@ ${objectsSummary || "(No characters/locations yet)"}
 - Stay grounded in the actual story content above
 - Keep responses concise unless asked to elaborate
 - Use the story's existing characters and locations — don't invent new ones unless asked
-- You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure.`;
+- You have tools available to read and modify the project. Use them when the user asks you to look up details, make changes, or explore the story structure. Before changing a scene, outline node, story object, universe, world object, timeline entry or the project, read it first and pass the contentHash from that read; if a write is rejected as stale, re-read and try again.`;
 }
 
 async function buildReviewSystemPrompt(projectId: string, conversationType: string): Promise<string> {

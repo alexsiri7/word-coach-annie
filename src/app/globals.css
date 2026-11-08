@@ -264,6 +264,11 @@
     border: 1px solid hsl(var(--border) / 0.15);
   }
 
+  /* Focus mode: faint accent glow from the top of the page */
+  .focus-backdrop {
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, hsl(var(--accent) / 0.06) 0%, hsl(var(--surface)) 70%);
+  }
+
   /* Gradient accent line — primary to primary-container for "soul" */
   .accent-gradient {
     background: linear-gradient(135deg,

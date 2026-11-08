@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "@/middleware";
-import { resetRateLimitStore } from "@/lib/rate-limit";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { proxy } from "@/proxy";
+import { resetRateLimitStore, resetRedisClient } from "@/lib/rate-limit";
+
+const mockRedisEval = vi.fn();
+vi.mock("ioredis", () => ({
+    default: vi.fn().mockImplementation(function () {
+        return { eval: mockRedisEval, on: vi.fn() };
+    }),
+}));
 
 // Mock Sentry
 vi.mock("@sentry/nextjs", () => ({
@@ -52,7 +62,7 @@ function createRequest(path: string, options?: {
     return req;
 }
 
-describe("middleware", () => {
+describe("proxy", () => {
     let origApiToken: string | undefined;
 
     beforeEach(() => {
@@ -64,31 +74,32 @@ describe("middleware", () => {
     afterEach(() => {
         if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
         else delete process.env.API_TOKEN;
+        vi.unstubAllEnvs();
     });
 
     it("passes through when auth is not enabled", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(false);
         const req = createRequest("/api/projects");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200); // NextResponse.next() returns 200
         const csp = res.headers.get("Content-Security-Policy");
         expect(csp).toBeTruthy();
         expect(csp).toContain("script-src");
-        // Core security guarantee: no unsafe-inline in script-src (style-src retains it intentionally)
+        // Core security guarantee: no unsafe-inline in script-src
         expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
     });
 
     it("allows public paths when auth is enabled", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/health");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
     it("allows the calendar feed without a session (token in the URL is the credential)", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/calendar/opportunities/some-token.ics");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
@@ -104,12 +115,12 @@ describe("middleware", () => {
         });
 
         it("rejects an unauthenticated request", async () => {
-            const res = await middleware(createRequest("/api/metrics"));
+            const res = await proxy(createRequest("/api/metrics"));
             expect(res.status).toBe(401);
         });
 
         it("allows the API_TOKEN bearer", async () => {
-            const res = await middleware(createRequest("/api/metrics", {
+            const res = await proxy(createRequest("/api/metrics", {
                 headers: { authorization: "Bearer my-token" },
             }));
             expect(res.status).toBe(200);
@@ -121,8 +132,15 @@ describe("middleware", () => {
                 email: "test@example.com",
                 name: "Test",
             });
-            const res = await middleware(createRequest("/api/metrics", {
+            const res = await proxy(createRequest("/api/metrics", {
                 cookies: { annie_session: "valid-jwt-token" },
+            }));
+            expect(res.status).toBe(401);
+        });
+
+        it("rejects a valid API_TOKEN login cookie", async () => {
+            const res = await proxy(createRequest("/api/metrics", {
+                cookies: { annie_session: await createLegacySessionCookie("my-token") },
             }));
             expect(res.status).toBe(401);
         });
@@ -135,7 +153,7 @@ describe("middleware", () => {
                 jti: "mcp-jti-1",
                 exp: Math.floor(Date.now() / 1000) + 3600,
             });
-            const res = await middleware(createRequest("/api/metrics", {
+            const res = await proxy(createRequest("/api/metrics", {
                 headers: { authorization: "Bearer mcp-token" },
             }));
             expect(res.status).toBe(401);
@@ -145,15 +163,15 @@ describe("middleware", () => {
     it("allows /api/auth/login path", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/auth/login");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
     it("allows /api/auth/refresh without a session cookie (endpoint handles auth itself)", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/auth/refresh");
-        const res = await middleware(req);
-        // Public path — middleware passes through; the route handler returns 401 for
+        const res = await proxy(req);
+        // Public path — proxy passes through; the route handler returns 401 for
         // missing/revoked cookies (tested in auth-refresh-route.test.ts).
         expect(res.status).toBe(200);
     });
@@ -161,7 +179,7 @@ describe("middleware", () => {
     it("allows /login path", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/login");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
@@ -171,7 +189,7 @@ describe("middleware", () => {
         const req = createRequest("/api/projects", {
             headers: { authorization: "Bearer valid-token" },
         });
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
@@ -181,7 +199,7 @@ describe("middleware", () => {
         const req = createRequest("/api/projects", {
             headers: { authorization: "Bearer wrong-token" },
         });
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(401);
     });
 
@@ -195,7 +213,7 @@ describe("middleware", () => {
         const req = createRequest("/api/projects", {
             cookies: { annie_session: "valid-jwt-token" },
         });
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
         expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
     });
@@ -211,32 +229,32 @@ describe("middleware", () => {
         });
 
         it("accepts a freshly issued cookie", async () => {
-            const res = await middleware(legacyRequest(await createLegacySessionCookie("my-token")));
+            const res = await proxy(legacyRequest(await createLegacySessionCookie("my-token")));
             expect(res.status).toBe(200);
         });
 
         it("rejects a cookie older than SESSION_MAX_AGE", async () => {
             const issued = Date.now() - (SESSION_MAX_AGE + 60) * 1000;
-            const res = await middleware(legacyRequest(await createLegacySessionCookie("my-token", issued)));
+            const res = await proxy(legacyRequest(await createLegacySessionCookie("my-token", issued)));
             expect(res.status).toBe(401);
         });
 
         it("rejects a tampered cookie", async () => {
             const cookie = await createLegacySessionCookie("my-token");
             const tampered = cookie.slice(0, -1) + (cookie.endsWith("0") ? "1" : "0");
-            const res = await middleware(legacyRequest(tampered));
+            const res = await proxy(legacyRequest(tampered));
             expect(res.status).toBe(401);
         });
 
         it("rejects a cookie issued before API_TOKEN was rotated", async () => {
-            const res = await middleware(legacyRequest(await createLegacySessionCookie("previous-token")));
+            const res = await proxy(legacyRequest(await createLegacySessionCookie("previous-token")));
             expect(res.status).toBe(401);
         });
 
         it("rejects the old deterministic session value", async () => {
             const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("annie-session:my-token"));
             const legacy = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-            const res = await middleware(legacyRequest(legacy));
+            const res = await proxy(legacyRequest(legacy));
             expect(res.status).toBe(401);
         });
     });
@@ -244,14 +262,14 @@ describe("middleware", () => {
     it("returns 401 for unauthenticated API requests", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/projects");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(401);
     });
 
     it("redirects unauthenticated page requests to login", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/dashboard");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(307);
         expect(res.headers.get("location")).toContain("/login");
         expect(res.headers.get("location")).toContain("from=%2Fdashboard");
@@ -260,7 +278,7 @@ describe("middleware", () => {
     it("redirects unauthenticated / to /landing", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(307);
         expect(res.headers.get("location")).toContain("/landing");
     });
@@ -268,15 +286,21 @@ describe("middleware", () => {
     it("does not include 'from' param in root redirect", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/");
-        const res = await middleware(req);
+        const res = await proxy(req);
         const location = res.headers.get("location") ?? "";
         expect(location).not.toContain("from=");
+    });
+
+    it.each(["/privacy", "/terms", "/dmca"])("serves %s to anonymous visitors", async (path) => {
+        vi.mocked(isAuthEnabled).mockReturnValue(true);
+        const res = await proxy(createRequest(path));
+        expect(res.status).toBe(200);
     });
 
     it("allows /landing path without auth", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/landing");
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200);
     });
 
@@ -290,7 +314,7 @@ describe("middleware", () => {
         const req = createRequest("/api/projects", {
             cookies: { annie_session: "valid-jwt-token" },
         });
-        await middleware(req);
+        await proxy(req);
         expect(Sentry.setUser).toHaveBeenCalledWith({ id: "sentry-user" });
         expect(Sentry.setUser).not.toHaveBeenCalledWith(
             expect.objectContaining({ email: expect.any(String) })
@@ -309,7 +333,7 @@ describe("middleware", () => {
         const req = createRequest("/api/projects", {
             headers: { authorization: "Bearer mcp-token" },
         });
-        await middleware(req);
+        await proxy(req);
         expect(Sentry.setUser).toHaveBeenCalledWith({ id: "mcp-user" });
         expect(Sentry.setUser).not.toHaveBeenCalledWith(
             expect.objectContaining({ email: expect.any(String) })
@@ -327,7 +351,7 @@ describe("middleware", () => {
                     "x-user-email": "victim@example.com",
                 },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
             expect(res.headers.get("x-middleware-request-x-user-email")).toBeNull();
         });
@@ -335,14 +359,14 @@ describe("middleware", () => {
         it("drops client-supplied x-user-id on public paths", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             const req = createRequest("/oauth/register", { headers: { "x-user-id": "victim-id" } });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
         });
 
         it("drops client-supplied x-user-id when auth is disabled", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
             const req = createRequest("/api/projects", { headers: { "x-user-id": "victim-id" } });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
         });
 
@@ -354,7 +378,7 @@ describe("middleware", () => {
                 headers: { "x-user-id": "victim-id" },
                 cookies: { annie_session: await createLegacySessionCookie("my-token") },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(200);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
         });
@@ -370,7 +394,7 @@ describe("middleware", () => {
                 headers: { "x-user-id": "victim-id", "x-user-email": "victim@example.com" },
                 cookies: { annie_session: "valid-jwt-token" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
             expect(res.headers.get("x-middleware-request-x-user-email")).toBe("test@example.com");
         });
@@ -387,7 +411,7 @@ describe("middleware", () => {
             const req = createRequest("/api/projects", {
                 headers: { authorization: "Bearer mcp-token", "x-user-id": "victim-id" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBe("mcp-user");
         });
     });
@@ -395,7 +419,7 @@ describe("middleware", () => {
     describe("CSP nonce injection", () => {
         it("sets Content-Security-Policy header on all passing responses", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
-            const res = await middleware(createRequest("/api/health"));
+            const res = await proxy(createRequest("/api/health"));
             const csp = res.headers.get("Content-Security-Policy");
             expect(csp).toBeTruthy();
             // Core security guarantee: no unsafe-inline in script-src
@@ -406,7 +430,7 @@ describe("middleware", () => {
 
         it("does not allow Google's font hosts (fonts are self-hosted, SEC-32)", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
-            const res = await middleware(createRequest("/api/health"));
+            const res = await proxy(createRequest("/api/health"));
             const csp = res.headers.get("Content-Security-Policy");
             expect(csp).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
         });
@@ -421,7 +445,7 @@ describe("middleware", () => {
             const req = createRequest("/api/projects", {
                 cookies: { annie_session: "valid-jwt-token" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(200);
             const csp = res.headers.get("Content-Security-Policy");
             expect(csp).toBeTruthy();
@@ -430,7 +454,7 @@ describe("middleware", () => {
 
         it("allows the harper.js spell-check worker and WebAssembly without unsafe-eval", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
-            const res = await middleware(createRequest("/api/health"));
+            const res = await proxy(createRequest("/api/health"));
             const csp = res.headers.get("Content-Security-Policy") ?? "";
             expect(csp).toMatch(/script-src[^;]*'wasm-unsafe-eval'/);
             expect(csp).not.toMatch(/script-src[^;]*'unsafe-eval'/);
@@ -439,7 +463,7 @@ describe("middleware", () => {
 
         it("x-nonce request header matches nonce in Content-Security-Policy", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
-            const res = await middleware(createRequest("/api/projects"));
+            const res = await proxy(createRequest("/api/projects"));
 
             // The nonce forwarded to the page (via request header rewrite)
             const xNonce = res.headers.get("x-middleware-request-x-nonce");
@@ -450,6 +474,63 @@ describe("middleware", () => {
             expect(xNonce).toBeTruthy();
             expect(nonceMatch).not.toBeNull();
             expect(xNonce).toBe(nonceMatch![1]);
+        });
+
+        it("style-src allows inline styles only by nonce or hash", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/projects"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            const styleSrc = csp.match(/style-src [^;]*/)?.[0] ?? "";
+            const scriptNonce = csp.match(/script-src[^;]*'nonce-([A-Za-z0-9+/=_-]+)'/)?.[1];
+
+            expect(styleSrc).not.toContain("'unsafe-inline'");
+            expect(scriptNonce).toBeTruthy();
+            expect(styleSrc).toContain(`'nonce-${scriptNonce}'`);
+        });
+
+        it("library style hashes match the installed packages' CSS", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            const sha256 = (text: string) => createHash("sha256").update(text).digest("base64");
+
+            // Both packages' exports maps block require.resolve of their files.
+            for (const bundle of ["force-graph/dist/force-graph.mjs", "float-tooltip/dist/float-tooltip.mjs"]) {
+                const source = readFileSync(path.join(process.cwd(), "node_modules", bundle), "utf8");
+                const literal = source.match(/var css_248z = ("(?:[^"\\]|\\.)*");/);
+                expect(literal, `${bundle} no longer declares css_248z`).not.toBeNull();
+                expect(csp).toContain(`'sha256-${sha256(JSON.parse(literal![1]))}'`);
+            }
+            expect(csp).toContain(`'sha256-${sha256("")}'`);
+        });
+
+        it("sets Content-Security-Policy on proxy-generated 401s and redirects", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+
+            const unauthorized = await proxy(createRequest("/api/projects"));
+            expect(unauthorized.status).toBe(401);
+            expect(unauthorized.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+
+            const redirect = await proxy(createRequest("/projects"));
+            expect(redirect.status).toBe(307);
+            expect(redirect.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+        });
+
+        it("reports violations to the Sentry CSP endpoint derived from the DSN", async () => {
+            vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://abc123@o42.ingest.us.sentry.io/7");
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/health"));
+            expect(res.headers.get("Content-Security-Policy")).toMatch(
+                /; report-uri https:\/\/o42\.ingest\.us\.sentry\.io\/api\/7\/security\/\?sentry_key=abc123$/
+            );
+        });
+
+        it("omits report-uri when no Sentry DSN is configured", async () => {
+            vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/health"));
+            expect(res.headers.get("Content-Security-Policy")).not.toContain("report-uri");
         });
     });
 
@@ -464,7 +545,7 @@ describe("middleware", () => {
 
             // Fill up the chat limit (30 requests)
             for (let i = 0; i < 30; i++) {
-                await middleware(createRequest("/api/chat", {
+                await proxy(createRequest("/api/chat", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -475,7 +556,7 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("Retry-After")).toBeTruthy();
             expect(res.headers.get("X-RateLimit-Limit")).toBe("30");
@@ -487,7 +568,7 @@ describe("middleware", () => {
             process.env.API_TOKEN = "test-token";
 
             for (let i = 0; i < 30; i++) {
-                await middleware(createRequest("/api/chat", {
+                await proxy(createRequest("/api/chat", {
                     method: "POST",
                     headers: { authorization: "Bearer test-token" },
                 }));
@@ -497,7 +578,7 @@ describe("middleware", () => {
                 method: "POST",
                 headers: { authorization: "Bearer test-token" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
         });
 
@@ -511,7 +592,7 @@ describe("middleware", () => {
 
             // Fill up the read limit (120 requests)
             for (let i = 0; i < 120; i++) {
-                await middleware(createRequest("/api/projects", {
+                await proxy(createRequest("/api/projects", {
                     cookies: { annie_session: "valid-jwt" },
                 }));
             }
@@ -520,7 +601,7 @@ describe("middleware", () => {
             const req = createRequest("/api/projects", {
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("120");
         });
@@ -535,7 +616,7 @@ describe("middleware", () => {
 
             // Fill up the write limit (60 requests)
             for (let i = 0; i < 60; i++) {
-                await middleware(createRequest("/api/nodes/123", {
+                await proxy(createRequest("/api/nodes/123", {
                     method: "PATCH",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -546,7 +627,7 @@ describe("middleware", () => {
                 method: "PATCH",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("60");
         });
@@ -561,7 +642,7 @@ describe("middleware", () => {
 
             // Fill up the project creation limit (100 requests)
             for (let i = 0; i < 100; i++) {
-                await middleware(createRequest("/api/projects", {
+                await proxy(createRequest("/api/projects", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -572,7 +653,7 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("100");
         });
@@ -587,7 +668,7 @@ describe("middleware", () => {
 
             // Fill up the feedback limit (5 requests)
             for (let i = 0; i < 5; i++) {
-                await middleware(createRequest("/api/feedback", {
+                await proxy(createRequest("/api/feedback", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -598,9 +679,51 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        });
+
+        it("ignores DISABLE_RATE_LIMIT on authenticated API routes in production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "feedback-prod-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            vi.stubEnv("NODE_ENV", "production");
+            try {
+                const feedback = () => proxy(createRequest("/api/feedback", {
+                    method: "POST",
+                    cookies: { annie_session: "valid-jwt" },
+                }));
+                for (let i = 0; i < 5; i++) await feedback();
+                expect((await feedback()).status).toBe(429);
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it("bypasses authenticated API limits with DISABLE_RATE_LIMIT outside production", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "feedback-dev-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+            vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+            try {
+                for (let i = 0; i < 6; i++) {
+                    const res = await proxy(createRequest("/api/feedback", {
+                        method: "POST",
+                        cookies: { annie_session: "valid-jwt" },
+                    }));
+                    expect(res.status).toBe(200);
+                }
+            } finally {
+                vi.unstubAllEnvs();
+            }
         });
 
         it("returns 429 when project import limit exceeded (20/hour)", async () => {
@@ -613,7 +736,7 @@ describe("middleware", () => {
 
             // Fill up the project import limit (20 requests)
             for (let i = 0; i < 20; i++) {
-                await middleware(createRequest("/api/projects/import", {
+                await proxy(createRequest("/api/projects/import", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -624,7 +747,7 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(429);
             expect(res.headers.get("Retry-After")).toBeTruthy();
             expect(res.headers.get("X-RateLimit-Limit")).toBe("20");
@@ -641,7 +764,7 @@ describe("middleware", () => {
 
             // Exhaust the import limit
             for (let i = 0; i < 20; i++) {
-                await middleware(createRequest("/api/projects/import", {
+                await proxy(createRequest("/api/projects/import", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -652,7 +775,7 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(200);
         });
 
@@ -666,7 +789,7 @@ describe("middleware", () => {
 
             // Send a few project creates (doesn't need to max out for this test)
             for (let i = 0; i < 5; i++) {
-                await middleware(createRequest("/api/projects", {
+                await proxy(createRequest("/api/projects", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -677,7 +800,7 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            const res = await middleware(req);
+            const res = await proxy(req);
             expect(res.status).toBe(200);
         });
 
@@ -686,10 +809,10 @@ describe("middleware", () => {
             const headers = { "x-real-ip": "1.2.3.4" };
 
             for (let i = 0; i < 5; i++) {
-                await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
+                await proxy(createRequest("/api/auth/refresh", { method: "POST", headers }));
             }
 
-            const res = await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }));
+            const res = await proxy(createRequest("/api/auth/refresh", { method: "POST", headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         });
@@ -699,10 +822,10 @@ describe("middleware", () => {
             const headers = { "x-real-ip": "9.9.9.9" };
 
             for (let i = 0; i < 5; i++) {
-                expect((await middleware(createRequest("/api/auth/me", { headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/api/auth/me", { headers }))).status).toBe(200);
             }
 
-            const res = await middleware(createRequest("/api/auth/me", { headers }));
+            const res = await proxy(createRequest("/api/auth/me", { headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("Retry-After")).toBe("60");
             expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
@@ -713,13 +836,13 @@ describe("middleware", () => {
             const headers = { "x-real-ip": "7.7.7.7" };
 
             for (let i = 0; i < 3; i++) {
-                expect((await middleware(createRequest("/api/auth/me", { headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/api/auth/me", { headers }))).status).toBe(200);
             }
             for (let i = 0; i < 2; i++) {
-                expect((await middleware(createRequest("/api/auth/refresh", { method: "POST", headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/api/auth/refresh", { method: "POST", headers }))).status).toBe(200);
             }
 
-            const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+            const res = await proxy(createRequest("/api/auth/login", { method: "POST", headers }));
             expect(res.status).toBe(429);
         });
 
@@ -728,16 +851,16 @@ describe("middleware", () => {
             const headers = { "x-real-ip": "4.4.4.4" };
 
             for (let i = 0; i < 30; i++) {
-                expect((await middleware(createRequest("/api/health", { headers }))).status).toBe(200);
-                expect((await middleware(createRequest("/version.json", { headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/api/health", { headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/version.json", { headers }))).status).toBe(200);
             }
 
-            const res = await middleware(createRequest("/login", { headers }));
+            const res = await proxy(createRequest("/login", { headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("Retry-After")).toBe("60");
             expect(res.headers.get("X-RateLimit-Limit")).toBe("60");
 
-            const otherIp = await middleware(createRequest("/api/health", { headers: { "x-real-ip": "4.4.4.5" } }));
+            const otherIp = await proxy(createRequest("/api/health", { headers: { "x-real-ip": "4.4.4.5" } }));
             expect(otherIp.status).toBe(200);
         });
 
@@ -746,15 +869,15 @@ describe("middleware", () => {
             const headers = { "x-real-ip": "3.3.3.3" };
 
             for (let i = 0; i < 10; i++) {
-                expect((await middleware(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
+                expect((await proxy(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
             }
 
-            const res = await middleware(createRequest("/oauth/token", { method: "POST", headers }));
+            const res = await proxy(createRequest("/oauth/token", { method: "POST", headers }));
             expect(res.status).toBe(429);
             expect(res.headers.get("Retry-After")).toBe("60");
             expect(res.headers.get("X-RateLimit-Limit")).toBe("10");
 
-            expect((await middleware(createRequest("/api/health", { headers }))).status).toBe(200);
+            expect((await proxy(createRequest("/api/health", { headers }))).status).toBe(200);
         });
 
         it("ignores DISABLE_RATE_LIMIT on public paths in production", async () => {
@@ -764,9 +887,9 @@ describe("middleware", () => {
             try {
                 const headers = { "x-real-ip": "2.2.2.2" };
                 for (let i = 0; i < 5; i++) {
-                    await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+                    await proxy(createRequest("/api/auth/login", { method: "POST", headers }));
                 }
-                const res = await middleware(createRequest("/api/auth/login", { method: "POST", headers }));
+                const res = await proxy(createRequest("/api/auth/login", { method: "POST", headers }));
                 expect(res.status).toBe(429);
             } finally {
                 vi.unstubAllEnvs();
@@ -779,7 +902,7 @@ describe("middleware", () => {
             try {
                 const headers = { "x-real-ip": "2.2.2.3" };
                 for (let i = 0; i < 11; i++) {
-                    expect((await middleware(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
+                    expect((await proxy(createRequest("/oauth/token", { method: "POST", headers }))).status).toBe(200);
                 }
             } finally {
                 vi.unstubAllEnvs();
@@ -794,10 +917,10 @@ describe("middleware", () => {
             });
 
             for (let i = 0; i < 5; i++) {
-                await middleware(refresh(i));
+                await proxy(refresh(i));
             }
 
-            const res = await middleware(refresh(5));
+            const res = await proxy(refresh(5));
             expect(res.status).toBe(429);
         });
 
@@ -805,7 +928,7 @@ describe("middleware", () => {
             vi.mocked(isAuthEnabled).mockReturnValue(false);
             // A few requests should pass without rate limiting
             for (let i = 0; i < 5; i++) {
-                const res = await middleware(createRequest("/api/chat", { method: "POST" }));
+                const res = await proxy(createRequest("/api/chat", { method: "POST" }));
                 expect(res.status).toBe(200);
             }
         });
@@ -820,7 +943,7 @@ describe("middleware", () => {
 
             // Fill up the chat limit (30 requests)
             for (let i = 0; i < 30; i++) {
-                await middleware(createRequest("/api/chat", {
+                await proxy(createRequest("/api/chat", {
                     method: "POST",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -831,13 +954,13 @@ describe("middleware", () => {
                 method: "POST",
                 cookies: { annie_session: "valid-jwt" },
             });
-            expect((await middleware(chatReq)).status).toBe(429);
+            expect((await proxy(chatReq)).status).toBe(429);
 
             // But read API should still work
             const apiReq = createRequest("/api/projects", {
                 cookies: { annie_session: "valid-jwt" },
             });
-            expect((await middleware(apiReq)).status).toBe(200);
+            expect((await proxy(apiReq)).status).toBe(200);
         });
 
         it("tracks read and write limits separately", async () => {
@@ -850,7 +973,7 @@ describe("middleware", () => {
 
             // Fill up the write limit (60 requests)
             for (let i = 0; i < 60; i++) {
-                await middleware(createRequest(`/api/nodes/${i}`, {
+                await proxy(createRequest(`/api/nodes/${i}`, {
                     method: "PATCH",
                     cookies: { annie_session: "valid-jwt" },
                 }));
@@ -861,13 +984,45 @@ describe("middleware", () => {
                 method: "PATCH",
                 cookies: { annie_session: "valid-jwt" },
             });
-            expect((await middleware(writeReq)).status).toBe(429);
+            expect((await proxy(writeReq)).status).toBe(429);
 
             // But read should still work
             const readReq = createRequest("/api/projects", {
                 cookies: { annie_session: "valid-jwt" },
             });
-            expect((await middleware(readReq)).status).toBe(200);
+            expect((await proxy(readReq)).status).toBe(200);
+        });
+    });
+
+    describe("with REDIS_URL set", () => {
+        beforeEach(() => {
+            resetRedisClient();
+            mockRedisEval.mockReset();
+            mockRedisEval.mockResolvedValue([1, -1]);
+            vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "redis-user",
+                email: "test@example.com",
+                name: "Test",
+            });
+        });
+
+        afterEach(() => {
+            resetRedisClient();
+        });
+
+        it.each([
+            ["auth", createRequest("/api/auth/login", { method: "POST" })],
+            ["chat", createRequest("/api/chat", { method: "POST", cookies: { annie_session: "valid-jwt" } })],
+            ["read", createRequest("/api/projects", { cookies: { annie_session: "valid-jwt" } })],
+            ["write", createRequest("/api/nodes/1", { method: "PATCH", cookies: { annie_session: "valid-jwt" } })],
+        ])("checks the %s bucket in Redis", async (bucket, req) => {
+            const res = await proxy(req);
+
+            expect(res.status).toBe(200);
+            expect(mockRedisEval).toHaveBeenCalledTimes(1);
+            expect(mockRedisEval.mock.calls[0][2]).toMatch(new RegExp(`^${bucket}:`));
         });
     });
 });

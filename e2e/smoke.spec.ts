@@ -252,6 +252,19 @@ async function mockFocusModeApi(page: Page) {
 // ── Tests ────────────────────────────────────────────────────────────────
 
 test.describe('E2E smoke tests – critical user flows', () => {
+  let cspViolations: string[] = []
+
+  test.beforeEach(async ({ page }) => {
+    cspViolations = []
+    page.on('console', (msg) => {
+      if (/Content Security Policy/i.test(msg.text())) cspViolations.push(msg.text())
+    })
+  })
+
+  test.afterEach(() => {
+    expect(cspViolations).toEqual([])
+  })
+
   test('1. Create a project and verify it appears in the project list', async ({
     page,
   }) => {
@@ -323,6 +336,10 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await page
       .locator('input[placeholder*="Fantasy"]')
       .fill('Thriller')
+
+    // Pick the project type, so the Radix Select's inline <style> runs under the CSP guard
+    await page.getByRole('dialog').getByRole('combobox').click()
+    await page.getByRole('option', { name: 'Fiction' }).click()
 
     // Click Create button in the dialog
     await page.getByRole('button', { name: 'Create' }).click()
@@ -419,17 +436,14 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await expect.poll(() => saveRequests.length, { timeout: 5_000 }).toBeGreaterThan(0)
   })
 
-  test('3b. Spell-check underlines a misspelling (harper worker + WASM pass the CSP)', async ({
+  test('3b. Spell-check underlines a misspelling (harper worker + WASM pass the CSP and COOP)', async ({
     page,
   }) => {
     await mockFocusModeApi(page)
 
-    const cspViolations: string[] = []
-    page.on('console', (msg) => {
-      if (/Content Security Policy/i.test(msg.text())) cspViolations.push(msg.text())
-    })
-
-    await page.goto('/project/proj-1/scene/sc-1/focus')
+    const response = await page.goto('/project/proj-1/scene/sc-1/focus')
+    expect(response?.headers()['cross-origin-opener-policy']).toBe('same-origin')
+    expect(response?.headers()['cross-origin-resource-policy']).toBe('same-origin')
     await page.waitForSelector('main', { timeout: 20_000 })
 
     const editor = page.locator('.tiptap, .ProseMirror').first()
@@ -439,7 +453,6 @@ test.describe('E2E smoke tests – critical user flows', () => {
     await page.keyboard.type(' She recieved the mesage.')
 
     await expect(page.locator('.harper-error').first()).toBeVisible({ timeout: 20_000 })
-    expect(cspViolations).toEqual([])
   })
 
   test('4. Story objects panel – create a character and verify it appears', async ({
