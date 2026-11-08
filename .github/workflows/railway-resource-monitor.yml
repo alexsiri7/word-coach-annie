@@ -37,7 +37,10 @@ jobs:
           # Railway removed memoryLimitMB from the ServiceInstance API — use the configurable limit
           echo "Memory limit: ${MEMORY_LIMIT_MB} MB"
 
-          # Query metrics for the last 30 minutes
+          # Query metrics for the last 30 minutes, one series per container instance.
+          # Ungrouped, Railway sums every instance in the service, so the old and new containers
+          # of a rolling deploy read as one container at twice the usage (#1453). The memory
+          # limit is per container, so the per-instance peak is what we compare against it.
           # Note: Railway returns CPU_USAGE as a percentage (0–100), not a fraction or millicores.
           END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           START=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
@@ -46,7 +49,7 @@ jobs:
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"query\": \"query { metrics(projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", startDate: \\\"$START\\\", endDate: \\\"$END\\\", measurements: [MEMORY_USAGE_GB, CPU_USAGE]) { measurement values { value } } }\"
+              \"query\": \"query { metrics(projectId: \\\"$RAILWAY_PROJECT_ID\\\", serviceId: \\\"$RAILWAY_SERVICE_ID\\\", environmentId: \\\"$RAILWAY_ENVIRONMENT_ID\\\", startDate: \\\"$START\\\", endDate: \\\"$END\\\", measurements: [MEMORY_USAGE_GB, CPU_USAGE], groupBy: [DEPLOYMENT_INSTANCE_ID]) { measurement values { value } } }\"
             }")
 
           API_ERRORS=$(echo "$METRICS_RESPONSE" | jq -r '.errors // empty')
@@ -55,8 +58,8 @@ jobs:
             exit 1
           fi
 
-          # Extract max memory usage (GB) and max CPU usage (%)
-          # Railway metrics() returns a flat array: [{measurement: "MEMORY_USAGE_GB", values: [{ts, value}]}, ...]
+          # Extract max memory usage (GB) and max CPU usage (%) across all instances
+          # Railway metrics() returns one entry per measurement and instance: [{measurement: "MEMORY_USAGE_GB", values: [{ts, value}]}, ...]
           MEMORY_GB=$(echo "$METRICS_RESPONSE" | jq -r '
             [.data.metrics[]
               | select(.measurement == "MEMORY_USAGE_GB")
