@@ -768,7 +768,7 @@ orphans:
       - "src/components/ai-settings-dialog.tsx"
       - "src/app/settings/page.tsx"
     suggested_requirement: "When a user saves AI settings, the system shall store their own provider key, model, coaching style, response length, custom instructions and chat compression parameters at user scope, shall resolve configuration as user, then global, then environment, and shall list selectable models from the provider using the resolved key."
-  - behavior: "AI manuscript coaching analyses: consistency check with severity-rated alerts, character voice monitor, plot-thread status per scene, and the Annie critique panel, via dedicated routes and MCP coaching tools (WCA-025 names only ai-manuscript in general terms)."
+  - behavior: "AI manuscript coaching analyses: consistency check with severity-rated alerts, character voice monitor, and plot-thread status per scene, via dedicated routes and MCP coaching tools (WCA-025 names only ai-manuscript in general terms)."
     code_paths:
       - "src/app/api/projects/[id]/consistency-check/route.ts"
       - "src/app/api/projects/[id]/voice-check/route.ts"
@@ -776,7 +776,6 @@ orphans:
       - "src/mcp/tools/coaching.ts"
       - "src/components/editor/consistency-alerts-panel.tsx"
       - "src/components/editor/voice-monitor-panel.tsx"
-      - "src/components/editor/annie-critique-panel.tsx"
     suggested_requirement: "When the author requests a consistency check, voice check, or plot-thread status for a project or scene, the system shall gather character profiles and scene text through the shared coaching context, return structured alerts or indicators, and degrade to non-AI profiles with an explicit warning when no AI key is configured."
   - behavior: "In-app chat agent (Google ADK) with the full read and write tool set loaded lazily via load_toolset, including scene content, story object, universe, export, snapshot and Google auth tools; materially beyond WCA-024's context injection and in tension with WCA-025's never-auto-edit wording."
     code_paths:

@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { autoSnapshot } from "../../mcp/snapshot";
 import { UserFacingError } from "@/lib/controllers/errors";
 
 const VALID_TYPES = ["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"] as const;
@@ -255,12 +254,6 @@ export class StoryObjectController {
         const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
         if (!obj) throw new UserFacingError("Story object not found");
 
-        try {
-            autoSnapshot("delete_story_object", obj.name);
-        } catch {
-            // ignore snapshot issues in pure execution context if necessary
-        }
-
         await prisma.storyObject.delete({ where: { id: objectId } });
 
         return { deleted: true, id: objectId, name: obj.name, type: obj.type };
@@ -368,12 +361,6 @@ export class StoryObjectController {
     static async batchDeleteStoryObjects(objectIds: string[]) {
         if (objectIds.length === 0) throw new UserFacingError("objectIds array must not be empty");
         if (objectIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
-
-        try {
-            autoSnapshot("batch_delete_story_objects", `${objectIds.length} objects`);
-        } catch {
-            // ignore snapshot issues
-        }
 
         const results = [];
         const errors = [];
