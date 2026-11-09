@@ -55,7 +55,7 @@ To prevent similar outages:
 
 ### Automated Resource Monitoring
 
-The `railway-resource-monitor.yml` workflow runs every 6 hours and opens a GitHub issue (labeled `railway-resources`) if production memory or CPU exceeds 80%.
+The `railway-resource-monitor.yml` workflow runs every 6 hours and opens a GitHub issue (labeled `railway-resources`) if any production container instance exceeds the memory or CPU threshold set by that workflow's `MEMORY_THRESHOLD_PCT` / `CPU_THRESHOLD_PCT` env values. Usage is measured per instance, so the brief overlap of old and new containers during a deploy does not count as one container at double the usage.
 
 - Issues auto-close when usage drops below the threshold
 - Manual trigger available via `workflow_dispatch` in the GitHub Actions UI
