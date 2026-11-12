@@ -168,10 +168,9 @@ export async function readSceneContent(nodeId: string) {
     };
 }
 
-export async function updateParagraph(
+async function resolveParagraphForEdit(
     nodeId: string,
     index: number,
-    content: string,
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
@@ -189,6 +188,17 @@ export async function updateParagraph(
         const expected = computeContentHash(String(index), entry.type, entry.content);
         verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
+    return { blocks, entry };
+}
+
+export async function updateParagraph(
+    nodeId: string,
+    index: number,
+    content: string,
+    paragraphContentHash?: string,
+    sceneContentHash?: string,
+) {
+    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
     if (entry.type === "BEAT") {
         blocks[entry.blockIndex] = { type: "BEAT", content };
     } else {
@@ -218,22 +228,9 @@ export async function deleteBeat(
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
-    const current = await StructureController.readSceneContent(nodeId);
-    if (sceneContentHash !== undefined) {
-        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
-    }
-    const blocks = current.blocks;
-    const flat = flattenBlocksToParagraphs(blocks);
-    if (index < 0 || index >= flat.length) {
-        throw new UserFacingError(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
-    }
-    const entry = flat[index];
+    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
     if (entry.type !== "BEAT") {
         throw new UserFacingError(`Paragraph ${index} is prose, not a beat — delete_beat only removes beats`);
-    }
-    if (paragraphContentHash !== undefined) {
-        const expected = computeContentHash(String(index), entry.type, entry.content);
-        verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
     blocks.splice(entry.blockIndex, 1);
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
