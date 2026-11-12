@@ -36,6 +36,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import { POST, GET, DELETE } from "../app/api/mcp/route";
+import { createServer } from "@/mcp";
 
 describe("MCP route auth gate", () => {
     beforeEach(() => {
@@ -92,5 +93,18 @@ describe("MCP route auth gate", () => {
         });
         const res = await DELETE(req);
         expect(res.status).toBe(401);
+    });
+
+    it.each([
+        ["read", "read"],
+        ["write", "write"],
+        ["admin", undefined],
+        [null, undefined],
+    ])("passes x-token-scope %s to createServer as %s", async (header, tokenScope) => {
+        mockAuthEnabled = true;
+        const headers: Record<string, string> = { "x-user-id": "user-123" };
+        if (header) headers["x-token-scope"] = header;
+        await POST(new Request("http://localhost/api/mcp", { method: "POST", headers, body: "{}" }));
+        expect(createServer).toHaveBeenCalledWith({ userId: "user-123", tokenScope });
     });
 });

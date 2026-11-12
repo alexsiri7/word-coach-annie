@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
 import { StructureController } from "@/lib/controllers/structure";
 import { ProjectsController } from "@/lib/controllers/projects";
-import { insertBeat } from "@/mcp/tools/structure";
+import { deleteBeat, insertBeat, readSceneContent } from "@/mcp/tools/structure";
 import { computeContentHash, StaleWriteError } from "@/mcp/content-hash";
 
 describe("StructureController", () => {
@@ -562,6 +562,62 @@ describe("StructureController", () => {
 
                 await expect(insertBeat(scene.id, 3, "Bad")).rejects.toThrow("out of range");
                 await expect(insertBeat(scene.id, -2, "Bad")).rejects.toThrow("out of range");
+            });
+        });
+
+        describe("deleteBeat", () => {
+            async function sceneWithBeat() {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(
+                    scene.id,
+                    "<p>Before</p><!-- beat: Doomed --><p>After</p>"
+                );
+                return scene;
+            }
+
+            it("removes the beat at the index and records a new version", async () => {
+                const scene = await sceneWithBeat();
+                const { paragraphs } = await readSceneContent(scene.id);
+                const versionsBefore = await prisma.contentVersion.count({ where: { nodeId: scene.id } });
+
+                const result = await deleteBeat(scene.id, 1, paragraphs[1].contentHash);
+                expect(result.nodeId).toBe(scene.id);
+
+                const read = await StructureController.readSceneContent(scene.id);
+                expect(read.content).toBe("<p>Before</p><p>After</p>");
+                expect(await prisma.contentVersion.count({ where: { nodeId: scene.id } })).toBe(versionsBefore + 1);
+                expect((await readSceneContent(scene.id)).paragraphs.map((p) => p.content)).toEqual([
+                    "<p>Before</p>",
+                    "<p>After</p>",
+                ]);
+            });
+
+            it("refuses to delete prose", async () => {
+                const scene = await sceneWithBeat();
+                const { paragraphs } = await readSceneContent(scene.id);
+                await expect(deleteBeat(scene.id, 0, paragraphs[0].contentHash)).rejects.toThrow(
+                    "Paragraph 0 is prose, not a beat"
+                );
+            });
+
+            it("rejects a stale paragraph hash", async () => {
+                const scene = await sceneWithBeat();
+                const staleHash = computeContentHash("1", "BEAT", "Something else");
+                await expect(deleteBeat(scene.id, 1, staleHash)).rejects.toThrow(StaleWriteError);
+            });
+
+            it("rejects a stale scene hash", async () => {
+                const scene = await sceneWithBeat();
+                const { paragraphs } = await readSceneContent(scene.id);
+                await expect(
+                    deleteBeat(scene.id, 1, paragraphs[1].contentHash, computeContentHash("stale-content"))
+                ).rejects.toThrow(StaleWriteError);
+            });
+
+            it("rejects an out-of-range index", async () => {
+                const scene = await sceneWithBeat();
+                await expect(deleteBeat(scene.id, 3, "hash")).rejects.toThrow("out of range");
+                await expect(deleteBeat(scene.id, -1, "hash")).rejects.toThrow("out of range");
             });
         });
 

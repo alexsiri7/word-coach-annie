@@ -2,7 +2,7 @@
 
 All endpoints are REST JSON APIs under `/api/`. Requests that modify data require authentication when `API_TOKEN` is set (see [SETUP.md](SETUP.md)).
 
-**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`.
+**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); those reach only `/api/nodes/**` and `/api/mcp`.
 
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 
@@ -172,6 +172,43 @@ Update the authenticated user's consent preference for a specific feature.
 - `400 Bad Request` — missing/invalid `feature` or `consentGiven`, or unrecognised `feature` value
 - `401 Unauthorized` — not authenticated
 - `500 Internal Server Error` — database error
+
+---
+
+## Personal API Tokens
+
+A personal API token (`annie_pat_…`) lets another app act as the user who created it. Send it as `Authorization: Bearer <token>`.
+
+- It reaches only `/api/nodes/**` and `/api/mcp`. Any other path returns `403 { "error": "Personal API tokens can only access scenes" }`, including these token endpoints.
+- A `read` token may only `GET`/`HEAD` the node routes; a write returns `403 { "error": "This API token is read-only" }`. A `write` token may read and write scenes. Over `/api/mcp`, a token sees only its scope's scene tools (see [MCP.md](MCP.md#personal-api-tokens)).
+- An unknown or revoked token returns `401`. Each token has its own rate limits (120 reads and 60 writes per minute).
+
+### `GET /api/account/api-tokens`
+Lists the current user's tokens, newest first. The token itself is never returned again.
+
+**Response**: `{ "tokens": [{ "id", "name", "scope": "read" | "write", "hint", "createdAt", "lastUsedAt" }] }` — `hint` is the token's last four characters; `lastUsedAt` is `null` until first use and updates at most once a minute.
+
+**Errors**: `401` if not signed in.
+
+---
+
+### `POST /api/account/api-tokens`
+Creates a token. Requires the `X-CSRF-Protection: 1` header.
+
+**Body**: `{ "name": "Punland editor", "scope": "read" | "write" }` — `name` is 1–100 characters.
+
+**Response**: `201 { "token": "annie_pat_…", "apiToken": { "id", "name", "scope", "hint", "createdAt", "lastUsedAt" } }`. This is the only time the token is shown.
+
+**Errors**: `400` invalid body; `401` not signed in; `403` missing CSRF header.
+
+---
+
+### `DELETE /api/account/api-tokens/:id`
+Revokes a token; apps using it get `401` from then on. Requires the `X-CSRF-Protection: 1` header.
+
+**Response**: `{ "ok": true }`
+
+**Errors**: `401` not signed in; `403` missing CSRF header; `404` no such token for this user.
 
 ---
 

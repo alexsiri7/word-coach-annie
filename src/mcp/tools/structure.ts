@@ -168,10 +168,9 @@ export async function readSceneContent(nodeId: string) {
     };
 }
 
-export async function updateParagraph(
+async function resolveParagraphForEdit(
     nodeId: string,
     index: number,
-    content: string,
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
@@ -189,6 +188,17 @@ export async function updateParagraph(
         const expected = computeContentHash(String(index), entry.type, entry.content);
         verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
+    return { blocks, entry };
+}
+
+export async function updateParagraph(
+    nodeId: string,
+    index: number,
+    content: string,
+    paragraphContentHash?: string,
+    sceneContentHash?: string,
+) {
+    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
     if (entry.type === "BEAT") {
         blocks[entry.blockIndex] = { type: "BEAT", content };
     } else {
@@ -206,6 +216,23 @@ export async function updateParagraph(
             blocks[entry.blockIndex] = { type: "CONTENT", content: before + content + after };
         }
     }
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+export async function deleteBeat(
+    nodeId: string,
+    index: number,
+    paragraphContentHash?: string,
+    sceneContentHash?: string,
+) {
+    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
+    if (entry.type !== "BEAT") {
+        throw new UserFacingError(`Paragraph ${index} is prose, not a beat — delete_beat only removes beats`);
+    }
+    blocks.splice(entry.blockIndex, 1);
     const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
     mcpCache.delete(`sceneContent:${nodeId}`);
     invalidateStructureCaches();

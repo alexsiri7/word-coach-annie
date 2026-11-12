@@ -4,6 +4,7 @@ import { createServer } from "@/mcp";
 import { mcpTransportOptions } from "@/mcp/transport-options";
 import { logger } from "@/lib/logger";
 import { isAuthEnabled } from "@/lib/auth";
+import { isPersonalTokenScope } from "@/lib/personal-tokens";
 
 async function handleMcpRequest(req: Request): Promise<Response> {
     try {
@@ -17,7 +18,9 @@ async function handleMcpRequest(req: Request): Promise<Response> {
         }
 
         if (userId) Sentry.setUser({ id: userId });
-        const server = createServer({ userId });
+        const scopeHeader = req.headers.get("x-token-scope");
+        const tokenScope = isPersonalTokenScope(scopeHeader) ? scopeHeader : undefined;
+        const server = createServer({ userId, tokenScope });
         const transport = new WebStandardStreamableHTTPServerTransport(mcpTransportOptions);
         await server.connect(transport);
         const response = await transport.handleRequest(req);

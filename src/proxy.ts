@@ -8,6 +8,12 @@ import {
     safeEqual,
 } from "@/lib/auth";
 import { verifyMcpToken } from "@/lib/oauth-tokens";
+import {
+    PERSONAL_TOKEN_PREFIX,
+    isPersonalTokenRequestAllowed,
+    verifyPersonalToken,
+    type PersonalTokenScope,
+} from "@/lib/personal-tokens";
 import { env } from "@/lib/env";
 import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-limit";
 import type { RateLimitConfig } from "@/lib/rate-limit-config";
@@ -166,7 +172,7 @@ async function applyRateLimit(
 }
 
 /** Request headers that only the proxy may set. Anything the client sent is dropped. */
-const IDENTITY_HEADERS = ["x-user-id", "x-user-email"] as const;
+const IDENTITY_HEADERS = ["x-user-id", "x-user-email", "x-token-scope"] as const;
 
 export async function proxy(request: NextRequest) {
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
@@ -178,13 +184,18 @@ export async function proxy(request: NextRequest) {
 async function route(request: NextRequest, nonce: string): Promise<NextResponse> {
     // Helper: NextResponse.next() with nonce injected into request headers.
     // Identity headers are never forwarded from the client; they are set here only from a
-    // verified JWT/MCP session (SEC-03).
-    function nextWithNonce(identity?: { userId: string; email: string }): NextResponse {
+    // verified JWT/MCP session or personal API token (SEC-03).
+    function nextWithNonce(identity?: {
+        userId: string;
+        email: string;
+        scope?: PersonalTokenScope;
+    }): NextResponse {
         const reqHeaders = new Headers(request.headers);
         for (const h of IDENTITY_HEADERS) reqHeaders.delete(h);
         if (identity) {
             reqHeaders.set("x-user-id", identity.userId);
             reqHeaders.set("x-user-email", identity.email);
+            if (identity.scope) reqHeaders.set("x-token-scope", identity.scope);
         }
         reqHeaders.set("x-nonce", nonce);
         return NextResponse.next({ request: { headers: reqHeaders } });
@@ -225,8 +236,32 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // 2. Personal API token (annie_pat_…): acts as its user, confined to scene routes and MCP.
+    // Scope is checked before rate limiting so refused requests don't spend the token's quota.
+    if (token?.startsWith(PERSONAL_TOKEN_PREFIX)) {
+        const pat = await verifyPersonalToken(token);
+        if (!pat) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const allowed = isPersonalTokenRequestAllowed(pathname, request.method, pat.scope);
+        if (allowed === "out-of-scope") {
+            return NextResponse.json(
+                { error: "Personal API tokens can only access scenes" },
+                { status: 403 }
+            );
+        }
+        if (allowed === "read-only") {
+            return NextResponse.json({ error: "This API token is read-only" }, { status: 403 });
+        }
+
+        const rateLimited = await applyRateLimit(request, `pat:${pat.tokenId}`);
+        if (rateLimited) return rateLimited;
+
+        Sentry.setUser({ id: pat.userId });
+        return nextWithNonce({ userId: pat.userId, email: pat.email, scope: pat.scope });
+    }
+
     if (authHeader) {
-        // 2. Check MCP OAuth access token (JWT with type: "mcp_access")
+        // 3. Check MCP OAuth access token (JWT with type: "mcp_access")
         if (token) {
             const mcpSession = await verifyMcpToken(token, "mcp_access");
             if (mcpSession) {

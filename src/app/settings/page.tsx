@@ -9,6 +9,7 @@ import { SENTRY_REPLAY_CONSENT_KEY } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AiModelSelect } from "@/components/ai-model-select";
+import { ApiTokensCard } from "@/components/api-tokens-card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -924,6 +925,8 @@ export default function SettingsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <ApiTokensCard />
 
         {/* Privacy & Data */}
         <div className="glass-card p-6 mt-6">

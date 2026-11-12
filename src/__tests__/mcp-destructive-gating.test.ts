@@ -18,6 +18,7 @@ vi.mock("../mcp/tools/structure", () => ({
   writeSceneContentFromBlocks: vi.fn(async () => ({})),
   updateParagraph: vi.fn(async () => ({})),
   insertBeat: vi.fn(async () => ({})),
+  deleteBeat: vi.fn(async () => ({})),
   getSceneVersions: vi.fn(async () => []),
   restoreSceneVersion: vi.fn(async () => ({})),
   addAnnotation: vi.fn(async () => ({})),
@@ -149,7 +150,7 @@ vi.mock("../lib/export/google-docs-exporter", () => ({
   },
 }));
 
-import { deleteNode } from "../mcp/tools/structure";
+import { deleteBeat, deleteNode } from "../mcp/tools/structure";
 import { listProjects } from "../mcp/tools/projects";
 import { deleteRelationship } from "../mcp/tools/relationships";
 import { prisma } from "@/lib/db";
@@ -224,6 +225,16 @@ describe("MCP destructive tool gating", () => {
     expect(deleteRelationship).toHaveBeenCalledWith("rel-1");
   });
 
+  it("delete_beat works when MCP_ALLOW_DESTRUCTIVE is unset, since restore_scene_version undoes it", async () => {
+    delete process.env.MCP_ALLOW_DESTRUCTIVE;
+    const { createServer } = await import("../mcp/index");
+    const server = createServer();
+
+    const result = await getToolHandler(server, "delete_beat").handler({ nodeId: "n1", index: 2, paragraphContentHash: "h" }) as { isError?: boolean };
+    expect(result.isError).toBeUndefined();
+    expect(deleteBeat).toHaveBeenCalledWith("n1", 2, "h", undefined);
+  });
+
   it("non-destructive tools work regardless of allowDestructive=false", async () => {
     const { createServer } = await import("../mcp/index");
     const server = createServer({ allowDestructive: false });
@@ -256,6 +267,18 @@ describe("MCP project ownership checks", () => {
 
     // verifyProjectOwnership throws — the OTEL span wrapper re-throws
     await expect(tool.handler({ projectId: "p1" })).rejects.toThrow("access denied");
+  });
+
+  it("rejects delete_beat on a scene in a project the user does not own", async () => {
+    vi.mocked(prisma.project.findFirst).mockResolvedValueOnce(null);
+
+    const { createServer } = await import("../mcp/index");
+    const server = createServer({ userId: "other-user" });
+
+    const result = await getToolHandler(server, "delete_beat").handler({ nodeId: "n1", index: 0, paragraphContentHash: "h" }) as { isError?: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("access denied");
+    expect(deleteBeat).not.toHaveBeenCalled();
   });
 
   it("allows access when userId is null (single-user mode)", async () => {
