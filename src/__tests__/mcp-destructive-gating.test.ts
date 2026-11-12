@@ -18,6 +18,7 @@ vi.mock("../mcp/tools/structure", () => ({
   writeSceneContentFromBlocks: vi.fn(async () => ({})),
   updateParagraph: vi.fn(async () => ({})),
   insertBeat: vi.fn(async () => ({})),
+  deleteBeat: vi.fn(async () => ({})),
   getSceneVersions: vi.fn(async () => []),
   restoreSceneVersion: vi.fn(async () => ({})),
   addAnnotation: vi.fn(async () => ({})),

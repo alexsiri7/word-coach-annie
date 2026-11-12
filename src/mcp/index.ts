@@ -13,6 +13,8 @@ import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
 import { prisma } from "@/lib/db";
 import { runPeerReview } from "@/lib/ai/peer-review-service";
+import type { PersonalTokenScope } from "@/lib/personal-tokens";
+import { TOKEN_SCOPE_TOOLS } from "./token-scopes";
 
 // Tool implementations
 import { listProjects, getProject, createProject, updateProject } from "./tools/projects";
@@ -26,6 +28,7 @@ import {
     writeSceneContentFromBlocks,
     updateParagraph,
     insertBeat,
+    deleteBeat,
     getSceneVersions,
     restoreSceneVersion,
     addAnnotation,
@@ -139,6 +142,11 @@ interface McpServerOptions {
     allowDestructive?: boolean;
     /** Authenticated user ID, extracted from x-user-id header by the MCP route handler. */
     userId?: string | null;
+    /**
+     * Set when the caller authenticated with a personal API token (x-token-scope header).
+     * Only the tools in that scope's allowlist are registered; absent means every tool.
+     */
+    tokenScope?: PersonalTokenScope;
 }
 
 // ─── Annie's Voice & Hard Rule ──────────────────────────────────────────────
@@ -148,6 +156,7 @@ function createServer(options?: McpServerOptions): McpServer {
 
 const allowDestructive = options?.allowDestructive ?? env.MCP_ALLOW_DESTRUCTIVE;
 const userId = options?.userId ?? null;
+const allowedTools = options?.tokenScope ? TOKEN_SCOPE_TOOLS[options.tokenScope] : null;
 
 const server = new McpServer({
     name: "word-coach-annie",
@@ -161,6 +170,7 @@ server.tool = ((...args: unknown[]) => {
     // server.tool() has multiple overloads; the handler is always the last arg
     // and the tool name is always the first.
     const toolName = args[0] as string;
+    if (allowedTools && !allowedTools.has(toolName)) return undefined;
     const handlerIdx = args.length - 1;
     const originalHandler = args[handlerIdx] as (...a: unknown[]) => Promise<unknown>;
 
@@ -488,6 +498,22 @@ server.tool(
         mcpRun("insert_beat", "Error inserting beat", async () => {
             await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             return insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
+        })
+);
+
+server.tool(
+    "delete_beat",
+    "Delete a single beat block from a scene by its index (from read_scene_content paragraphs array). Only beats can be deleted — prose paragraphs are refused. Requires paragraphContentHash from the paragraph entry to prevent stale deletes. Creates a new scene version, so restore_scene_version can undo it.",
+    {
+        nodeId: z.string().describe("The scene node ID"),
+        index: z.number().int().describe("The paragraph index of the beat, from the paragraphs array"),
+        paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
+        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+    },
+    async ({ nodeId, index, paragraphContentHash, sceneContentHash }) =>
+        mcpRun("delete_beat", "Error deleting beat", async () => {
+            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+            return deleteBeat(nodeId, index, paragraphContentHash, sceneContentHash);
         })
 );
 

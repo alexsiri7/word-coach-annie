@@ -212,6 +212,36 @@ export async function updateParagraph(
     return result;
 }
 
+export async function deleteBeat(
+    nodeId: string,
+    index: number,
+    paragraphContentHash?: string,
+    sceneContentHash?: string,
+) {
+    const current = await StructureController.readSceneContent(nodeId);
+    if (sceneContentHash !== undefined) {
+        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
+    }
+    const blocks = current.blocks;
+    const flat = flattenBlocksToParagraphs(blocks);
+    if (index < 0 || index >= flat.length) {
+        throw new UserFacingError(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
+    }
+    const entry = flat[index];
+    if (entry.type !== "BEAT") {
+        throw new UserFacingError(`Paragraph ${index} is prose, not a beat — delete_beat only removes beats`);
+    }
+    if (paragraphContentHash !== undefined) {
+        const expected = computeContentHash(String(index), entry.type, entry.content);
+        verifyContentHash(paragraphContentHash, expected, "read_scene_content");
+    }
+    blocks.splice(entry.blockIndex, 1);
+    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
 export async function insertBeat(
     nodeId: string,
     afterParagraphIndex: number,

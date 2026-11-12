@@ -9,19 +9,19 @@
  */
 import { isTokenRevoked } from "@/lib/token-blocklist";
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
 import {
     verifySessionToken,
     getJwtKey,
     JWT_ISSUER,
     JWT_AUDIENCE_REFRESH,
     REFRESH_MAX_AGE,
+    isEmailAllowed,
 } from "@/lib/auth";
 import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { logger } from "@/lib/logger";
 
 export type { SessionPayload } from "@/lib/auth";
-export { createSessionToken } from "@/lib/auth";
+export { createSessionToken, isEmailAllowed } from "@/lib/auth";
 
 export interface RefreshPayload {
     userId: string;
@@ -29,13 +29,6 @@ export interface RefreshPayload {
     name: string;
     picture?: string;
     jti?: string;
-}
-
-/** True when ALLOWED_EMAILS is unset or lists `email` (case-insensitive). */
-export function isEmailAllowed(email: string): boolean {
-    if (!env.ALLOWED_EMAILS) return true;
-    const allowed = env.ALLOWED_EMAILS.split(",").map((e) => e.trim().toLowerCase());
-    return allowed.includes(email.toLowerCase());
 }
 
 /**

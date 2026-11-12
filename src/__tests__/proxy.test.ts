@@ -28,6 +28,14 @@ vi.mock("@/lib/oauth-tokens", () => ({
 
 import { verifyMcpToken } from "@/lib/oauth-tokens";
 
+// Only the DB lookup is mocked; the prefix and the path/scope rules stay real.
+vi.mock("@/lib/personal-tokens", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/personal-tokens")>()),
+    verifyPersonalToken: vi.fn(async () => null),
+}));
+
+import { verifyPersonalToken } from "@/lib/personal-tokens";
+
 // Mock auth module; the legacy API_TOKEN cookie helpers stay real so their verification is exercised end to end.
 vi.mock("@/lib/auth", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@/lib/auth")>();
@@ -413,6 +421,119 @@ describe("proxy", () => {
             });
             const res = await proxy(req);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBe("mcp-user");
+        });
+    });
+
+    describe("personal API tokens", () => {
+        const writeToken = {
+            tokenId: "tok-write",
+            userId: "pat-user",
+            email: "pat@example.com",
+            scope: "write" as const,
+        };
+
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            process.env.API_TOKEN = "my-token";
+        });
+
+        afterEach(() => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(null);
+        });
+
+        function patRequest(path: string, method = "GET", headers: Record<string, string> = {}) {
+            return createRequest(path, {
+                method,
+                headers: { authorization: "Bearer annie_pat_secret", ...headers },
+            });
+        }
+
+        it("forwards the token's identity and scope on a scene write", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            const res = await proxy(patRequest("/api/nodes/n1/content", "PUT", { "x-user-id": "victim-id" }));
+            expect(res.status).toBe(200);
+            expect(verifyPersonalToken).toHaveBeenCalledWith("annie_pat_secret");
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("pat-user");
+            expect(res.headers.get("x-middleware-request-x-user-email")).toBe("pat@example.com");
+            expect(res.headers.get("x-middleware-request-x-token-scope")).toBe("write");
+            expect(Sentry.setUser).toHaveBeenCalledWith({ id: "pat-user" });
+        });
+
+        it("lets a token reach the MCP endpoint", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue({ ...writeToken, scope: "read" });
+            const res = await proxy(patRequest("/api/mcp", "POST"));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-token-scope")).toBe("read");
+        });
+
+        it("lets a read-only token read scenes but refuses a write with 403", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue({ ...writeToken, scope: "read" });
+            expect((await proxy(patRequest("/api/nodes/n1/content"))).status).toBe(200);
+
+            const res = await proxy(patRequest("/api/nodes/n1/content", "PUT"));
+            expect(res.status).toBe(403);
+            expect(await res.json()).toEqual({ error: "This API token is read-only" });
+        });
+
+        it.each([
+            ["/api/account/api-tokens", "POST"],
+            ["/api/projects", "GET"],
+            ["/api/nodes-evil", "GET"],
+            ["/settings", "GET"],
+        ])("refuses %s %s with 403, even for a write token", async (path, method) => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            const res = await proxy(patRequest(path, method));
+            expect(res.status).toBe(403);
+            expect(await res.json()).toEqual({ error: "Personal API tokens can only access scenes" });
+        });
+
+        it("returns 401 for an unknown or revoked token without trying it as an MCP token", async () => {
+            const res = await proxy(patRequest("/api/nodes/n1/content"));
+            expect(res.status).toBe(401);
+            expect(verifyMcpToken).not.toHaveBeenCalled();
+        });
+
+        it("does not open /api/metrics to a personal token", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            const res = await proxy(patRequest("/api/metrics"));
+            expect(res.status).toBe(401);
+            expect(verifyPersonalToken).not.toHaveBeenCalled();
+        });
+
+        it("drops a client-supplied x-token-scope on the session branch", async () => {
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const res = await proxy(createRequest("/api/projects", {
+                headers: { "x-token-scope": "write" },
+                cookies: { annie_session: "valid-jwt-token" },
+            }));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-token-scope")).toBeNull();
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+        });
+
+        it("rate-limits each token in its own bucket", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            for (let i = 0; i < 60; i++) {
+                await proxy(patRequest("/api/nodes/n1/content", "PUT"));
+            }
+            const limited = await proxy(patRequest("/api/nodes/n1/content", "PUT"));
+            expect(limited.status).toBe(429);
+
+            vi.mocked(verifyPersonalToken).mockResolvedValue({ ...writeToken, tokenId: "tok-other" });
+            expect((await proxy(patRequest("/api/nodes/n1/content", "PUT"))).status).toBe(200);
+        });
+
+        it("does not spend rate-limit quota on refused requests", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue({ ...writeToken, scope: "read" });
+            for (let i = 0; i < 70; i++) {
+                await proxy(patRequest("/api/nodes/n1/content", "PUT"));
+            }
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            expect((await proxy(patRequest("/api/nodes/n1/content", "PUT"))).status).toBe(200);
         });
     });
 

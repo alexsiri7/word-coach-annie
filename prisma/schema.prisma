@@ -49,6 +49,22 @@ model User {
   providers         Provider[]
   opportunities     Opportunity[]
   writingTasks      WritingTask[]
+  apiTokens         ApiToken[]
+}
+
+// Personal API token: lets another app act as the user on scene routes and MCP.
+model ApiToken {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  scope      String    // "read" | "write"
+  tokenHash  String    @unique // SHA-256 hex of the full token; the token itself is never stored
+  hint       String    // last 4 characters, so the owner can tell tokens apart
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model UserConsent {

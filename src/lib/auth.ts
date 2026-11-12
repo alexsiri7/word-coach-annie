@@ -195,6 +195,13 @@ export function isAuthEnabled(): boolean {
     return authConfigurationProblems(env).length === 0;
 }
 
+/** True when ALLOWED_EMAILS is unset or lists `email` (case-insensitive). */
+export function isEmailAllowed(email: string): boolean {
+    if (!env.ALLOWED_EMAILS) return true;
+    const allowed = env.ALLOWED_EMAILS.split(",").map((e) => e.trim().toLowerCase());
+    return allowed.includes(email.toLowerCase());
+}
+
 /** Returns true when Google OAuth is the active auth mode (multi-user deployments where every request must carry a user identity). */
 export function isGoogleAuthMode(): boolean {
     return !!env.GOOGLE_CLIENT_ID;
