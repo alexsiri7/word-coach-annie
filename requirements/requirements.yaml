@@ -900,3 +900,18 @@ requirements:
       - "The MCP tools get_consistency_context, get_voice_context and get_plot_thread_status return the same gathered context to an MCP client that owns the project"
       - "Neither check changes scene content"
     notes: "The consistency and voice checks require project write access; plot-thread status requires read access. The consistency check reads up to 20 scenes (or only the focused scene), each cut to 800 characters of text; the voice check reads 1,500 characters of the latest version and sends at most 1,000. Results are not stored: dismissing an alert hides it until the next run. The audit draft also listed an Annie critique panel; it called a route that never existed and was removed rather than built (#1397), so AI scene feedback outside these checks stays with peer review. Known gaps: the consistency-check and voice-check routes have no test, the voice check gives no warning when AI is not configured, and it answers a scene outside the project with 500 rather than 404."
+
+  - id: WCA-072
+    title: Personal API tokens
+    statement: "When a signed-in user creates a personal API token with a name and a read or read+write-scenes scope, the system shall show the token once, store only its hash, and accept it as an Authorization bearer that acts as that user on the scene/node API routes and the MCP endpoint, refusing writes from a read-only token and any other route with 403 and a revoked or unknown token with 401."
+    category: functional
+    priority: should
+    status: active
+    source: src/lib/personal-tokens.ts, src/proxy.ts, src/mcp/token-scopes.ts, src/mcp/index.ts createServer tokenScope/delete_beat, src/app/api/account/api-tokens/route.ts, src/app/api/account/api-tokens/[id]/route.ts, src/components/api-tokens-card.tsx, src/__tests__/personal-tokens.test.ts, src/__tests__/api-tokens-route.test.ts, src/__tests__/proxy.test.ts
+    acceptance:
+      - "A user can create a token, sees it once, can revoke it; a revoked or wrong token gets 401."
+      - "With a read+write token, a script can read a scene's beats and replace one beat; the change shows in the editor and in the scene's version history."
+      - "A read-only token cannot write (403)."
+      - "Tokens are stored hashed; no token appears in logs."
+      - "Existing browser and MCP OAuth auth keep working; tests cover token auth."
+    notes: "Tokens reach only /api/nodes/** and /api/mcp; over MCP a read token sees list_projects, get_project, get_outline, read_scene_content and get_scene_versions, and a write token adds write_scene_content, update_paragraph, insert_beat, delete_beat and restore_scene_version. Each token has its own rate-limit buckets (pat:<tokenId>), and lastUsedAt is written at most once a minute. The token's user must still pass ALLOWED_EMAILS. Tokens do not expire. The shared API_TOKEN (WCA-060) is unchanged."

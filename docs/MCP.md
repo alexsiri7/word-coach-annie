@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **97 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **98 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -30,7 +30,18 @@ Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for detai
 
 ### Authentication
 
-Set `API_TOKEN` in your environment. MCP clients must send `Authorization: Bearer <API_TOKEN>`.
+Over HTTP, `/api/mcp` acts as a user, so each request needs a credential that carries one: an MCP OAuth access token (from the `/oauth/*` flow), a signed-in session, or a personal API token. The shared `API_TOKEN` bearer carries no user, so `/api/mcp` refuses it while auth is enabled; it is only useful with auth disabled for local development. The stdio server needs no credential.
+
+#### Personal API tokens
+
+For another app's backend (for example a game's scene editor), create a token in **Settings → API tokens** and send `Authorization: Bearer annie_pat_…` to `POST /api/mcp`. The server then registers only the scene tools the token's scope allows:
+
+| Scope | Tools |
+|-------|-------|
+| `read` | `list_projects`, `get_project`, `get_outline`, `read_scene_content`, `get_scene_versions` |
+| `write` | the `read` tools plus `write_scene_content`, `update_paragraph`, `insert_beat`, `delete_beat`, `restore_scene_version` |
+
+Other tools are absent from `tools/list`, and calling one fails as an unknown tool. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
 
 To enable destructive tools (delete tools), set `MCP_ALLOW_DESTRUCTIVE=true`.
 
@@ -263,6 +274,19 @@ tool over `write_scene_content` when adding structural waypoints without touchin
 | `afterParagraphIndex` | number | Scene-level paragraph index (from `read_scene_content` paragraphs array). Each `<p>` element and each BEAT block counts as one paragraph. Use `-1` to insert before all paragraphs. When the target falls inside a CONTENT block, the block is split automatically. |
 | `beatContent` | string | The beat text to insert (structural waypoint — not prose) |
 | `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content` for stale detection |
+
+---
+
+#### `delete_beat`
+Delete one beat block from a scene by its paragraph index. Prose paragraphs are refused. Creates a
+new scene version, so `restore_scene_version` can undo it.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `nodeId` | string | The scene node ID |
+| `index` | number | The beat's paragraph index from the paragraphs array |
+| `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
+| `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
 
 ---
 

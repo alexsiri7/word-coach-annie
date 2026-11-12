@@ -185,6 +185,8 @@ The app supports three auth modes (controlled by environment variables):
 | **Token auth** | `API_TOKEN` set | Send `Authorization: Bearer <token>` header, or use session cookie from `/api/auth/login` |
 | **Google OAuth** | `GOOGLE_CLIENT_ID/SECRET` set | Full OAuth flow with invite-list control via `ALLOWED_EMAILS` |
 
+When auth is enabled, signed-in users can also issue [personal API tokens](#personal-api-tokens) for other apps.
+
 ### Session Security
 
 Google OAuth uses a two-token model:
@@ -198,7 +200,16 @@ On logout and account deletion, both tokens' `jti` claims are written to the `Re
 
 Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
 
-**Module split**: Edge-safe functions (JWT create/verify without DB) live in `src/lib/auth.ts`. Node.js-only functions (blocklist-aware verification, refresh token operations) live in `src/lib/auth-server.ts`. Do not import `auth-server.ts` or `token-blocklist.ts` from middleware or any Edge-compatible module.
+### Personal API Tokens
+
+A signed-in user can mint named personal API tokens in Settings (`/api/account/api-tokens`) so another app — for example a game's scene editor — can read or edit their scenes as them. Send `Authorization: Bearer annie_pat_…`.
+
+- **Storage**: 256 random bits behind the `annie_pat_` prefix. Only the SHA-256 hash and the last four characters (`ApiToken.tokenHash`, `hint`) are stored; the plaintext is returned once, at creation. Revoking deletes the row.
+- **Verification**: `src/proxy.ts` checks the bearer after `API_TOKEN` and before MCP OAuth, through `src/lib/personal-tokens.ts`. The token's user must still exist and pass `ALLOWED_EMAILS`. Unknown, revoked or unverifiable (DB error) tokens get 401. The proxy forwards `x-user-id`, `x-user-email` and the proxy-only `x-token-scope`.
+- **Scope and surface**: `read` or `write` (read + write scenes). A token reaches only `/api/nodes/**` and `/api/mcp`; anything else returns 403 `Personal API tokens can only access scenes`, and a `read` token writing to `/api/nodes/**` returns 403 `This API token is read-only`. On `/api/mcp`, `createServer({ tokenScope })` registers only the tools in `src/mcp/token-scopes.ts`.
+- **Rate limits and usage**: each token has its own read/write buckets (key `pat:<tokenId>`), so a busy integration cannot exhaust the author's own editor quota. `lastUsedAt` is written at most once a minute and shown in Settings.
+
+**Module split**: Edge-safe functions (JWT create/verify without DB) live in `src/lib/auth.ts`. Node.js-only functions (blocklist-aware verification, refresh token operations) live in `src/lib/auth-server.ts`. `src/proxy.ts` runs on the Node.js runtime and reaches the database only to verify personal API tokens, through `src/lib/personal-tokens.ts`; it still does not import `auth-server.ts` or `token-blocklist.ts`, and neither may any Edge-compatible module.
 
 - In Node.js API routes, use `verifySessionTokenNode` (from `auth-server.ts`) instead of `verifySessionToken` to ensure revoked sessions are rejected.
 

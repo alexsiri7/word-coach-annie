@@ -17,12 +17,35 @@ Users SHALL sign in with Google. When an allowlist of emails is configured, sign
 
 ### Requirement: Everything but public pages requires authentication
 
-Every request outside a public set — health check, sign-in and sign-out, landing, privacy, terms, DMCA, version check, OAuth metadata, registration and token endpoints, and the calendar feed — SHALL require a valid session, API token or MCP OAuth token, and SHALL be refused otherwise.
+Every request outside a public set — health check, sign-in and sign-out, landing, privacy, terms, DMCA, version check, OAuth metadata, registration and token endpoints, and the calendar feed — SHALL require a valid session, API token, personal API token or MCP OAuth token, and SHALL be refused otherwise.
 
 #### Scenario: Anonymous API call
 - GIVEN no credentials
 - WHEN a request is made to a project API
 - THEN it is refused as unauthenticated
+
+### Requirement: Users can issue personal API tokens
+
+A signed-in user SHALL be able to create named personal API tokens, list them with their scope and last use, and revoke them. A token SHALL be shown only once, at creation, and stored only as a hash. A revoked or unknown token SHALL be refused with 401. Requests made with a token SHALL be rate-limited per token, and each token's last use SHALL be recorded.
+
+#### Scenario: Revoked token
+- GIVEN a token the user has revoked
+- WHEN it is presented
+- THEN the request is refused with 401
+
+### Requirement: Personal API tokens reach only scenes
+
+A personal API token SHALL act as its user with a read or read+write-scenes scope. It SHALL reach only the scene/node API routes and the MCP endpoint, where it SHALL see only its scope's scene tools, and SHALL be refused with 403 elsewhere. A read-only token SHALL be refused with 403 when it writes.
+
+#### Scenario: Game backend replaces a beat
+- GIVEN a read+write token
+- WHEN a script reads a scene's beats and replaces one
+- THEN the change shows in the editor and in the scene's version history
+
+#### Scenario: Read-only token writes
+- GIVEN a read-only token
+- WHEN it is used to change a scene
+- THEN the request is refused with 403
 
 ### Requirement: Sessions last while the author is active
 
