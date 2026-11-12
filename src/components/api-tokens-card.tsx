@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { PersonalTokenScope } from "@/lib/personal-tokens";
 
 interface ApiTokenSummary {
   id: string;
@@ -24,8 +25,6 @@ interface ApiTokenSummary {
   createdAt: string;
   lastUsedAt: string | null;
 }
-
-type Scope = "read" | "write";
 
 const SCOPE_LABELS: Record<string, string> = {
   read: "Read only",
@@ -41,7 +40,7 @@ export function ApiTokensCard() {
   const [tokens, setTokens] = useState<ApiTokenSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<Scope>("read");
+  const [scope, setScope] = useState<PersonalTokenScope>("read");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
