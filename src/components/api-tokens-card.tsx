@@ -29,7 +29,7 @@ interface ApiTokenSummary {
 const SCOPE_LABELS: Record<string, string> = {
   read: "Read only",
   write: "Read & write scenes",
-};
+} satisfies Record<PersonalTokenScope, string>;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
