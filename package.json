@@ -96,7 +96,7 @@
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.15.0",
-    "@next/bundle-analyzer": "^16.4.2",
+    "@next/bundle-analyzer": "^16.4.5",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/archiver": "^7.0.0",
