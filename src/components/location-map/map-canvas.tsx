@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "@/lib/utils";
-import type { LocationMapItem } from "@/schemas/location-map";
+import type { LocationMapInput, LocationMapItem } from "@/schemas/location-map";
 import {
     moveTo,
     resizeFromCorner,
@@ -16,12 +16,7 @@ import {
     type View,
 } from "./geometry";
 
-export interface MapDoc {
-    widthM: number;
-    heightM: number;
-    backgroundImageId: string | null;
-    items: LocationMapItem[];
-}
+export type MapDoc = LocationMapInput;
 
 export interface ItemLabel {
     text: string;

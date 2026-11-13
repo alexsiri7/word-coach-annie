@@ -13,17 +13,12 @@ import {
     type LocationMapInput,
     type LocationMapItem,
     type LocationMapItemUpsert,
+    type LocationMapItemView,
 } from "@/schemas/location-map";
 
-/** linkName is the linked story object's current name, so renames follow without rewriting maps. */
-export type LocationMapItemView = LocationMapItem & { linkName: string | null; unlinked: boolean };
-
-export type LocationMapView = {
+export type LocationMapView = Omit<LocationMapInput, "items"> & {
     id: string;
     storyObjectId: string;
-    widthM: number;
-    heightM: number;
-    backgroundImageId: string | null;
     items: LocationMapItemView[];
     updatedAt: Date;
     contentHash: string;
@@ -151,7 +146,8 @@ function clean(map: LocationMapInput): LocationMapInput {
 
 async function write(db: DbClient, location: Location, map: LocationMapInput, previous: LocationMapItem[]) {
     await checkReferences(db, location, map, previous);
-    const { widthM, heightM, backgroundImageId, items } = clean(map);
+    // Sanitizing escapes <, > and &, which can push text past the schema's length limits.
+    const { widthM, heightM, backgroundImageId, items } = validated(clean(map));
     const data = { widthM, heightM, backgroundImageId, items: items as Prisma.InputJsonValue };
     const row = await db.locationMap.upsert({
         where: { storyObjectId: location.id },

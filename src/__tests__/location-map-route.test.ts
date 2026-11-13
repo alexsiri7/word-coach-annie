@@ -86,6 +86,15 @@ describe("location map", () => {
         expect(await prisma.locationMap.count()).toBe(0);
     });
 
+    it("refuses text that sanitizing escapes past its length limit, and stores nothing", async () => {
+        const { location } = await setup();
+        const label = "x<3".repeat(33) + "x";
+        const res = await put(location.id, map([{ id: "n", kind: "note", label, x: 1, y: 1, w: 0.4, h: 0.4 }]));
+        expect(res.status).toBe(400);
+        expect((await res.json()).error).toMatch(/^items\.0\.label: /);
+        expect(await prisma.locationMap.count()).toBe(0);
+    });
+
     it("refuses a map on a story object that is not a location", async () => {
         const { location: character } = await setup("CHARACTER");
         const res = await put(character.id, map([]));

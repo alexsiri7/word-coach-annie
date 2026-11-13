@@ -40,6 +40,7 @@ import {
     LOCATION_MAP_LINK_TYPES,
     type LocationMapItem,
     type LocationMapItemKind,
+    type LocationMapItemView,
     type LocationMapLinkType,
 } from "@/schemas/location-map";
 import { MapCanvas, type ItemLabel, type MapDoc } from "./map-canvas";
@@ -61,8 +62,7 @@ const AUTOSAVE_MS = 800;
 const KEEPALIVE_MAX_BYTES = 64 * 1024;
 const ZOOM_STEP = 1.25;
 
-type ServerItem = LocationMapItem & { linkName: string | null; unlinked: boolean };
-type ServerMap = Omit<MapDoc, "items"> & { items: ServerItem[] };
+type ServerMap = Omit<MapDoc, "items"> & { items: LocationMapItemView[] };
 type SaveState = "saved" | "unsaved" | "saving" | "failed";
 
 const SAVE_LABELS: Record<SaveState, string> = {

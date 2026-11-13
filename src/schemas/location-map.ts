@@ -79,6 +79,9 @@ export type LocationMapItem = z.output<typeof LocationMapItemSchema>;
 export type LocationMapItemUpsert = z.output<typeof LocationMapItemUpsertSchema>;
 export type LocationMapInput = z.output<typeof LocationMapInputSchema>;
 
+/** An item as a read returns it: linkName is the linked story object's current name, so renames follow without rewriting maps. */
+export type LocationMapItemView = LocationMapItem & { linkName: string | null; unlinked: boolean };
+
 export type LocationMapLinkType = "CHARACTER" | "WORLD_ELEMENT" | "LOCATION";
 
 /** The story-object type each kind may link to; the schema keeps links off the other kinds. */
