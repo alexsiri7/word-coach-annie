@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import https from "node:https";
+import type { ClientRequest, IncomingMessage } from "node:http";
 import { fetchRemoteImage, isBlockedAddress } from "@/lib/location-images/fetch-remote";
 
 describe("isBlockedAddress", () => {
@@ -28,5 +30,29 @@ describe("fetchRemoteImage", () => {
 
     it("refuses a hostname that resolves to a private address", async () => {
         await expect(fetchRemoteImage("https://localhost/a.png")).rejects.toThrow("That address is not reachable");
+    });
+
+    describe("following a redirect", () => {
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        function redirectTo(location: string) {
+            return vi.spyOn(https, "get").mockImplementation(((_url: URL, _options: unknown, callback: (res: IncomingMessage) => void) => {
+                const res = { statusCode: 302, headers: { location }, resume: () => res } as unknown as IncomingMessage;
+                queueMicrotask(() => callback(res));
+                return { on: () => undefined, destroy: () => undefined } as unknown as ClientRequest;
+            }) as unknown as typeof https.get);
+        }
+
+        it.each([
+            ["https://169.254.169.254/latest/meta-data", "That address is not reachable"],
+            ["https://[::1]/a.png", "That address is not reachable"],
+            ["http://example.com/a.png", "Image URL must use https"],
+        ])("re-checks the target %s before connecting to it", async (location, message) => {
+            const get = redirectTo(location);
+            await expect(fetchRemoteImage("https://images.example.com/a.png")).rejects.toThrow(message);
+            expect(get).toHaveBeenCalledTimes(1);
+        });
     });
 });
