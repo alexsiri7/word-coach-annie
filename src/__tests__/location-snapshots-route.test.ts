@@ -27,6 +27,7 @@ import { getCurrentUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { removeObjects, uploadObject } from "@/lib/storage/supabase-storage";
 import { UniversesController } from "@/lib/controllers/universes";
+import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { IMAGE_FILE_CACHE_SECONDS } from "@/lib/controllers/location-images";
 import { MAX_SNAPSHOTS_PER_LOCATION } from "@/lib/controllers/location-snapshots";
 import { POST as ingestRoute } from "@/app/api/projects/[id]/locations/[slug]/snapshots/route";
@@ -360,6 +361,23 @@ describe("location snapshots", () => {
             await ingestOk(project.id);
             const res = await deleteStoryObject(jsonRequest(`/api/story-objects/${location.id}`, "DELETE"), params(location.id));
             expect(res.status).toBe(200);
+            expect(stored.size).toBe(0);
+            expect(await prisma.locationSnapshot.count()).toBe(0);
+        });
+
+        it("removes snapshot files when the location is deleted through the controller", async () => {
+            const { project, location } = await setup();
+            await ingestOk(project.id);
+            await StoryObjectController.deleteStoryObject(location.id);
+            expect(stored.size).toBe(0);
+            expect(await prisma.locationSnapshot.count()).toBe(0);
+        });
+
+        it("removes snapshot files when the location is batch-deleted", async () => {
+            const { project, location } = await setup();
+            await ingestOk(project.id);
+            const result = await StoryObjectController.batchDeleteStoryObjects([location.id]);
+            expect(result.totalDeleted).toBe(1);
             expect(stored.size).toBe(0);
             expect(await prisma.locationSnapshot.count()).toBe(0);
         });

@@ -137,7 +137,7 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(deleted).toBeNull();
   });
 
-  it("removes the files of the user's location images, and no one else's", async () => {
+  it("removes the files of the user's location images and snapshots, and no one else's", async () => {
     const user = await testPrisma.user.create({
       data: { id: "del-img", email: "del-img@test.com", googleId: "g-del-img" },
     });
@@ -153,6 +153,12 @@ describe("DELETE /api/auth/delete-account", () => {
           width: 1, height: 1, bytes: 1, sha256: prefix,
         },
       });
+      await testPrisma.locationSnapshot.create({
+        data: {
+          storyObjectId: location.id, build: "b1", takenAt: new Date(), storagePath: `${prefix}/snap.webp`,
+          sha256: prefix, width: 1, height: 1, things: [],
+        },
+      });
     };
     await addImage(user.id, "mine");
     await addImage(other.id, "theirs");
@@ -163,8 +169,9 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(res.status).toBe(200);
 
     expect(removeObjects).toHaveBeenCalledTimes(1);
-    expect(removeObjects).toHaveBeenCalledWith(["mine/full.webp", "mine/thumb.webp"]);
+    expect(removeObjects).toHaveBeenCalledWith(["mine/full.webp", "mine/thumb.webp", "mine/snap.webp"]);
     expect(await testPrisma.locationImage.count()).toBe(1);
+    expect(await testPrisma.locationSnapshot.count()).toBe(1);
   });
 
   it("clears session and refresh cookies in response", async () => {
