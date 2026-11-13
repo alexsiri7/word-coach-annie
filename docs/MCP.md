@@ -41,6 +41,8 @@ For another app's backend (for example a game's scene editor), create a token in
 | `read` | `list_projects`, `get_project`, `get_outline`, `read_scene_content`, `get_scene_versions` |
 | `write` | the `read` tools plus `write_scene_content`, `update_paragraph`, `insert_beat`, `delete_beat`, `restore_scene_version` |
 
+A `snapshots` token cannot reach `/api/mcp` at all; it only posts location snapshots over REST.
+
 Other tools are absent from `tools/list`, and calling one fails as an unknown tool. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
 
 To enable destructive tools (delete tools), set `MCP_ALLOW_DESTRUCTIVE=true`.
@@ -553,6 +555,56 @@ Remove one item from a location's map. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 |-------|------|-------------|
 | `storyObjectId` | string | The LOCATION story object ID |
 | `itemId` | string | The map item ID |
+
+---
+
+### Location Snapshots
+
+A game's screenshots of a `LOCATION`, posted by its build job (see [API.md](API.md#location-snapshots)), with the clickable things on them and the author's annotations. Owner only. Coordinates are pixels of the uploaded screenshot (`width` × `height`). Ten snapshots are kept per location; annotations on deleted ones stay, with `snapshotId: null`.
+
+#### `list_location_snapshots`
+A location's snapshots, newest first (`id`, `build`, `takenAt`, `createdAt`, `width`, `height`, `thingCount`), plus `notesFromDeletedSnapshots`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+
+---
+
+#### `get_location_snapshot`
+A snapshot with its `things` (`{ key, name, description, kind, box: { x, y, w, h } }`), a signed `imageUrl` that expires after an hour, and `annotations`: the notes on this snapshot plus every name/description request on the location. Pass exactly one parameter.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `snapshotId` | string? | The snapshot ID |
+| `storyObjectId` | string? | A LOCATION ID, for its latest snapshot |
+
+---
+
+#### `add_snapshot_annotation`
+A note on a region, or a request to change a thing's name or description. A request stays `open` until a later snapshot carries its text, then becomes `done`; a new request replaces the thing's open one for that field.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `snapshotId` | string | The snapshot ID |
+| `kind` | enum | `note`, `description`, `name` |
+| `text` | string | The note (1–5000 characters), or the requested description (≤ 5000) or name (1–200) |
+| `thingKey` | string? | The thing's key; required for `description` and `name` |
+| `region` | object? | Notes only: `{ type: "point", x, y }`, `{ type: "rect", x, y, w, h }` or `{ type: "path", points: [[x, y], …] }` |
+| `storyObjectId` | string? | Notes only: a story object of the same project |
+
+---
+
+#### `update_snapshot_annotation`
+Change an annotation's text or status, or a note's region or linked story object.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `annotationId` | string | The annotation ID |
+| `text` | string? | New text |
+| `status` | enum? | `open`, `sent` (exported by the story sync), `done` (resolved) |
+| `region` | object? | Notes only: new region |
+| `storyObjectId` | string \| null? | Notes only: story object to link, or `null` to unlink |
 
 ---
 

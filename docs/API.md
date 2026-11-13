@@ -2,7 +2,7 @@
 
 All endpoints are REST JSON APIs under `/api/`. Requests that modify data require authentication when `API_TOKEN` is set (see [SETUP.md](SETUP.md)).
 
-**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); those reach only `/api/nodes/**` and `/api/mcp`.
+**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`.
 
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 
@@ -179,14 +179,15 @@ Update the authenticated user's consent preference for a specific feature.
 
 A personal API token (`annie_pat_…`) lets another app act as the user who created it. Send it as `Authorization: Bearer <token>`.
 
-- It reaches only `/api/nodes/**` and `/api/mcp`. Any other path returns `403 { "error": "Personal API tokens can only access scenes" }`, including these token endpoints.
+- A `read` or `write` token reaches only `/api/nodes/**` and `/api/mcp`. Any other path returns `403 { "error": "Personal API tokens can only access scenes" }`, including these token endpoints.
+- A `snapshots` token reaches only [`POST /api/projects/:id/locations/:slug/snapshots`](#post-apiprojectsidlocationsslugsnapshots), for a game's build job. Any other path, `/api/mcp` included, returns `403 { "error": "This API token can only post location snapshots" }`.
 - A `read` token may only `GET`/`HEAD` the node routes; a write returns `403 { "error": "This API token is read-only" }`. A `write` token may read and write scenes. Over `/api/mcp`, a token sees only its scope's scene tools (see [MCP.md](MCP.md#personal-api-tokens)).
 - An unknown or revoked token returns `401`. Each token has its own rate limits (120 reads and 60 writes per minute).
 
 ### `GET /api/account/api-tokens`
 Lists the current user's tokens, newest first. The token itself is never returned again.
 
-**Response**: `{ "tokens": [{ "id", "name", "scope": "read" | "write", "hint", "createdAt", "lastUsedAt" }] }` — `hint` is the token's last four characters; `lastUsedAt` is `null` until first use and updates at most once a minute.
+**Response**: `{ "tokens": [{ "id", "name", "scope": "read" | "write" | "snapshots", "hint", "createdAt", "lastUsedAt" }] }` — `hint` is the token's last four characters; `lastUsedAt` is `null` until first use and updates at most once a minute.
 
 **Errors**: `401` if not signed in.
 
@@ -195,7 +196,7 @@ Lists the current user's tokens, newest first. The token itself is never returne
 ### `POST /api/account/api-tokens`
 Creates a token. Requires the `X-CSRF-Protection: 1` header.
 
-**Body**: `{ "name": "Punland editor", "scope": "read" | "write" }` — `name` is 1–100 characters.
+**Body**: `{ "name": "Punland editor", "scope": "read" | "write" | "snapshots" }` — `name` is 1–100 characters.
 
 **Response**: `201 { "token": "annie_pat_…", "apiToken": { "id", "name", "scope", "hint", "createdAt", "lastUsedAt" } }`. This is the only time the token is shown.
 
@@ -458,7 +459,7 @@ Update a story object.
 ---
 
 ### `DELETE /api/story-objects/:id`
-Delete a story object. Its location images and their stored files are deleted too, and so is its map.
+Delete a story object. Its location images, map and snapshots, and their stored files, are deleted too.
 
 ---
 
@@ -529,6 +530,69 @@ Delete a location's map. Owner only.
 Redirect (`302`) to a signed storage URL valid for an hour. Owner only.
 
 **Query params**: `variant`: `thumb` (default, 400 px) | `full`
+
+---
+
+### Location snapshots
+
+A game's screenshots of a location, with the clickable "things" on them, and the author's annotations. Owner only, like location images. Coordinates (thing boxes, annotation regions) are pixels of the uploaded screenshot, whose size is the snapshot's `width` × `height`. The ten most recently received snapshots of a location are kept; older ones and their files are deleted, while their annotations stay with `snapshotId: null`.
+
+### `POST /api/projects/:id/locations/:slug/snapshots`
+Post a game's screenshot of a location. Authenticate with a `snapshots` personal API token (no CSRF header needed); a signed-in owner may also post with the `X-CSRF-Protection: 1` header.
+
+`:slug` names the project's LOCATION as the story-sync export does: the name lowercased, every run of characters other than `a-z0-9` replaced by `-`, trimmed of `-` (`untitled` if empty); locations sharing a slug get `-2`, `-3`, … in name-then-id order.
+
+**Body** (`multipart/form-data`):
+- `file`: the screenshot (JPEG, PNG, WebP or GIF; at most 20 MB and 25 megapixels), stored re-encoded to WebP (longest side 2048 px).
+- `build`: version string or commit, 1–200 characters.
+- `takenAt`: ISO date-time.
+- `things`: JSON array (at most 500, 1 MB) of `{ key, name, description?, kind?, box: { x, y, w, h } }`. `key` (1–200 characters) is the game's stable id for the thing and must be unique; `name` ≤ 200, `description` ≤ 5000, `kind` ≤ 50 characters.
+
+**Response**: `201 { created: true, snapshot }`, or `200 { created: false, snapshot }` when the file bytes and things equal the latest snapshot's (nothing is stored). `snapshot` is `{ id, storyObjectId, build, takenAt, sha256, width, height, things, createdAt, imageUrl }`, things sorted by `key`. Storing a snapshot marks done every open or sent name/description request whose text the snapshot's thing now carries (ignoring whitespace differences).
+
+**Errors**: `400` invalid field or not an image; `403` another user's project or missing CSRF header; `404` `{ error: "Project not found" }`, or `{ error: "Unknown location", knownSlugs: [...] }` for an unknown slug (nothing is stored); `413` over 20 MB; `503` storage not configured.
+
+---
+
+### `GET /api/story-objects/:id/snapshots`
+A location's snapshots, newest first, and all of its annotations.
+
+**Response**: `{ data: [{ id, build, takenAt, createdAt, width, height, thingCount }], annotations: [{ id, locationId, snapshotId, kind, thingKey, region, text, storyObjectId, status, createdAt, updatedAt }] }`
+
+---
+
+### `GET /api/location-snapshots/:id`
+One snapshot with its `things` and `imageUrl` (`/api/location-snapshots/:id/file`).
+
+---
+
+### `GET /api/location-snapshots/:id/file`
+Redirect (`302`) to a signed storage URL valid for an hour.
+
+---
+
+### `POST /api/location-snapshots/:id/annotations`
+Annotate a snapshot. Requires the `X-CSRF-Protection: 1` header.
+
+**Body**:
+- A note: `{ kind: "note", text, region?, thingKey?, storyObjectId? }`. `text` is 1–5000 characters. `region` is `{ type: "point", x, y }`, `{ type: "rect", x, y, w, h }` or `{ type: "path", points: [[x, y], …] }` (2–1000 points). `storyObjectId` must be in the same project.
+- A requested change: `{ kind: "description" | "name", thingKey, text }`. `thingKey` must be one of the snapshot's things; a name is 1–200 characters, a description up to 5000. It replaces the thing's open request for that field, if any.
+
+**Response**: `201` with the annotation (`status: "open"`).
+
+**Errors**: `400` invalid body, unknown thing, or a story object from another project; `404` snapshot not found.
+
+---
+
+### `PATCH /api/snapshot-annotations/:id`
+**Body**: `{ text?, status?: "open" | "sent" | "done", region?, storyObjectId?: string | null }` — `region` and `storyObjectId` only for notes; `null` unlinks. `sent` means exported by the story sync; `done` resolves it.
+
+**Errors**: `400` invalid or empty body; `404` annotation not found.
+
+---
+
+### `DELETE /api/snapshot-annotations/:id`
+Delete an annotation.
 
 ---
 
