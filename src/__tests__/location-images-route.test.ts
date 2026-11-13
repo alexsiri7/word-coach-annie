@@ -28,10 +28,12 @@ import { prisma } from "@/lib/db";
 import { createSignedUrl, removeObjects, uploadObject } from "@/lib/storage/supabase-storage";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { UniversesController } from "@/lib/controllers/universes";
+import { IMAGE_FILE_CACHE_SECONDS, SIGNED_URL_TTL_SECONDS } from "@/lib/controllers/location-images";
 import { GET as listImages, POST as uploadImage } from "@/app/api/story-objects/[id]/images/route";
 import { PATCH, DELETE } from "@/app/api/location-images/[id]/route";
 import { GET as getFile } from "@/app/api/location-images/[id]/file/route";
 import { DELETE as deleteStoryObject } from "@/app/api/story-objects/[id]/route";
+import { DELETE as deleteProject } from "@/app/api/projects/[id]/route";
 
 const OWNER = "image-owner";
 const STRANGER = "image-stranger";
@@ -173,6 +175,23 @@ describe("location images", () => {
         expect(await res.json()).toMatchObject({ isCover: true, caption: "Front gate" });
         const covers = await prisma.locationImage.findMany({ where: { storyObjectId: location.id, isCover: true } });
         expect(covers.map((i) => i.id)).toEqual([b.id]);
+
+        expect((await patch(b.id, { isCover: false })).status).toBe(200);
+        expect(await prisma.locationImage.count({ where: { storyObjectId: location.id, isCover: true } })).toBe(0);
+    });
+
+    it("keeps one cover and distinct positions when uploads race", async () => {
+        const { location } = await setup();
+        const results = await Promise.all([1, 2, 3].map(() => upload(location.id, new Blob([new Uint8Array(png)]))));
+        for (const res of results) {
+            if (res.status !== 201) expect(await res.json()).toEqual({ error: "This location's images changed at the same time; please try again" });
+        }
+
+        const rows = await orderedImages(location.id);
+        expect(rows.length).toBe(results.filter((r) => r.status === 201).length);
+        expect(rows.filter((i) => i.isCover)).toHaveLength(1);
+        expect(rows.map((i) => i.orderIndex)).toEqual(rows.map((_, i) => i));
+        expect(stored.size).toBe(rows.length * 2);
     });
 
     it("refuses an empty or invalid update", async () => {
@@ -203,8 +222,9 @@ describe("location images", () => {
         const thumb = await file(a.id);
         expect(thumb.status).toBe(302);
         expect(thumb.headers.get("location")).toBe(`https://storage.test/signed/${row.thumbPath}?token=t`);
-        expect(thumb.headers.get("cache-control")).toBe("private, max-age=3000");
-        expect(createSignedUrl).toHaveBeenCalledWith(row.thumbPath, 3600);
+        expect(thumb.headers.get("cache-control")).toBe(`private, max-age=${IMAGE_FILE_CACHE_SECONDS}`);
+        expect(IMAGE_FILE_CACHE_SECONDS).toBeLessThan(SIGNED_URL_TTL_SECONDS);
+        expect(createSignedUrl).toHaveBeenCalledWith(row.thumbPath, SIGNED_URL_TTL_SECONDS);
 
         expect((await file(a.id, "full")).headers.get("location")).toContain(row.storagePath);
         expect((await file(a.id, "original")).status).toBe(400);
@@ -252,6 +272,18 @@ describe("location images", () => {
             await StoryObjectController.deleteStoryObject(location.id);
             expect(stored.size).toBe(0);
             expect(await prisma.locationImage.count()).toBe(0);
+        });
+
+        it("removes the files when the project is deleted", async () => {
+            const { project, location } = await setup();
+            await uploadOk(location.id);
+            const paths = (await orderedImages(location.id)).flatMap((i) => [i.storagePath, i.thumbPath]);
+            await prisma.project.update({ where: { id: project.id }, data: { archivedAt: new Date() } });
+
+            const res = await deleteProject(jsonRequest(`/api/projects/${project.id}`, "DELETE", { confirmTitle: "P" }), params(project.id));
+            expect(res.status).toBe(200);
+            expect(removeObjects).toHaveBeenCalledWith(paths);
+            expect(stored.size).toBe(0);
         });
 
         it("refuses to move a location with images to the universe", async () => {

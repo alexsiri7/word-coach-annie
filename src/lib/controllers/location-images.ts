@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
@@ -10,6 +10,9 @@ import type { LocationImageKind, LocationImageUpdateInput } from "@/schemas/loca
 
 /** Signed URLs live an hour; long enough for a session, short enough that a leaked one goes stale. */
 export const SIGNED_URL_TTL_SECONDS = 3600;
+
+/** How long a browser may reuse a redirect to a signed URL; it must expire before the URL does. */
+export const IMAGE_FILE_CACHE_SECONDS = SIGNED_URL_TTL_SECONDS - 600;
 
 export type LocationImageVariant = "full" | "thumb";
 
@@ -30,6 +33,21 @@ const publicFields = {
 } satisfies Prisma.LocationImageSelect;
 
 export type LocationImage = Prisma.LocationImageGetPayload<{ select: typeof publicFields }>;
+
+/**
+ * Cover and order are read, then written, so two edits to one location must not
+ * interleave; the loser of a race is told to retry rather than leaving two covers.
+ */
+async function serializable<T>(fn: (tx: DbClient) => Promise<T>): Promise<T> {
+    try {
+        return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
+            throw new UserFacingError("This location's images changed at the same time; please try again");
+        }
+        throw e;
+    }
+}
 
 async function renumber(tx: DbClient, orderedIds: string[]) {
     await Promise.all(orderedIds.map((id, orderIndex) => tx.locationImage.update({ where: { id }, data: { orderIndex } })));
@@ -83,7 +101,7 @@ export class LocationImageController {
         await uploadObject(storagePath, image.full, "image/webp");
         try {
             await uploadObject(thumbPath, image.thumb, "image/webp");
-            return await prisma.$transaction(async (tx) => {
+            return await serializable(async (tx) => {
                 const count = await tx.locationImage.count({ where: { storyObjectId } });
                 return tx.locationImage.create({
                     data: {
@@ -109,7 +127,7 @@ export class LocationImageController {
     }
 
     static async update(imageId: string, changes: LocationImageUpdateInput): Promise<LocationImage> {
-        return prisma.$transaction(async (tx) => {
+        return serializable(async (tx) => {
             const image = await tx.locationImage.findUnique({ where: { id: imageId }, select: { storyObjectId: true } });
             if (!image) throw new NotFoundError("Location image not found");
 
@@ -138,7 +156,7 @@ export class LocationImageController {
 
     /** A location that has images keeps a cover: deleting the cover promotes the new first image. */
     static async delete(imageId: string): Promise<{ deleted: true; id: string }> {
-        const removed = await prisma.$transaction(async (tx) => {
+        const removed = await serializable(async (tx) => {
             const image = await tx.locationImage.findUnique({ where: { id: imageId } });
             if (!image) throw new NotFoundError("Location image not found");
             await tx.locationImage.delete({ where: { id: imageId } });

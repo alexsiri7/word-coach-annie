@@ -48,7 +48,7 @@ export class StoryObjectController {
                 orderBy: { createdAt: "desc" },
                 take: Math.min(limit, 200),
                 skip: offset,
-                include: { images: { where: { isCover: true }, select: { id: true }, take: 1 } },
+                include: { images: { where: { isCover: true }, orderBy: { orderIndex: "asc" }, select: { id: true }, take: 1 } },
             }),
             prisma.storyObject.count({ where }),
             shouldFetchWorldObjects
