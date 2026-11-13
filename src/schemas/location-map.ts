@@ -79,6 +79,17 @@ export type LocationMapItem = z.output<typeof LocationMapItemSchema>;
 export type LocationMapItemUpsert = z.output<typeof LocationMapItemUpsertSchema>;
 export type LocationMapInput = z.output<typeof LocationMapInputSchema>;
 
+export type LocationMapLinkType = "CHARACTER" | "WORLD_ELEMENT" | "LOCATION";
+
+/** The story-object type each kind may link to; the schema keeps links off the other kinds. */
+export const LOCATION_MAP_LINK_TYPES: Record<LocationMapItemKind, LocationMapLinkType | null> = {
+  character: "CHARACTER",
+  object: "WORLD_ELEMENT",
+  exit: "LOCATION",
+  area: null,
+  note: null,
+};
+
 /** The first problem, prefixed by where it is, e.g. `items.0.kind: Invalid option…`. */
 export function describeLocationMapError(error: z.ZodError): string {
   const issue = error.issues[0];

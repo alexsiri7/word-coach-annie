@@ -510,7 +510,7 @@ Coordinates are metres from the map's top-left corner, y down. An item is `{ id,
 ### `PUT /api/story-objects/:id/map`
 Create or replace a location's map. Owner only; the last write wins.
 
-**Body**: `{ widthM, heightM, backgroundImageId?, items }` — `widthM` and `heightM` 1–200, at most 500 items with unique ids, `backgroundImageId` one of this location's images or `null`. `linkName` and `unlinked` are ignored, so a map read from `GET` can be sent back. A link must point to a story object of the right type in this project, unless the same item already held it (so an unlinked item can be saved again).
+**Body**: `{ widthM, heightM, backgroundImageId?, items }` — `widthM` and `heightM` 1–200, at most 500 items with unique ids, `backgroundImageId` one of this location's images or `null`. `linkName` and `unlinked` are ignored, so a map read from `GET` can be sent back. A link must point to a story object of the right type in this project, unless the same item, as the same kind, already held it (so an unlinked item can be saved again).
 
 **Response**: `{ data: <map> }` as for `GET`.
 
@@ -521,7 +521,7 @@ Create or replace a location's map. Owner only; the last write wins.
 ### `DELETE /api/story-objects/:id/map`
 Delete a location's map. Owner only.
 
-**Response**: `{ deleted: true }`. **Errors**: `404` no such story object, or it has no map
+**Response**: `{ deleted: true }`. **Errors**: `400` not a location; `404` story object not found, or it has no map
 
 ---
 

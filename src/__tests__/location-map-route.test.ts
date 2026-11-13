@@ -14,6 +14,7 @@ import { getCurrentUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { UniversesController } from "@/lib/controllers/universes";
+import { LocationMapController } from "@/lib/controllers/location-maps";
 import { GET, PUT, DELETE } from "@/app/api/story-objects/[id]/map/route";
 
 const OWNER = "map-owner";
@@ -134,6 +135,16 @@ describe("location map", () => {
             expect((await res.json()).error).toBe(message);
         });
 
+        it("checks a kept link again when its item changes kind", async () => {
+            const { project, location } = await setup();
+            const well = await prisma.storyObject.create({ data: { projectId: project.id, type: "WORLD_ELEMENT", name: "Well" } });
+            await putOk(location.id, map([{ id: "w", kind: "object", x: 1, y: 1, w: 1, h: 1, storyObjectId: well.id }]));
+
+            const res = await put(location.id, map([{ id: "w", kind: "exit", x: 1, y: 1, w: 1, h: 0.3, targetLocationId: well.id }]));
+            expect(res.status).toBe(400);
+            expect((await res.json()).error).toBe("Item w: targetLocationId must be a LOCATION in this project");
+        });
+
         it("refuses a link to another project's story object", async () => {
             const { location } = await setup();
             const other = await prisma.project.create({ data: { title: "Other", userId: STRANGER } });
@@ -141,6 +152,26 @@ describe("location map", () => {
             const res = await put(location.id, map([{ id: "i", kind: "character", x: 1, y: 1, w: 1, h: 1, storyObjectId: theirs.id }]));
             expect(res.status).toBe(400);
         });
+    });
+
+    // Node is single-threaded, so the two transactions are interleaved rather than
+    // truly simultaneous; a loser fails with P2034 instead of overwriting the winner.
+    it("keeps every item that concurrent upserts report as saved", async () => {
+        const { location } = await setup();
+        await putOk(location.id, map([]));
+
+        const results = await Promise.allSettled(["a", "b"].map((id) =>
+            LocationMapController.upsertItem(location.id, { id, kind: "note", label: "", description: "", x: 1, y: 1, w: 0.4, h: 0.4, rotation: 0 }),
+        ));
+
+        const stored = await prisma.locationMap.findUniqueOrThrow({ where: { storyObjectId: location.id } });
+        const storedIds = (stored.items as Array<{ id: string }>).map((item) => item.id);
+        const savedIds = results.flatMap((r) => (r.status === "fulfilled" ? [r.value.item.id] : []));
+        expect(savedIds.length).toBeGreaterThan(0);
+        expect(storedIds).toEqual(expect.arrayContaining(savedIds));
+        for (const r of results) {
+            if (r.status === "rejected") expect(String(r.reason)).toContain("changed at the same time");
+        }
     });
 
     describe("background", () => {

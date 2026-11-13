@@ -7,11 +7,11 @@ import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
 import {
     describeLocationMapError,
+    LOCATION_MAP_LINK_TYPES,
     LocationMapInputSchema,
     LocationMapItemSchema,
     type LocationMapInput,
     type LocationMapItem,
-    type LocationMapItemKind,
     type LocationMapItemUpsert,
 } from "@/schemas/location-map";
 
@@ -30,15 +30,6 @@ export type LocationMapView = {
 };
 
 type Location = { id: string; projectId: string };
-
-/** The story-object type each kind may link to; the schema keeps links off the other kinds. */
-const LINK_TYPES: Record<LocationMapItemKind, string | null> = {
-    character: "CHARACTER",
-    object: "WORLD_ELEMENT",
-    exit: "LOCATION",
-    area: null,
-    note: null,
-};
 
 /** Item edits read the stored list, then write it back, so two edits to one map must not interleave. */
 async function serializable<T>(storyObjectId: string, fn: (tx: DbClient) => Promise<T>): Promise<T> {
@@ -112,8 +103,8 @@ async function toView(
 
 /**
  * Links must point at a story object of the right type in this project. A link the
- * same item already holds is kept as it is even if its target was deleted, so an
- * unlinked item survives a re-save.
+ * same item already holds, as the same kind, is kept as it is even if its target was
+ * deleted, so an unlinked item survives a re-save.
  */
 async function checkReferences(db: DbClient, location: Location, map: LocationMapInput, previous: LocationMapItem[]) {
     if (map.backgroundImageId !== null) {
@@ -126,10 +117,10 @@ async function checkReferences(db: DbClient, location: Location, map: LocationMa
         }
     }
 
-    const kept = new Map(previous.map((item) => [item.id, linkOf(item)]));
+    const kept = new Map(previous.map((item) => [item.id, `${item.kind}:${linkOf(item)}`]));
     const toCheck = map.items.flatMap((item) => {
         const link = linkOf(item);
-        return link !== null && kept.get(item.id) !== link ? [{ item, link }] : [];
+        return link !== null && kept.get(item.id) !== `${item.kind}:${link}` ? [{ item, link }] : [];
     });
     if (toCheck.length === 0) return;
 
@@ -139,7 +130,7 @@ async function checkReferences(db: DbClient, location: Location, map: LocationMa
     });
     const typeOf = new Map(targets.map((t) => [t.id, t.type]));
     for (const { item, link } of toCheck) {
-        const expected = LINK_TYPES[item.kind];
+        const expected = LOCATION_MAP_LINK_TYPES[item.kind];
         if (typeOf.get(link) !== expected) {
             const field = item.kind === "exit" ? "targetLocationId" : "storyObjectId";
             throw new UserFacingError(`Item ${item.id}: ${field} must be a ${expected} in this project`);
