@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { UserFacingError } from "@/lib/controllers/errors";
+import { logger } from "@/lib/logger";
 
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 /**
@@ -35,6 +36,7 @@ async function decodeStep<T>(step: () => Promise<T>): Promise<T> {
     try {
         return await step();
     } catch (e) {
+        logger.warn("Location image could not be decoded", { error: String(e) });
         if (e instanceof Error && /pixel limit/i.test(e.message)) {
             throw new ImageRejectedError("Image is too large (over 25 megapixels)");
         }

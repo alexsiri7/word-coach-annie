@@ -24,12 +24,11 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-
-type ImageKind = "reference" | "mood" | "sketch";
+import type { LocationImageKind } from "@/schemas/location-images";
 
 interface LocationImage {
     id: string;
-    kind: ImageKind;
+    kind: LocationImageKind;
     caption: string;
     orderIndex: number;
     isCover: boolean;
@@ -39,7 +38,7 @@ interface LocationImage {
     fullUrl: string;
 }
 
-const KIND_LABELS: Record<ImageKind, string> = {
+const KIND_LABELS: Record<LocationImageKind, string> = {
     reference: "Reference",
     mood: "Mood",
     sketch: "Sketch",
@@ -63,9 +62,10 @@ export function LocationImages({ storyObjectId, onChanged }: { storyObjectId: st
     const fileInput = useRef<HTMLInputElement>(null);
 
     const load = useCallback(async () => {
-        const res = await fetch(`/api/story-objects/${storyObjectId}/images`);
-        if (res.ok) setImages((await res.json()).data);
-    }, [storyObjectId]);
+        const res = await fetch(`/api/story-objects/${storyObjectId}/images`).catch(() => null);
+        if (res?.ok) setImages((await res.json()).data);
+        else toastError(res ? await errorMessage(res, "Could not load images") : "Could not load images");
+    }, [storyObjectId, toastError]);
 
     useEffect(() => {
         load();
@@ -203,12 +203,12 @@ export function LocationImages({ storyObjectId, onChanged }: { storyObjectId: st
                                     if (e.target.value !== image.caption) change(image.id, { caption: e.target.value });
                                 }}
                             />
-                            <Select value={image.kind} onValueChange={(kind) => change(image.id, { kind: kind as ImageKind })}>
+                            <Select value={image.kind} onValueChange={(kind) => change(image.id, { kind: kind as LocationImageKind })}>
                                 <SelectTrigger className="h-7 text-xs" aria-label="Kind">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {(Object.keys(KIND_LABELS) as ImageKind[]).map((kind) => (
+                                    {(Object.keys(KIND_LABELS) as LocationImageKind[]).map((kind) => (
                                         <SelectItem key={kind} value={kind}>{KIND_LABELS[kind]}</SelectItem>
                                     ))}
                                 </SelectContent>
