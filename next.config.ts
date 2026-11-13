@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
   // Next.js's bundler tries to statically resolve those requires and fails the build.
   serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify", "ioredis", "@google/adk"],
   experimental: {
+    // src/proxy.ts makes Next buffer request bodies, silently truncating them past this
+    // limit (default 10 MB). Location image uploads allow 20 MB, which is ~26.7 MB as
+    // base64 in an MCP add_location_image call.
+    proxyClientMaxBodySize: "28mb",
     optimizePackageImports: [
       "lucide-react",
       "@radix-ui/react-accordion",

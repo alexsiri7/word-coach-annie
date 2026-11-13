@@ -116,6 +116,8 @@ export interface StoryObject {
   role: string | null;
   tags: string;
   source?: "project" | "universe";
+  /** The cover image of a location, when it has one; only on list results. */
+  coverImageId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -4,6 +4,7 @@ import { getCurrentUserId, verifyProjectReadAccess, verifyProjectWriteAccess } f
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { StoryObjectUpdateSchema } from "@/schemas/story-objects";
+import { collectImagePaths, purgeImageFiles } from "@/lib/location-images/files";
 
 export async function GET(
   request: NextRequest,
@@ -144,7 +145,9 @@ export async function DELETE(
     const access = await verifyProjectWriteAccess(existing.projectId, userId, request.headers.get("x-user-email"));
     if (!access.authorized) return access.response;
 
+    const imagePaths = await collectImagePaths({ storyObjectId: id });
     await prisma.storyObject.delete({ where: { id } });
+    await purgeImageFiles(imagePaths);
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {

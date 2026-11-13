@@ -647,6 +647,17 @@ describe("proxy", () => {
             );
         });
 
+        it("allows images from the configured Supabase Storage origin only", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            vi.stubEnv("SUPABASE_URL", "");
+            const without = (await proxy(createRequest("/api/health"))).headers.get("Content-Security-Policy") ?? "";
+            expect(without).toMatch(/img-src 'self' data: blob: https:\/\/lh3\.googleusercontent\.com https:\/\/github\.com\/user-attachments\/;/);
+
+            vi.stubEnv("SUPABASE_URL", "https://abcd.supabase.co/");
+            const withStorage = (await proxy(createRequest("/api/health"))).headers.get("Content-Security-Policy") ?? "";
+            expect(withStorage.match(/img-src [^;]*/)?.[0]).toMatch(/ https:\/\/abcd\.supabase\.co$/);
+        });
+
         it("omits report-uri when no Sentry DSN is configured", async () => {
             vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
             vi.mocked(isAuthEnabled).mockReturnValue(false);

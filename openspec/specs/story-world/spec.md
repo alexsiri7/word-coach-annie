@@ -15,6 +15,33 @@ Each project SHALL hold story objects of five types — Character, Location, Plo
 - WHEN the author filters the story objects to Location
 - THEN exactly the two locations are listed
 
+### Requirement: Locations carry images
+
+The project owner SHALL be able to attach images of kind reference, mood or sketch to a location story object, caption them, reorder them, mark one as the cover shown in the location list, and delete them, on desktop and mobile and through MCP.
+
+#### Scenario: First image is the cover
+- GIVEN a location with no images
+- WHEN the owner uploads an image
+- THEN it is listed with kind reference and marked as the cover
+
+### Requirement: Location images are private and re-encoded
+
+Uploads SHALL be re-encoded to WebP at most 2048 px on the longest side with a 400 px thumbnail and no metadata, and refused when they are not an image or exceed 20 MB. Images SHALL be stored privately and served only to the project owner, through short-lived signed URLs.
+
+#### Scenario: Upload is re-encoded
+- GIVEN a 3000×2000 JPEG carrying GPS metadata
+- WHEN the owner uploads it
+- THEN a 2048×1365 WebP without metadata is stored
+
+#### Scenario: Non-image refused
+- WHEN a text file is uploaded as an image
+- THEN the upload is refused and nothing is stored
+
+#### Scenario: Stranger refused
+- GIVEN another user, even one the project is shared with
+- WHEN they request a location image or its file
+- THEN the request is refused and no signed URL is issued
+
 ### Requirement: Typed relationships between entities
 
 The author or an agent SHALL be able to link any two entities — scenes, story objects, or world objects of a universe the project is linked to — with a typed relationship such as appears in, located at, part of plotline or related to. Every relationship SHALL be visible from both ends, and each entity SHALL show all relationships touching it.
@@ -38,6 +65,11 @@ The author SHALL be able to create universes, link and unlink projects to them, 
 - GIVEN universe U with world object "Captain Reyes" and projects P1 and P2 linked to U
 - WHEN either project relates a scene to Captain Reyes
 - THEN both projects see the same Captain Reyes and the same timeline
+
+#### Scenario: Location with images not transferred
+- GIVEN a project location that has images
+- WHEN the author moves it to the universe
+- THEN the move is refused until its images are removed, because world objects hold no images
 
 ### Requirement: Timeline matrix
 

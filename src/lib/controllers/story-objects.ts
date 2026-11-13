@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { UserFacingError } from "@/lib/controllers/errors";
+import { collectImagePaths, purgeImageFiles } from "@/lib/location-images/files";
 
 const VALID_TYPES = ["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"] as const;
 type StoryObjectType = (typeof VALID_TYPES)[number];
@@ -47,6 +48,7 @@ export class StoryObjectController {
                 orderBy: { createdAt: "desc" },
                 take: Math.min(limit, 200),
                 skip: offset,
+                include: { images: { where: { isCover: true }, select: { id: true }, take: 1 } },
             }),
             prisma.storyObject.count({ where }),
             shouldFetchWorldObjects
@@ -65,6 +67,7 @@ export class StoryObjectController {
             notes: obj.notes,
             role: obj.role,
             tags: obj.tags,
+            coverImageId: obj.images[0]?.id ?? null,
             source: "project" as const,
             createdAt: obj.createdAt.toISOString(),
             updatedAt: obj.updatedAt.toISOString(),
@@ -78,6 +81,7 @@ export class StoryObjectController {
             notes: obj.notes,
             role: null,
             tags: obj.tags,
+            coverImageId: null,
             source: "universe" as const,
             createdAt: obj.createdAt.toISOString(),
             updatedAt: obj.updatedAt.toISOString(),
@@ -254,7 +258,9 @@ export class StoryObjectController {
         const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
         if (!obj) throw new UserFacingError("Story object not found");
 
+        const imagePaths = await collectImagePaths({ storyObjectId: objectId });
         await prisma.storyObject.delete({ where: { id: objectId } });
+        await purgeImageFiles(imagePaths);
 
         return { deleted: true, id: objectId, name: obj.name, type: obj.type };
     }
@@ -370,7 +376,9 @@ export class StoryObjectController {
             try {
                 const obj = await prisma.storyObject.findUnique({ where: { id: objectId } });
                 if (!obj) throw new UserFacingError("Story object not found");
+                const imagePaths = await collectImagePaths({ storyObjectId: objectId });
                 await prisma.storyObject.delete({ where: { id: objectId } });
+                await purgeImageFiles(imagePaths);
                 results.push({ index: i, success: true, id: objectId, name: obj.name });
             } catch (e) {
                 errors.push({
