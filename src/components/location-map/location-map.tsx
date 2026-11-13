@@ -36,19 +36,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { LocationMapItem, LocationMapItemKind } from "@/schemas/location-map";
+import {
+    LOCATION_MAP_LINK_TYPES,
+    type LocationMapItem,
+    type LocationMapItemKind,
+    type LocationMapLinkType,
+} from "@/schemas/location-map";
 import { MapCanvas, type ItemLabel, type MapDoc } from "./map-canvas";
 import { ItemPanel, KIND_LABELS, type LinkOption } from "./item-panel";
 import { areaFromPoints, fitView, snapTo, SNAP_M, toMap, zoomAbout, type Point, type View } from "./geometry";
 import { commit, redo, startHistory, undo, type History } from "./history";
-
-type LinkType = "CHARACTER" | "WORLD_ELEMENT" | "LOCATION";
-
-const LINK_TYPES: Partial<Record<LocationMapItemKind, LinkType>> = {
-    character: "CHARACTER",
-    object: "WORLD_ELEMENT",
-    exit: "LOCATION",
-};
 
 const DEFAULT_SIZES: Record<Exclude<LocationMapItemKind, "area">, [number, number]> = {
     object: [1, 1],
@@ -60,6 +57,8 @@ const DEFAULT_SIZES: Record<Exclude<LocationMapItemKind, "area">, [number, numbe
 const KIND_ICONS = { object: Square, character: User, exit: DoorOpen, area: Pentagon, note: MapPin };
 
 const AUTOSAVE_MS = 800;
+// Browsers refuse a keepalive request whose body is over 64 KiB.
+const KEEPALIVE_MAX_BYTES = 64 * 1024;
 const ZOOM_STEP = 1.25;
 
 type ServerItem = LocationMapItem & { linkName: string | null; unlinked: boolean };
@@ -80,6 +79,10 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 
 function linkOf(item: LocationMapItem): string | null {
     return item.storyObjectId ?? item.targetLocationId ?? null;
+}
+
+function withItem(doc: MapDoc, item: LocationMapItem): MapDoc {
+    return { ...doc, items: doc.items.map((i) => (i.id === item.id ? item : i)) };
 }
 
 function toDoc(map: ServerMap): MapDoc {
@@ -143,13 +146,18 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
     const [snap, setSnap] = useState(true);
     const [saveState, setSaveState] = useState<SaveState>("saved");
     const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
-    const [linkOptions, setLinkOptions] = useState<Partial<Record<LinkType, LinkOption[]>>>({});
+    const [linkOptions, setLinkOptions] = useState<Partial<Record<LocationMapLinkType, LinkOption[]>>>({});
     const [images, setImages] = useState<Array<{ id: string; caption: string }>>([]);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [newSize, setNewSize] = useState({ w: 12, h: 8 });
 
     const canvasSize = useRef<[number, number] | null>(null);
+    // What the server holds, and the last map handed to save(): the same unless a save is pending.
     const saved = useRef<MapDoc | null>(null);
+    const queued = useRef<MapDoc | null>(null);
+    const autosave = useRef<ReturnType<typeof setTimeout>>(undefined);
+    // Panel text typed but not yet blurred; select() and the unmount flush commit it if the field goes first.
+    const typing = useRef<LocationMapItem | null>(null);
     const present = history?.present ?? null;
     const latest = useRef(present);
     latest.current = present;
@@ -169,6 +177,7 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
             if (data) {
                 const doc = toDoc(data);
                 saved.current = doc;
+                queued.current = doc;
                 setHistory(startHistory(doc));
                 setServerNames(new Map(data.items.flatMap((i) => (i.linkName ? [[linkOf(i)!, i.linkName] as const] : []))));
             }
@@ -181,7 +190,8 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
 
     useEffect(() => {
         let cancelled = false;
-        for (const type of Object.values(LINK_TYPES)) {
+        for (const type of Object.values(LOCATION_MAP_LINK_TYPES)) {
+            if (!type) continue;
             fetch(`/api/projects/${projectId}/story-objects?type=${type}&limit=200`)
                 .then((res) => (res.ok ? res.json() : null))
                 .then((body: { data: Array<{ id: string; name: string; source?: string }> } | null) => {
@@ -204,23 +214,27 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
         };
     }, [projectId, storyObjectId]);
 
-    const put = useCallback((doc: MapDoc, keepalive = false) =>
-        fetch(url, {
+    const put = useCallback((doc: MapDoc, keepalive = false) => {
+        const body = JSON.stringify(doc);
+        return fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(doc),
-            keepalive,
-        }), [url]);
+            body,
+            keepalive: keepalive && new Blob([body]).size < KEEPALIVE_MAX_BYTES,
+        });
+    }, [url]);
 
     // One save at a time, in order, so an older map never lands after a newer one.
-    const save = useCallback((doc: MapDoc) => {
+    const save = useCallback((doc: MapDoc, keepalive = false) => {
+        queued.current = doc;
         saving.current = saving.current.then(async () => {
             setSaveState("saving");
-            const res = await put(doc).catch(() => null);
+            const res = await put(doc, keepalive).catch(() => null);
             if (res?.ok) {
                 saved.current = doc;
                 setSaveState(latest.current === doc ? "saved" : "unsaved");
             } else {
+                if (queued.current === doc) queued.current = saved.current;
                 setSaveState("failed");
                 toastError(res ? await errorMessage(res, "Could not save the map") : "Could not save the map");
             }
@@ -228,16 +242,22 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
     }, [put, toastError]);
 
     useEffect(() => {
-        if (!present || present === saved.current) return;
+        if (!present) return;
+        if (present === queued.current) {
+            if (present === saved.current) setSaveState("saved");
+            return;
+        }
         setSaveState("unsaved");
         const timer = setTimeout(() => save(present), AUTOSAVE_MS);
+        autosave.current = timer;
         return () => clearTimeout(timer);
     }, [present, save]);
 
-    // Leaving the tab mid-debounce must not lose the last change.
+    // Leaving the tab mid-debounce or mid-typing must not lose the last change.
     useEffect(() => () => {
-        if (latest.current && latest.current !== saved.current) put(latest.current, true).catch(() => {});
-    }, [put]);
+        const doc = latest.current && typing.current ? withItem(latest.current, typing.current) : latest.current;
+        if (doc && doc !== queued.current) save(doc, true);
+    }, [save]);
 
     const fit = useCallback(() => {
         const doc = latest.current;
@@ -261,8 +281,16 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
     }, []);
 
     const replaceItem = useCallback((item: LocationMapItem) => {
-        change((doc) => ({ ...doc, items: doc.items.map((i) => (i.id === item.id ? item : i)) }));
+        change((doc) => withItem(doc, item));
     }, [change]);
+
+    // Selecting on pointerdown unmounts the panel's fields before they blur.
+    const select = useCallback((id: string | null) => {
+        const item = typing.current;
+        typing.current = null;
+        if (item) replaceItem(item);
+        setSelectedId(id);
+    }, [replaceItem]);
 
     const deleteItem = useCallback((id: string) => {
         change((doc) => ({ ...doc, items: doc.items.filter((i) => i.id !== id) }));
@@ -291,15 +319,15 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
             const id = crypto.randomUUID();
             const area: LocationMapItem = { id, kind: "area", label: "Area", description: "", rotation: 0, ...areaFromPoints(areaPoints) };
             change((doc) => ({ ...doc, items: [...doc.items, area] }));
-            setSelectedId(id);
+            select(id);
         }
         setAreaPoints(null);
-    }, [areaPoints, change]);
+    }, [areaPoints, change, select]);
 
     const addItem = (kind: LocationMapItemKind) => {
         if (!present) return;
         if (kind === "area") {
-            setSelectedId(null);
+            select(null);
             setAreaPoints([]);
             return;
         }
@@ -320,7 +348,7 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
             rotation: 0,
         };
         change((doc) => ({ ...doc, items: [...doc.items, item] }));
-        setSelectedId(item.id);
+        select(item.id);
     };
 
     useEffect(() => {
@@ -354,19 +382,23 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
             return;
         }
         saved.current = doc;
+        queued.current = doc;
         setSaveState("saved");
         setHistory(startHistory(doc));
     };
 
     const deleteMap = async () => {
         setDeleteOpen(false);
+        clearTimeout(autosave.current);
         await saving.current;
         const res = await fetch(url, { method: "DELETE" }).catch(() => null);
         if (!res?.ok) {
             toastError(res ? await errorMessage(res, "Could not delete the map") : "Could not delete the map");
+            if (latest.current && latest.current !== queued.current) save(latest.current);
             return;
         }
         saved.current = null;
+        queued.current = null;
         latest.current = null;
         setHistory(null);
         setSelectedId(null);
@@ -394,7 +426,7 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
 
     const shown = draft ? { ...present, items: present.items.map((i) => (i.id === draft.id ? draft : i)) } : present;
     const selected = shown.items.find((i) => i.id === selectedId) ?? null;
-    const linkType = selected ? LINK_TYPES[selected.kind] : undefined;
+    const linkType = selected ? LOCATION_MAP_LINK_TYPES[selected.kind] : null;
     const selectedLink = selected ? linkOf(selected) : null;
     const canvasCentre: Point = canvasSize.current ? [canvasSize.current[0] / 2, canvasSize.current[1] / 2] : [0, 0];
 
@@ -501,7 +533,7 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
                         onViewChange={setView}
                         onResize={onResize}
                         selectedId={selectedId}
-                        onSelect={setSelectedId}
+                        onSelect={select}
                         labelOf={labelOf}
                         backgroundUrl={present.backgroundImageId ? `/api/location-images/${present.backgroundImageId}/file?variant=full` : null}
                         snap={snap}
@@ -520,6 +552,9 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
                             linkOptions={linkType ? linkOptions[linkType] ?? [] : undefined}
                             linkName={selectedLink ? names.get(selectedLink) ?? null : null}
                             onChange={replaceItem}
+                            onTyping={(item) => {
+                                typing.current = item;
+                            }}
                             onDelete={() => deleteItem(selected.id)}
                             onOpenExit={openExit}
                         />

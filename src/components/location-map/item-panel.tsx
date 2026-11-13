@@ -33,6 +33,8 @@ interface ItemPanelProps {
     linkOptions: LinkOption[] | undefined;
     linkName: string | null;
     onChange: (item: LocationMapItem) => void;
+    /** The item with the text being typed, or null once it matches or is committed. */
+    onTyping: (item: LocationMapItem | null) => void;
     onDelete: () => void;
     onOpenExit: (item: LocationMapItem) => void;
 }
@@ -72,8 +74,17 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
     );
 }
 
-export function ItemPanel({ item, linkOptions, linkName, onChange, onDelete, onOpenExit }: ItemPanelProps) {
+export function ItemPanel({ item, linkOptions, linkName, onChange, onTyping, onDelete, onOpenExit }: ItemPanelProps) {
     const link = linkOf(item);
+    const textHandlers = (field: "label" | "description") => ({
+        onChange: (e: { target: { value: string } }) => {
+            onTyping(e.target.value === item[field] ? null : { ...item, [field]: e.target.value });
+        },
+        onBlur: (e: { target: { value: string } }) => {
+            onTyping(null);
+            if (e.target.value !== item[field]) onChange({ ...item, [field]: e.target.value });
+        },
+    });
     const unlinked = link !== null && linkName === null;
 
     return (
@@ -90,9 +101,7 @@ export function ItemPanel({ item, linkOptions, linkName, onChange, onDelete, onO
                     defaultValue={item.label}
                     maxLength={100}
                     className="h-8"
-                    onBlur={(e) => {
-                        if (e.target.value !== item.label) onChange({ ...item, label: e.target.value });
-                    }}
+                    {...textHandlers("label")}
                 />
             </label>
 
@@ -132,9 +141,7 @@ export function ItemPanel({ item, linkOptions, linkName, onChange, onDelete, onO
                     maxLength={2000}
                     rows={3}
                     placeholder="What is here, how it looks, what happens…"
-                    onBlur={(e) => {
-                        if (e.target.value !== item.description) onChange({ ...item, description: e.target.value });
-                    }}
+                    {...textHandlers("description")}
                 />
             </label>
 

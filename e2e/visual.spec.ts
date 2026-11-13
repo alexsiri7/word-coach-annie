@@ -399,7 +399,7 @@ async function mockLocationImagesApi(page: Page) {
  * story-object pickers filtered by type. Returns the bodies of every map save.
  */
 async function mockLocationMapApi(page: Page) {
-  const saves: Array<{ items: Array<{ id: string; x: number; y: number }> }> = []
+  const saves: Array<{ items: Array<{ id: string; x: number; y: number; description: string }> }> = []
   const objects = [...MOCK_STORY_OBJECTS.storyObjects, MOCK_THRONE_ROOM]
   await page.route('**/api/projects/proj-1/story-objects*', route => {
     const type = new URL(route.request().url()).searchParams.get('type')
@@ -1011,6 +1011,24 @@ test.describe('Visual regression – Annie', () => {
     expect(throne.x).toBeGreaterThan(6)
     expect(throne.x % 0.5).toBe(0)
   })
+
+  for (const [leaveBy, leave] of [
+    ['selecting another item', (page: Page) => page.locator('[data-item-id="m-throne"]').click()],
+    ['switching to Details', (page: Page) => page.getByRole('tab', { name: 'Details' }).click()],
+  ] as const) {
+    test(`location map: a description being typed is saved on ${leaveBy}`, async ({ page }) => {
+      await mockProjectEditorApi(page)
+      await mockLocationImagesApi(page)
+      const saves = await mockLocationMapApi(page)
+      await openLocationMap(page)
+      await page.locator('[data-item-id="m-kael"]').click()
+      await page.getByTestId('map-item-panel').getByRole('textbox', { name: 'Description' }).fill('Leaning on the pillar')
+      await leave(page)
+
+      await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+      expect(saves.at(-1)!.items.find(i => i.id === 'm-kael')!.description).toBe('Leaning on the pillar')
+    })
+  }
 
   test('location map: double-clicking an exit opens the map it leads to', async ({ page }) => {
     await mockProjectEditorApi(page)
