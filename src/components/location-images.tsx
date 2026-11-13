@@ -46,7 +46,7 @@ const KIND_LABELS: Record<LocationImageKind, string> = {
 
 const ACCEPTED_TYPES = "image/jpeg,image/png,image/webp,image/gif";
 
-async function errorMessage(res: Response, fallback: string): Promise<string> {
+export async function errorMessage(res: Response, fallback: string): Promise<string> {
     const body = await res.json().catch(() => null);
     return typeof body?.error === "string" ? body.error : fallback;
 }

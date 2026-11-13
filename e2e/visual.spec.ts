@@ -217,6 +217,49 @@ const MOCK_LOCATION_MAP = {
   ],
 }
 
+const MOCK_SNAPSHOT_THINGS = [
+  { key: 'banner', name: 'Royal banner', description: 'A faded amber banner.', kind: 'hotspot', box: { x: 150, y: 90, w: 140, h: 260 } },
+  { key: 'door', name: 'Great door', description: 'Oak, bound in iron.', kind: 'exit', box: { x: 560, y: 260, w: 180, h: 340 } },
+  { key: 'throne', name: 'Sunstone throne', description: 'Carved from one block of amber stone.', kind: 'hotspot', box: { x: 900, y: 300, w: 220, h: 260 } },
+]
+
+const MOCK_LOCATION_SNAPSHOT = {
+  id: 'snap-2',
+  storyObjectId: 'so-3',
+  build: 'a1b2c3d',
+  takenAt: '2026-03-12T09:30:00Z',
+  createdAt: '2026-03-12T09:31:00Z',
+  sha256: 'sha-snap-2',
+  width: 1280,
+  height: 720,
+  things: MOCK_SNAPSHOT_THINGS,
+  imageUrl: '/api/location-snapshots/snap-2/file',
+}
+
+const MOCK_SNAPSHOT_SUMMARIES = [
+  { id: 'snap-2', build: 'a1b2c3d', takenAt: '2026-03-12T09:30:00Z', createdAt: '2026-03-12T09:31:00Z', width: 1280, height: 720, thingCount: 3 },
+  { id: 'snap-1', build: '9f8e7d6', takenAt: '2026-03-05T09:30:00Z', createdAt: '2026-03-05T09:31:00Z', width: 1280, height: 720, thingCount: 3 },
+]
+
+const MOCK_SNAPSHOT_ANNOTATIONS = [
+  {
+    id: 'sa-1', locationId: 'so-3', snapshotId: 'snap-2', kind: 'note', thingKey: null,
+    region: { type: 'rect', x: 330, y: 80, w: 180, h: 120 }, text: 'Add a window here so the dawn light falls on the throne.',
+    storyObjectId: null, status: 'open', createdAt: '2026-03-12T10:00:00Z', updatedAt: '2026-03-12T10:00:00Z',
+  },
+  {
+    id: 'sa-2', locationId: 'so-3', snapshotId: 'snap-2', kind: 'note', thingKey: null,
+    region: { type: 'path', points: [[860, 600], [940, 640], [1060, 650], [1150, 610], [1160, 560]] },
+    text: 'Kael should stand guard by the throne.', storyObjectId: 'so-2', status: 'open',
+    createdAt: '2026-03-12T10:05:00Z', updatedAt: '2026-03-12T10:05:00Z',
+  },
+  {
+    id: 'sa-3', locationId: 'so-3', snapshotId: 'snap-2', kind: 'description', thingKey: 'banner', region: null,
+    text: 'A faded amber banner, torn at one corner.', storyObjectId: null, status: 'open',
+    createdAt: '2026-03-12T10:10:00Z', updatedAt: '2026-03-12T10:10:00Z',
+  },
+]
+
 const MOCK_PROJECT_DETAIL = {
   id: 'proj-1',
   title: 'The Amber Throne',
@@ -446,6 +489,29 @@ async function itemCentre(page: Page, id: string) {
   const box = await page.locator(`[data-item-id="${id}"]`).boundingBox()
   if (!box) throw new Error(`map item ${id} is not on screen`)
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+/** Intercept the location panel's snapshot list, the latest snapshot and its screenshot */
+async function mockLocationSnapshotsApi(page: Page) {
+  await page.route('**/api/story-objects/so-3/snapshots', route =>
+    route.fulfill({ json: { data: MOCK_SNAPSHOT_SUMMARIES, annotations: MOCK_SNAPSHOT_ANNOTATIONS }, status: 200 })
+  )
+  await page.route('**/api/location-snapshots/snap-2', route =>
+    route.fulfill({ json: MOCK_LOCATION_SNAPSHOT, status: 200 })
+  )
+  const scene = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720">
+      <rect width="1280" height="720" fill="#3b2a1e"/>
+      <rect y="560" width="1280" height="160" fill="#5a4030"/>
+      <rect x="170" y="100" width="100" height="240" fill="#c8873a"/>
+      <rect x="580" y="270" width="140" height="330" fill="#6b4a2b"/>
+      <rect x="930" y="320" width="160" height="230" fill="#e0a84a"/>
+    </svg>`
+  )
+  const png = await sharp(scene).png().toBuffer()
+  await page.route('**/api/location-snapshots/*/file', route =>
+    route.fulfill({ body: png, contentType: 'image/png', status: 200 })
+  )
 }
 
 /** Intercept API calls for the universe page */
@@ -995,6 +1061,32 @@ test.describe('Visual regression – Annie', () => {
     await page.getByTestId('map-item-panel').waitFor({ state: 'visible' })
 
     await expect(page).toHaveScreenshot('location-map.png', {
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.01,
+    })
+  })
+
+  test('location snapshots', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    await mockLocationSnapshotsApi(page)
+    await page.goto('/project/proj-1')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    const menuButton = page.locator('button[aria-label="Open sidebar menu"]')
+    if (await menuButton.isVisible().catch(() => false)) {
+      await menuButton.click()
+    }
+
+    await page.getByRole('tab', { name: 'Locations' }).click()
+    await page.getByRole('button', { name: 'Sunstone Keep' }).click()
+    await page.getByRole('tab', { name: 'Snapshots' }).click()
+    await expect(page.locator('img[alt="Game snapshot"]')).toHaveJSProperty('complete', true)
+    await page.getByRole('button', { name: 'Royal banner' }).click()
+    await page.getByText('Changed in Annie, not in the game yet').waitFor({ state: 'visible' })
+
+    await expect(page).toHaveScreenshot('location-snapshots.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
