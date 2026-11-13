@@ -32,7 +32,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LocationImages } from "@/components/location-images";
+import { LocationMap } from "@/components/location-map/location-map";
 import type { StoryObject, StoryObjectType, Project } from "@/lib/types";
 
 interface StoryObjectPanelProps {
@@ -41,7 +43,13 @@ interface StoryObjectPanelProps {
     onClose: () => void;
     onDeleted: () => void;
     onUpdated: () => void;
+    /** Project locations show Details and Map tabs; other objects only have details. */
+    tab: StoryObjectPanelTab;
+    onTabChange: (tab: StoryObjectPanelTab) => void;
+    onOpenLocation: (storyObjectId: string) => void;
 }
+
+export type StoryObjectPanelTab = "details" | "map";
 
 const TYPE_LABELS: Record<StoryObjectType, string> = {
     CHARACTER: "Character",
@@ -85,7 +93,16 @@ interface NormalizedRelationship {
     } | null;
 }
 
-export function StoryObjectPanel({ objectId, source = "project", onClose, onDeleted, onUpdated }: StoryObjectPanelProps) {
+export function StoryObjectPanel({
+    objectId,
+    source = "project",
+    onClose,
+    onDeleted,
+    onUpdated,
+    tab,
+    onTabChange,
+    onOpenLocation,
+}: StoryObjectPanelProps) {
     const { error: toastError } = useToast();
     const [obj, setObj] = useState<StoryObject | null>(null);
     const [name, setName] = useState("");
@@ -293,6 +310,155 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
         );
     }
 
+    const isProjectLocation = !isUniverse && obj.type === "LOCATION";
+
+    const details = (
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div>
+                <label htmlFor="obj-name" className="block text-xs font-medium text-text-muted mb-1.5">Name</label>
+                <Input id="obj-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+
+            {obj.type === "CHARACTER" && (
+                <div>
+                    <label htmlFor="obj-role" className="block text-xs font-medium text-text-muted mb-1.5">Role</label>
+                    <Select value={role} onValueChange={setRole}>
+                        <SelectTrigger id="obj-role">
+                            <SelectValue placeholder="Select role..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="protagonist">Protagonist</SelectItem>
+                            <SelectItem value="antagonist">Antagonist</SelectItem>
+                            <SelectItem value="supporting">Supporting</SelectItem>
+                            <SelectItem value="minor">Minor</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+
+            <div>
+                <label htmlFor="obj-description" className="block text-xs font-medium text-text-muted mb-1.5">Description</label>
+                <Textarea
+                    id="obj-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                    placeholder="Describe this element..."
+                />
+            </div>
+
+            <div>
+                <label htmlFor="obj-notes" className="block text-xs font-medium text-text-muted mb-1.5">Notes</label>
+                <Textarea
+                    id="obj-notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={4}
+                    placeholder="Additional notes..."
+                />
+            </div>
+
+            <div>
+                <label htmlFor="obj-tags" className="block text-xs font-medium text-text-muted mb-1.5">Tags</label>
+                <Input
+                    id="obj-tags"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="Comma-separated tags"
+                />
+            </div>
+
+            {isProjectLocation && (
+                <LocationImages storyObjectId={objectId} onChanged={onUpdated} />
+            )}
+
+            {/* Relationships Section */}
+            {!isUniverse && (
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-medium text-text-muted">
+                            <Link className="h-3 w-3 inline mr-1" />
+                            Relationships
+                        </label>
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={handleOpenAddRel}>
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add
+                        </Button>
+                    </div>
+                    {relationships.length === 0 ? (
+                        <p className="text-xs text-text-muted italic">No relationships yet.</p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {relationships.map((rel) => (
+                                <div
+                                    key={rel.relationshipId}
+                                    className="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-surface-overlay/50 hover:bg-surface-overlay transition-colors"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <span className="tag-pill text-[10px] px-1.5 py-0.5 bg-accent/10 text-accent/80">
+                                                {rel.direction === "incoming" ? "\u2190" : "\u2192"} {RELATIONSHIP_TYPE_LABELS[rel.type] || rel.type}
+                                            </span>
+                                            {rel.target && (
+                                                <span className="truncate font-medium text-text-primary">
+                                                    {rel.target.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {rel.label && (
+                                            <p className="text-[11px] text-text-muted mt-0.5 truncate">{rel.label}</p>
+                                        )}
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-danger"
+                                        onClick={() => setDeleteRelId(rel.relationshipId)}
+                                        aria-label="Remove relationship"
+                                    >
+                                        <Unlink className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+
+    const footer = (
+        <div className="flex items-center justify-between px-5 py-4 pb-6 border-t border-border bg-surface-raised">
+            <Button
+                variant="ghost"
+                size="sm"
+                className="text-danger hover:text-danger-hover hover:bg-danger/10"
+                onClick={() => setDeleteOpen(true)}
+            >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Delete
+            </Button>
+            <div className="flex items-center gap-2">
+                {!isUniverse && project?.universeId && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setTransferOpen(true)}
+                    >
+                        <Globe className="h-4 w-4" />
+                        Move to Universe
+                    </Button>
+                )}
+                {saved && <span className="text-xs text-success" role="status">Saved!</span>}
+                <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
+                    <Save className="h-4 w-4 mr-1.5" />
+                    {saving ? "Saving..." : "Save"}
+                </Button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="flex flex-col h-full bg-surface animate-fade-in">
             {/* Header */}
@@ -312,151 +478,39 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                 </Button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                <div>
-                    <label htmlFor="obj-name" className="block text-xs font-medium text-text-muted mb-1.5">Name</label>
-                    <Input id="obj-name" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-
-                {obj.type === "CHARACTER" && (
-                    <div>
-                        <label htmlFor="obj-role" className="block text-xs font-medium text-text-muted mb-1.5">Role</label>
-                        <Select value={role} onValueChange={setRole}>
-                            <SelectTrigger id="obj-role">
-                                <SelectValue placeholder="Select role..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="protagonist">Protagonist</SelectItem>
-                                <SelectItem value="antagonist">Antagonist</SelectItem>
-                                <SelectItem value="supporting">Supporting</SelectItem>
-                                <SelectItem value="minor">Minor</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
-
-                <div>
-                    <label htmlFor="obj-description" className="block text-xs font-medium text-text-muted mb-1.5">Description</label>
-                    <Textarea
-                        id="obj-description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={4}
-                        placeholder="Describe this element..."
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="obj-notes" className="block text-xs font-medium text-text-muted mb-1.5">Notes</label>
-                    <Textarea
-                        id="obj-notes"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={4}
-                        placeholder="Additional notes..."
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="obj-tags" className="block text-xs font-medium text-text-muted mb-1.5">Tags</label>
-                    <Input
-                        id="obj-tags"
-                        value={tags}
-                        onChange={(e) => setTags(e.target.value)}
-                        placeholder="Comma-separated tags"
-                    />
-                </div>
-
-                {!isUniverse && obj.type === "LOCATION" && (
-                    <LocationImages storyObjectId={objectId} onChanged={onUpdated} />
-                )}
-
-                {/* Relationships Section */}
-                {!isUniverse && (
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="block text-xs font-medium text-text-muted">
-                                <Link className="h-3 w-3 inline mr-1" />
-                                Relationships
-                            </label>
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={handleOpenAddRel}>
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add
-                            </Button>
-                        </div>
-                        {relationships.length === 0 ? (
-                            <p className="text-xs text-text-muted italic">No relationships yet.</p>
-                        ) : (
-                            <div className="space-y-1.5">
-                                {relationships.map((rel) => (
-                                    <div
-                                        key={rel.relationshipId}
-                                        className="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-surface-overlay/50 hover:bg-surface-overlay transition-colors"
-                                    >
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 text-xs">
-                                                <span className="tag-pill text-[10px] px-1.5 py-0.5 bg-accent/10 text-accent/80">
-                                                    {rel.direction === "incoming" ? "\u2190" : "\u2192"} {RELATIONSHIP_TYPE_LABELS[rel.type] || rel.type}
-                                                </span>
-                                                {rel.target && (
-                                                    <span className="truncate font-medium text-text-primary">
-                                                        {rel.target.name}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {rel.label && (
-                                                <p className="text-[11px] text-text-muted mt-0.5 truncate">{rel.label}</p>
-                                            )}
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-danger"
-                                            onClick={() => setDeleteRelId(rel.relationshipId)}
-                                            aria-label="Remove relationship"
-                                        >
-                                            <Unlink className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-4 pb-6 border-t border-border bg-surface-raised">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-danger hover:text-danger-hover hover:bg-danger/10"
-                    onClick={() => setDeleteOpen(true)}
+            {isProjectLocation ? (
+                <Tabs
+                    value={tab}
+                    onValueChange={(value) => onTabChange(value as StoryObjectPanelTab)}
+                    className="flex-1 min-h-0 flex flex-col"
                 >
-                    <Trash2 className="h-4 w-4 mr-1.5" />
-                    Delete
-                </Button>
-                <div className="flex items-center gap-2">
-                    {!isUniverse && project?.universeId && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => setTransferOpen(true)}
-                        >
-                            <Globe className="h-4 w-4" />
-                            Move to Universe
-                        </Button>
-                    )}
-                    {saved && <span className="text-xs text-success" role="status">Saved!</span>}
-                    <Button size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
-                        <Save className="h-4 w-4 mr-1.5" />
-                        {saving ? "Saving..." : "Save"}
-                    </Button>
-                </div>
-            </div>
+                    <div className="px-5 pt-3">
+                        <TabsList>
+                            <TabsTrigger value="details">Details</TabsTrigger>
+                            <TabsTrigger value="map">Map</TabsTrigger>
+                        </TabsList>
+                    </div>
+                    <TabsContent value="details" className="flex-1 min-h-0 mt-0 flex flex-col">
+                        {details}
+                        {footer}
+                    </TabsContent>
+                    <TabsContent value="map" className="flex-1 min-h-0 mt-3 border-t border-border">
+                        <LocationMap
+                            key={objectId}
+                            storyObjectId={objectId}
+                            projectId={obj.projectId}
+                            onOpenLocation={onOpenLocation}
+                        />
+                    </TabsContent>
+                </Tabs>
+            ) : (
+                <>
+                    {details}
+                    {footer}
+                </>
+            )}
 
+            {/* Delete confirmation */}
             {/* Delete confirmation */}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <AlertDialogContent>

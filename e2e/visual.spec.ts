@@ -182,6 +182,41 @@ const MOCK_LOCATION_IMAGES = [
   fullUrl: `/api/location-images/${image.id}/file?variant=full`,
 }))
 
+const MOCK_THRONE_ROOM = {
+  id: 'so-4',
+  projectId: 'proj-1',
+  type: 'LOCATION',
+  name: 'Throne Room',
+  description: 'Where the queen holds court.',
+  notes: '',
+  role: null,
+  tags: '',
+  createdAt: '2026-01-15T10:00:00Z',
+  updatedAt: '2026-02-20T10:00:00Z',
+}
+
+const mapItem = (item: Record<string, unknown>) => ({
+  label: '', description: '', rotation: 0, linkName: null, unlinked: false, ...item,
+})
+
+const MOCK_LOCATION_MAP = {
+  id: 'lm-1',
+  storyObjectId: 'so-3',
+  widthM: 12,
+  heightM: 8,
+  backgroundImageId: null,
+  updatedAt: '2026-03-01T10:00:00Z',
+  contentHash: 'hash-lm-1',
+  items: [
+    mapItem({ id: 'm-hall', kind: 'area', label: 'Great hall', x: 6, y: 4, w: 9, h: 5, points: [[-4.5, -2.5], [4.5, -2.5], [4.5, 2.5], [-1, 2.5], [-4.5, 0]] }),
+    mapItem({ id: 'm-throne', kind: 'object', label: 'Throne', x: 6, y: 2.5, w: 1.5, h: 1 }),
+    mapItem({ id: 'm-kael', kind: 'character', label: 'Guard', x: 4, y: 3.5, w: 0.6, h: 0.6, storyObjectId: 'so-2', linkName: 'Kael' }),
+    mapItem({ id: 'm-door', kind: 'exit', label: 'Door', x: 10.5, y: 4, w: 1.2, h: 0.3, rotation: 90, targetLocationId: 'so-4', linkName: 'Throne Room' }),
+    mapItem({ id: 'm-chest', kind: 'object', label: 'Old chest', x: 3, y: 6.5, w: 1, h: 0.6, rotation: 15, storyObjectId: 'so-gone', unlinked: true }),
+    mapItem({ id: 'm-note', kind: 'note', label: 'Draughty corner', x: 9, y: 7, w: 0.4, h: 0.4 }),
+  ],
+}
+
 const MOCK_PROJECT_DETAIL = {
   id: 'proj-1',
   title: 'The Amber Throne',
@@ -357,6 +392,53 @@ async function mockLocationImagesApi(page: Page) {
     const id = new URL(route.request().url()).pathname.split('/')[3]
     return route.fulfill({ body: files.get(id), contentType: 'image/png', status: 200 })
   })
+}
+
+/**
+ * Intercept the location map, a second location for its exit to lead to, and the
+ * story-object pickers filtered by type. Returns the bodies of every map save.
+ */
+async function mockLocationMapApi(page: Page) {
+  const saves: Array<{ items: Array<{ id: string; x: number; y: number }> }> = []
+  const objects = [...MOCK_STORY_OBJECTS.storyObjects, MOCK_THRONE_ROOM]
+  await page.route('**/api/projects/proj-1/story-objects*', route => {
+    const type = new URL(route.request().url()).searchParams.get('type')
+    const data = type ? objects.filter(o => o.type === type) : objects
+    return route.fulfill({ json: { data, total: data.length }, status: 200 })
+  })
+  await page.route('**/api/story-objects/so-3/map', route => {
+    if (route.request().method() === 'PUT') saves.push(route.request().postDataJSON())
+    return route.fulfill({ json: { data: MOCK_LOCATION_MAP }, status: 200 })
+  })
+  await page.route('**/api/story-objects/so-4', route =>
+    route.fulfill({ json: { ...MOCK_THRONE_ROOM, relationships: [], relatedBy: [] }, status: 200 })
+  )
+  await page.route('**/api/story-objects/so-4/map', route => route.fulfill({ json: { data: null }, status: 200 }))
+  await page.route('**/api/story-objects/so-4/images', route => route.fulfill({ json: { data: [] }, status: 200 }))
+  return saves
+}
+
+async function openLocationMap(page: Page) {
+  await page.goto('/project/proj-1')
+  await page.waitForSelector('main', { timeout: 20_000 })
+  await disableAnimations(page)
+
+  const menuButton = page.locator('button[aria-label="Open sidebar menu"]')
+  if (await menuButton.isVisible().catch(() => false)) {
+    await menuButton.click()
+  }
+
+  await page.getByRole('tab', { name: 'Locations' }).click()
+  await page.getByRole('button', { name: 'Sunstone Keep' }).click()
+  await page.getByRole('tab', { name: 'Map' }).click()
+  await page.locator('[data-item-id="m-throne"]').waitFor({ state: 'visible', timeout: 10_000 })
+}
+
+/** Centre of a map item on screen. */
+async function itemCentre(page: Page, id: string) {
+  const box = await page.locator(`[data-item-id="${id}"]`).boundingBox()
+  if (!box) throw new Error(`map item ${id} is not on screen`)
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
 /** Intercept API calls for the universe page */
@@ -894,6 +976,76 @@ test.describe('Visual regression – Annie', () => {
     await expect(page).toHaveScreenshot('location-editor.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
+    })
+  })
+
+  test('location map', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    await mockLocationMapApi(page)
+    await openLocationMap(page)
+    await page.locator('[data-item-id="m-kael"]').click()
+    await page.getByTestId('map-item-panel').waitFor({ state: 'visible' })
+
+    await expect(page).toHaveScreenshot('location-map.png', {
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.01,
+    })
+  })
+
+  test('location map: dragging an item with the mouse saves its new place', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    const saves = await mockLocationMapApi(page)
+    await openLocationMap(page)
+
+    const start = await itemCentre(page, 'm-throne')
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(start.x + 60, start.y + 5, { steps: 5 })
+    await page.mouse.move(start.x + 120, start.y + 10, { steps: 5 })
+    await page.mouse.up()
+
+    await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+    const throne = saves.at(-1)!.items.find(i => i.id === 'm-throne')!
+    expect(throne.x).toBeGreaterThan(6)
+    expect(throne.x % 0.5).toBe(0)
+  })
+
+  test('location map: double-clicking an exit opens the map it leads to', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    await mockLocationMapApi(page)
+    await openLocationMap(page)
+
+    const door = await itemCentre(page, 'm-door')
+    await page.mouse.dblclick(door.x, door.y)
+    await expect(page.getByRole('heading', { name: 'Throne Room' })).toBeVisible()
+    await expect(page.getByText('This location has no map yet')).toBeVisible()
+  })
+
+  test.describe('on a touch screen', () => {
+    test.use({ hasTouch: true })
+
+    test('location map: dragging an item by touch saves its new place', async ({ page }) => {
+      await mockProjectEditorApi(page)
+      await mockLocationImagesApi(page)
+      const saves = await mockLocationMapApi(page)
+      await openLocationMap(page)
+
+      const start = await itemCentre(page, 'm-throne')
+      const cdp = await page.context().newCDPSession(page)
+      const touch = (type: string, dx: number, dy: number) => cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x: start.x + dx, y: start.y + dy }],
+      })
+      await touch('touchStart', 0, 0)
+      for (let step = 1; step <= 6; step++) await touch('touchMove', 0, step * 20)
+      await touch('touchEnd', 0, 120)
+
+      await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+      const throne = saves.at(-1)!.items.find(i => i.id === 'm-throne')!
+      expect(throne.y).toBeGreaterThan(2.5)
     })
   })
 
