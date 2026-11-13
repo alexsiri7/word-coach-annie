@@ -52,6 +52,24 @@ export async function projectIdForLocationImage(imageId: string): Promise<string
     return i.storyObject.projectId;
 }
 
+export async function projectIdForLocationSnapshot(snapshotId: string): Promise<string> {
+    const s = await prisma.locationSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: { storyObject: { select: { projectId: true } } },
+    });
+    if (!s) throw new AccessDeniedError("Location snapshot");
+    return s.storyObject.projectId;
+}
+
+export async function projectIdForSnapshotAnnotation(annotationId: string): Promise<string> {
+    const a = await prisma.snapshotAnnotation.findUnique({
+        where: { id: annotationId },
+        select: { location: { select: { projectId: true } } },
+    });
+    if (!a) throw new AccessDeniedError("Snapshot annotation");
+    return a.location.projectId;
+}
+
 export async function universeIdForWorldObject(objectId: string): Promise<string> {
     const w = await prisma.worldObject.findUnique({ where: { id: objectId }, select: { universeId: true } });
     if (!w) throw new AccessDeniedError("World object");
