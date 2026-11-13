@@ -117,6 +117,11 @@ The author SHALL be able to create universes, link and unlink projects to them, 
 - WHEN the author moves it to the universe
 - THEN the move is refused until its map is deleted, because world objects hold no maps
 
+#### Scenario: Location with game snapshots not transferred
+- GIVEN a project location that has game snapshots
+- WHEN the author moves it to the universe
+- THEN the move is refused, because moving would delete the snapshots and the notes on them
+
 ### Requirement: Timeline matrix
 
 The author SHALL be able to view a matrix of story objects against scenes in outline order, showing in which scenes each character, location or plotline appears, derived from relationships.

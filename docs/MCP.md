@@ -139,7 +139,7 @@ Remove a project's universe link.
 ---
 
 #### `transfer_story_object_to_universe`
-Transfer a project story object into a universe as a world object. Refuses a location that has images or a map — remove them first.
+Transfer a project story object into a universe as a world object. Refuses a location that has images or a map — remove them first — or that has game snapshots.
 
 | Param | Type | Description |
 |-------|------|-------------|

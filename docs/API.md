@@ -729,7 +729,7 @@ Transfer a story object from a project to a universe.
 
 **Body**: `{ storyObjectId: string, universeId: string }`
 
-**Errors**: `400` if the location has images or a map — remove them before transferring
+**Errors**: `400` if the location has images or a map — remove them before transferring; `400` if the location has game snapshots, which can't be moved to a universe
 
 ---
 
