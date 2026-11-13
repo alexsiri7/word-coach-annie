@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **98 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **102 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -137,7 +137,7 @@ Remove a project's universe link.
 ---
 
 #### `transfer_story_object_to_universe`
-Transfer a project story object into a universe as a world object.
+Transfer a project story object into a universe as a world object. Refuses a location that has images — remove them first.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -366,7 +366,7 @@ Get all unresolved annotations, optionally filtered by project.
 ### Story Objects
 
 #### `list_story_objects`
-List story objects with optional filtering.
+List story objects with optional filtering. Each project object carries `coverImageId` (its cover location image, or null).
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -451,6 +451,54 @@ Delete multiple story objects in one operation (max 50). Requires `MCP_ALLOW_DES
 | Param | Type | Description |
 |-------|------|-------------|
 | `objectIds` | string[] | Array of story object IDs |
+
+---
+
+### Location Images
+
+Images attach only to `LOCATION` story objects and are visible only to the project owner. Files live in a private bucket; signed URLs expire after an hour. Storage paths are never returned.
+
+#### `list_location_images`
+List a location's images in display order: `id`, `kind`, `caption`, `orderIndex`, `isCover`, `width`, `height`, `bytes`, `sha256` (changes only when the file does), and signed `url` / `thumbUrl`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+
+---
+
+#### `add_location_image`
+Attach an image from an https URL or base64 data (exactly one). JPEG, PNG, WebP or GIF, at most 20 MB and 25 megapixels; re-encoded to WebP (longest side 2048 px, plus a 400 px thumbnail) with metadata stripped. The first image becomes the cover. URLs must resolve to public addresses. Fails with a retry message if another edit to the same location's images is in progress.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `url` | string? | Public https URL of the image |
+| `base64` | string? | Image bytes as base64; a `data:image/...;base64,` prefix is allowed |
+| `kind` | enum? | `reference` (default), `mood`, `sketch` |
+| `caption` | string? | Caption (max 500 characters) |
+
+---
+
+#### `update_location_image`
+Change a caption or kind, move an image, or make it the cover. Fails with a retry message if another edit to the same location's images is in progress.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `imageId` | string | The location image ID |
+| `caption` | string? | New caption |
+| `kind` | enum? | `reference`, `mood`, `sketch` |
+| `orderIndex` | number? | New position, 0-based; the others shift to make room |
+| `isCover` | boolean? | `true` makes this the cover (replacing the previous one); `false` clears it |
+
+---
+
+#### `delete_location_image`
+Delete an image and its stored files. Deleting the cover makes the new first image the cover. Fails with a retry message if another edit to the same location's images is in progress. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `imageId` | string | The location image ID |
 
 ---
 

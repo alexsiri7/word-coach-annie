@@ -32,6 +32,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { LocationImages } from "@/components/location-images";
 import type { StoryObject, StoryObjectType, Project } from "@/lib/types";
 
 interface StoryObjectPanelProps {
@@ -366,6 +367,10 @@ export function StoryObjectPanel({ objectId, source = "project", onClose, onDele
                         placeholder="Comma-separated tags"
                     />
                 </div>
+
+                {!isUniverse && obj.type === "LOCATION" && (
+                    <LocationImages storyObjectId={objectId} onChanged={onUpdated} />
+                )}
 
                 {/* Relationships Section */}
                 {!isUniverse && (

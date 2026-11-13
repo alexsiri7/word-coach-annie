@@ -752,6 +752,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         }}
                       >
                         <span className="flex items-center gap-1.5">
+                          {obj.coverImageId && (
+                            <img
+                              src={`/api/location-images/${obj.coverImageId}/file?variant=thumb`}
+                              alt=""
+                              loading="lazy"
+                              className="h-5 w-5 rounded-sm object-cover flex-shrink-0"
+                            />
+                          )}
                           {obj.name}
                           {obj.source === "universe" && (
                             <span title="Universe entity">

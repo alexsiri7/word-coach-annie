@@ -387,6 +387,10 @@ export class UniversesController {
                 where: { id: storyObjectId },
             });
             if (!obj) throw new UserFacingError("Story object not found");
+            // World objects cannot hold images; moving would silently lose them.
+            if (await tx.locationImage.count({ where: { storyObjectId } }) > 0) {
+                throw new UserFacingError("Remove this location's images before moving it to the universe");
+            }
 
             // 2. Create WorldObject
             const wo = await tx.worldObject.create({

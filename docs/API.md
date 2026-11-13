@@ -301,6 +301,8 @@ List all story objects in a project.
 
 **Query params**: `type` (optional filter: CHARACTER, LOCATION, PLOTLINE, WORLD_ELEMENT, NOTE)
 
+Each project object carries `coverImageId`: the id of its cover location image, or `null`.
+
 ---
 
 ### `GET /api/projects/:id/relationships`
@@ -456,7 +458,48 @@ Update a story object.
 ---
 
 ### `DELETE /api/story-objects/:id`
-Delete a story object.
+Delete a story object. Its location images and their stored files are deleted too.
+
+---
+
+### `GET /api/story-objects/:id/images`
+List a location's images in display order. Owner only.
+
+**Response**: `{ data: [{ id, storyObjectId, kind, caption, orderIndex, isCover, width, height, bytes, sha256, createdAt, updatedAt, thumbUrl, fullUrl }] }`. `thumbUrl`/`fullUrl` are the `/api/location-images/:id/file` URLs below.
+
+---
+
+### `POST /api/story-objects/:id/images`
+Upload an image to a LOCATION story object. Owner only; requires the `x-csrf-protection: 1` header.
+
+**Body** (`multipart/form-data`): `file` (JPEG, PNG, WebP or GIF; at most 20 MB and 25 megapixels), optional `kind` (`reference` | `mood` | `sketch`, default `reference`) and `caption` (max 500 characters).
+
+The image is re-encoded to WebP (longest side 2048 px, plus a 400 px thumbnail) with metadata stripped. The first image becomes the cover.
+
+**Response**: `201` with the image. `400` for a non-image or a non-location, or when another edit to the same location's images was in progress (retry); `413` over 20 MB, `503` when storage is not configured.
+
+---
+
+### `PATCH /api/location-images/:id`
+Update an image. Owner only.
+
+**Body**: `{ caption?, kind?, orderIndex?, isCover? }` — `orderIndex` moves the image (0 = first); `isCover: true` replaces the previous cover.
+
+**Errors**: `400` invalid body, or another edit to the same location's images was in progress (retry); `404` image not found
+
+---
+
+### `DELETE /api/location-images/:id`
+Delete an image and its stored files. Owner only. Deleting the cover makes the new first image the cover.
+
+**Errors**: `400` if another edit to the same location's images was in progress (retry); `404` image not found
+
+---
+
+### `GET /api/location-images/:id/file`
+Redirect (`302`) to a signed storage URL valid for an hour. Owner only.
+
+**Query params**: `variant`: `thumb` (default, 400 px) | `full`
 
 ---
 
@@ -592,6 +635,8 @@ Create a world object.
 Transfer a story object from a project to a universe.
 
 **Body**: `{ storyObjectId: string, universeId: string }`
+
+**Errors**: `400` if the location has images — remove them before transferring
 
 ---
 

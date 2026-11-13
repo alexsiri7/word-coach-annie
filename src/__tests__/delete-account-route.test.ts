@@ -25,11 +25,15 @@ vi.mock("@/lib/token-blocklist", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
+vi.mock("@/lib/storage/supabase-storage", () => ({
+  removeObjects: vi.fn(async () => undefined),
+}));
 
 import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
 import { isGoogleAuthMode } from "@/lib/auth";
 import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
+import { removeObjects } from "@/lib/storage/supabase-storage";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -131,6 +135,36 @@ describe("DELETE /api/auth/delete-account", () => {
     // Verify user no longer exists
     const deleted = await testPrisma.user.findUnique({ where: { id: user.id } });
     expect(deleted).toBeNull();
+  });
+
+  it("removes the files of the user's location images, and no one else's", async () => {
+    const user = await testPrisma.user.create({
+      data: { id: "del-img", email: "del-img@test.com", googleId: "g-del-img" },
+    });
+    const other = await testPrisma.user.create({
+      data: { id: "del-img-other", email: "del-img-other@test.com", googleId: "g-del-img-other" },
+    });
+    const addImage = async (userId: string, prefix: string) => {
+      const project = await testPrisma.project.create({ data: { title: "P", userId } });
+      const location = await testPrisma.storyObject.create({ data: { projectId: project.id, type: "LOCATION", name: "L" } });
+      await testPrisma.locationImage.create({
+        data: {
+          storyObjectId: location.id, storagePath: `${prefix}/full.webp`, thumbPath: `${prefix}/thumb.webp`,
+          width: 1, height: 1, bytes: 1, sha256: prefix,
+        },
+      });
+    };
+    await addImage(user.id, "mine");
+    await addImage(other.id, "theirs");
+    vi.mocked(getCurrentUserId).mockReturnValue(user.id);
+
+    const { DELETE } = await import("@/app/api/auth/delete-account/route");
+    const res = await DELETE(makeRequest({ email: "del-img@test.com" }));
+    expect(res.status).toBe(200);
+
+    expect(removeObjects).toHaveBeenCalledTimes(1);
+    expect(removeObjects).toHaveBeenCalledWith(["mine/full.webp", "mine/thumb.webp"]);
+    expect(await testPrisma.locationImage.count()).toBe(1);
   });
 
   it("clears session and refresh cookies in response", async () => {

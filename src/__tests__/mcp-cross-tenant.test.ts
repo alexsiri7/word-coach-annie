@@ -12,6 +12,16 @@ vi.mock("../lib/controllers/google-auth", () => ({
     },
 }));
 
+vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/storage/supabase-storage")>();
+    return {
+        ...actual,
+        uploadObject: vi.fn(async () => {}),
+        createSignedUrls: vi.fn(async (paths: string[]) => new Map(paths.map((p) => [p, `https://storage.test/${p}?token=t`]))),
+        removeObjects: vi.fn(async () => {}),
+    };
+});
+
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsApi } from "../lib/google-api";
 
@@ -217,6 +227,81 @@ describe("MCP cross-tenant access (SEC-02)", () => {
             });
             expect(result.isError).toBe(true);
             expect(result.content[0].text).toContain("access denied");
+        });
+    });
+
+    describe("location images", () => {
+        const PNG_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+        async function setupLocation() {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const location = await prisma.storyObject.create({ data: { projectId: project.id, type: "LOCATION", name: "Harbour" } });
+            const image = await prisma.locationImage.create({
+                data: {
+                    storyObjectId: location.id, storagePath: "secret/full.webp", thumbPath: "secret/thumb.webp",
+                    width: 1, height: 1, bytes: 10, sha256: "abc", isCover: true,
+                },
+            });
+            return { location, image };
+        }
+
+        it("denies every location image tool on another user's location", async () => {
+            const { location, image } = await setupLocation();
+            for (const [tool, args] of [
+                ["list_location_images", { storyObjectId: location.id }],
+                ["add_location_image", { storyObjectId: location.id, base64: PNG_BASE64 }],
+                ["update_location_image", { imageId: image.id, caption: "hijacked" }],
+                ["delete_location_image", { imageId: image.id }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError, tool).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+            expect(await prisma.locationImage.findUniqueOrThrow({ where: { id: image.id } })).toMatchObject({ caption: "" });
+        });
+
+        it("lists signed URLs to the owner without storage paths as fields", async () => {
+            const { location, image } = await setupLocation();
+            const result = await callTool("owner-a", "list_location_images", { storyObjectId: location.id });
+            expect(result.isError).toBeUndefined();
+            const [listed] = JSON.parse(result.content[0].text);
+            expect(listed).toMatchObject({
+                id: image.id, sha256: "abc", bytes: 10, isCover: true,
+                url: "https://storage.test/secret/full.webp?token=t",
+                thumbUrl: "https://storage.test/secret/thumb.webp?token=t",
+            });
+            expect(listed).not.toHaveProperty("storagePath");
+            expect(listed).not.toHaveProperty("thumbPath");
+        });
+
+        it("adds an image from base64 with a data URL prefix", async () => {
+            const { location } = await setupLocation();
+            const result = await callTool("owner-a", "add_location_image", {
+                storyObjectId: location.id, base64: `data:image/png;base64,${PNG_BASE64}`, kind: "sketch", caption: "Plan",
+            });
+            expect(result.isError).toBeUndefined();
+            expect(JSON.parse(result.content[0].text)).toMatchObject({ kind: "sketch", caption: "Plan", orderIndex: 1, isCover: false });
+        });
+
+        it("requires exactly one of url or base64", async () => {
+            const { location } = await setupLocation();
+            for (const args of [{}, { url: "https://example.com/a.png", base64: PNG_BASE64 }]) {
+                const result = await callTool("owner-a", "add_location_image", { storyObjectId: location.id, ...args });
+                expect(result.isError).toBe(true);
+                expect(result.content[0].text).toContain("Provide exactly one of url or base64");
+            }
+        });
+
+        it("gates delete_location_image behind MCP_ALLOW_DESTRUCTIVE", async () => {
+            const { image } = await setupLocation();
+            const { createServer } = await import("../mcp/index");
+            const server = createServer({ userId: "owner-a", allowDestructive: false });
+            const tools = (server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<ToolResult> }> })._registeredTools;
+            const result = await tools.delete_location_image.handler({ imageId: image.id });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("MCP_ALLOW_DESTRUCTIVE");
+            expect(await prisma.locationImage.count({ where: { id: image.id } })).toBe(1);
         });
     });
 

@@ -35,6 +35,16 @@ function sentryCspReportUri(dsn: string | undefined): string | null {
     }
 }
 
+/** Location images redirect to signed URLs on this origin, and CSP checks redirect targets. */
+function storageImageOrigin(url: string | undefined): string | null {
+    if (!url) return null;
+    try {
+        return new URL(url).origin;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * force-graph and float-tooltip (story graph) inject their CSS through rollup's styleInject,
  * which offers no nonce hook and inserts an empty <style> before filling it. proxy.test.ts
@@ -48,6 +58,7 @@ const LIBRARY_STYLE_HASHES = [
 
 function buildCsp(nonce: string): string {
     const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
+    const storageOrigin = storageImageOrigin(process.env.SUPABASE_URL);
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
@@ -58,7 +69,7 @@ function buildCsp(nonce: string): string {
         // No style= in server-rendered markup (client-side style props go through the CSSOM,
         // which CSP does not govern); library <style> tags carry the nonce or a pinned hash.
         `style-src 'self' 'nonce-${nonce}' ${LIBRARY_STYLE_HASHES.join(" ")}`,
-        "img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/",
+        `img-src 'self' data: blob: https://lh3.googleusercontent.com https://github.com/user-attachments/${storageOrigin ? ` ${storageOrigin}` : ""}`,
         "font-src 'self'",
         "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
         "object-src 'none'",

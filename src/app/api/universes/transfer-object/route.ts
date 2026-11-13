@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { UniversesController } from "@/lib/controllers/universes";
 import { getCurrentUserId, verifyUniverseAccess, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 export async function POST(request: NextRequest) {
     try {
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof UserFacingError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         logger.error("Failed to transfer story object", error);
         return NextResponse.json(
             { error: "Internal server error" },

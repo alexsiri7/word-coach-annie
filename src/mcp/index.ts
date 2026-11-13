@@ -60,6 +60,13 @@ import {
 import { WritingTaskCapacity, WritingTaskDueDate, WritingTaskKind } from "@/schemas/writing-tasks";
 import { NodeOrderIndex } from "@/schemas/nodes";
 import { ContentHash } from "@/schemas/content-hash";
+import { LocationImageCaptionSchema, LocationImageKindSchema, LocationImageUpdateSchema } from "@/schemas/location-images";
+import {
+    listLocationImages,
+    addLocationImage,
+    updateLocationImage,
+    deleteLocationImage,
+} from "./tools/location-images";
 import {
     listRelationships,
     createRelationship,
@@ -131,6 +138,7 @@ import {
     assertUniverseOwner as verifyUniverseOwnership,
     assertRelationshipOwner,
     projectIdForAnnotation,
+    projectIdForLocationImage,
     projectIdForNode,
     projectIdForStoryObject,
     universeIdForWorldObject,
@@ -698,6 +706,72 @@ server.tool(
         await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
         const result = await deleteStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+);
+
+// ─── Location Image Tools ────────────────────────────────────────────────────
+
+server.tool(
+    "list_location_images",
+    "List the images attached to a LOCATION story object, in display order. Each has id, kind (reference | mood | sketch), caption, isCover, width, height, bytes, sha256 (changes only when the file does) and signed url / thumbUrl that expire after an hour.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+    },
+    async ({ storyObjectId }) =>
+        mcpRun("list_location_images", "Error listing location images", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return listLocationImages(storyObjectId);
+        })
+);
+
+server.tool(
+    "add_location_image",
+    "Attach an image to a LOCATION story object, from an https url or base64 data (exactly one). JPEG, PNG, WebP or GIF, at most 20 MB and 25 megapixels; it is re-encoded to WebP (longest side 2048 px) with metadata stripped. The first image becomes the cover.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        url: z.string().optional().describe("Public https URL of the image"),
+        base64: z.string().optional().describe("Image bytes as base64 (a data:image/...;base64, prefix is allowed)"),
+        kind: LocationImageKindSchema.optional().describe("reference (default), mood or sketch"),
+        caption: LocationImageCaptionSchema.optional().describe("Caption"),
+    },
+    async (params) =>
+        mcpRun("add_location_image", "Error adding location image", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(params.storyObjectId), userId);
+            return addLocationImage(params);
+        })
+);
+
+server.tool(
+    "update_location_image",
+    "Change a location image's caption or kind, move it to a position (orderIndex, 0 = first), or make it the location's cover (isCover: true replaces the previous cover).",
+    {
+        imageId: z.string().describe("The location image ID"),
+        caption: LocationImageCaptionSchema.optional().describe("New caption"),
+        kind: LocationImageKindSchema.optional().describe("reference, mood or sketch"),
+        orderIndex: z.number().int().min(0).optional().describe("New position, 0-based"),
+        isCover: z.boolean().optional().describe("true to make this the cover, false to clear it"),
+    },
+    async ({ imageId, ...changes }) =>
+        mcpRun("update_location_image", "Error updating location image", async () => {
+            await verifyProjectOwnership(await projectIdForLocationImage(imageId), userId);
+            const parsed = LocationImageUpdateSchema.safeParse(changes);
+            if (!parsed.success) throw new UserFacingError(parsed.error.issues[0]?.message ?? "Invalid input");
+            return updateLocationImage(imageId, parsed.data);
+        })
+);
+
+server.tool(
+    "delete_location_image",
+    "Delete a location image and its stored files. Cannot be undone.",
+    {
+        imageId: z.string().describe("The location image ID to delete"),
+    },
+    async ({ imageId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        return mcpRun("delete_location_image", "Error deleting location image", async () => {
+            await verifyProjectOwnership(await projectIdForLocationImage(imageId), userId);
+            return deleteLocationImage(imageId);
+        });
     }
 );
 

@@ -5,6 +5,7 @@ import { isGoogleAuthMode } from "@/lib/auth";
 import { clearSessionCookies, revokeRequestTokens } from "@/lib/end-session";
 import { AccountDeleteSchema } from "@/schemas/account";
 import { logger } from "@/lib/logger";
+import { collectImagePaths, purgeImageFiles } from "@/lib/location-images/files";
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -38,6 +39,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Email does not match" }, { status: 400 });
     }
 
+    const imagePaths = await collectImagePaths({ storyObject: { project: { userId } } });
+
     // Credentials and GoogleDocExports lack cascade; delete them explicitly before removing the user.
     // Project and Universe rows are also deleted explicitly (cascade covers them too, belt-and-suspenders).
     // Shares of other owners' projects are keyed by the invitee's lowercased email, not a user relation.
@@ -51,6 +54,7 @@ export async function DELETE(request: NextRequest) {
       prisma.universe.deleteMany({ where: { userId } }),
       prisma.user.delete({ where: { id: userId } }),
     ]);
+    await purgeImageFiles(imagePaths);
 
     await revokeRequestTokens(request);
 

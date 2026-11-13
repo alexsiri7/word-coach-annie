@@ -51,6 +51,12 @@ const envSchema = z.object({
   GITHUB_FEEDBACK_TOKEN: z.string().optional(),
   GITHUB_FEEDBACK_REPO: z.string().optional(), // format: "owner/repo"
 
+  // Location images — a private Supabase Storage bucket. The key is the service
+  // role / secret key: server only, never NEXT_PUBLIC. Unset disables image upload.
+  SUPABASE_URL: z.url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().optional(), // default "location-images"
+
   // MCP
   MCP_ALLOW_DESTRUCTIVE: z
     .enum(["true", "false"])
