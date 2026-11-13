@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import sharp from 'sharp'
 
 // ── Stable mock data ──────────────────────────────────────────────────────
 
@@ -154,12 +155,32 @@ const MOCK_STORY_OBJECTS = {
       notes: 'Built on a hill of amber-veined stone.',
       role: null,
       tags: 'palace,capital',
+      coverImageId: 'li-1',
       createdAt: '2026-01-15T10:00:00Z',
       updatedAt: '2026-02-20T10:00:00Z',
     },
   ],
   total: 3,
 }
+
+const MOCK_LOCATION_IMAGES = [
+  { id: 'li-1', kind: 'reference', caption: 'Front gate at dawn', isCover: true, colour: '#c8873a' },
+  { id: 'li-2', kind: 'mood', caption: 'Amber light in the hall', isCover: false, colour: '#7a4e8c' },
+  { id: 'li-3', kind: 'sketch', caption: 'Floor plan', isCover: false, colour: '#4f7f6a' },
+].map(({ colour, ...image }, orderIndex) => ({
+  ...image,
+  colour,
+  storyObjectId: 'so-3',
+  orderIndex,
+  width: 2048,
+  height: 1365,
+  bytes: 184_000,
+  sha256: `sha-${image.id}`,
+  createdAt: '2026-03-01T10:00:00Z',
+  updatedAt: '2026-03-01T10:00:00Z',
+  thumbUrl: `/api/location-images/${image.id}/file?variant=thumb`,
+  fullUrl: `/api/location-images/${image.id}/file?variant=full`,
+}))
 
 const MOCK_PROJECT_DETAIL = {
   id: 'proj-1',
@@ -317,6 +338,25 @@ async function mockProjectEditorApi(page: Page) {
     url => /\/api\/projects\/proj-1\/?$/.test(url.pathname),
     route => route.fulfill({ json: MOCK_PROJECT_DETAIL, status: 200 })
   )
+}
+
+/** Intercept the location panel's story object, image list and image files */
+async function mockLocationImagesApi(page: Page) {
+  const location = MOCK_STORY_OBJECTS.storyObjects.find(o => o.id === 'so-3')
+  await page.route('**/api/story-objects/so-3', route =>
+    route.fulfill({ json: { ...location, relationships: [], relatedBy: [] }, status: 200 })
+  )
+  await page.route('**/api/story-objects/so-3/images', route =>
+    route.fulfill({ json: { data: MOCK_LOCATION_IMAGES.map(({ colour: _colour, ...image }) => image) }, status: 200 })
+  )
+  const files = new Map<string, Buffer>()
+  for (const image of MOCK_LOCATION_IMAGES) {
+    files.set(image.id, await sharp({ create: { width: 120, height: 80, channels: 3, background: image.colour } }).png().toBuffer())
+  }
+  await page.route('**/api/location-images/*/file*', route => {
+    const id = new URL(route.request().url()).pathname.split('/')[3]
+    return route.fulfill({ body: files.get(id), contentType: 'image/png', status: 200 })
+  })
 }
 
 /** Intercept API calls for the universe page */
@@ -828,6 +868,30 @@ test.describe('Visual regression – Annie', () => {
     await page.getByRole('toolbar', { name: 'Text formatting' }).waitFor({ state: 'visible', timeout: 10_000 })
 
     await expect(page).toHaveScreenshot('project-editor.png', {
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.01,
+    })
+  })
+
+  test('location editor with images', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    await page.goto('/project/proj-1')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+
+    const menuButton = page.locator('button[aria-label="Open sidebar menu"]')
+    if (await menuButton.isVisible().catch(() => false)) {
+      await menuButton.click()
+    }
+
+    await page.getByRole('tab', { name: 'Locations' }).click()
+    await page.getByRole('button', { name: 'Sunstone Keep' }).click()
+    await page.getByText('Images', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 })
+    await page.getByRole('button', { name: 'Delete image' }).last().scrollIntoViewIfNeeded()
+    await expect(page.locator('img[src*="variant=thumb"]').last()).toHaveJSProperty('complete', true)
+
+    await expect(page).toHaveScreenshot('location-editor.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
