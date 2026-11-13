@@ -111,13 +111,17 @@ export function LocationSnapshots({ storyObjectId, projectId }: { storyObjectId:
     }, [load]);
 
     useEffect(() => {
-        fetch(`/api/projects/${projectId}/story-objects?limit=200`)
-            .then((res) => (res.ok ? res.json() : null))
-            .then((body: { data?: { id: string; name: string }[] } | null) =>
-                setStoryObjects((body?.data ?? []).filter((o) => o.id !== storyObjectId)),
-            )
-            .catch(() => setStoryObjects([]));
-    }, [projectId, storyObjectId]);
+        (async () => {
+            const res = await fetch(`/api/projects/${projectId}/story-objects?limit=200`).catch(() => null);
+            if (!res?.ok) {
+                const failure = "Could not load story objects to link notes to";
+                toastError(res ? await errorMessage(res, failure) : failure);
+                return;
+            }
+            const body: { data: { id: string; name: string }[] } = await res.json();
+            setStoryObjects(body.data.filter((o) => o.id !== storyObjectId));
+        })();
+    }, [projectId, storyObjectId, toastError]);
 
     const summaryId = summaries?.[index]?.id;
     useEffect(() => {
