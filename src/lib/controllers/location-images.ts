@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
+import { logger } from "@/lib/logger";
 import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 import { processLocationImage } from "@/lib/location-images/process";
 import { purgeImageFiles } from "@/lib/location-images/files";
@@ -38,11 +39,12 @@ export type LocationImage = Prisma.LocationImageGetPayload<{ select: typeof publ
  * Cover and order are read, then written, so two edits to one location must not
  * interleave; the loser of a race is told to retry rather than leaving two covers.
  */
-async function serializable<T>(fn: (tx: DbClient) => Promise<T>): Promise<T> {
+async function serializable<T>(target: Record<string, string>, fn: (tx: DbClient) => Promise<T>): Promise<T> {
     try {
         return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
+            logger.warn("Location image write conflict (P2034)", target);
             throw new UserFacingError("This location's images changed at the same time; please try again");
         }
         throw e;
@@ -101,7 +103,7 @@ export class LocationImageController {
         await uploadObject(storagePath, image.full, "image/webp");
         try {
             await uploadObject(thumbPath, image.thumb, "image/webp");
-            return await serializable(async (tx) => {
+            return await serializable({ storyObjectId }, async (tx) => {
                 const count = await tx.locationImage.count({ where: { storyObjectId } });
                 return tx.locationImage.create({
                     data: {
@@ -127,7 +129,7 @@ export class LocationImageController {
     }
 
     static async update(imageId: string, changes: LocationImageUpdateInput): Promise<LocationImage> {
-        return serializable(async (tx) => {
+        return serializable({ imageId }, async (tx) => {
             const image = await tx.locationImage.findUnique({ where: { id: imageId }, select: { storyObjectId: true } });
             if (!image) throw new NotFoundError("Location image not found");
 
@@ -156,7 +158,7 @@ export class LocationImageController {
 
     /** A location that has images keeps a cover: deleting the cover promotes the new first image. */
     static async delete(imageId: string): Promise<{ deleted: true; id: string }> {
-        const removed = await serializable(async (tx) => {
+        const removed = await serializable({ imageId }, async (tx) => {
             const image = await tx.locationImage.findUnique({ where: { id: imageId } });
             if (!image) throw new NotFoundError("Location image not found");
             await tx.locationImage.delete({ where: { id: imageId } });
