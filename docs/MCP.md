@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **98 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **102 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -137,7 +137,7 @@ Remove a project's universe link.
 ---
 
 #### `transfer_story_object_to_universe`
-Transfer a project story object into a universe as a world object.
+Transfer a project story object into a universe as a world object. Refuses a location that has images — remove them first.
 
 | Param | Type | Description |
 |-------|------|-------------|

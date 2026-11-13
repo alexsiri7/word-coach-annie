@@ -632,6 +632,8 @@ Transfer a story object from a project to a universe.
 
 **Body**: `{ storyObjectId: string, universeId: string }`
 
+**Errors**: `400` if the location has images — remove them before transferring
+
 ---
 
 ### `POST /api/universes/:id/projects`
