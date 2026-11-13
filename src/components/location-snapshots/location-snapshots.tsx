@@ -228,15 +228,15 @@ export function LocationSnapshots({ storyObjectId, projectId }: { storyObjectId:
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "done" }),
-        });
-        if (!res.ok) toastError(await errorMessage(res, "Could not resolve"));
+        }).catch(() => null);
+        if (!res?.ok) toastError(res ? await errorMessage(res, "Could not resolve") : "Could not resolve");
         await load();
     };
 
     const remove = async (id: string) => {
         setDeleteId(null);
-        const res = await fetch(`/api/snapshot-annotations/${id}`, { method: "DELETE" });
-        if (!res.ok) toastError(await errorMessage(res, "Could not delete"));
+        const res = await fetch(`/api/snapshot-annotations/${id}`, { method: "DELETE" }).catch(() => null);
+        if (!res?.ok) toastError(res ? await errorMessage(res, "Could not delete") : "Could not delete");
         await load();
     };
 
