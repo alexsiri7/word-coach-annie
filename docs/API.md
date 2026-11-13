@@ -476,7 +476,7 @@ Upload an image to a LOCATION story object. Owner only; requires the `x-csrf-pro
 
 The image is re-encoded to WebP (longest side 2048 px, plus a 400 px thumbnail) with metadata stripped. The first image becomes the cover.
 
-**Response**: `201` with the image. `400` for a non-image or a non-location, `413` over 20 MB, `503` when storage is not configured.
+**Response**: `201` with the image. `400` for a non-image or a non-location, or when another edit to the same location's images was in progress (retry); `413` over 20 MB, `503` when storage is not configured.
 
 ---
 
@@ -485,10 +485,14 @@ Update an image. Owner only.
 
 **Body**: `{ caption?, kind?, orderIndex?, isCover? }` — `orderIndex` moves the image (0 = first); `isCover: true` replaces the previous cover.
 
+**Errors**: `400` invalid body, or another edit to the same location's images was in progress (retry); `404` image not found
+
 ---
 
 ### `DELETE /api/location-images/:id`
 Delete an image and its stored files. Owner only. Deleting the cover makes the new first image the cover.
+
+**Errors**: `400` if another edit to the same location's images was in progress (retry); `404` image not found
 
 ---
 

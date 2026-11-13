@@ -468,7 +468,7 @@ List a location's images in display order: `id`, `kind`, `caption`, `orderIndex`
 ---
 
 #### `add_location_image`
-Attach an image from an https URL or base64 data (exactly one). JPEG, PNG, WebP or GIF, at most 20 MB and 25 megapixels; re-encoded to WebP (longest side 2048 px, plus a 400 px thumbnail) with metadata stripped. The first image becomes the cover. URLs must resolve to public addresses.
+Attach an image from an https URL or base64 data (exactly one). JPEG, PNG, WebP or GIF, at most 20 MB and 25 megapixels; re-encoded to WebP (longest side 2048 px, plus a 400 px thumbnail) with metadata stripped. The first image becomes the cover. URLs must resolve to public addresses. Fails with a retry message if another edit to the same location's images is in progress.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -481,7 +481,7 @@ Attach an image from an https URL or base64 data (exactly one). JPEG, PNG, WebP 
 ---
 
 #### `update_location_image`
-Change a caption or kind, move an image, or make it the cover.
+Change a caption or kind, move an image, or make it the cover. Fails with a retry message if another edit to the same location's images is in progress.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -494,7 +494,7 @@ Change a caption or kind, move an image, or make it the cover.
 ---
 
 #### `delete_location_image`
-Delete an image and its stored files. Deleting the cover makes the new first image the cover. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+Delete an image and its stored files. Deleting the cover makes the new first image the cover. Fails with a retry message if another edit to the same location's images is in progress. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
 
 | Param | Type | Description |
 |-------|------|-------------|
