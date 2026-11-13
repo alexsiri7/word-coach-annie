@@ -154,8 +154,11 @@ export function LocationSnapshots({ storyObjectId, projectId }: { storyObjectId:
     );
     const selectedThing = snapshot?.things.find((t) => t.key === selectedKey) ?? null;
 
-    const pendingEdit = (key: string, field: ThingField) =>
-        annotations.find((a) => a.kind === field && a.thingKey === key && isPending(a));
+    // A thing can have sent requests the game hasn't shipped yet and a newer open one; the open one is the author's latest.
+    const pendingEdit = (key: string, field: ThingField) => {
+        const pending = annotations.filter((a) => a.kind === field && a.thingKey === key && isPending(a));
+        return pending.find((a) => a.status === "open") ?? pending[pending.length - 1];
+    };
 
     const selectThing = (key: string) => {
         const thing = snapshot?.things.find((t) => t.key === key);
