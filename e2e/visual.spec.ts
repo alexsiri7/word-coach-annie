@@ -399,7 +399,7 @@ async function mockLocationImagesApi(page: Page) {
  * story-object pickers filtered by type. Returns the bodies of every map save.
  */
 async function mockLocationMapApi(page: Page) {
-  const saves: Array<{ items: Array<{ id: string; x: number; y: number; description: string }> }> = []
+  const saves: Array<{ items: Array<{ id: string; kind: string; x: number; y: number; w: number; h: number; rotation: number; description: string }> }> = []
   const objects = [...MOCK_STORY_OBJECTS.storyObjects, MOCK_THRONE_ROOM]
   await page.route('**/api/projects/proj-1/story-objects*', route => {
     const type = new URL(route.request().url()).searchParams.get('type')
@@ -432,6 +432,13 @@ async function openLocationMap(page: Page) {
   await page.getByRole('button', { name: 'Sunstone Keep' }).click()
   await page.getByRole('tab', { name: 'Map' }).click()
   await page.locator('[data-item-id="m-throne"]').waitFor({ state: 'visible', timeout: 10_000 })
+}
+
+/** Centre of the selected item's resize (`"1,1"` etc.) or rotate handle on screen. */
+async function handleCentre(page: Page, handle: string) {
+  const box = await page.locator(`[data-handle="${handle}"] :is(rect, circle)`).last().boundingBox()
+  if (!box) throw new Error(`map handle ${handle} is not on screen`)
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
 /** Centre of a map item on screen. */
@@ -1011,6 +1018,83 @@ test.describe('Visual regression – Annie', () => {
     expect(throne.x).toBeGreaterThan(6)
     expect(throne.x % 0.5).toBe(0)
   })
+
+  test('location map: dragging a corner handle resizes an item', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    const saves = await mockLocationMapApi(page)
+    await openLocationMap(page)
+    await page.locator('[data-item-id="m-throne"]').click()
+
+    const corner = await handleCentre(page, '1,1')
+    await page.mouse.move(corner.x, corner.y)
+    await page.mouse.down()
+    await page.mouse.move(corner.x + 40, corner.y + 30, { steps: 5 })
+    await page.mouse.move(corner.x + 80, corner.y + 60, { steps: 5 })
+    await page.mouse.up()
+
+    await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+    const throne = saves.at(-1)!.items.find(i => i.id === 'm-throne')!
+    expect(throne.w).toBeGreaterThan(1.5)
+    expect(throne.h).toBeGreaterThan(1)
+    expect(throne.rotation).toBe(0)
+  })
+
+  test('location map: dragging the rotate handle turns an item', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    const saves = await mockLocationMapApi(page)
+    await openLocationMap(page)
+    await page.locator('[data-item-id="m-throne"]').click()
+
+    const centre = await itemCentre(page, 'm-throne')
+    const handle = await handleCentre(page, 'rotate')
+    await page.mouse.move(handle.x, handle.y)
+    await page.mouse.down()
+    await page.mouse.move(centre.x + 50, centre.y - 50, { steps: 5 })
+    await page.mouse.move(centre.x + 100, centre.y, { steps: 5 })
+    await page.mouse.up()
+
+    await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+    const throne = saves.at(-1)!.items.find(i => i.id === 'm-throne')!
+    expect(throne.rotation).toBe(90)
+    expect(throne).toMatchObject({ x: 6, y: 2.5, w: 1.5, h: 1 })
+  })
+
+  test('location map: adding an object places and saves it', async ({ page }) => {
+    await mockProjectEditorApi(page)
+    await mockLocationImagesApi(page)
+    const saves = await mockLocationMapApi(page)
+    await openLocationMap(page)
+    await page.getByRole('button', { name: 'Add object' }).click()
+
+    await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+    const known = new Set(MOCK_LOCATION_MAP.items.map(i => i.id))
+    const added = saves.at(-1)!.items.filter(i => !known.has(i.id))
+    expect(added).toHaveLength(1)
+    expect(added[0].kind).toBe('object')
+    await expect(page.locator(`[data-item-id="${added[0].id}"]`)).toBeVisible()
+    await expect(page.getByTestId('map-item-panel')).toBeVisible()
+  })
+
+  for (const [deleteBy, remove] of [
+    ['the Delete key', (page: Page) => page.keyboard.press('Delete')],
+    ['the panel button', (page: Page) => page.getByRole('button', { name: 'Delete note' }).click()],
+  ] as const) {
+    test(`location map: ${deleteBy} deletes the selected item`, async ({ page }) => {
+      await mockProjectEditorApi(page)
+      await mockLocationImagesApi(page)
+      const saves = await mockLocationMapApi(page)
+      await openLocationMap(page)
+      await page.locator('[data-item-id="m-note"]').click()
+      await page.getByTestId('map-item-panel').waitFor({ state: 'visible' })
+      await remove(page)
+
+      await expect(page.locator('[data-item-id="m-note"]')).toHaveCount(0)
+      await expect.poll(() => saves.length, { timeout: 5_000 }).toBeGreaterThan(0)
+      expect(saves.at(-1)!.items.map(i => i.id)).not.toContain('m-note')
+    })
+  }
 
   for (const [leaveBy, leave] of [
     ['selecting another item', (page: Page) => page.locator('[data-item-id="m-throne"]').click()],
