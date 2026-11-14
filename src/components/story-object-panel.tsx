@@ -35,6 +35,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LocationImages } from "@/components/location-images";
 import { LocationMap } from "@/components/location-map/location-map";
+import { LocationSnapshots } from "@/components/location-snapshots/location-snapshots";
 import type { StoryObject, StoryObjectType, Project } from "@/lib/types";
 
 interface StoryObjectPanelProps {
@@ -43,13 +44,13 @@ interface StoryObjectPanelProps {
     onClose: () => void;
     onDeleted: () => void;
     onUpdated: () => void;
-    /** Project locations show Details and Map tabs; other objects only have details. */
+    /** Project locations show Details, Map and Snapshots tabs; other objects only have details. */
     tab: StoryObjectPanelTab;
     onTabChange: (tab: StoryObjectPanelTab) => void;
     onOpenLocation: (storyObjectId: string) => void;
 }
 
-export type StoryObjectPanelTab = "details" | "map";
+export type StoryObjectPanelTab = "details" | "map" | "snapshots";
 
 const TYPE_LABELS: Record<StoryObjectType, string> = {
     CHARACTER: "Character",
@@ -488,6 +489,7 @@ export function StoryObjectPanel({
                         <TabsList>
                             <TabsTrigger value="details">Details</TabsTrigger>
                             <TabsTrigger value="map">Map</TabsTrigger>
+                            <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
                         </TabsList>
                     </div>
                     <TabsContent value="details" className="flex-1 min-h-0 mt-0 flex flex-col">
@@ -501,6 +503,9 @@ export function StoryObjectPanel({
                             projectId={obj.projectId}
                             onOpenLocation={onOpenLocation}
                         />
+                    </TabsContent>
+                    <TabsContent value="snapshots" className="flex-1 min-h-0 mt-0 overflow-y-auto p-5">
+                        <LocationSnapshots storyObjectId={objectId} projectId={obj.projectId} />
                     </TabsContent>
                 </Tabs>
             ) : (

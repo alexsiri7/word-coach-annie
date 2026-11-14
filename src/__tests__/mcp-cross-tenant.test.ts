@@ -17,6 +17,7 @@ vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
     return {
         ...actual,
         uploadObject: vi.fn(async () => {}),
+        createSignedUrl: vi.fn(async (path: string) => `https://storage.test/${path}?token=t`),
         createSignedUrls: vi.fn(async (paths: string[]) => new Map(paths.map((p) => [p, `https://storage.test/${p}?token=t`]))),
         removeObjects: vi.fn(async () => {}),
     };
@@ -403,6 +404,73 @@ describe("MCP cross-tenant access (SEC-02)", () => {
             expect(result.isError).toBe(true);
             expect(result.content[0].text).toContain("MCP_ALLOW_DESTRUCTIVE");
             expect(await prisma.locationMap.findUniqueOrThrow({ where: { storyObjectId: location.id } })).toMatchObject({ items: [bar] });
+        });
+    });
+
+    describe("location snapshots", () => {
+        const THINGS = [{ key: "lamp", name: "Lamp", description: "Old", kind: "", box: { x: 1, y: 2, w: 3, h: 4 } }];
+
+        async function setupSnapshot() {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const location = await prisma.storyObject.create({ data: { projectId: project.id, type: "LOCATION", name: "Harbour" } });
+            const snapshot = await prisma.locationSnapshot.create({
+                data: {
+                    storyObjectId: location.id, build: "b1", takenAt: new Date(), storagePath: "secret/snap.webp",
+                    sha256: "abc", width: 640, height: 480, things: THINGS,
+                },
+            });
+            const note = await prisma.snapshotAnnotation.create({
+                data: { locationId: location.id, snapshotId: snapshot.id, kind: "note", text: "mine" },
+            });
+            return { location, snapshot, note };
+        }
+
+        it("denies every location snapshot tool on another user's location", async () => {
+            const { location, snapshot, note } = await setupSnapshot();
+            for (const [tool, args] of [
+                ["list_location_snapshots", { storyObjectId: location.id }],
+                ["get_location_snapshot", { snapshotId: snapshot.id }],
+                ["get_location_snapshot", { storyObjectId: location.id }],
+                ["add_snapshot_annotation", { snapshotId: snapshot.id, kind: "note", text: "hijacked" }],
+                ["update_snapshot_annotation", { annotationId: note.id, text: "hijacked" }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError, tool).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+            expect(await prisma.snapshotAnnotation.findMany()).toMatchObject([{ id: note.id, text: "mine" }]);
+        });
+
+        it("gives the owner the latest snapshot with a signed URL, things and annotations, without its storage path", async () => {
+            const { location, snapshot, note } = await setupSnapshot();
+            const result = await callTool("owner-a", "get_location_snapshot", { storyObjectId: location.id });
+            expect(result.isError).toBeUndefined();
+            const got = JSON.parse(result.content[0].text);
+            expect(got).toMatchObject({
+                id: snapshot.id, width: 640, height: 480, things: THINGS,
+                imageUrl: "https://storage.test/secret/snap.webp?token=t",
+                annotations: [{ id: note.id, text: "mine" }],
+            });
+            expect(got).not.toHaveProperty("storagePath");
+        });
+
+        it("lets the owner request a description change and resolve it", async () => {
+            const { snapshot } = await setupSnapshot();
+            const added = await callTool("owner-a", "add_snapshot_annotation", {
+                snapshotId: snapshot.id, kind: "description", thingKey: "lamp", text: "A brass lamp",
+            });
+            expect(added.isError).toBeUndefined();
+            const edit = JSON.parse(added.content[0].text);
+            expect(edit).toMatchObject({ kind: "description", thingKey: "lamp", status: "open" });
+
+            const updated = await callTool("owner-a", "update_snapshot_annotation", { annotationId: edit.id, status: "done" });
+            expect(JSON.parse(updated.content[0].text)).toMatchObject({ status: "done" });
+        });
+
+        it("requires exactly one of snapshotId or storyObjectId", async () => {
+            const result = await callTool("owner-a", "get_location_snapshot", {});
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("Provide exactly one of snapshotId or storyObjectId");
         });
     });
 

@@ -35,7 +35,7 @@ A signed-in user SHALL be able to create named personal API tokens, list them wi
 
 ### Requirement: Personal API tokens reach only scenes
 
-A personal API token SHALL act as its user with a read or read+write-scenes scope. It SHALL reach only the scene/node API routes and the MCP endpoint, where it SHALL see only its scope's scene tools, and SHALL be refused with 403 elsewhere. A read-only token SHALL be refused with 403 when it writes.
+A personal API token SHALL act as its user with a read, read+write-scenes or post-snapshots scope. A read or read+write token SHALL reach only the scene/node API routes and the MCP endpoint, where it SHALL see only its scope's scene tools, and SHALL be refused with 403 elsewhere. A read-only token SHALL be refused with 403 when it writes. A snapshots token SHALL reach only the location snapshot upload and SHALL be refused with 403 elsewhere.
 
 #### Scenario: Game backend replaces a beat
 - GIVEN a read+write token
@@ -46,6 +46,11 @@ A personal API token SHALL act as its user with a read or read+write-scenes scop
 - GIVEN a read-only token
 - WHEN it is used to change a scene
 - THEN the request is refused with 403
+
+#### Scenario: Snapshot token posts a snapshot
+- GIVEN a snapshots token
+- WHEN it posts a location snapshot, then reads a scene
+- THEN the snapshot is stored and the read is refused with 403
 
 ### Requirement: Sessions last while the author is active
 

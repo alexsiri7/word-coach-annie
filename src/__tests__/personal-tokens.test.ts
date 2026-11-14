@@ -113,6 +113,12 @@ describe("personal API tokens", () => {
             ["/api/projects", "GET", "write", "out-of-scope"],
             ["/api/nodes-evil", "GET", "write", "out-of-scope"],
             ["/api/mcpx", "POST", "write", "out-of-scope"],
+            ["/api/projects/p/locations/keep/snapshots", "POST", "snapshots", "ok"],
+            ["/api/projects/p/locations/keep/snapshots", "GET", "snapshots", "out-of-scope"],
+            ["/api/projects/p/locations/a/b/snapshots", "POST", "snapshots", "out-of-scope"],
+            ["/api/mcp", "POST", "snapshots", "out-of-scope"],
+            ["/api/nodes/x/content", "GET", "snapshots", "out-of-scope"],
+            ["/api/projects/p/locations/keep/snapshots", "POST", "write", "out-of-scope"],
         ] as const)("%s %s with %s → %s", (path, method, scope, expected) => {
             expect(isPersonalTokenRequestAllowed(path, method, scope)).toBe(expected);
         });

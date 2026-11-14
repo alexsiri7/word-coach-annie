@@ -3,10 +3,13 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { removeObjects } from "@/lib/storage/supabase-storage";
 
-/** Storage paths of the matching images, collected before their rows are deleted. */
-export async function collectImagePaths(where: Prisma.LocationImageWhereInput): Promise<string[]> {
-    const rows = await prisma.locationImage.findMany({ where, select: { storagePath: true, thumbPath: true } });
-    return rows.flatMap((r) => [r.storagePath, r.thumbPath]);
+/** Storage paths of the matching story objects' images and snapshots, collected before their rows are deleted. */
+export async function collectLocationFilePaths(where: Prisma.StoryObjectWhereInput): Promise<string[]> {
+    const [images, snapshots] = await Promise.all([
+        prisma.locationImage.findMany({ where: { storyObject: where }, select: { storagePath: true, thumbPath: true } }),
+        prisma.locationSnapshot.findMany({ where: { storyObject: where }, select: { storagePath: true } }),
+    ]);
+    return [...images.flatMap((r) => [r.storagePath, r.thumbPath]), ...snapshots.map((r) => r.storagePath)];
 }
 
 /**

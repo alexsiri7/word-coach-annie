@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getCurrentUserId, validateCsrfHeader, verifyProjectAccess } from "@/lib/api-auth";
+import { validateCsrfHeader } from "@/lib/api-auth";
 import { LocationImageController } from "@/lib/controllers/location-images";
 import { MAX_IMAGE_BYTES } from "@/lib/location-images/process";
 import { LocationImageCaptionSchema, LocationImageKindSchema } from "@/schemas/location-images";
-import { locationImageErrorResponse } from "@/app/api/location-images/access";
+import { locationImageErrorResponse, verifyStoryObjectAccess } from "@/app/api/location-images/access";
 
 type Params = { params: Promise<{ id: string }> };
-
-async function verifyStoryObjectAccess(request: NextRequest, id: string): Promise<NextResponse | null> {
-  const storyObject = await prisma.storyObject.findUnique({ where: { id }, select: { projectId: true } });
-  if (!storyObject) return NextResponse.json({ error: "Story object not found" }, { status: 404 });
-  const access = await verifyProjectAccess(storyObject.projectId, getCurrentUserId(request));
-  return access.authorized ? null : access.response;
-}
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
