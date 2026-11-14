@@ -599,6 +599,52 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
+  test('selecting text opens the editor bubble menu and its comment popover', async ({
+    page,
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'bubble-menu')
+      projectId = project.id
+
+      const sceneRes = await request.post(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+        data: { type: 'SCENE', title: 'Bubble Scene', orderIndex: 0 },
+      })
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      const saveRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: '<p>The heavy oak doors groaned open.</p>' },
+      })
+      expect(saveRes.status()).toBe(201)
+
+      await page.goto(`/project/${projectId}/scene/${scene.id}/focus`)
+      const paragraph = page
+        .locator('.tiptap, .ProseMirror')
+        .first()
+        .getByText('The heavy oak doors groaned open.')
+      await expect(paragraph).toBeVisible({ timeout: 20_000 })
+
+      const commentButton = page.getByRole('button', { name: 'Comment', exact: true })
+      await expect(commentButton).toBeHidden()
+
+      await paragraph.dblclick()
+      await expect(commentButton).toBeVisible({ timeout: 5_000 })
+
+      await commentButton.click()
+      await expect(page.getByText('Add Annotation')).toBeVisible({
+        timeout: 5_000,
+      })
+      await expect(page.locator('#new-annotation-input')).toBeVisible()
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
   // ── h) JSON export round-trip ──────────────────────────────────────
   test('JSON export contains all project data', async ({ request }) => {
     let projectId: string | undefined
