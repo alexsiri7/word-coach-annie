@@ -599,6 +599,82 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
+  test('commenting from the editor bubble menu highlights the selected text', async ({
+    page,
+    request,
+  }) => {
+    let projectId: string | undefined
+
+    try {
+      const project = await createProject(request, 'bubble-menu')
+      projectId = project.id
+
+      const sceneRes = await request.post(`/api/projects/${projectId}/nodes`, {
+        headers: AUTH_HEADERS,
+        data: { type: 'SCENE', title: 'Bubble Scene', orderIndex: 0 },
+      })
+      expect(sceneRes.status()).toBe(201)
+      const scene = await sceneRes.json()
+
+      const saveRes = await request.post(`/api/nodes/${scene.id}/content`, {
+        headers: AUTH_HEADERS,
+        data: { content: '<p>The heavy oak doors groaned open.</p>' },
+      })
+      expect(saveRes.status()).toBe(201)
+
+      await page.goto(`/project/${projectId}/scene/${scene.id}/focus`)
+      const paragraph = page
+        .locator('.tiptap, .ProseMirror')
+        .first()
+        .getByText('The heavy oak doors groaned open.')
+      await expect(paragraph).toBeVisible({ timeout: 20_000 })
+
+      const commentButton = page.getByRole('button', { name: 'Comment', exact: true })
+      await expect(commentButton).toBeHidden()
+
+      await paragraph.dblclick()
+      await expect(commentButton).toBeVisible({ timeout: 5_000 })
+
+      await commentButton.click()
+      const popover = page.getByRole('dialog').filter({ hasText: 'Add Annotation' })
+      await expect(popover).toBeVisible({ timeout: 5_000 })
+      const annotationInput = popover.locator('#new-annotation-input')
+      await expect(annotationInput).toBeVisible()
+
+      await annotationInput.fill('Too loud?')
+      const [annotationRes] = await Promise.all([
+        page.waitForResponse(
+          (res) =>
+            res.url().endsWith(`/api/nodes/${scene.id}/annotations`) &&
+            res.request().method() === 'POST',
+        ),
+        popover.getByRole('button', { name: 'Save', exact: true }).click(),
+      ])
+      expect(annotationRes.ok()).toBeTruthy()
+      const annotation = await annotationRes.json()
+
+      const mark = page.locator(`[data-annotation-id="${annotation.id}"]`)
+      await expect(mark).toBeVisible({ timeout: 5_000 })
+      await expect(mark).toHaveText(annotation.selectedText)
+      await expect(mark).toHaveClass(/bg-yellow-200/)
+
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(`/api/nodes/${scene.id}/content`, {
+              headers: AUTH_HEADERS,
+            })
+            const body = await res.json()
+            return body.latest?.content ?? ''
+          },
+          { timeout: 10_000 },
+        )
+        .toContain(`data-annotation-id="${annotation.id}"`)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
   // ── h) JSON export round-trip ──────────────────────────────────────
   test('JSON export contains all project data', async ({ request }) => {
     let projectId: string | undefined
