@@ -14,6 +14,7 @@ import {
     User,
     ZoomIn,
     ZoomOut,
+    type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ const DEFAULT_SIZES: Record<Exclude<LocationMapItemKind, "area">, [number, numbe
     note: [0.4, 0.4],
 };
 
-const KIND_ICONS = { object: Square, character: User, exit: DoorOpen, area: Pentagon, note: MapPin };
+const KIND_ICONS: Record<LocationMapItemKind, LucideIcon> = { object: Square, character: User, exit: DoorOpen, area: Pentagon, note: MapPin };
 
 const AUTOSAVE_MS = 800;
 // Browsers refuse a keepalive request whose body is over 64 KiB.
@@ -138,6 +139,8 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
     const url = `/api/story-objects/${storyObjectId}/map`;
 
     const [loaded, setLoaded] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [reloadToken, setReloadToken] = useState(0);
     const [history, setHistory] = useState<History<MapDoc> | null>(null);
     const [draft, setDraft] = useState<LocationMapItem | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -165,11 +168,13 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
 
     useEffect(() => {
         let cancelled = false;
+        setLoadFailed(false);
         (async () => {
             const res = await fetch(url).catch(() => null);
             if (cancelled) return;
             if (!res?.ok) {
                 toastError(res ? await errorMessage(res, "Could not load the map") : "Could not load the map");
+                setLoadFailed(true);
                 return;
             }
             const { data } = (await res.json()) as { data: ServerMap | null };
@@ -186,7 +191,7 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
         return () => {
             cancelled = true;
         };
-    }, [url, toastError]);
+    }, [url, toastError, reloadToken]);
 
     useEffect(() => {
         let cancelled = false;
@@ -405,6 +410,15 @@ export function LocationMap({ storyObjectId, projectId, onOpenLocation }: Locati
         setAreaPoints(null);
         setView(null);
     };
+
+    if (loadFailed) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-4 h-full p-8 text-center">
+                <p className="text-sm text-text-muted">Could not load the map.</p>
+                <Button size="sm" onClick={() => setReloadToken((t) => t + 1)}>Retry</Button>
+            </div>
+        );
+    }
 
     if (!loaded) {
         return (

@@ -10,6 +10,18 @@ import { z } from "zod";
 export const LOCATION_MAP_ITEM_KINDS = ["object", "character", "exit", "area", "note"] as const;
 export const LocationMapItemKindSchema = z.enum(LOCATION_MAP_ITEM_KINDS);
 
+export type LocationMapItemKind = z.infer<typeof LocationMapItemKindSchema>;
+export type LocationMapLinkType = "CHARACTER" | "WORLD_ELEMENT" | "LOCATION";
+
+/** The story-object type each kind may link to; the schema keeps links off the other kinds. */
+export const LOCATION_MAP_LINK_TYPES: Record<LocationMapItemKind, LocationMapLinkType | null> = {
+  character: "CHARACTER",
+  object: "WORLD_ELEMENT",
+  exit: "LOCATION",
+  area: null,
+  note: null,
+};
+
 const POINT_TOLERANCE_M = 0.01;
 
 export function normaliseRotation(degrees: number): number {
@@ -43,10 +55,11 @@ function checkItemRules(item: Omit<z.output<typeof itemFields>, "id">, ctx: z.Re
   if (item.points?.some(([px, py]) => Math.abs(px) > item.w / 2 + POINT_TOLERANCE_M || Math.abs(py) > item.h / 2 + POINT_TOLERANCE_M)) {
     ctx.addIssue({ code: "custom", message: "area points must lie within the item's width and height", path: ["points"] });
   }
-  if (item.storyObjectId != null && item.kind !== "object" && item.kind !== "character") {
+  const linkType = LOCATION_MAP_LINK_TYPES[item.kind];
+  if (item.storyObjectId != null && (linkType === null || linkType === "LOCATION")) {
     ctx.addIssue({ code: "custom", message: "storyObjectId is only allowed on object and character items", path: ["storyObjectId"] });
   }
-  if (item.targetLocationId != null && item.kind !== "exit") {
+  if (item.targetLocationId != null && linkType !== "LOCATION") {
     ctx.addIssue({ code: "custom", message: "targetLocationId is only allowed on exit items", path: ["targetLocationId"] });
   }
 }
@@ -74,24 +87,12 @@ export const LocationMapInputSchema = z
     }
   });
 
-export type LocationMapItemKind = z.infer<typeof LocationMapItemKindSchema>;
 export type LocationMapItem = z.output<typeof LocationMapItemSchema>;
 export type LocationMapItemUpsert = z.output<typeof LocationMapItemUpsertSchema>;
 export type LocationMapInput = z.output<typeof LocationMapInputSchema>;
 
 /** An item as a read returns it: linkName is the linked story object's current name, so renames follow without rewriting maps. */
 export type LocationMapItemView = LocationMapItem & { linkName: string | null; unlinked: boolean };
-
-export type LocationMapLinkType = "CHARACTER" | "WORLD_ELEMENT" | "LOCATION";
-
-/** The story-object type each kind may link to; the schema keeps links off the other kinds. */
-export const LOCATION_MAP_LINK_TYPES: Record<LocationMapItemKind, LocationMapLinkType | null> = {
-  character: "CHARACTER",
-  object: "WORLD_ELEMENT",
-  exit: "LOCATION",
-  area: null,
-  note: null,
-};
 
 /** The first problem, prefixed by where it is, e.g. `items.0.kind: Invalid option…`. */
 export function describeLocationMapError(error: z.ZodError): string {

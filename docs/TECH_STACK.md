@@ -64,6 +64,7 @@ Core models for hierarchical story structure:
 | MediumExport | Medium publish tracking |
 | WorldObjectTimelineEntry | Timeline events for world objects |
 | LocationImage | Images attached to a location story object (files in Supabase Storage) |
+| LocationMap | Top-down sketch of a location (size, optional background image, item list) |
 
 ## Frontend
 

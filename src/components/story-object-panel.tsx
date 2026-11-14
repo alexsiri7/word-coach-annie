@@ -511,7 +511,6 @@ export function StoryObjectPanel({
             )}
 
             {/* Delete confirmation */}
-            {/* Delete confirmation */}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

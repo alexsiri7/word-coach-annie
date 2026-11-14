@@ -14,6 +14,10 @@ import {
 import { normaliseRotation, type LocationMapItem, type LocationMapItemKind } from "@/schemas/location-map";
 import { MIN_SIZE_M, resize } from "./geometry";
 
+/** Matches the schema's `coordinate`/`size` bounds (src/schemas/location-map.ts) so a value typed here never gets refused on save. */
+const MAX_COORDINATE_M = 1000;
+const MAX_SIZE_M = 1000;
+
 export const KIND_LABELS: Record<LocationMapItemKind, string> = {
     object: "Object",
     character: "Character",
@@ -49,8 +53,20 @@ function withLink(item: LocationMapItem, id: string | null): LocationMapItem {
     return item.kind === "exit" ? { ...item, targetLocationId: id } : { ...item, storyObjectId: id };
 }
 
-/** Commits on blur or Enter, so typing a number is one undo step. */
-function NumberField({ label, value, onCommit }: { label: string; value: number; onCommit: (value: number) => void }) {
+/** Commits on blur or Enter, so typing a number is one undo step. Clamped to [min, max] so a typed value is never refused on save. */
+function NumberField({
+    label,
+    value,
+    min,
+    max,
+    onCommit,
+}: {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    onCommit: (value: number) => void;
+}) {
     return (
         <label className="block">
             <span className="block text-[11px] text-text-muted mb-0.5">{label}</span>
@@ -62,8 +78,13 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
                 defaultValue={value}
                 className="h-7 px-2 text-xs"
                 onBlur={(e) => {
-                    const next = Number(e.target.value);
-                    if (e.target.value !== "" && Number.isFinite(next) && next !== value) onCommit(next);
+                    const parsed = Number(e.target.value);
+                    if (e.target.value === "" || !Number.isFinite(parsed)) {
+                        e.target.value = String(value);
+                        return;
+                    }
+                    const next = Math.min(max, Math.max(min, parsed));
+                    if (next !== value) onCommit(next);
                     else e.target.value = String(value);
                 }}
                 onKeyDown={(e) => {
@@ -146,11 +167,11 @@ export function ItemPanel({ item, linkOptions, linkName, onChange, onTyping, onD
             </label>
 
             <div className="grid grid-cols-3 gap-2">
-                <NumberField label="X (m)" value={item.x} onCommit={(x) => onChange({ ...item, x })} />
-                <NumberField label="Y (m)" value={item.y} onCommit={(y) => onChange({ ...item, y })} />
-                <NumberField label="Rotation (°)" value={item.rotation} onCommit={(r) => onChange({ ...item, rotation: normaliseRotation(r) })} />
-                <NumberField label="Width (m)" value={item.w} onCommit={(w) => onChange(resize(item, Math.max(MIN_SIZE_M, w), item.h))} />
-                <NumberField label="Height (m)" value={item.h} onCommit={(h) => onChange(resize(item, item.w, Math.max(MIN_SIZE_M, h)))} />
+                <NumberField label="X (m)" value={item.x} min={-MAX_COORDINATE_M} max={MAX_COORDINATE_M} onCommit={(x) => onChange({ ...item, x })} />
+                <NumberField label="Y (m)" value={item.y} min={-MAX_COORDINATE_M} max={MAX_COORDINATE_M} onCommit={(y) => onChange({ ...item, y })} />
+                <NumberField label="Rotation (°)" value={item.rotation} min={-Infinity} max={Infinity} onCommit={(r) => onChange({ ...item, rotation: normaliseRotation(r) })} />
+                <NumberField label="Width (m)" value={item.w} min={MIN_SIZE_M} max={MAX_SIZE_M} onCommit={(w) => onChange(resize(item, Math.max(MIN_SIZE_M, w), item.h))} />
+                <NumberField label="Height (m)" value={item.h} min={MIN_SIZE_M} max={MAX_SIZE_M} onCommit={(h) => onChange(resize(item, item.w, Math.max(MIN_SIZE_M, h)))} />
             </div>
 
             <Button
