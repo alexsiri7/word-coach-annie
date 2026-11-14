@@ -599,7 +599,7 @@ test.describe('Integration tests — real server, real data', () => {
     }
   })
 
-  test('selecting text opens the editor bubble menu and its comment popover', async ({
+  test('commenting from the editor bubble menu highlights the selected text', async ({
     page,
     request,
   }) => {
@@ -636,10 +636,40 @@ test.describe('Integration tests — real server, real data', () => {
       await expect(commentButton).toBeVisible({ timeout: 5_000 })
 
       await commentButton.click()
-      await expect(page.getByText('Add Annotation')).toBeVisible({
-        timeout: 5_000,
-      })
-      await expect(page.locator('#new-annotation-input')).toBeVisible()
+      const popover = page.getByRole('dialog').filter({ hasText: 'Add Annotation' })
+      await expect(popover).toBeVisible({ timeout: 5_000 })
+      const annotationInput = popover.locator('#new-annotation-input')
+      await expect(annotationInput).toBeVisible()
+
+      await annotationInput.fill('Too loud?')
+      const [annotationRes] = await Promise.all([
+        page.waitForResponse(
+          (res) =>
+            res.url().endsWith(`/api/nodes/${scene.id}/annotations`) &&
+            res.request().method() === 'POST',
+        ),
+        popover.getByRole('button', { name: 'Save', exact: true }).click(),
+      ])
+      expect(annotationRes.ok()).toBeTruthy()
+      const annotation = await annotationRes.json()
+
+      const mark = page.locator(`[data-annotation-id="${annotation.id}"]`)
+      await expect(mark).toBeVisible({ timeout: 5_000 })
+      await expect(mark).toHaveText(annotation.selectedText)
+      await expect(mark).toHaveClass(/bg-yellow-200/)
+
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(`/api/nodes/${scene.id}/content`, {
+              headers: AUTH_HEADERS,
+            })
+            const body = await res.json()
+            return body.latest?.content ?? ''
+          },
+          { timeout: 10_000 },
+        )
+        .toContain(`data-annotation-id="${annotation.id}"`)
     } finally {
       if (projectId) await deleteProject(request, projectId)
     }
