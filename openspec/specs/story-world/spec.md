@@ -42,6 +42,29 @@ Uploads SHALL be re-encoded to WebP at most 2048 px on the longest side with a 4
 - WHEN they request a location image or its file
 - THEN the request is refused and no signed URL is issued
 
+### Requirement: Locations carry a map
+
+The project owner SHALL be able to sketch a top-down map of a location in metres, optionally over one of its images, and place, move, resize, rotate, describe and delete objects, characters, exits, areas and notes on it, with a mouse or by touch and through MCP. Maps SHALL be validated on every write.
+
+#### Scenario: Invalid map refused
+- WHEN a map with an item of an unknown kind is saved, over the API or MCP
+- THEN it is refused with the problem and nothing is stored
+
+#### Scenario: Renamed link follows
+- GIVEN a map item linked to the character Kael
+- WHEN Kael is renamed
+- THEN the item shows the new name
+
+#### Scenario: Deleted target leaves an unlinked item
+- GIVEN a map item linked to a character
+- WHEN the character is deleted
+- THEN the item stays on the map, marked unlinked, and the map can still be saved
+
+#### Scenario: Exit opens the other map
+- GIVEN an exit linked to another location
+- WHEN the author double-clicks it
+- THEN that location's map opens
+
 ### Requirement: Typed relationships between entities
 
 The author or an agent SHALL be able to link any two entities — scenes, story objects, or world objects of a universe the project is linked to — with a typed relationship such as appears in, located at, part of plotline or related to. Every relationship SHALL be visible from both ends, and each entity SHALL show all relationships touching it.
@@ -70,6 +93,11 @@ The author SHALL be able to create universes, link and unlink projects to them, 
 - GIVEN a project location that has images
 - WHEN the author moves it to the universe
 - THEN the move is refused until its images are removed, because world objects hold no images
+
+#### Scenario: Location with a map not transferred
+- GIVEN a project location that has a map
+- WHEN the author moves it to the universe
+- THEN the move is refused until its map is deleted, because world objects hold no maps
 
 ### Requirement: Timeline matrix
 

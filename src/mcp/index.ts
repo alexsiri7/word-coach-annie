@@ -68,6 +68,12 @@ import {
     deleteLocationImage,
 } from "./tools/location-images";
 import {
+    getLocationMap,
+    setLocationMap,
+    upsertLocationMapItem,
+    deleteLocationMapItem,
+} from "./tools/location-maps";
+import {
     listRelationships,
     createRelationship,
     deleteRelationship,
@@ -771,6 +777,72 @@ server.tool(
         return mcpRun("delete_location_image", "Error deleting location image", async () => {
             await verifyProjectOwnership(await projectIdForLocationImage(imageId), userId);
             return deleteLocationImage(imageId);
+        });
+    }
+);
+
+// ─── Location Map Tools ──────────────────────────────────────────────────────
+
+const LOCATION_MAP_GEOMETRY =
+    "Coordinates are metres from the map's top-left corner, y down: x, y is an item's centre, w, h its size, rotation degrees clockwise about the centre. " +
+    "Item kinds: object (rectangle; storyObjectId may link a WORLD_ELEMENT), character (circle; storyObjectId may link a CHARACTER), " +
+    "exit (door; targetLocationId may link another LOCATION), area (polygon; points is a list of [x, y] pairs, at least 3, relative to the item's centre and within ±w/2, ±h/2), note (pin). " +
+    "Each item has id, kind, label, description, x, y, w, h, rotation and optionally points, storyObjectId, targetLocationId.";
+
+server.tool(
+    "get_location_map",
+    `Read the top-down map of a LOCATION story object, or null if it has none. Returns widthM, heightM, backgroundImageId (a location image id or null), items and a contentHash for set_location_map. Each item also carries read-only linkName (the linked story object's current name) and unlinked (true when its link target was deleted). ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+    },
+    async ({ storyObjectId }) =>
+        mcpRun("get_location_map", "Error reading location map", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return getLocationMap(storyObjectId);
+        })
+);
+
+server.tool(
+    "set_location_map",
+    `Create or replace the whole map of a LOCATION story object. Replacing an existing map requires contentHash from get_location_map. widthM and heightM are 1–200 m; at most 500 items. ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        map: z.record(z.string(), z.unknown()).describe("{ widthM, heightM, backgroundImageId?, items: [...] }"),
+        contentHash: ContentHash.locationMap.optional(),
+    },
+    async ({ storyObjectId, map, contentHash }) =>
+        mcpRun("set_location_map", "Error saving location map", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return setLocationMap(storyObjectId, map, contentHash);
+        })
+);
+
+server.tool(
+    "upsert_location_map_item",
+    `Add an item to a location's map, or replace the item with the same id. Without an id the item is appended with a new one. The map must exist (set_location_map). ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        item: z.record(z.string(), z.unknown()).describe("The item; omit id to add a new one"),
+    },
+    async ({ storyObjectId, item }) =>
+        mcpRun("upsert_location_map_item", "Error saving location map item", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return upsertLocationMapItem(storyObjectId, item);
+        })
+);
+
+server.tool(
+    "delete_location_map_item",
+    "Remove one item from a location's map. Cannot be undone.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        itemId: z.string().describe("The map item ID"),
+    },
+    async ({ storyObjectId, itemId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        return mcpRun("delete_location_map_item", "Error deleting location map item", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return deleteLocationMapItem(storyObjectId, itemId);
         });
     }
 );

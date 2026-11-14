@@ -458,7 +458,7 @@ Update a story object.
 ---
 
 ### `DELETE /api/story-objects/:id`
-Delete a story object. Its location images and their stored files are deleted too.
+Delete a story object. Its location images and their stored files are deleted too, and so is its map.
 
 ---
 
@@ -493,6 +493,35 @@ Update an image. Owner only.
 Delete an image and its stored files. Owner only. Deleting the cover makes the new first image the cover.
 
 **Errors**: `400` if another edit to the same location's images was in progress (retry); `404` image not found
+
+---
+
+### `GET /api/story-objects/:id/map`
+Read a location's top-down map. Owner only.
+
+**Response**: `{ data: { id, storyObjectId, widthM, heightM, backgroundImageId, items, updatedAt, contentHash } }`, or `{ data: null }` when the location has no map. Each item also carries read-only `linkName` (the linked story object's current name, or `null`) and `unlinked` (`true` when its link target no longer exists).
+
+Coordinates are metres from the map's top-left corner, y down. An item is `{ id, kind, label, description, x, y, w, h, rotation, points?, storyObjectId?, targetLocationId? }`: `kind` is `object` | `character` | `exit` | `area` | `note`; `x, y` is its centre, `w, h` its size and `rotation` degrees clockwise about the centre. An `area` has `points`, at least three `[x, y]` pairs relative to its centre and within `±w/2, ±h/2`. `storyObjectId` links an `object` to a WORLD_ELEMENT or a `character` to a CHARACTER; `targetLocationId` links an `exit` to a LOCATION.
+
+**Errors**: `400` not a location; `404` story object not found
+
+---
+
+### `PUT /api/story-objects/:id/map`
+Create or replace a location's map. Owner only; the last write wins.
+
+**Body**: `{ widthM, heightM, backgroundImageId?, items }` — `widthM` and `heightM` 1–200, at most 500 items with unique ids, `backgroundImageId` one of this location's images or `null`. `linkName` and `unlinked` are ignored, so a map read from `GET` can be sent back. A link must point to a story object of the right type in this project, unless the same item, as the same kind, already held it (so an unlinked item can be saved again).
+
+**Response**: `{ data: <map> }` as for `GET`.
+
+**Errors**: `400` with the first problem and where it is (e.g. `items.0.kind: …`), a link of the wrong type, a background from elsewhere, a non-location, or another edit to the same map in progress (retry); `404` story object not found
+
+---
+
+### `DELETE /api/story-objects/:id/map`
+Delete a location's map. Owner only.
+
+**Response**: `{ deleted: true }`. **Errors**: `400` not a location; `404` story object not found, or it has no map
 
 ---
 
@@ -636,7 +665,7 @@ Transfer a story object from a project to a universe.
 
 **Body**: `{ storyObjectId: string, universeId: string }`
 
-**Errors**: `400` if the location has images — remove them before transferring
+**Errors**: `400` if the location has images or a map — remove them before transferring
 
 ---
 

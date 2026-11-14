@@ -305,6 +305,107 @@ describe("MCP cross-tenant access (SEC-02)", () => {
         });
     });
 
+    describe("location maps", () => {
+        const bar = { id: "bar", kind: "object", x: 3, y: 2, w: 4, h: 1 };
+
+        async function setupMap() {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const location = await prisma.storyObject.create({ data: { projectId: project.id, type: "LOCATION", name: "Harbour" } });
+            await prisma.locationMap.create({ data: { storyObjectId: location.id, widthM: 12, heightM: 8, items: [bar] } });
+            return { project, location };
+        }
+
+        async function readMap(storyObjectId: string) {
+            const result = await callTool("owner-a", "get_location_map", { storyObjectId });
+            expect(result.isError).toBeUndefined();
+            return JSON.parse(result.content[0].text);
+        }
+
+        it("denies every location map tool on another user's location", async () => {
+            const { location } = await setupMap();
+            for (const [tool, args] of [
+                ["get_location_map", { storyObjectId: location.id }],
+                ["set_location_map", { storyObjectId: location.id, map: { widthM: 1, heightM: 1, items: [] } }],
+                ["upsert_location_map_item", { storyObjectId: location.id, item: { ...bar, label: "hijacked" } }],
+                ["delete_location_map_item", { storyObjectId: location.id, itemId: "bar" }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError, tool).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+            expect(await prisma.locationMap.findUniqueOrThrow({ where: { storyObjectId: location.id } })).toMatchObject({ widthM: 12, items: [bar] });
+        });
+
+        it("refuses an invalid map with the schema's message", async () => {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const location = await prisma.storyObject.create({ data: { projectId: project.id, type: "LOCATION", name: "Inn" } });
+            const result = await callTool("owner-a", "set_location_map", {
+                storyObjectId: location.id,
+                map: { widthM: 12, heightM: 8, items: [{ id: "a", kind: "area", x: 1, y: 1, w: 1, h: 1 }] },
+            });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("items.0.points: points are required on area items");
+            expect(await prisma.locationMap.count()).toBe(0);
+        });
+
+        it("creates a map without a contentHash but replaces one only with the current hash", async () => {
+            const { location } = await setupMap();
+            const next = { widthM: 20, heightM: 10, items: [] };
+
+            const missing = await callTool("owner-a", "set_location_map", { storyObjectId: location.id, map: next });
+            expect(missing.isError).toBe(true);
+            expect(missing.content[0].text).toContain("pass its contentHash");
+
+            const stale = await callTool("owner-a", "set_location_map", { storyObjectId: location.id, map: next, contentHash: "0".repeat(64) });
+            expect(stale.isError).toBe(true);
+            expect(stale.content[0].text).toContain("Stale write rejected");
+
+            const { contentHash } = await readMap(location.id);
+            const ok = await callTool("owner-a", "set_location_map", { storyObjectId: location.id, map: next, contentHash });
+            expect(ok.isError).toBeUndefined();
+            expect(JSON.parse(ok.content[0].text)).toMatchObject({ widthM: 20, items: [] });
+        });
+
+        it("appends an item without an id and replaces one with an existing id in place", async () => {
+            const { location } = await setupMap();
+            const added = await callTool("owner-a", "upsert_location_map_item", {
+                storyObjectId: location.id, item: { kind: "note", label: "Draughty", x: 1, y: 1, w: 0.4, h: 0.4 },
+            });
+            expect(added.isError).toBeUndefined();
+            const newId = JSON.parse(added.content[0].text).item.id;
+            expect(newId).toMatch(/^[0-9a-f-]{36}$/);
+
+            const replaced = await callTool("owner-a", "upsert_location_map_item", {
+                storyObjectId: location.id, item: { ...bar, label: "Long bar", w: 6 },
+            });
+            expect(replaced.isError).toBeUndefined();
+            expect((await readMap(location.id)).items.map((i: { id: string; label: string; w: number }) => [i.id, i.label, i.w]))
+                .toEqual([["bar", "Long bar", 6], [newId, "Draughty", 0.4]]);
+        });
+
+        it("deletes one item, and says so when it is not there", async () => {
+            const { location } = await setupMap();
+            const result = await callTool("owner-a", "delete_location_map_item", { storyObjectId: location.id, itemId: "bar" });
+            expect(result.isError).toBeUndefined();
+            expect((await readMap(location.id)).items).toEqual([]);
+
+            const again = await callTool("owner-a", "delete_location_map_item", { storyObjectId: location.id, itemId: "bar" });
+            expect(again.isError).toBe(true);
+            expect(again.content[0].text).toContain("Map item not found");
+        });
+
+        it("gates delete_location_map_item behind MCP_ALLOW_DESTRUCTIVE", async () => {
+            const { location } = await setupMap();
+            const { createServer } = await import("../mcp/index");
+            const server = createServer({ userId: "owner-a", allowDestructive: false });
+            const tools = (server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<ToolResult> }> })._registeredTools;
+            const result = await tools.delete_location_map_item.handler({ storyObjectId: location.id, itemId: "bar" });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("MCP_ALLOW_DESTRUCTIVE");
+            expect(await prisma.locationMap.findUniqueOrThrow({ where: { storyObjectId: location.id } })).toMatchObject({ items: [bar] });
+        });
+    });
+
     describe("google docs", () => {
         it("forwards the caller's userId to GoogleAuthController", async () => {
             await callTool("owner-a", "google_auth_status", {});

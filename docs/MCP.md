@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **102 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **106 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -137,7 +137,7 @@ Remove a project's universe link.
 ---
 
 #### `transfer_story_object_to_universe`
-Transfer a project story object into a universe as a world object. Refuses a location that has images — remove them first.
+Transfer a project story object into a universe as a world object. Refuses a location that has images or a map — remove them first.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -499,6 +499,60 @@ Delete an image and its stored files. Deleting the cover makes the new first ima
 | Param | Type | Description |
 |-------|------|-------------|
 | `imageId` | string | The location image ID |
+
+---
+
+### Location Maps
+
+A location may have one top-down map, visible only to the project owner. Coordinates are metres from the map's top-left corner, y down. An item is `{ id, kind, label, description, x, y, w, h, rotation, points?, storyObjectId?, targetLocationId? }`: `x, y` is its centre, `w, h` its size, `rotation` degrees clockwise about the centre.
+
+| Kind | Shape | Link |
+|------|-------|------|
+| `object` | rectangle | `storyObjectId` → a WORLD_ELEMENT |
+| `character` | circle | `storyObjectId` → a CHARACTER |
+| `exit` | door | `targetLocationId` → a LOCATION |
+| `area` | polygon: `points`, at least three `[x, y]` pairs relative to the centre, within `±w/2, ±h/2` | — |
+| `note` | pin | — |
+
+Links must point into the same project. Reads add `linkName` (the linked object's current name) and `unlinked` (its target was deleted); writes ignore both. An invalid map or item is refused with the first problem and where it is. Writes fail with a retry message if another edit to the same map is in progress.
+
+#### `get_location_map`
+Read a location's map with a `contentHash`, or `null` when it has none.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+
+---
+
+#### `set_location_map`
+Create or replace the whole map. Replacing an existing map requires the `contentHash` from `get_location_map`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `map` | object | `{ widthM, heightM, backgroundImageId?, items }` — sizes 1–200 m, at most 500 items, `backgroundImageId` one of the location's images |
+| `contentHash` | string? | From `get_location_map`; required once a map exists |
+
+---
+
+#### `upsert_location_map_item`
+Add one item, or replace the item with the same `id` in place. Without an `id` the item is appended with a new one. The map must exist.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `item` | object | The item; omit `id` to add a new one |
+
+---
+
+#### `delete_location_map_item`
+Remove one item from a location's map. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `itemId` | string | The map item ID |
 
 ---
 
