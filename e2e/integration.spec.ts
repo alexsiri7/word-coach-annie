@@ -670,6 +670,12 @@ test.describe('Integration tests — real server, real data', () => {
           { timeout: 10_000 },
         )
         .toContain(`data-annotation-id="${annotation.id}"`)
+
+      await page.reload()
+      const reloadedMark = page.locator(`[data-annotation-id="${annotation.id}"]`)
+      await expect(reloadedMark).toBeVisible({ timeout: 20_000 })
+      await expect(reloadedMark).toHaveText(annotation.selectedText)
+      await expect(reloadedMark).toHaveClass(/bg-yellow-200/)
     } finally {
       if (projectId) await deleteProject(request, projectId)
     }
