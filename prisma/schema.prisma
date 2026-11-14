@@ -57,7 +57,7 @@ model ApiToken {
   id         String    @id @default(cuid())
   userId     String
   name       String
-  scope      String    // "read" | "write"
+  scope      String    // "read" | "write" | "snapshots"
   tokenHash  String    @unique // SHA-256 hex of the full token; the token itself is never stored
   hint       String    // last 4 characters, so the owner can tell tokens apart
   createdAt  DateTime  @default(now())
@@ -149,21 +149,24 @@ model Relationship {
 }
 
 model StoryObject {
-  id            String          @id @default(cuid())
-  projectId     String
-  type          String
-  name          String
-  description   String          @default("")
-  notes         String          @default("")
-  role          String?
-  tags          String          @default("")
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  relationships Relationship[]  @relation("Relationship_toObjectIdToStoryObject")
-  relatedBy     Relationship[]  @relation("Relationship_fromObjectIdToStoryObject")
-  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  images        LocationImage[]
-  map           LocationMap?
+  id                        String               @id @default(cuid())
+  projectId                 String
+  type                      String
+  name                      String
+  description               String               @default("")
+  notes                     String               @default("")
+  role                      String?
+  tags                      String               @default("")
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  relationships             Relationship[]       @relation("Relationship_toObjectIdToStoryObject")
+  relatedBy                 Relationship[]       @relation("Relationship_fromObjectIdToStoryObject")
+  project                   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  images                    LocationImage[]
+  map                       LocationMap?
+  snapshots                 LocationSnapshot[]
+  snapshotAnnotations       SnapshotAnnotation[] @relation("SnapshotAnnotationLocation")
+  linkedSnapshotAnnotations SnapshotAnnotation[] @relation("SnapshotAnnotationLink")
 
   @@index([projectId, type])
 }
@@ -203,6 +206,46 @@ model LocationMap {
   backgroundImage   LocationImage? @relation(fields: [backgroundImageId], references: [id], onDelete: SetNull)
 
   @@index([backgroundImageId])
+}
+
+// A game's screenshot of a location, with its clickable things (#1486).
+model LocationSnapshot {
+  id            String               @id @default(cuid())
+  storyObjectId String
+  build         String
+  takenAt       DateTime
+  storagePath   String
+  sha256        String // of the uploaded file, before re-encoding
+  width         Int // of the uploaded screenshot: the pixel space of things and regions
+  height        Int
+  things        Json // [{ key, name, description, kind, box: { x, y, w, h } }], sorted by key
+  createdAt     DateTime             @default(now())
+  storyObject   StoryObject          @relation(fields: [storyObjectId], references: [id], onDelete: Cascade)
+  annotations   SnapshotAnnotation[]
+
+  @@index([storyObjectId, createdAt(sort: Desc)])
+}
+
+// A note on a snapshot region, or a requested name/description change to a thing.
+model SnapshotAnnotation {
+  id            String            @id @default(cuid())
+  locationId    String // the LOCATION; kept when the snapshot is pruned
+  snapshotId    String? // null once the snapshot is pruned; the text stays
+  kind          String // note | description | name
+  thingKey      String?
+  region        Json? // { type: "point", x, y } | { type: "rect", x, y, w, h } | { type: "path", points: [[x, y], ...] }
+  text          String
+  storyObjectId String? // story object a note is linked to
+  status        String            @default("open") // open | sent | done
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  location      StoryObject       @relation("SnapshotAnnotationLocation", fields: [locationId], references: [id], onDelete: Cascade)
+  snapshot      LocationSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+  storyObject   StoryObject?      @relation("SnapshotAnnotationLink", fields: [storyObjectId], references: [id], onDelete: SetNull)
+
+  @@index([locationId, status])
+  @@index([snapshotId])
+  @@index([storyObjectId])
 }
 
 model StructureNode {

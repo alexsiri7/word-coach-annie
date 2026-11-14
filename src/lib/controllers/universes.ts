@@ -394,6 +394,10 @@ export class UniversesController {
             if (await tx.locationMap.count({ where: { storyObjectId } }) > 0) {
                 throw new UserFacingError("Remove this location's map before moving it to the universe");
             }
+            // Moving would cascade-delete the game's snapshots and the author's notes on them.
+            if (await tx.locationSnapshot.count({ where: { storyObjectId } }) > 0) {
+                throw new UserFacingError("This location has game snapshots and can't be moved to the universe");
+            }
 
             // 2. Create WorldObject
             const wo = await tx.worldObject.create({

@@ -24,6 +24,9 @@ export interface ProcessedImage {
     thumb: Buffer;
     width: number;
     height: number;
+    /** The upload's upright size, before any downscale. */
+    sourceWidth: number;
+    sourceHeight: number;
     bytes: number;
     sha256: string;
 }
@@ -53,7 +56,8 @@ export async function processLocationImage(input: Buffer): Promise<ProcessedImag
     if (input.length > MAX_IMAGE_BYTES) throw new ImageRejectedError("Image is larger than 20 MB");
 
     const options = { limitInputPixels: MAX_IMAGE_PIXELS, failOn: "error" as const };
-    const { format } = await decodeStep(() => sharp(input, options).metadata());
+    const metadata = await decodeStep(() => sharp(input, options).metadata());
+    const { format } = metadata;
     if (!format || !ACCEPTED_FORMATS.has(format)) {
         throw new ImageRejectedError("Not a supported image (use JPEG, PNG, WebP or GIF)");
     }
@@ -71,11 +75,14 @@ export async function processLocationImage(input: Buffer): Promise<ProcessedImag
         .webp({ quality: 75 })
         .toBuffer();
 
+    const quarterTurned = (metadata.orientation ?? 1) >= 5;
     return {
         full: full.data,
         thumb,
         width: full.info.width,
         height: full.info.height,
+        sourceWidth: quarterTurned ? metadata.height : metadata.width,
+        sourceHeight: quarterTurned ? metadata.width : metadata.height,
         bytes: full.data.length,
         sha256: createHash("sha256").update(full.data).digest("hex"),
     };

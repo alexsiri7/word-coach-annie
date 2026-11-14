@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { PersonalTokenScope } from "@/lib/personal-tokens";
 
 describe("MCP Server", () => {
     beforeEach(() => {
@@ -38,7 +39,7 @@ describe("MCP Server", () => {
 });
 
 describe("MCP tools for personal API tokens", () => {
-    async function registeredTools(tokenScope?: "read" | "write") {
+    async function registeredTools(tokenScope?: PersonalTokenScope) {
         const { createServer } = await import("../mcp/index");
         const server = createServer({ userId: "u", allowDestructive: true, tokenScope });
         return Object.keys((server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools).sort();
@@ -63,6 +64,10 @@ describe("MCP tools for personal API tokens", () => {
             "update_paragraph",
             "write_scene_content",
         ]);
+    });
+
+    it("registers no tools for a snapshots token", async () => {
+        expect(await registeredTools("snapshots")).toEqual([]);
     });
 
     it("registers every tool without a token scope", async () => {

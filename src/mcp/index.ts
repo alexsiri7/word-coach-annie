@@ -67,6 +67,14 @@ import {
     updateLocationImage,
     deleteLocationImage,
 } from "./tools/location-images";
+import { SnapshotAnnotationKindSchema, SnapshotAnnotationStatusSchema, SnapshotRegionSchema } from "@/schemas/location-snapshots";
+import { LocationSnapshotController } from "@/lib/controllers/location-snapshots";
+import {
+    listLocationSnapshots,
+    getLocationSnapshot,
+    addSnapshotAnnotation,
+    updateSnapshotAnnotation,
+} from "./tools/location-snapshots";
 import {
     getLocationMap,
     setLocationMap,
@@ -145,7 +153,9 @@ import {
     assertRelationshipOwner,
     projectIdForAnnotation,
     projectIdForLocationImage,
+    projectIdForLocationSnapshot,
     projectIdForNode,
+    projectIdForSnapshotAnnotation,
     projectIdForStoryObject,
     universeIdForWorldObject,
     universeIdForTimelineEntry,
@@ -845,6 +855,77 @@ server.tool(
             return deleteLocationMapItem(storyObjectId, itemId);
         });
     }
+);
+
+// ─── Location Snapshot Tools ─────────────────────────────────────────────────
+
+server.tool(
+    "list_location_snapshots",
+    "List a LOCATION's game snapshots, newest first (at most 10 are kept): id, build, takenAt, width, height and thingCount. Also returns notes whose snapshot has since been deleted, as text.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+    },
+    async ({ storyObjectId }) =>
+        mcpRun("list_location_snapshots", "Error listing location snapshots", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return listLocationSnapshots(storyObjectId);
+        })
+);
+
+server.tool(
+    "get_location_snapshot",
+    "Get a game snapshot of a location: its things ({ key, name, description, kind, box }, box in screenshot pixels of width × height), a signed imageUrl that expires after an hour, and annotations: notes on this snapshot plus every name/description change requested for the location. Pass snapshotId, or storyObjectId for the latest snapshot.",
+    {
+        snapshotId: z.string().optional().describe("The snapshot ID"),
+        storyObjectId: z.string().optional().describe("A LOCATION story object ID, for its latest snapshot"),
+    },
+    async ({ snapshotId, storyObjectId }) =>
+        mcpRun("get_location_snapshot", "Error getting location snapshot", async () => {
+            if ((snapshotId === undefined) === (storyObjectId === undefined)) {
+                throw new UserFacingError("Provide exactly one of snapshotId or storyObjectId");
+            }
+            if (snapshotId !== undefined) {
+                await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
+                return getLocationSnapshot(snapshotId);
+            }
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId!), userId);
+            return getLocationSnapshot(await LocationSnapshotController.latestId(storyObjectId!));
+        })
+);
+
+server.tool(
+    "add_snapshot_annotation",
+    "Annotate a game snapshot. kind note: a note (text) on an optional region (point, rect or path in screenshot pixels), optionally about a thing (thingKey) and linked to a story object of the same project. kind description or name: request that a thing's (thingKey) description or name change to text; it stays open until a later snapshot carries that text, and replaces the thing's earlier open request.",
+    {
+        snapshotId: z.string().describe("The snapshot ID"),
+        kind: SnapshotAnnotationKindSchema.describe("note, description or name"),
+        text: z.string().describe("The note, or the requested description or name"),
+        thingKey: z.string().optional().describe("The thing's key; required for description and name"),
+        region: SnapshotRegionSchema.optional().describe("Notes only: { type: point, x, y } | { type: rect, x, y, w, h } | { type: path, points: [[x, y], ...] }"),
+        storyObjectId: z.string().optional().describe("Notes only: a story object of the same project the note is about"),
+    },
+    async ({ snapshotId, ...input }) =>
+        mcpRun("add_snapshot_annotation", "Error adding snapshot annotation", async () => {
+            await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
+            return addSnapshotAnnotation(snapshotId, input);
+        })
+);
+
+server.tool(
+    "update_snapshot_annotation",
+    "Change a snapshot annotation's text or status (open, sent = exported by the story sync, done = resolved), or a note's region or linked story object (null unlinks).",
+    {
+        annotationId: z.string().describe("The annotation ID"),
+        text: z.string().optional().describe("New text"),
+        status: SnapshotAnnotationStatusSchema.optional().describe("open, sent or done"),
+        region: SnapshotRegionSchema.optional().describe("Notes only: new region"),
+        storyObjectId: z.string().nullable().optional().describe("Notes only: story object to link, or null to unlink"),
+    },
+    async ({ annotationId, ...changes }) =>
+        mcpRun("update_snapshot_annotation", "Error updating snapshot annotation", async () => {
+            await verifyProjectOwnership(await projectIdForSnapshotAnnotation(annotationId), userId);
+            return updateSnapshotAnnotation(annotationId, changes);
+        })
 );
 
 // ─── Batch Tools ────────────────────────────────────────────────────────────

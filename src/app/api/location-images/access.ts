@@ -19,6 +19,14 @@ export async function verifyLocationImageAccess(
     return access.authorized ? null : access.response;
 }
 
+/** Owner-only access to a story object's images and snapshots. */
+export async function verifyStoryObjectAccess(request: NextRequest, id: string): Promise<NextResponse | null> {
+    const storyObject = await prisma.storyObject.findUnique({ where: { id }, select: { projectId: true } });
+    if (!storyObject) return NextResponse.json({ error: "Story object not found" }, { status: 404 });
+    const access = await verifyProjectAccess(storyObject.projectId, getCurrentUserId(request));
+    return access.authorized ? null : access.response;
+}
+
 export function locationImageErrorResponse(label: string, error: unknown): NextResponse {
     if (error instanceof StorageNotConfiguredError) {
         return NextResponse.json({ error: error.message }, { status: 503 });

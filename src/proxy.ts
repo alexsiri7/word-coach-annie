@@ -247,7 +247,8 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Personal API token (annie_pat_…): acts as its user, confined to scene routes and MCP.
+    // 2. Personal API token (annie_pat_…): acts as its user, confined to scene routes and MCP,
+    // or to posting location snapshots for a snapshots token.
     // Scope is checked before rate limiting so refused requests don't spend the token's quota.
     if (token?.startsWith(PERSONAL_TOKEN_PREFIX)) {
         const pat = await verifyPersonalToken(token);
@@ -255,10 +256,10 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
 
         const allowed = isPersonalTokenRequestAllowed(pathname, request.method, pat.scope);
         if (allowed === "out-of-scope") {
-            return NextResponse.json(
-                { error: "Personal API tokens can only access scenes" },
-                { status: 403 }
-            );
+            const error = pat.scope === "snapshots"
+                ? "This API token can only post location snapshots"
+                : "Personal API tokens can only access scenes";
+            return NextResponse.json({ error }, { status: 403 });
         }
         if (allowed === "read-only") {
             return NextResponse.json({ error: "This API token is read-only" }, { status: 403 });

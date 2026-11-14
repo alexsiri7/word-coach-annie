@@ -29,7 +29,12 @@ interface ApiTokenSummary {
 const SCOPE_LABELS: Record<string, string> = {
   read: "Read only",
   write: "Read & write scenes",
+  snapshots: "Post location snapshots",
 } satisfies Record<PersonalTokenScope, string>;
+
+function isScope(value: string): value is PersonalTokenScope {
+  return Object.hasOwn(SCOPE_LABELS, value);
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -128,7 +133,7 @@ export function ApiTokensCard() {
           <h2 className="text-lg font-semibold text-text-primary">API tokens</h2>
         </div>
         <p className="text-sm text-text-secondary mb-4">
-          Let another app read or edit your scenes as you. Tokens can only reach scenes.
+          Let another app read or edit your scenes as you, or let a game post snapshots of its locations. Tokens can reach nothing else.
         </p>
 
         {loading ? (
@@ -200,13 +205,14 @@ export function ApiTokensCard() {
                 <label htmlFor="api-token-scope" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Access
                 </label>
-                <Select value={scope} onValueChange={(v) => setScope(v === "write" ? "write" : "read")}>
+                <Select value={scope} onValueChange={(v) => setScope(isScope(v) ? v : "read")}>
                   <SelectTrigger id="api-token-scope">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="read">{SCOPE_LABELS.read}</SelectItem>
                     <SelectItem value="write">{SCOPE_LABELS.write}</SelectItem>
+                    <SelectItem value="snapshots">{SCOPE_LABELS.snapshots}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

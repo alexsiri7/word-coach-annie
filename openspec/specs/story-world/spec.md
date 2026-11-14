@@ -65,6 +65,24 @@ The project owner SHALL be able to sketch a top-down map of a location in metres
 - WHEN the author double-clicks it
 - THEN that location's map opens
 
+### Requirement: Locations carry game snapshots
+
+A game's build job SHALL be able to post a screenshot of a location, named by the story-sync export's slug, with the clickable things on it. The owner SHALL see the latest snapshot with its things outlined, step back to older ones, request a change to a thing's name or description, and pin, box or circle a region with a note, on desktop and mobile and through MCP. Ten snapshots SHALL be kept per location; notes on deleted ones SHALL be kept as text.
+
+#### Scenario: Same snapshot posted twice
+- GIVEN a location whose latest snapshot has a given file and things
+- WHEN the same file and things are posted again
+- THEN nothing is stored
+
+#### Scenario: Unknown slug
+- WHEN a snapshot is posted for a slug no location of the project has
+- THEN it is refused with 404 listing the known slugs and nothing is stored
+
+#### Scenario: Requested description arrives in the game
+- GIVEN an open request to change a thing's description
+- WHEN a later snapshot carries that description
+- THEN the request is marked done
+
 ### Requirement: Typed relationships between entities
 
 The author or an agent SHALL be able to link any two entities — scenes, story objects, or world objects of a universe the project is linked to — with a typed relationship such as appears in, located at, part of plotline or related to. Every relationship SHALL be visible from both ends, and each entity SHALL show all relationships touching it.
@@ -98,6 +116,11 @@ The author SHALL be able to create universes, link and unlink projects to them, 
 - GIVEN a project location that has a map
 - WHEN the author moves it to the universe
 - THEN the move is refused until its map is deleted, because world objects hold no maps
+
+#### Scenario: Location with game snapshots not transferred
+- GIVEN a project location that has game snapshots
+- WHEN the author moves it to the universe
+- THEN the move is refused, because moving would delete the snapshots and the notes on them
 
 ### Requirement: Timeline matrix
 

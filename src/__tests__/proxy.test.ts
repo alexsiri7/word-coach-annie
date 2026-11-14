@@ -487,6 +487,27 @@ describe("proxy", () => {
             expect(await res.json()).toEqual({ error: "Personal API tokens can only access scenes" });
         });
 
+        it("lets a snapshots token post a location snapshot and nothing else", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue({ ...writeToken, scope: "snapshots" });
+            const ok = await proxy(patRequest("/api/projects/p1/locations/sunstone-keep/snapshots", "POST"));
+            expect(ok.status).toBe(200);
+            expect(ok.headers.get("x-middleware-request-x-user-id")).toBe("pat-user");
+            expect(ok.headers.get("x-middleware-request-x-token-scope")).toBe("snapshots");
+
+            for (const [path, method] of [["/api/nodes/n1/content", "GET"], ["/api/mcp", "POST"]]) {
+                const res = await proxy(patRequest(path, method));
+                expect(res.status).toBe(403);
+                expect(await res.json()).toEqual({ error: "This API token can only post location snapshots" });
+            }
+        });
+
+        it("refuses a write token on the snapshot route", async () => {
+            vi.mocked(verifyPersonalToken).mockResolvedValue(writeToken);
+            const res = await proxy(patRequest("/api/projects/p1/locations/sunstone-keep/snapshots", "POST"));
+            expect(res.status).toBe(403);
+            expect(await res.json()).toEqual({ error: "Personal API tokens can only access scenes" });
+        });
+
         it("returns 401 for an unknown or revoked token without trying it as an MCP token", async () => {
             const res = await proxy(patRequest("/api/nodes/n1/content"));
             expect(res.status).toBe(401);

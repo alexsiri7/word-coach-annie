@@ -26,7 +26,13 @@ describe("processLocationImage", () => {
         expect(full.exif).toBeUndefined();
         expect(full.icc).toBeUndefined();
         expect(full.xmp).toBeUndefined();
-        expect(result).toMatchObject({ width: 2048, height: 1365, bytes: result.full.length });
+        expect(result).toMatchObject({
+            width: 2048,
+            height: 1365,
+            sourceWidth: 3000,
+            sourceHeight: 2000,
+            bytes: result.full.length,
+        });
         expect(result.sha256).toBe(createHash("sha256").update(result.full).digest("hex"));
 
         const thumb = await sharp(result.thumb).metadata();
@@ -35,7 +41,12 @@ describe("processLocationImage", () => {
 
     it("applies EXIF orientation before stripping it", async () => {
         const rotated = await solid(300, 100).withMetadata({ orientation: 6 }).jpeg().toBuffer();
-        expect(await processLocationImage(rotated)).toMatchObject({ width: 100, height: 300 });
+        expect(await processLocationImage(rotated)).toMatchObject({
+            width: 100,
+            height: 300,
+            sourceWidth: 100,
+            sourceHeight: 300,
+        });
     });
 
     it("does not enlarge a small image", async () => {
