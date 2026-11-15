@@ -34,23 +34,31 @@ export type Condition =
     | { world: string }
     | { not: Condition };
 
-export type Effect =
-    | { say: string; by?: string }
-    | { goTo: string; at?: FloorPoint }
-    | { goBack: true }
-    | { wait: number }
-    | { pickUp: string }
-    | { give: string }
-    | { take: string }
-    | { gather: string }
-    | { set: string; to: FlagValue }
-    | { talk: string }
-    | { changeStat: string; by: number }
-    | { reachGoal: string };
+/** Each effect, keyed by its name: the key it carries. */
+interface EffectShapes {
+    say: { say: string; by?: string };
+    goTo: { goTo: string; at?: FloorPoint };
+    goBack: { goBack: true };
+    wait: { wait: number };
+    pickUp: { pickUp: string };
+    give: { give: string };
+    take: { take: string };
+    gather: { gather: string };
+    set: { set: string; to: FlagValue };
+    talk: { talk: string };
+    changeStat: { changeStat: string; by: number };
+    reachGoal: { reachGoal: string };
+}
 
-export const EFFECT_NAMES = [
-    "say", "goTo", "goBack", "wait", "pickUp", "give", "take", "gather", "set", "talk", "changeStat", "reachGoal",
-] as const;
+export type Effect = EffectShapes[keyof EffectShapes];
+export type EffectName = keyof EffectShapes;
+
+const effectNames: { [K in EffectName]: K extends keyof EffectShapes[K] ? true : never } = {
+    say: true, goTo: true, goBack: true, wait: true, pickUp: true, give: true,
+    take: true, gather: true, set: true, talk: true, changeStat: true, reachGoal: true,
+};
+
+export const EFFECT_NAMES = Object.keys(effectNames) as EffectName[];
 
 export interface Reaction { when?: Condition[]; effects: Effect[] }
 
@@ -119,12 +127,15 @@ export interface Room {
     onStart?: Reaction[];
 }
 
-/** `next` is a node id, or null to end the conversation. */
+/**
+ * `next` is a node id, or null to end the conversation. The spec's action node is two
+ * shapes, so each has its own tag: `action` applies effects, `branch` branches on a condition.
+ */
 export type DialogueNode =
     | { id: string; type: "line"; speaker: string; text: string; next: string | null }
     | { id: string; type: "choice"; options: { text: string; when?: Condition[]; next: string | null }[] }
     | { id: string; type: "action"; effects: Effect[]; next: string | null }
-    | { id: string; type: "action"; if: Condition[]; then: string | null; else: string | null }
+    | { id: string; type: "branch"; if: Condition[]; then: string | null; else: string | null }
     | ImprovNode;
 
 /** The fallback is not one of `outcomes`: it is what the node does at the turn limit or without the AI. */
@@ -217,10 +228,16 @@ export interface PreviewResult {
 
 // ─── Mocks every test file installs ──────────────────────────────────────────
 
-/** Supabase Storage held in memory, for model files and snapshot screenshots. */
+/**
+ * Supabase Storage held in memory, for model files and snapshot screenshots. An
+ * implementation that keeps model files there reads them back with `downloadObject`,
+ * which the storage module does not have yet.
+ */
 const stored = new Map<string, Buffer>();
 
-export function fakeStorage(actual: typeof import("@/lib/storage/supabase-storage")): typeof actual {
+type StorageModule = typeof import("@/lib/storage/supabase-storage");
+
+export function fakeStorage(actual: StorageModule): StorageModule & { downloadObject(path: string): Promise<Buffer> } {
     const signed = (path: string) => `https://storage.test/signed/${path}?token=t`;
     return {
         ...actual,
@@ -228,6 +245,11 @@ export function fakeStorage(actual: typeof import("@/lib/storage/supabase-storag
         createSignedUrl: vi.fn(async (path: string) => signed(path)),
         createSignedUrls: vi.fn(async (paths: string[]) => new Map(paths.map((p) => [p, signed(p)]))),
         removeObjects: vi.fn(async (paths: string[]) => { for (const p of paths) stored.delete(p); }),
+        downloadObject: vi.fn(async (path: string) => {
+            const data = stored.get(path);
+            if (!data) throw new Error(`No stored object at ${path}`);
+            return data;
+        }),
     };
 }
 

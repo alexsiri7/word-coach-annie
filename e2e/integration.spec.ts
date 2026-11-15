@@ -1138,7 +1138,10 @@ const line = (id: string, text: string, next: string | null): DialogueNode => ({
   next,
 })
 
-/** A game project whose bartender has the conversation `talk`, entering at the first node. */
+/**
+ * A game project whose bartender has the conversation `talk`, entering at the first node.
+ * Saved in the order seedGame keeps: nothing names an object saved after it.
+ */
 async function createConversation(
   request: APIRequestContext,
   nodes: DialogueNode[],
@@ -1164,6 +1167,30 @@ async function createConversation(
     height: 1.55,
     artSpec: { prompt: 'A crow in an apron', notes: '', referenceImages: [] },
     status: 'placeholder',
+  })
+  await save('model', {
+    id: 'scene/street',
+    kind: 'scene',
+    file: 'models/scenes/street.glb',
+    artSpec: { prompt: 'A street at night', notes: '', referenceImages: [] },
+    status: 'placeholder',
+  })
+  await save('world', { id: 'street', name: 'Street', start: 'street' })
+  await save('room', {
+    id: 'street',
+    world: 'street',
+    model: 'scene/street',
+    label: 'PUNLAND · STREET',
+    place: { verb: 'On', name: 'street' },
+    hint: 'The street.',
+    start: { x: 640, y: 600 },
+    walkable: [
+      { x: 100, y: 560 },
+      { x: 1180, y: 560 },
+      { x: 1180, y: 630 },
+      { x: 100, y: 630 },
+    ],
+    hotspots: [],
   })
   await save('character', { id: 'bartender', name: 'Bartender', model: 'character/bartender' })
   await save('game', {

@@ -43,7 +43,7 @@ describe("game-world-model", () => {
         it.fails("Deleting an object that is in use", async () => {
             const { game, projectId } = await seededGame();
             const inUse: { kind: "item" | "flag"; id: string; usedIn: { id: string; hotspot: string }[] }[] = [
-                { kind: "item", id: "map", usedIn: [{ id: "shop", hotspot: "counter" }] },
+                { kind: "item", id: "map", usedIn: [{ id: "street", hotspot: "flyer" }, { id: "shop", hotspot: "counter" }] },
                 { kind: "flag", id: "door-open", usedIn: [{ id: "street", hotspot: "flyer" }, { id: "street", hotspot: "door" }] },
             ];
 
