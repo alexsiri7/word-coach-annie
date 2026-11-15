@@ -8,7 +8,8 @@ vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => null),
 }));
 
-vi.mock("@/lib/import-json", () => ({
+vi.mock("@/lib/import-json", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/import-json")>()),
   importProjectJson: vi.fn(async () => ({ projectId: "imported-id" })),
 }));
 
@@ -17,6 +18,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId } from "@/lib/api-auth";
+import { importProjectJson } from "@/lib/import-json";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,23 @@ describe("POST /api/projects/import", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("returns 409 when the import transaction loses a serialization conflict at COMMIT", async () => {
+    // COMMIT-time conflicts reach the caller as the raw adapter error, not P2034.
+    vi.mocked(importProjectJson).mockRejectedValueOnce(
+      Object.assign(new Error("TransactionWriteConflict"), {
+        name: "DriverAdapterError",
+        cause: { kind: "TransactionWriteConflict" },
+      })
+    );
+    const { POST } = await import("@/app/api/projects/import/route");
+    const res = await POST(makePostRequest({
+      exportVersion: 1,
+      project: { title: "My Novel", author: "Author" },
+    }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("Request conflict, please try again.");
   });
 
   it("uses getCurrentUserId from the request", async () => {

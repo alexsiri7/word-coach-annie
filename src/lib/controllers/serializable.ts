@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import type { MappedError } from "@prisma/driver-adapter-utils";
 import { prisma, type DbClient } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { UserFacingError } from "@/lib/controllers/errors";
@@ -13,7 +14,7 @@ export function isSerializationConflict(e: unknown): boolean {
     if (e instanceof Prisma.PrismaClientKnownRequestError) return e.code === "P2034";
     if (!(e instanceof Error) || e.name !== "DriverAdapterError") return false;
     const cause = (e as { cause?: unknown }).cause;
-    return typeof cause === "object" && cause !== null && (cause as { kind?: unknown }).kind === "TransactionWriteConflict";
+    return typeof cause === "object" && cause !== null && (cause as { kind?: MappedError["kind"] }).kind === "TransactionWriteConflict";
 }
 
 /**
