@@ -183,6 +183,20 @@ describe("location snapshots", () => {
             expect(await prisma.locationSnapshot.count({ where: { storyObjectId: location.id } })).toBe(1);
         });
 
+        it("tells the uploader to retry when the write loses a serialization conflict at COMMIT", async () => {
+            const { project, location } = await setup();
+            // COMMIT-time conflicts reach the caller as the raw adapter error, not P2034.
+            vi.spyOn(prisma, "$transaction").mockRejectedValueOnce(
+                Object.assign(new Error("TransactionWriteConflict"), { name: "DriverAdapterError", cause: { kind: "TransactionWriteConflict" } }),
+            );
+
+            const res = await ingest(project.id, "sunstone-keep");
+            expect(res.status).toBe(400);
+            expect(await res.json()).toEqual({ error: "This location's snapshots changed at the same time; please try again" });
+            expect(stored.size).toBe(0);
+            expect(await prisma.locationSnapshot.count({ where: { storyObjectId: location.id } })).toBe(0);
+        });
+
         it("stores a new snapshot when only the things or only the file changed", async () => {
             const { project, location } = await setup();
             await ingestOk(project.id);

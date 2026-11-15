@@ -183,6 +183,18 @@ describe("location map", () => {
         }
     });
 
+    it("tells the editor to retry when the write loses a serialization conflict at COMMIT", async () => {
+        const { location } = await setup();
+        // COMMIT-time conflicts reach the caller as the raw adapter error, not P2034.
+        vi.spyOn(prisma, "$transaction").mockRejectedValueOnce(
+            Object.assign(new Error("TransactionWriteConflict"), { name: "DriverAdapterError", cause: { kind: "TransactionWriteConflict" } }),
+        );
+
+        const res = await put(location.id, map([]));
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: "This location's map changed at the same time; please try again" });
+    });
+
     describe("background", () => {
         async function image(storyObjectId: string) {
             return prisma.locationImage.create({
