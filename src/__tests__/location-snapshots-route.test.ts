@@ -12,8 +12,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const stored = new Map<string, Buffer>();
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@/lib/storage/supabase-storage")>();
+vi.mock("@/lib/storage/object-storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/storage/object-storage")>();
     return {
         ...actual,
         uploadObject: vi.fn(async (path: string, data: Buffer) => { stored.set(path, data); }),
@@ -25,7 +25,7 @@ vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
 
 import { getCurrentUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { removeObjects, uploadObject } from "@/lib/storage/supabase-storage";
+import { removeObjects, uploadObject } from "@/lib/storage/object-storage";
 import { UniversesController } from "@/lib/controllers/universes";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { IMAGE_FILE_CACHE_SECONDS } from "@/lib/controllers/location-images";
@@ -181,6 +181,20 @@ describe("location snapshots", () => {
             expect(await res.json()).toMatchObject({ created: false, snapshot: { id: first.id, build: "build-1" } });
             expect(uploadObject).toHaveBeenCalledTimes(1);
             expect(await prisma.locationSnapshot.count({ where: { storyObjectId: location.id } })).toBe(1);
+        });
+
+        it("tells the uploader to retry when the write loses a serialization conflict at COMMIT", async () => {
+            const { project, location } = await setup();
+            // COMMIT-time conflicts reach the caller as the raw adapter error, not P2034.
+            vi.spyOn(prisma, "$transaction").mockRejectedValueOnce(
+                Object.assign(new Error("TransactionWriteConflict"), { name: "DriverAdapterError", cause: { kind: "TransactionWriteConflict" } }),
+            );
+
+            const res = await ingest(project.id, "sunstone-keep");
+            expect(res.status).toBe(400);
+            expect(await res.json()).toEqual({ error: "This location's snapshots changed at the same time; please try again" });
+            expect(stored.size).toBe(0);
+            expect(await prisma.locationSnapshot.count({ where: { storyObjectId: location.id } })).toBe(0);
         });
 
         it("stores a new snapshot when only the things or only the file changed", async () => {

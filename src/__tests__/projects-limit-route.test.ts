@@ -17,6 +17,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { getCurrentUserId } from "@/lib/api-auth";
+import { prisma } from "@/lib/db";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,22 @@ describe("POST /api/projects - active project limit (HTTP level)", () => {
       where: { userId: user.id, archivedAt: null },
     });
     expect(finalCount).toBe(3);
+  });
+
+  it("returns 409 when the transaction loses a serialization conflict at COMMIT", async () => {
+    // COMMIT-time conflicts reach the caller as the raw adapter error, not P2034.
+    vi.spyOn(prisma, "$transaction").mockRejectedValueOnce(
+      Object.assign(new Error("TransactionWriteConflict"), {
+        name: "DriverAdapterError",
+        cause: { kind: "TransactionWriteConflict" },
+      })
+    );
+
+    const { POST } = await import("@/app/api/projects/route");
+    const res = await POST(makePostRequest({ title: "Raced" }));
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("Request conflict, please try again.");
   });
 
   it("skips the limit check and creates a project for unauthenticated (API_TOKEN/dev) requests", async () => {

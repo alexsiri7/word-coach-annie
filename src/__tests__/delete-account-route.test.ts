@@ -25,7 +25,7 @@ vi.mock("@/lib/token-blocklist", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@/lib/storage/supabase-storage", () => ({
+vi.mock("@/lib/storage/object-storage", () => ({
   removeObjects: vi.fn(async () => undefined),
 }));
 
@@ -33,7 +33,7 @@ import { getCurrentUserId, validateCsrfHeader } from "@/lib/api-auth";
 import { isGoogleAuthMode } from "@/lib/auth";
 import { verifySessionTokenNode, verifyRefreshToken } from "@/lib/auth-server";
 import { revokeToken } from "@/lib/token-blocklist";
-import { removeObjects } from "@/lib/storage/supabase-storage";
+import { removeObjects } from "@/lib/storage/object-storage";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

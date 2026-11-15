@@ -12,8 +12,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const stored = new Map<string, Buffer>();
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@/lib/storage/supabase-storage")>();
+vi.mock("@/lib/storage/object-storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/storage/object-storage")>();
     return {
         ...actual,
         uploadObject: vi.fn(async (path: string, data: Buffer) => { stored.set(path, data); }),
@@ -25,7 +25,7 @@ vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
 
 import { getCurrentUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { createSignedUrl, removeObjects, uploadObject } from "@/lib/storage/supabase-storage";
+import { createSignedUrl, removeObjects, uploadObject } from "@/lib/storage/object-storage";
 import { StoryObjectController } from "@/lib/controllers/story-objects";
 import { UniversesController } from "@/lib/controllers/universes";
 import { IMAGE_FILE_CACHE_SECONDS, SIGNED_URL_TTL_SECONDS } from "@/lib/controllers/location-images";
