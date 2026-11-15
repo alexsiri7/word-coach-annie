@@ -235,7 +235,7 @@ export interface PreviewResult {
  */
 const stored = new Map<string, Buffer>();
 
-type StorageModule = typeof import("@/lib/storage/supabase-storage");
+type StorageModule = typeof import("@/lib/storage/object-storage");
 
 export function fakeStorage(actual: StorageModule): StorageModule & { downloadObject(path: string): Promise<Buffer> } {
     const signed = (path: string) => `https://storage.test/signed/${path}?token=t`;

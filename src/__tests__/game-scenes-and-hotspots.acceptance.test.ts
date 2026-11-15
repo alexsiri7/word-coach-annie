@@ -9,7 +9,7 @@ vi.mock("@/lib/api-auth", async (importOriginal) => {
     return { ...actual, getCurrentUserId: vi.fn(() => null as string | null) };
 });
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) =>
+vi.mock("@/lib/storage/object-storage", async (importOriginal) =>
     (await import("./game-acceptance")).fakeStorage(await importOriginal()));
 
 import { POST as ingestRoute } from "@/app/api/projects/[id]/locations/[slug]/snapshots/route";
@@ -30,7 +30,8 @@ function hotspot(id: string, target: Hotspot["target"]): Hotspot {
 async function snapshot(projectId: string, storyObjectId: string, build: number, doorName: string): Promise<{ id: string }> {
     const locations = await testPrisma.storyObject.findMany({ where: { projectId, type: "LOCATION" }, select: { id: true, name: true } });
     const slug = [...locationSlugs(locations)].find(([, id]) => id === storyObjectId)![0];
-    const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#c84" } }).png().toBuffer();
+    // A different picture each build, so a later snapshot is a new upload, not a repeat of the last.
+    const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: { r: 200, g: 136, b: 68 + build } } }).png().toBuffer();
     const form = new FormData();
     form.set("file", new Blob([new Uint8Array(png)], { type: "image/png" }));
     form.set("build", `build-${build}`);

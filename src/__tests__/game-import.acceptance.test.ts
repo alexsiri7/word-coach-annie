@@ -10,7 +10,7 @@ vi.mock("@/lib/api-auth", async (importOriginal) => {
     return { ...actual, getCurrentUserId: vi.fn(() => null as string | null) };
 });
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) =>
+vi.mock("@/lib/storage/object-storage", async (importOriginal) =>
     (await import("./game-acceptance")).fakeStorage(await importOriginal()));
 
 import {

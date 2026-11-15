@@ -8,7 +8,7 @@ vi.mock("@/lib/api-auth", async (importOriginal) => {
     return { ...actual, getCurrentUserId: vi.fn(() => null as string | null) };
 });
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) =>
+vi.mock("@/lib/storage/object-storage", async (importOriginal) =>
     (await import("./game-acceptance")).fakeStorage(await importOriginal()));
 
 import { CONTENT, app, bundleFile, improvNode, json, model, seededGame, unreachableEnding } from "./game-acceptance";
@@ -44,6 +44,20 @@ describe("game-export", () => {
                 "frontend/src/assets/models.json",
                 "backend/src/punland_api/content/characters/bartender.json",
             ]));
+            // The registry in the engine's shape: the file and height sit under model3d.
+            expect(json(files, "frontend/src/assets/models.json")).toEqual({
+                models: expect.arrayContaining([
+                    { id: "scene/street", kind: "scene", model3d: { file: "models/scenes/street.glb", placeholder: false } },
+                    { id: "character/bartender", kind: "character", model3d: { file: "models/characters/bartender.glb", placeholder: false, height: 1.55 } },
+                ]),
+            });
+            // The improv node's character sheet, in the engine's shape; what the character knows goes in the sheet's text.
+            const improv = improvNode();
+            const sheet = json(files, "backend/src/punland_api/content/characters/bartender.json") as Record<string, unknown>;
+            expect(Object.keys(sheet).sort()).toEqual(["canned", "goal", "name", "sheet"]);
+            expect(sheet).toMatchObject({ name: "Bartender", goal: improv.goal, canned: improv.canned });
+            expect(sheet.sheet).toEqual(expect.stringContaining(improv.persona));
+            expect(sheet.sheet).toEqual(expect.stringContaining(improv.knows));
             const street = model("scene/street");
             expect(bundleFile(files, `frontend/public/${street.file}`)).toEqual({
                 path: `frontend/public/${street.file}`, encoding: "base64", content: street.fileData,
