@@ -42,22 +42,28 @@ describe("game-world-model", () => {
 
         it.fails("Deleting an object that is in use", async () => {
             const { game, projectId } = await seededGame();
+            const inUse: { kind: "item" | "flag"; id: string; usedIn: { id: string; hotspot: string }[] }[] = [
+                { kind: "item", id: "map", usedIn: [{ id: "shop", hotspot: "counter" }] },
+                { kind: "flag", id: "door-open", usedIn: [{ id: "street", hotspot: "flyer" }, { id: "street", hotspot: "door" }] },
+            ];
 
-            const first = await game.call<{ deleted: boolean; usedBy: { kind: string; id: string; field: string }[] }>(
-                "delete_game_object", { projectId, kind: "item", id: "map" },
-            );
+            for (const { kind, id, usedIn } of inUse) {
+                const first = await game.call<{ deleted: boolean; usedBy: { kind: string; id: string; field: string }[] }>(
+                    "delete_game_object", { projectId, kind, id },
+                );
 
-            expect(first.deleted).toBe(false);
-            expect(first.usedBy).toContainEqual(
-                expect.objectContaining({ kind: "room", id: "shop", field: expect.stringContaining("counter") }),
-            );
-            expect((await game.list(projectId, "item")).map((i) => i.id)).toContain("map");
+                expect(first.deleted).toBe(false);
+                for (const use of usedIn) {
+                    expect(first.usedBy).toContainEqual(
+                        expect.objectContaining({ kind: "room", id: use.id, field: expect.stringContaining(`hotspots[${use.hotspot}]`) }),
+                    );
+                }
+                expect((await game.list(projectId, kind)).map((o) => o.id)).toContain(id);
 
-            const confirmed = await game.call<{ deleted: boolean }>(
-                "delete_game_object", { projectId, kind: "item", id: "map", confirm: true },
-            );
-            expect(confirmed.deleted).toBe(true);
-            expect((await game.list(projectId, "item")).map((i) => i.id)).not.toContain("map");
+                const confirmed = await game.call<{ deleted: boolean }>("delete_game_object", { projectId, kind, id, confirm: true });
+                expect(confirmed.deleted).toBe(true);
+                expect((await game.list(projectId, kind)).map((o) => o.id)).not.toContain(id);
+            }
         });
     });
 

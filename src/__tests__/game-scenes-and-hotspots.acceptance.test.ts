@@ -16,7 +16,7 @@ import { POST as ingestRoute } from "@/app/api/projects/[id]/locations/[slug]/sn
 import { locationSlugs } from "@/lib/location-snapshots/slug";
 import { testPrisma } from "./setup";
 import {
-    CONTENT, DOOR, FLOOR, FLYER, app, appRefusal, json, model, room, seededGame,
+    CONTENT, COUNTER, DOOR, FLOOR, FLYER, app, appRefusal, json, model, room, seededGame,
     type Hotspot, type Room,
 } from "./game-acceptance";
 
@@ -27,14 +27,14 @@ function hotspot(id: string, target: Hotspot["target"]): Hotspot {
 }
 
 /** A snapshot of the room's location, whose things are keyed by hotspot id. */
-async function snapshot(projectId: string, storyObjectId: string, build: string, doorName: string): Promise<{ id: string }> {
+async function snapshot(projectId: string, storyObjectId: string, build: number, doorName: string): Promise<{ id: string }> {
     const locations = await testPrisma.storyObject.findMany({ where: { projectId, type: "LOCATION" }, select: { id: true, name: true } });
     const slug = [...locationSlugs(locations)].find(([, id]) => id === storyObjectId)![0];
     const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#c84" } }).png().toBuffer();
     const form = new FormData();
     form.set("file", new Blob([new Uint8Array(png)], { type: "image/png" }));
-    form.set("build", build);
-    form.set("takenAt", build === "build-1" ? "2026-11-01T10:00:00Z" : "2026-11-02T10:00:00Z");
+    form.set("build", `build-${build}`);
+    form.set("takenAt", `2026-11-0${build}T10:00:00Z`);
     form.set("things", JSON.stringify([
         { key: "door", name: doorName, description: "", kind: "exit", box: { x: 50, y: 0, w: 14, h: 48 } },
         { key: "flyer", name: "Flyer", description: "", kind: "hotspot", box: { x: 10, y: 20, w: 10, h: 10 } },
@@ -105,7 +105,13 @@ describe("game-scenes-and-hotspots", () => {
         it.fails("A duplicate id", async () => {
             const { game, projectId } = await seededGame();
 
-            const reason = await game.saveRefusal(projectId, "room", streetWith({ ...DOOR, name: "Back door" }));
+            const rear: Hotspot = {
+                ...hotspot("door", { node: "rear" }),
+                name: "Rear exit",
+                interactions: [{ verb: "look", effects: [{ say: "The way out back." }] }],
+            };
+
+            const reason = await game.saveRefusal(projectId, "room", streetWith(rear));
 
             expect(reason).toContain("door");
         });
@@ -114,18 +120,26 @@ describe("game-scenes-and-hotspots", () => {
     describe("Requirement: Exits", () => {
         it.fails("Linking two rooms", async () => {
             const { game, projectId } = await seededGame();
+            const out: Hotspot = {
+                ...hotspot("out", { node: "out" }),
+                interactions: [{ verb: "go", effects: [{ goTo: "street", at: { x: 1000, y: 600 } }] }],
+            };
+
+            await game.save(projectId, "room", room("shop", [COUNTER, out]));
 
             const { files } = await game.exportGame(projectId);
-
-            const door = json<Omit<Room, "id">>(files, `${CONTENT}/rooms/street.json`).hotspots.find((h) => h.id === "door");
-            expect(door?.interactions[0].effects).toEqual([{ goTo: "shop", at: { x: 600, y: 600 } }]);
+            const exit = json<Omit<Room, "id">>(files, `${CONTENT}/rooms/shop.json`).hotspots.find((h) => h.id === "out");
+            expect(exit?.interactions).toEqual(out.interactions);
         });
 
         it.fails("An arrival off the floor", async () => {
             const { game, projectId } = await seededGame();
             const offFloor: Hotspot = { ...DOOR, interactions: [{ verb: "go", effects: [{ goTo: "shop", at: { x: 10, y: 10 } }] }] };
 
-            await game.saveRefusal(projectId, "room", room("street", [FLYER, offFloor]));
+            const reason = await game.saveRefusal(projectId, "room", room("street", [FLYER, offFloor]));
+
+            expect(reason).toContain("door");
+            expect(reason).toContain("shop");
         });
     });
 
@@ -167,7 +181,7 @@ describe("game-scenes-and-hotspots", () => {
         it.fails("A requested rename", async () => {
             const { game, projectId } = await seededGame();
             const { storyObjectId } = await game.get(projectId, "room", "street");
-            const first = await snapshot(projectId, storyObjectId, "build-1", "Shop door");
+            const first = await snapshot(projectId, storyObjectId, 1, "Shop door");
             const request = await game.call<{ id: string }>("add_snapshot_annotation", {
                 snapshotId: first.id, kind: "name", thingKey: "door", text: "Oak door",
             });
@@ -176,9 +190,13 @@ describe("game-scenes-and-hotspots", () => {
 
             expect(applied.status).not.toBe("done");
             expect((await game.get(projectId, "room", "street")).hotspots.find((h) => h.id === "door")?.name).toBe("Oak door");
-            await snapshot(projectId, storyObjectId, "build-2", "Oak door");
-            const latest = await game.call<{ annotations: { id: string; status: string }[] }>("get_location_snapshot", { storyObjectId });
-            expect(latest.annotations.find((a) => a.id === request.id)?.status).toBe("done");
+            const status = async () =>
+                (await game.call<{ annotations: { id: string; status: string }[] }>("get_location_snapshot", { storyObjectId }))
+                    .annotations.find((a) => a.id === request.id)?.status;
+            await snapshot(projectId, storyObjectId, 2, "Shop door");
+            expect(await status()).not.toBe("done");
+            await snapshot(projectId, storyObjectId, 3, "Oak door");
+            expect(await status()).toBe("done");
         });
     });
 

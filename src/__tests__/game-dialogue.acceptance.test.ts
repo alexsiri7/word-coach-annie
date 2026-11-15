@@ -90,9 +90,10 @@ describe("game-dialogue", () => {
 
             expect(fellBack.transcript.map((line) => line.text)).toContain("Come back later");
             expect(fellBack.ended).toBe(true);
-            await game.saveRefusal(projectId, "conversation", {
-                id: "unlimited", character: "bartender", entry: "improv", nodes: [improvNode({ turnLimit: undefined })],
+            const reason = await game.saveRefusal(projectId, "conversation", {
+                id: "unlimited", character: "bartender", entry: "pitch", nodes: [improvNode({ id: "pitch", turnLimit: undefined })],
             });
+            expect(reason).toContain("pitch");
         });
     });
 

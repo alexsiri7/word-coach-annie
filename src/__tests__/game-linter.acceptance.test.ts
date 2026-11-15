@@ -12,7 +12,7 @@ vi.mock("@/lib/storage/supabase-storage", async (importOriginal) =>
 
 import {
     DOOR, FLYER, PROTAGONIST, app, model, room, seededGame, unreachableEnding,
-    type Finding, type GameClient, type Hotspot,
+    type Condition, type Finding, type GameClient, type Hotspot,
 } from "./game-acceptance";
 
 function hotspot(id: string, interactions: Hotspot["interactions"]): Hotspot {
@@ -88,13 +88,15 @@ describe("game-linter", () => {
             await game.save(projectId, "act", {
                 id: "1", name: "Act 1", goals: [{ id: "enter-shop", name: "Get into the shop" }, { id: "show-ticket", name: "Show the ticket" }],
             });
-            const gate = hotspot("gate", [{ verb: "use", item: "ticket", effects: [{ take: "ticket" }] }]);
             const booth = hotspot("booth", [{ verb: "use", item: "ticket", effects: [{ reachGoal: "show-ticket" }] }]);
-            await game.save(projectId, "room", room("street", [FLYER, DOOR, gate, booth]));
+            const gate = (when?: Condition[]) => hotspot("gate", [{ verb: "use", item: "ticket", when, effects: [{ take: "ticket" }] }]);
+            const namesBoth = (errors: Finding[]) => errors.some((e) => mentions(e, "gate") && mentions(e, "booth"));
 
-            const { errors } = await game.lint(projectId);
+            await game.save(projectId, "room", room("street", [FLYER, DOOR, gate(), booth]));
+            expect(namesBoth((await game.lint(projectId)).errors)).toBe(true);
 
-            expect(errors.some((e) => mentions(e, "gate") && mentions(e, "booth"))).toBe(true);
+            await game.save(projectId, "room", room("street", [FLYER, DOOR, gate([{ goal: "show-ticket" }]), booth]));
+            expect(namesBoth((await game.lint(projectId)).errors)).toBe(false);
         });
     });
 
@@ -108,6 +110,7 @@ describe("game-linter", () => {
             const { warnings } = await game.lint(projectId);
 
             expect(warnings.some((w) => mentions(w, "lamp-on"))).toBe(true);
+            expect(warnings.some((w) => mentions(w, "door-open"))).toBe(false);
         });
     });
 

@@ -76,7 +76,8 @@ describe("game-import", () => {
             const { game, files, empty } = await exportedGame();
             const sheet = {
                 name: "Bartender",
-                sheet: "You are the bartender of The Three Crows, dry, unhurried and quietly kind.",
+                sheet: "You are the bartender of The Three Crows, dry, unhurried and quietly kind. "
+                    + "You know the third crow won't vouch for anyone who doesn't live in Punland.",
                 canned: "The bartender raises a wing: busy night, kid.",
                 goal: "promise to put in a word with the third crow",
             };
@@ -89,6 +90,7 @@ describe("game-import", () => {
                 .filter((c) => c.character === "bartender")
                 .flatMap((c) => c.nodes)
                 .find((n): n is ImprovNode => n.type === "improv");
+            // The engine's sheet has no field of its own for what the character knows: it is in the sheet's text.
             expect(improv?.persona).toContain(sheet.sheet);
             expect(improv?.goal).toBe(sheet.goal);
             expect(improv?.canned).toBe(sheet.canned);
@@ -129,7 +131,10 @@ describe("game-import", () => {
             const preview = await importGame(game, projectId, relabelled);
 
             expect(preview.applied).toBe(false);
-            expect(preview.changes).toContainEqual({ kind: "room", id: "street", change: "update" });
+            expect(preview.changes).toContainEqual({
+                kind: "room", id: "street", change: "update",
+                differences: [{ field: "label", from: before, to: "PUNLAND · THE OLD STREET" }],
+            });
             expect(await label()).toBe(before);
 
             const confirmed = await importGame(game, projectId, relabelled, true);

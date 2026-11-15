@@ -150,6 +150,12 @@ Test setup: `src/__tests__/globalSetup.ts` — creates a fresh in-memory SQLite 
 
 **Never mock the database** — tests use a real SQLite DB seeded per test. This is intentional to catch schema/query issues that mocks would hide.
 
+**Game-authoring acceptance tests** (`src/__tests__/game-*.acceptance.test.ts`, #1501) are marked `it.fails` until the issue that builds each scenario makes it pass; that issue changes the mark to `it`. "Migrating Tune Story" needs a checkout of `alexsiri7/punland`, so it is skipped unless `PUNLAND_DIR` (optional) points at one:
+
+```bash
+PUNLAND_DIR=/path/to/punland npm run test:run -- game-import
+```
+
 ### TypeScript
 
 ```bash

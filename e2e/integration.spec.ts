@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext } from '@playwright/test'
+import type { DialogueNode, GameObjectInput, Kind } from '../src/__tests__/game-acceptance'
 
 // ── Auth config ─────────────────────────────────────────────────────────
 const API_TOKEN = process.env.API_TOKEN || 'e2e-test-token'
@@ -1123,12 +1124,11 @@ test.describe('Integration tests — real server, real data', () => {
 // ── Game dialogue editor — acceptance for #1501 ─────────────────────────
 // The visual editor's scenarios in openspec/specs/game-dialogue. Each is marked
 // test.fail() until #1505 makes it pass; then the mark comes off. The routes and
-// object shapes are the ones src/__tests__/game-acceptance.ts fixes.
+// object shapes are the ones src/__tests__/game-acceptance.ts fixes. A node with a
+// problem is aria-invalid, with the problem as its error message (aria-errormessage).
 
 const GAME_WRITE_HEADERS = { ...AUTH_HEADERS, 'x-csrf-protection': '1' }
 const SOON = { timeout: 5_000 }
-
-type DialogueNode = Record<string, unknown> & { id: string }
 
 const line = (id: string, text: string, next: string | null): DialogueNode => ({
   id,
@@ -1150,7 +1150,7 @@ async function createConversation(
   expect(res.status()).toBe(201)
   const projectId: string = (await res.json()).id
 
-  const save = async (kind: string, object: Record<string, unknown> & { id: string }) => {
+  const save = async <K extends Kind>(kind: K, object: GameObjectInput[K]) => {
     const put = await request.put(
       `/api/projects/${projectId}/game/objects/${kind}/${encodeURIComponent(object.id)}`,
       { headers: GAME_WRITE_HEADERS, data: object },
@@ -1244,15 +1244,18 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
     test.fail()
     let projectId: string | undefined
     try {
-      projectId = await createConversation(request, [line('a', 'First.', 'b'), line('b', 'Second.', null)])
+      projectId = await createConversation(request, [
+        line('opening', 'First.', 'farewell'),
+        line('farewell', 'Second.', null),
+      ])
       await page.goto(`/project/${projectId}/conversations/talk`)
 
-      await page.locator('[data-node-id="b"]').click()
+      await page.locator('[data-node-id="farewell"]').click()
       await page.getByRole('button', { name: 'Delete node' }).click()
 
-      const a = page.locator('[data-node-id="a"]')
-      await expect(a).toHaveAttribute('aria-invalid', 'true', SOON)
-      await expect(a).toContainText('b', SOON)
+      const opening = page.locator('[data-node-id="opening"]')
+      await expect(opening).toHaveAttribute('aria-invalid', 'true', SOON)
+      await expect(opening).toHaveAccessibleErrorMessage(/farewell/, SOON)
     } finally {
       if (projectId) await deleteProject(request, projectId)
     }

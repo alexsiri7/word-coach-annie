@@ -14,6 +14,7 @@ import { NextRequest } from "next/server";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { getCurrentUserId } from "@/lib/api-auth";
+import { UNEXPECTED_ERROR_REASON } from "@/mcp/tool-errors";
 import { testPrisma } from "./setup";
 
 // ─── The engine's vocabulary ─────────────────────────────────────────────────
@@ -193,7 +194,10 @@ export interface Bundle { files: BundleFile[]; warnings: Finding[] }
 
 export interface ImportResult {
     applied: boolean;
-    changes: { kind: Kind; id: string; change: "add" | "update" }[];
+    changes: (
+        | { kind: Kind; id: string; change: "add" }
+        | { kind: Kind; id: string; change: "update"; differences: { field: string; from: unknown; to: unknown }[] }
+    )[];
     unmapped: { file: string; field: string }[];
 }
 
@@ -246,7 +250,7 @@ export interface GameClient {
 type ToolResult = { isError?: boolean; content: { type: string; text: string }[] };
 
 /** A missing tool or a crash is not a validation refusal, though `it.fails` would take it for one. */
-const NOT_A_REFUSAL = /Tool .+ not found|an unexpected error occurred/;
+const NOT_A_REFUSAL = new RegExp(`Tool .+ not found|${UNEXPECTED_ERROR_REASON}`);
 
 export async function connectGame(): Promise<GameClient> {
     const userId = "game-author";
@@ -384,8 +388,9 @@ export function improvNode(overrides: Partial<ImprovNode> = {}): ImprovNode {
 export const PROTAGONIST = "Mo";
 
 /**
- * Saves the game in dependency order. The world comes before its rooms, so its start
- * names a room that does not exist yet: that is the linter's to report, not the save's.
+ * Saves the game in dependency order, so nothing names an object saved after it. The one
+ * exception is the world's start, a room saved after the world: that is the linter's to
+ * report, not the save's.
  */
 export async function seedGame(game: GameClient, projectId: string): Promise<void> {
     for (const id of ["scene/street", "scene/shop", "object/flyer"]) await game.save(projectId, "model", model(id));
@@ -397,8 +402,8 @@ export async function seedGame(game: GameClient, projectId: string): Promise<voi
     await game.save(projectId, "flag", { id: "door-open" });
     await game.save(projectId, "stat", { id: "followers", name: "Followers", start: 0 });
     await game.save(projectId, "act", { id: "1", name: "Act 1", goals: [{ id: "enter-shop", name: "Get into the shop" }] });
-    await game.save(projectId, "room", room("street", [FLYER, DOOR]));
     await game.save(projectId, "room", room("shop", [COUNTER]));
+    await game.save(projectId, "room", room("street", [FLYER, DOOR]));
     await game.save(projectId, "conversation", { id: "bartender-talk", character: "bartender", entry: "improv", nodes: [improvNode()] });
     await game.save(projectId, "game", {
         id: "game",

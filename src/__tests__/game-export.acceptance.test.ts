@@ -1,5 +1,6 @@
 // Acceptance tests for openspec/specs/game-export (#1501), one per scenario. Each is `it.fails`
-// until #1507 makes it pass; then it becomes `it`.
+// until #1507 makes it pass; then it becomes `it`. Content files have the engine's layout
+// (alexsiri7/punland frontend/src/content/*.json): items by id, with the start items.
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/api-auth", async (importOriginal) => {
@@ -24,11 +25,20 @@ describe("game-export", () => {
                 schemaVersion: expect.any(Number),
                 start: { room: "street", items: [] },
             });
-            const paths = files.map((f) => f.path);
-            for (const name of ["worlds", "items", "characters", "objects", "stats", "acts"]) {
-                expect(paths).toContain(`${CONTENT}/${name}.json`);
-            }
-            expect(paths).toEqual(expect.arrayContaining([
+            expect(json(files, `${CONTENT}/worlds.json`)).toEqual({ worlds: [{ id: "street", name: "Street", start: "street" }] });
+            expect(json(files, `${CONTENT}/items.json`)).toEqual({
+                start: [], items: { map: { name: "Map", noUse: "That doesn't need a map." } },
+            });
+            expect(json(files, `${CONTENT}/characters.json`)).toEqual({
+                protagonist: { model: "character/bartender" },
+                characters: [{ id: "bartender", name: "Bartender", model: "character/bartender" }],
+            });
+            expect(json(files, `${CONTENT}/objects.json`)).toEqual({ objects: [{ id: "flyer", name: "Flyer", model: "object/flyer" }] });
+            expect(json(files, `${CONTENT}/stats.json`)).toEqual({ stats: [{ id: "followers", name: "Followers", start: 0 }] });
+            expect(json(files, `${CONTENT}/acts.json`)).toEqual({
+                acts: [{ id: "1", name: "Act 1", goals: [{ id: "enter-shop", name: "Get into the shop" }] }],
+            });
+            expect(files.map((f) => f.path)).toEqual(expect.arrayContaining([
                 `${CONTENT}/rooms/street.json`,
                 `${CONTENT}/rooms/shop.json`,
                 "frontend/src/assets/models.json",
