@@ -1,6 +1,6 @@
 // Acceptance tests for openspec/specs/game-dialogue (#1501), one per scenario. Each is `it.fails`
-// until #1504 makes it pass; then it becomes `it`. The visual editor's scenarios are in
-// e2e/integration.spec.ts (#1505).
+// until #1504 (or #1502, which stores conversations) makes it pass; then it becomes `it`. The
+// visual editor's scenarios are in e2e/integration.spec.ts (#1505).
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/api-auth", async (importOriginal) => {
@@ -98,7 +98,7 @@ describe("game-dialogue", () => {
     });
 
     describe("Requirement: Agent access", () => {
-        it.fails("An agent writes a conversation", async () => {
+        it("An agent writes a conversation", async () => {
             const { game, projectId } = await seededGame();
 
             await game.save(projectId, "conversation", drinks());

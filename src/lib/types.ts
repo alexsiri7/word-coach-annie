@@ -1,5 +1,5 @@
 // Shared types used across the app
-export type ProjectType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL";
+export type ProjectType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL" | "GAME";
 
 export interface Project {
   id: string;

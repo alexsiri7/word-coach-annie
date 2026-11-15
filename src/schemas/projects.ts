@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ProjectType = z.enum(["FICTION", "ARTICLE_COLLECTION", "GENERAL"]);
+export const ProjectType = z.enum(["FICTION", "ARTICLE_COLLECTION", "GENERAL", "GAME"]);
 
 export const ProjectCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),

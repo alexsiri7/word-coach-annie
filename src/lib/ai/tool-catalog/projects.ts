@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ContentHash } from "@/schemas/content-hash";
+import { ProjectType } from "@/schemas/projects";
 import { defineTool } from "./types";
 
 export const listProjectsSpec = defineTool({
@@ -33,6 +34,7 @@ export const createProjectSpec = defineTool({
         author: z.string().optional().describe("Author name"),
         synopsis: z.string().optional().describe("Project synopsis"),
         genre: z.string().optional().describe("Genre"),
+        projectType: ProjectType.optional().describe("FICTION (default), ARTICLE_COLLECTION, GENERAL or GAME"),
     }),
 });
 

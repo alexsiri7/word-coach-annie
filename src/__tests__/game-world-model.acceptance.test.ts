@@ -26,7 +26,7 @@ const roomFile = (files: BundleFile[], id: string) => json<Omit<Room, "id">>(fil
 
 describe("game-world-model", () => {
     describe("Requirement: Game objects", () => {
-        it.fails("Adding an item", async () => {
+        it("Adding an item", async () => {
             const { game, projectId } = await seededGame();
 
             await game.save(projectId, "item", { id: "guitar", name: "Guitar", noUse: "It won't play that." });
@@ -40,7 +40,7 @@ describe("game-world-model", () => {
             expect(street.hotspots.find((h) => h.id === "sign")?.interactions[0].when).toEqual([{ has: "guitar" }]);
         });
 
-        it.fails("Deleting an object that is in use", async () => {
+        it("Deleting an object that is in use", async () => {
             const { game, projectId } = await seededGame();
             const inUse: { kind: "item" | "flag"; id: string; usedIn: { id: string; hotspot: string }[] }[] = [
                 { kind: "item", id: "map", usedIn: [{ id: "street", hotspot: "flyer" }, { id: "shop", hotspot: "counter" }] },
@@ -68,7 +68,7 @@ describe("game-world-model", () => {
     });
 
     describe("Requirement: Conditions and effects", () => {
-        it.fails("Building a rule", async () => {
+        it("Building a rule", async () => {
             const { game, projectId } = await seededGame();
             const sign = hotspot("sign", [{ verb: "look", when: [{ has: "map" }], effects: [{ say: "The shop is that way." }] }]);
 
@@ -80,7 +80,7 @@ describe("game-world-model", () => {
             ]);
         });
 
-        it.fails("An unknown effect", async () => {
+        it("An unknown effect", async () => {
             const { game, projectId } = await seededGame();
             const teleport = { teleport: "shop" } as unknown as Effect;
 
@@ -126,7 +126,7 @@ describe("game-world-model", () => {
     });
 
     describe("Requirement: Puzzles", () => {
-        it.fails("Defining a puzzle", async () => {
+        it("Defining a puzzle", async () => {
             const { game, projectId } = await seededGame();
             await game.save(projectId, "item", { id: "broken-guitar", name: "Broken guitar", noUse: "It's broken." });
             await game.save(projectId, "flag", { id: "guitar_fixed" });
@@ -143,7 +143,7 @@ describe("game-world-model", () => {
             expect(await game.get(projectId, "puzzle", "working-guitar")).toMatchObject(puzzle);
         });
 
-        it.fails("Seeing what depends on what", async () => {
+        it("Seeing what depends on what", async () => {
             const { game, projectId } = await seededGame();
             await game.save(projectId, "flag", { id: "has-gig" });
             await game.save(projectId, "puzzle", {
@@ -159,7 +159,7 @@ describe("game-world-model", () => {
     });
 
     describe("Requirement: Acts, goals and endings", () => {
-        it.fails("Branching to an ending", async () => {
+        it("Branching to an ending", async () => {
             const { game, projectId } = await seededGame();
             await game.save(projectId, "act", { id: "ending-star", name: "A star", goals: [] });
             await game.save(projectId, "act", { id: "ending-band", name: "A band", goals: [] });
@@ -177,7 +177,7 @@ describe("game-world-model", () => {
             expect(acts).toContainEqual(expect.objectContaining({ id: "ending-band", final: true }));
         });
 
-        it.fails("An act that can get stuck", async () => {
+        it("An act that can get stuck", async () => {
             const { game, projectId } = await seededGame();
             await game.save(projectId, "act", { id: "ending-star", name: "A star", goals: [] });
 
@@ -211,7 +211,7 @@ describe("game-world-model", () => {
     });
 
     describe("Requirement: Agent access", () => {
-        it.fails("An agent adds a flag", async () => {
+        it("An agent adds a flag", async () => {
             const { game, projectId } = await seededGame();
 
             await game.save(projectId, "flag", { id: "lamp-on", description: "The lamp in the shop is lit." });

@@ -779,6 +779,7 @@ export default function Dashboard() {
                   <SelectItem value="FICTION">Fiction</SelectItem>
                   <SelectItem value="ARTICLE_COLLECTION">Article Collection</SelectItem>
                   <SelectItem value="GENERAL">General</SelectItem>
+                  <SelectItem value="GAME">Game</SelectItem>
                 </SelectContent>
               </Select>
             </div>

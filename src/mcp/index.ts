@@ -12,6 +12,7 @@ import { registerWritingTaskTools } from "./register/writing-tasks";
 import { registerSubmissionTools } from "./register/submissions";
 import { registerOpportunityTools } from "./register/opportunities";
 import { registerExportTools } from "./register/export";
+import { registerGameObjectTools } from "./register/game-objects";
 import { registerUniverseTools } from "./register/universes";
 import { registerGoogleAuthTools } from "./register/google-auth";
 import { registerCoachingTools } from "./register/coaching";
@@ -51,6 +52,7 @@ function createServer(options?: McpServerOptions): McpServer {
     registerSubmissionTools(ctx);
     registerOpportunityTools(ctx);
     registerExportTools(ctx);
+    registerGameObjectTools(ctx);
     registerUniverseTools(ctx);
     registerGoogleAuthTools(ctx);
     registerCoachingTools(ctx);
