@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type LocationMap } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import { sanitizeInput } from "@/lib/sanitize-server";
-import { logger } from "@/lib/logger";
 import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
+import { runSerializable } from "@/lib/controllers/serializable";
 import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
 import {
     describeLocationMapError,
@@ -27,16 +27,13 @@ export type LocationMapView = Omit<LocationMapInput, "items"> & {
 type Location = { id: string; projectId: string };
 
 /** Item edits read the stored list, then write it back, so two edits to one map must not interleave. */
-async function serializable<T>(storyObjectId: string, fn: (tx: DbClient) => Promise<T>): Promise<T> {
-    try {
-        return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
-            logger.warn("Location map write conflict (P2034)", { storyObjectId });
-            throw new UserFacingError("This location's map changed at the same time; please try again");
-        }
-        throw e;
-    }
+function serializable<T>(storyObjectId: string, fn: (tx: DbClient) => Promise<T>): Promise<T> {
+    return runSerializable(
+        "Location map write conflict (P2034)",
+        "This location's map changed at the same time; please try again",
+        { storyObjectId },
+        fn,
+    );
 }
 
 async function requireLocation(db: DbClient, storyObjectId: string): Promise<Location> {

@@ -1,4 +1,4 @@
-import type { MappedError } from "@prisma/driver-adapter-utils";
+import { isDriverAdapterError, type MappedError } from "@prisma/driver-adapter-utils";
 import { logger } from "@/lib/logger";
 
 /**
@@ -52,7 +52,7 @@ function isRetryableLink(link: object): boolean {
   if (typeof message === "string" && CONNECT_FAILURE.test(message)) return true;
   if (name === "PrismaClientInitializationError") return true;
 
-  if (name === "DriverAdapterError" && typeof cause === "object" && cause !== null) {
+  if (isDriverAdapterError(link) && cause !== null) {
     const payload = cause as { kind?: MappedError["kind"]; message?: unknown };
     if (typeof payload.kind !== "string") return false;
     if (RETRYABLE_ADAPTER_KINDS.has(payload.kind)) return true;

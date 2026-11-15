@@ -7,6 +7,7 @@ import { isGoogleAuthMode } from "@/lib/auth";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { ProjectCreateSchema } from "@/schemas/projects";
 import type { ProjectListItem } from "@/lib/types";
+import { isSerializationConflict } from "@/lib/controllers/serializable";
 import { ActiveProjectLimitError, assertActiveProjectLimit } from "@/lib/project-limit";
 
 // GET /api/projects - List projects (scoped by userId when authenticated via Google)
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
     // P2034 = transaction serialization failure (two concurrent requests raced)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    if (isSerializationConflict(error)) {
       logger.warn("POST /api/projects serialization conflict (P2034)", { userId });
       return NextResponse.json(
         { error: "Request conflict, please try again." },
