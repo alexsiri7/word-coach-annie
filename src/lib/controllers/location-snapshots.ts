@@ -7,7 +7,7 @@ import { runSerializable } from "@/lib/controllers/serializable";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/controllers/location-images";
 import { processLocationImage } from "@/lib/location-images/process";
 import { purgeImageFiles } from "@/lib/location-images/files";
-import { createSignedUrl, uploadObject } from "@/lib/storage/supabase-storage";
+import { createSignedUrl, uploadObject } from "@/lib/storage/object-storage";
 import {
     SnapshotAnnotationKindSchema,
     SnapshotThingsSchema,

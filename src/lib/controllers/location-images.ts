@@ -6,7 +6,7 @@ import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
 import { runSerializable } from "@/lib/controllers/serializable";
 import { processLocationImage } from "@/lib/location-images/process";
 import { purgeImageFiles } from "@/lib/location-images/files";
-import { createSignedUrl, createSignedUrls, uploadObject } from "@/lib/storage/supabase-storage";
+import { createSignedUrl, createSignedUrls, uploadObject } from "@/lib/storage/object-storage";
 import type { LocationImageKind, LocationImageUpdateInput } from "@/schemas/location-images";
 
 /** Signed URLs live an hour; long enough for a session, short enough that a leaked one goes stale. */

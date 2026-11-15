@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { removeObjects } from "@/lib/storage/supabase-storage";
+import { removeObjects } from "@/lib/storage/object-storage";
 
 /** Storage paths of the matching story objects' images and snapshots, collected before their rows are deleted. */
 export async function collectLocationFilePaths(where: Prisma.StoryObjectWhereInput): Promise<string[]> {
