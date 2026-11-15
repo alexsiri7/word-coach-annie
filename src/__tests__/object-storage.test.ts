@@ -60,6 +60,10 @@ describe("object storage (R2)", () => {
         expect(req.headers.get("content-type")).toBe("image/webp");
         expect(req.headers.get("cache-control")).toBe("max-age=31536000");
         expect(req.headers.get("authorization")).toMatch(/^AWS4-HMAC-SHA256 Credential=test-access-key\/\d{8}\/auto\/s3\/aws4_request/);
+        // R2 refuses a PUT without Content-Length, so the bytes go to fetch as-is, never as a stream.
+        const body = fetchMock.mock.calls[0][1]?.body;
+        expect(body).toBeInstanceOf(Uint8Array);
+        expect(new TextDecoder().decode(body as Uint8Array)).toBe("img");
     });
 
     it("reports a failed request with its status", async () => {
