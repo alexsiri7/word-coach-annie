@@ -57,6 +57,7 @@ import {
 import dynamic from "next/dynamic";
 import { OutlineTree } from "@/components/outline-tree";
 import { ErrorBoundary } from "@/components/error-boundary";
+import type { StoryObjectPanelTab } from "@/components/story-object-panel";
 
 const SceneEditor = dynamic(() => import("@/components/scene-editor").then(m => m.SceneEditor), {
   loading: () => <div className="flex items-center justify-center h-full"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>,
@@ -110,6 +111,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedObjectSource, setSelectedObjectSource] = useState<"project" | "universe">("project");
+  const [selectedObjectTab, setSelectedObjectTab] = useState<StoryObjectPanelTab>("details");
   const [activeTab, setActiveTab] = useState<SidebarTab>("outline");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fromCache, setFromCache] = useState(false);
@@ -372,6 +374,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const handleSearchSelectObject = (objectId: string, objectType: string) => {
     setSelectedObjectId(objectId);
     setSelectedObjectSource("project");
+    setSelectedObjectTab("details");
     setSelectedNodeId(null);
     const tab = OBJECT_TYPE_TO_TAB[objectType];
     if (tab) setActiveTab(tab);
@@ -747,6 +750,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         onClick={() => {
                           setSelectedObjectId(obj.id);
                           setSelectedObjectSource(obj.source || "project");
+                          setSelectedObjectTab("details");
                           setSelectedNodeId(null);
                           setSidebarOpen(false);
                         }}
@@ -793,6 +797,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     fetchStoryObjects();
                   }}
                   onUpdated={fetchStoryObjects}
+                  tab={selectedObjectTab}
+                  onTabChange={setSelectedObjectTab}
+                  onOpenLocation={(id) => {
+                    setSelectedObjectId(id);
+                    setSelectedObjectSource("project");
+                    setSelectedObjectTab("map");
+                  }}
                 />
               </ErrorBoundary>
             ) : selectedNode && selectedNode.type === "SCENE" ? (

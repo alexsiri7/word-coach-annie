@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **102 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **106 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -40,6 +40,8 @@ For another app's backend (for example a game's scene editor), create a token in
 |-------|-------|
 | `read` | `list_projects`, `get_project`, `get_outline`, `read_scene_content`, `get_scene_versions` |
 | `write` | the `read` tools plus `write_scene_content`, `update_paragraph`, `insert_beat`, `delete_beat`, `restore_scene_version` |
+
+A `snapshots` token cannot reach `/api/mcp` at all; it only posts location snapshots over REST.
 
 Other tools are absent from `tools/list`, and calling one fails as an unknown tool. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
 
@@ -137,7 +139,7 @@ Remove a project's universe link.
 ---
 
 #### `transfer_story_object_to_universe`
-Transfer a project story object into a universe as a world object. Refuses a location that has images — remove them first.
+Transfer a project story object into a universe as a world object. Refuses a location that has images or a map — remove them first — or that has game snapshots.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -499,6 +501,110 @@ Delete an image and its stored files. Deleting the cover makes the new first ima
 | Param | Type | Description |
 |-------|------|-------------|
 | `imageId` | string | The location image ID |
+
+---
+
+### Location Maps
+
+A location may have one top-down map, visible only to the project owner. Coordinates are metres from the map's top-left corner, y down. An item is `{ id, kind, label, description, x, y, w, h, rotation, points?, storyObjectId?, targetLocationId? }`: `x, y` is its centre, `w, h` its size, `rotation` degrees clockwise about the centre.
+
+| Kind | Shape | Link |
+|------|-------|------|
+| `object` | rectangle | `storyObjectId` → a WORLD_ELEMENT |
+| `character` | circle | `storyObjectId` → a CHARACTER |
+| `exit` | door | `targetLocationId` → a LOCATION |
+| `area` | polygon: `points`, at least three `[x, y]` pairs relative to the centre, within `±w/2, ±h/2` | — |
+| `note` | pin | — |
+
+Links must point into the same project. Reads add `linkName` (the linked object's current name) and `unlinked` (its target was deleted); writes ignore both. An invalid map or item is refused with the first problem and where it is. Writes fail with a retry message if another edit to the same map is in progress.
+
+#### `get_location_map`
+Read a location's map with a `contentHash`, or `null` when it has none.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+
+---
+
+#### `set_location_map`
+Create or replace the whole map. Replacing an existing map requires the `contentHash` from `get_location_map`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `map` | object | `{ widthM, heightM, backgroundImageId?, items }` — sizes 1–200 m, at most 500 items, `backgroundImageId` one of the location's images |
+| `contentHash` | string? | From `get_location_map`; required once a map exists |
+
+---
+
+#### `upsert_location_map_item`
+Add one item, or replace the item with the same `id` in place. Without an `id` the item is appended with a new one. The map must exist.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `item` | object | The item; omit `id` to add a new one |
+
+---
+
+#### `delete_location_map_item`
+Remove one item from a location's map. Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+| `itemId` | string | The map item ID |
+
+---
+
+### Location Snapshots
+
+A game's screenshots of a `LOCATION`, posted by its build job (see [API.md](API.md#location-snapshots)), with the clickable things on them and the author's annotations. Owner only. Coordinates are pixels of the uploaded screenshot (`width` × `height`). Ten snapshots are kept per location; annotations on deleted ones stay, with `snapshotId: null`.
+
+#### `list_location_snapshots`
+A location's snapshots, newest first (`id`, `build`, `takenAt`, `createdAt`, `width`, `height`, `thingCount`), plus `notesFromDeletedSnapshots`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `storyObjectId` | string | The LOCATION story object ID |
+
+---
+
+#### `get_location_snapshot`
+A snapshot with its `things` (`{ key, name, description, kind, box: { x, y, w, h } }`), a signed `imageUrl` that expires after an hour, and `annotations`: the notes on this snapshot plus every name/description request on the location. Pass exactly one parameter.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `snapshotId` | string? | The snapshot ID |
+| `storyObjectId` | string? | A LOCATION ID, for its latest snapshot |
+
+---
+
+#### `add_snapshot_annotation`
+A note on a region, or a request to change a thing's name or description. A request stays `open` until a later snapshot carries its text, then becomes `done`; a new request replaces the thing's open one for that field.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `snapshotId` | string | The snapshot ID |
+| `kind` | enum | `note`, `description`, `name` |
+| `text` | string | The note (1–5000 characters), or the requested description (≤ 5000) or name (1–200) |
+| `thingKey` | string? | The thing's key; required for `description` and `name` |
+| `region` | object? | Notes only: `{ type: "point", x, y }`, `{ type: "rect", x, y, w, h }` or `{ type: "path", points: [[x, y], …] }` |
+| `storyObjectId` | string? | Notes only: a story object of the same project |
+
+---
+
+#### `update_snapshot_annotation`
+Change an annotation's text or status, or a note's region or linked story object.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `annotationId` | string | The annotation ID |
+| `text` | string? | New text |
+| `status` | enum? | `open`, `sent` (exported by the story sync), `done` (resolved) |
+| `region` | object? | Notes only: new region |
+| `storyObjectId` | string \| null? | Notes only: story object to link, or `null` to unlink |
 
 ---
 

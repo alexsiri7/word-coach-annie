@@ -73,6 +73,12 @@ describe("/api/account/api-tokens", () => {
         expect(logged).not.toContain(token);
     });
 
+    it("creates a token that may only post location snapshots", async () => {
+        const res = await POST(request("POST", { name: "Punland snapshot job", scope: "snapshots" }));
+        expect(res.status).toBe(201);
+        expect((await res.json()).apiToken).toMatchObject({ scope: "snapshots" });
+    });
+
     it("requires the CSRF header to create", async () => {
         expect((await POST(request("POST", { name: "x", scope: "read" }, false))).status).toBe(403);
     });

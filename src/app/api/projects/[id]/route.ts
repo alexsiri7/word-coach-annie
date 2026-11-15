@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess, verifyProjectReadAccess } from "@/lib/api-auth";
 import { ProjectUpdateSchema, ProjectDeleteSchema } from "@/schemas/projects";
-import { collectImagePaths, purgeImageFiles } from "@/lib/location-images/files";
+import { collectLocationFilePaths, purgeImageFiles } from "@/lib/location-images/files";
 
 // GET /api/projects/[id] - Get a project by ID
 export async function GET(
@@ -102,9 +102,9 @@ export async function DELETE(
       );
     }
 
-    const imagePaths = await collectImagePaths({ storyObject: { projectId: id } });
+    const filePaths = await collectLocationFilePaths({ projectId: id });
     await prisma.project.delete({ where: { id } });
-    await purgeImageFiles(imagePaths);
+    await purgeImageFiles(filePaths);
 
     return NextResponse.json({ status: "deleted" });
   } catch (error) {

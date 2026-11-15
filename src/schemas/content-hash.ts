@@ -11,5 +11,6 @@ export const ContentHash = {
   storyObject: z.string().describe(`The contentHash from get_story_object — ${updatingVersion}`),
   universe: z.string().describe(`The contentHash from get_universe — ${updatingVersion}`),
   worldObject: z.string().describe(`The contentHash from get_world_object — ${updatingVersion}`),
+  locationMap: z.string().describe(`The contentHash from get_location_map — ${updatingVersion}`),
   timelineEntry: z.string().describe(`The contentHash for this entry from get_world_object's timeline array — ${updatingVersion}`),
 };

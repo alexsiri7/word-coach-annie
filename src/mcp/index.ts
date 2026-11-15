@@ -67,6 +67,20 @@ import {
     updateLocationImage,
     deleteLocationImage,
 } from "./tools/location-images";
+import { SnapshotAnnotationKindSchema, SnapshotAnnotationStatusSchema, SnapshotRegionSchema } from "@/schemas/location-snapshots";
+import { LocationSnapshotController } from "@/lib/controllers/location-snapshots";
+import {
+    listLocationSnapshots,
+    getLocationSnapshot,
+    addSnapshotAnnotation,
+    updateSnapshotAnnotation,
+} from "./tools/location-snapshots";
+import {
+    getLocationMap,
+    setLocationMap,
+    upsertLocationMapItem,
+    deleteLocationMapItem,
+} from "./tools/location-maps";
 import {
     listRelationships,
     createRelationship,
@@ -139,7 +153,9 @@ import {
     assertRelationshipOwner,
     projectIdForAnnotation,
     projectIdForLocationImage,
+    projectIdForLocationSnapshot,
     projectIdForNode,
+    projectIdForSnapshotAnnotation,
     projectIdForStoryObject,
     universeIdForWorldObject,
     universeIdForTimelineEntry,
@@ -773,6 +789,143 @@ server.tool(
             return deleteLocationImage(imageId);
         });
     }
+);
+
+// ─── Location Map Tools ──────────────────────────────────────────────────────
+
+const LOCATION_MAP_GEOMETRY =
+    "Coordinates are metres from the map's top-left corner, y down: x, y is an item's centre, w, h its size, rotation degrees clockwise about the centre. " +
+    "Item kinds: object (rectangle; storyObjectId may link a WORLD_ELEMENT), character (circle; storyObjectId may link a CHARACTER), " +
+    "exit (door; targetLocationId may link another LOCATION), area (polygon; points is a list of [x, y] pairs, at least 3, relative to the item's centre and within ±w/2, ±h/2), note (pin). " +
+    "Each item has id, kind, label, description, x, y, w, h, rotation and optionally points, storyObjectId, targetLocationId.";
+
+server.tool(
+    "get_location_map",
+    `Read the top-down map of a LOCATION story object, or null if it has none. Returns widthM, heightM, backgroundImageId (a location image id or null), items and a contentHash for set_location_map. Each item also carries read-only linkName (the linked story object's current name) and unlinked (true when its link target was deleted). ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+    },
+    async ({ storyObjectId }) =>
+        mcpRun("get_location_map", "Error reading location map", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return getLocationMap(storyObjectId);
+        })
+);
+
+server.tool(
+    "set_location_map",
+    `Create or replace the whole map of a LOCATION story object. Replacing an existing map requires contentHash from get_location_map. widthM and heightM are 1–200 m; at most 500 items. ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        map: z.record(z.string(), z.unknown()).describe("{ widthM, heightM, backgroundImageId?, items: [...] }"),
+        contentHash: ContentHash.locationMap.optional(),
+    },
+    async ({ storyObjectId, map, contentHash }) =>
+        mcpRun("set_location_map", "Error saving location map", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return setLocationMap(storyObjectId, map, contentHash);
+        })
+);
+
+server.tool(
+    "upsert_location_map_item",
+    `Add an item to a location's map, or replace the item with the same id. Without an id the item is appended with a new one. The map must exist (set_location_map). ${LOCATION_MAP_GEOMETRY}`,
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        item: z.record(z.string(), z.unknown()).describe("The item; omit id to add a new one"),
+    },
+    async ({ storyObjectId, item }) =>
+        mcpRun("upsert_location_map_item", "Error saving location map item", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return upsertLocationMapItem(storyObjectId, item);
+        })
+);
+
+server.tool(
+    "delete_location_map_item",
+    "Remove one item from a location's map. Cannot be undone.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+        itemId: z.string().describe("The map item ID"),
+    },
+    async ({ storyObjectId, itemId }) => {
+        const guard = destructiveGuard(); if (guard) return guard;
+        return mcpRun("delete_location_map_item", "Error deleting location map item", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return deleteLocationMapItem(storyObjectId, itemId);
+        });
+    }
+);
+
+// ─── Location Snapshot Tools ─────────────────────────────────────────────────
+
+server.tool(
+    "list_location_snapshots",
+    "List a LOCATION's game snapshots, newest first (at most 10 are kept): id, build, takenAt, width, height and thingCount. Also returns notes whose snapshot has since been deleted, as text.",
+    {
+        storyObjectId: z.string().describe("The LOCATION story object ID"),
+    },
+    async ({ storyObjectId }) =>
+        mcpRun("list_location_snapshots", "Error listing location snapshots", async () => {
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
+            return listLocationSnapshots(storyObjectId);
+        })
+);
+
+server.tool(
+    "get_location_snapshot",
+    "Get a game snapshot of a location: its things ({ key, name, description, kind, box }, box in screenshot pixels of width × height), a signed imageUrl that expires after an hour, and annotations: notes on this snapshot plus every name/description change requested for the location. Pass snapshotId, or storyObjectId for the latest snapshot.",
+    {
+        snapshotId: z.string().optional().describe("The snapshot ID"),
+        storyObjectId: z.string().optional().describe("A LOCATION story object ID, for its latest snapshot"),
+    },
+    async ({ snapshotId, storyObjectId }) =>
+        mcpRun("get_location_snapshot", "Error getting location snapshot", async () => {
+            if ((snapshotId === undefined) === (storyObjectId === undefined)) {
+                throw new UserFacingError("Provide exactly one of snapshotId or storyObjectId");
+            }
+            if (snapshotId !== undefined) {
+                await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
+                return getLocationSnapshot(snapshotId);
+            }
+            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId!), userId);
+            return getLocationSnapshot(await LocationSnapshotController.latestId(storyObjectId!));
+        })
+);
+
+server.tool(
+    "add_snapshot_annotation",
+    "Annotate a game snapshot. kind note: a note (text) on an optional region (point, rect or path in screenshot pixels), optionally about a thing (thingKey) and linked to a story object of the same project. kind description or name: request that a thing's (thingKey) description or name change to text; it stays open until a later snapshot carries that text, and replaces the thing's earlier open request.",
+    {
+        snapshotId: z.string().describe("The snapshot ID"),
+        kind: SnapshotAnnotationKindSchema.describe("note, description or name"),
+        text: z.string().describe("The note, or the requested description or name"),
+        thingKey: z.string().optional().describe("The thing's key; required for description and name"),
+        region: SnapshotRegionSchema.optional().describe("Notes only: { type: point, x, y } | { type: rect, x, y, w, h } | { type: path, points: [[x, y], ...] }"),
+        storyObjectId: z.string().optional().describe("Notes only: a story object of the same project the note is about"),
+    },
+    async ({ snapshotId, ...input }) =>
+        mcpRun("add_snapshot_annotation", "Error adding snapshot annotation", async () => {
+            await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
+            return addSnapshotAnnotation(snapshotId, input);
+        })
+);
+
+server.tool(
+    "update_snapshot_annotation",
+    "Change a snapshot annotation's text or status (open, sent = exported by the story sync, done = resolved), or a note's region or linked story object (null unlinks).",
+    {
+        annotationId: z.string().describe("The annotation ID"),
+        text: z.string().optional().describe("New text"),
+        status: SnapshotAnnotationStatusSchema.optional().describe("open, sent or done"),
+        region: SnapshotRegionSchema.optional().describe("Notes only: new region"),
+        storyObjectId: z.string().nullable().optional().describe("Notes only: story object to link, or null to unlink"),
+    },
+    async ({ annotationId, ...changes }) =>
+        mcpRun("update_snapshot_annotation", "Error updating snapshot annotation", async () => {
+            await verifyProjectOwnership(await projectIdForSnapshotAnnotation(annotationId), userId);
+            return updateSnapshotAnnotation(annotationId, changes);
+        })
 );
 
 // ─── Batch Tools ────────────────────────────────────────────────────────────

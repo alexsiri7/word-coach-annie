@@ -903,7 +903,7 @@ requirements:
 
   - id: WCA-072
     title: Personal API tokens
-    statement: "When a signed-in user creates a personal API token with a name and a read or read+write-scenes scope, the system shall show the token once, store only its hash, and accept it as an Authorization bearer that acts as that user on the scene/node API routes and the MCP endpoint, refusing writes from a read-only token and any other route with 403 and a revoked or unknown token with 401."
+    statement: "When a signed-in user creates a personal API token with a name and a read, read+write-scenes or post-snapshots scope, the system shall show the token once, store only its hash, and accept it as an Authorization bearer that acts as that user on the scene/node API routes and the MCP endpoint (a snapshots token: on the location snapshot upload only), refusing writes from a read-only token and any other route with 403 and a revoked or unknown token with 401."
     category: functional
     priority: should
     status: active
@@ -914,4 +914,4 @@ requirements:
       - "A read-only token cannot write (403)."
       - "Tokens are stored hashed; no token appears in logs."
       - "Existing browser and MCP OAuth auth keep working; tests cover token auth."
-    notes: "Tokens reach only /api/nodes/** and /api/mcp; over MCP a read token sees list_projects, get_project, get_outline, read_scene_content and get_scene_versions, and a write token adds write_scene_content, update_paragraph, insert_beat, delete_beat and restore_scene_version. Each token has its own rate-limit buckets (pat:<tokenId>), and lastUsedAt is written at most once a minute. The token's user must still pass ALLOWED_EMAILS. Tokens do not expire. The shared API_TOKEN (WCA-060) is unchanged."
+    notes: "Read and write tokens reach only /api/nodes/** and /api/mcp; a snapshots token reaches only POST /api/projects/:id/locations/:slug/snapshots (#1486) and gets 403 'This API token can only post location snapshots' elsewhere, MCP included. Over MCP a read token sees list_projects, get_project, get_outline, read_scene_content and get_scene_versions, and a write token adds write_scene_content, update_paragraph, insert_beat, delete_beat and restore_scene_version. Each token has its own rate-limit buckets (pat:<tokenId>), and lastUsedAt is written at most once a minute. The token's user must still pass ALLOWED_EMAILS. Tokens do not expire. The shared API_TOKEN (WCA-060) is unchanged."

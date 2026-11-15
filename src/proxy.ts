@@ -35,14 +35,10 @@ function sentryCspReportUri(dsn: string | undefined): string | null {
     }
 }
 
-/** Location images redirect to signed URLs on this origin, and CSP checks redirect targets. */
-function storageImageOrigin(url: string | undefined): string | null {
-    if (!url) return null;
-    try {
-        return new URL(url).origin;
-    } catch {
-        return null;
-    }
+
+/** The R2 bucket's S3 origin, where location images' presigned URLs point; null when unset. */
+function r2StorageOrigin(accountId: string | undefined): string | null {
+    return accountId && /^[0-9a-f]{32}$/.test(accountId) ? `https://${accountId}.r2.cloudflarestorage.com` : null;
 }
 
 /**
@@ -58,7 +54,8 @@ const LIBRARY_STYLE_HASHES = [
 
 function buildCsp(nonce: string): string {
     const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
-    const storageOrigin = storageImageOrigin(process.env.SUPABASE_URL);
+    // Location images redirect to presigned URLs on the bucket's origin, and CSP checks redirect targets.
+    const storageOrigin = r2StorageOrigin(process.env.R2_ACCOUNT_ID);
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).
@@ -247,7 +244,8 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Personal API token (annie_pat_…): acts as its user, confined to scene routes and MCP.
+    // 2. Personal API token (annie_pat_…): acts as its user, confined to scene routes and MCP,
+    // or to posting location snapshots for a snapshots token.
     // Scope is checked before rate limiting so refused requests don't spend the token's quota.
     if (token?.startsWith(PERSONAL_TOKEN_PREFIX)) {
         const pat = await verifyPersonalToken(token);
@@ -255,10 +253,10 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
 
         const allowed = isPersonalTokenRequestAllowed(pathname, request.method, pat.scope);
         if (allowed === "out-of-scope") {
-            return NextResponse.json(
-                { error: "Personal API tokens can only access scenes" },
-                { status: 403 }
-            );
+            const error = pat.scope === "snapshots"
+                ? "This API token can only post location snapshots"
+                : "Personal API tokens can only access scenes";
+            return NextResponse.json({ error }, { status: 403 });
         }
         if (allowed === "read-only") {
             return NextResponse.json({ error: "This API token is read-only" }, { status: 403 });
