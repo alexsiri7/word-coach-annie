@@ -231,7 +231,7 @@ List all projects (scoped to current user when authenticated via Google).
       "author": "string",
       "synopsis": "string",
       "genre": "string",
-      "projectType": "FICTION | ARTICLE_COLLECTION | GENERAL",
+      "projectType": "FICTION | ARTICLE_COLLECTION | GENERAL | GAME",
       "isSample": false,
       "archivedAt": "ISO8601 | null",
       "createdAt": "ISO8601",
@@ -251,7 +251,7 @@ List all projects (scoped to current user when authenticated via Google).
 ### `POST /api/projects`
 Create a new project.
 
-**Body**: `{ "title": "string", "author"?: "string", "synopsis"?: "string", "genre"?: "string", "projectType"?: "FICTION|ARTICLE_COLLECTION|GENERAL" }`
+**Body**: `{ "title": "string", "author"?: "string", "synopsis"?: "string", "genre"?: "string", "projectType"?: "FICTION|ARTICLE_COLLECTION|GENERAL|GAME" }`
 
 **Response**: Project object (201)
 
@@ -304,6 +304,31 @@ List all story objects in a project.
 **Query params**: `type` (optional filter: CHARACTER, LOCATION, PLOTLINE, WORLD_ELEMENT, NOTE)
 
 Each project object carries `coverImageId`: the id of its cover location image, or `null`.
+
+---
+
+### `GET /api/projects/:id/game/objects`
+List a `GAME` project's objects of one kind, in the order they were added. Owner only. The kinds, shapes, rules and derived fields are those of the MCP game object tools (see [MCP.md](MCP.md#game-objects)).
+
+**Query params**: `kind` (required): `game`, `item`, `flag`, `stat`, `act`, `world`, `puzzle`, `character`, `object`, `model`, `room` or `conversation`
+
+**Response**: `{ "objects": [...] }`; 400 `{ error }` for an unknown kind.
+
+---
+
+### `PUT /api/projects/:id/game/objects/:kind/:objectId`
+Create an object, or replace the one with the same kind and id whole. Owner only.
+
+**Body**: the object, with `id` equal to `:objectId` (URL-encoded, e.g. `scene%2Fstreet`).
+
+**Response**: `{ "object": {...} }`; 400 `{ error }` naming the field and the problem, with the same message as `save_game_object`.
+
+---
+
+### `DELETE /api/projects/:id/game/objects/:kind/:objectId`
+Delete an object. Owner only. When other objects' rules name it, nothing is deleted unless `?confirm=true`.
+
+**Response**: `{ "deleted": boolean, "usedBy": [{ "kind", "id", "field" }] }`; 404 when the game has no such object.
 
 ---
 

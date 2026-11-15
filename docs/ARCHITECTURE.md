@@ -97,6 +97,7 @@ Project (1) ──────────────────┬─── (
                               │         └─── (N) WritingTask (optional scene link)
                               ├─── (N) StoryObject (CHARACTER | LOCATION | PLOTLINE | WORLD_ELEMENT | NOTE)
                               ├─── (N) WritingTask (project-level tasks)
+                              ├─── (N) GameObject (GAME projects: item | flag | stat | act | world | puzzle | room | …, JSON per kind)
                               └─── (N) Conversation (named chat thread)
                                         └─── (N) ChatMessage (AI chat history)
 
