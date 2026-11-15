@@ -4,13 +4,15 @@ import { logger } from "@/lib/logger";
 
 export type McpResult = { content: [{ type: "text"; text: string }]; isError?: true };
 
+export const UNEXPECTED_ERROR_REASON = "an unexpected error occurred";
+
 /**
  * Tool error result for an MCP client. Only a UserFacingError's message is
  * shown; anything else (Prisma, crypto, upstream API text) stays in the server
  * log behind a generic reason.
  */
 export function toolError(errorPrefix: string, e: unknown): McpResult {
-    const reason = e instanceof UserFacingError ? e.message : "an unexpected error occurred";
+    const reason = e instanceof UserFacingError ? e.message : UNEXPECTED_ERROR_REASON;
     return { content: [{ type: "text", text: `${errorPrefix}: ${reason}` }], isError: true };
 }
 

@@ -7,11 +7,11 @@ The engine plays a bundle, not an Annie project. Export turns a game in Annie in
 ## Requirements
 
 ### Requirement: The bundle
-Annie SHALL export a game as one bundle: a manifest that names the game, its schema version and its start; the content files for worlds, rooms, items, characters, objects, stats and acts; the model registry and the model files; and the AI sheet of each character that has an improvised conversation. The files SHALL be laid out as the engine loads them.
+Annie SHALL export a game as one bundle: a manifest that names the game, its schema version and its start; the content files for worlds, rooms, items, characters, objects, stats and acts; the model registry, which names each model's file by its path; and the AI sheet of each character that has an improvised conversation. The files SHALL be laid out as the engine loads them. The bundle MUST NOT hold the model files: they stay in the engine's repository.
 
 #### Scenario: Exporting a game
 - WHEN the author exports a game that passes the linter
-- THEN the bundle holds the manifest, the content files, the registry, the model files and the character sheets
+- THEN the bundle holds the manifest, the content files, the registry and the character sheets, and no model file
 
 ### Requirement: Deterministic output
 Exporting the same game twice SHALL give byte-identical bundles: stable ordering, no timestamps and no random ids, so that a bundle kept in git shows only real changes.

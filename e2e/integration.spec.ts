@@ -1,4 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test'
+import type { DialogueNode, GameObjectInput, Kind } from '../src/__tests__/game-acceptance'
+import { PROTAGONIST, model, room } from '../src/__tests__/game-fixtures'
 
 // ── Auth config ─────────────────────────────────────────────────────────
 const API_TOKEN = process.env.API_TOKEN || 'e2e-test-token'
@@ -1117,5 +1119,166 @@ test.describe('Integration tests — real server, real data', () => {
         ),
     )
     expect(violations).toEqual([])
+  })
+})
+
+// ── Game dialogue editor — acceptance for #1501 ─────────────────────────
+// The visual editor's scenarios in openspec/specs/game-dialogue. Each is marked
+// test.fail() until #1505 makes it pass; then the mark comes off. The routes and
+// object shapes are the ones src/__tests__/game-acceptance.ts fixes. A node with a
+// problem is aria-invalid, with the problem as its error message (aria-errormessage).
+
+const GAME_WRITE_HEADERS = { ...AUTH_HEADERS, 'x-csrf-protection': '1' }
+const SOON = { timeout: 5_000 }
+
+const line = (id: string, text: string, next: string | null): DialogueNode => ({
+  id,
+  type: 'line',
+  speaker: 'bartender',
+  text,
+  next,
+})
+
+/**
+ * A game project whose bartender has the conversation `talk`, entering at the first node.
+ * Saved in the order seedGame keeps: nothing names an object saved after it.
+ */
+async function createGameProject(request: APIRequestContext): Promise<string> {
+  const res = await request.post('/api/projects', {
+    headers: AUTH_HEADERS,
+    data: { title: `E2E Game ${Date.now()}`, projectType: 'GAME' },
+  })
+  expect(res.status()).toBe(201)
+  return (await res.json()).id
+}
+
+/** Seeds the project; the caller holds the id first, so a failed step still deletes it. */
+async function seedConversation(
+  request: APIRequestContext,
+  projectId: string,
+  nodes: DialogueNode[],
+): Promise<void> {
+  const save = async <K extends Kind>(kind: K, object: GameObjectInput[K]) => {
+    const put = await request.put(
+      `/api/projects/${projectId}/game/objects/${kind}/${encodeURIComponent(object.id)}`,
+      { headers: GAME_WRITE_HEADERS, data: object },
+    )
+    expect(put.status()).toBe(200)
+  }
+  await save('model', model('character/bartender', { height: 1.55, status: 'placeholder' }))
+  await save('model', model('scene/street', { status: 'placeholder' }))
+  await save('world', { id: 'street', name: 'Street', start: 'street' })
+  await save('room', room('street', []))
+  await save('character', { id: 'bartender', name: 'Bartender', model: 'character/bartender' })
+  await save('game', {
+    id: 'game',
+    name: 'Tune Street',
+    start: { room: 'street', items: [] },
+    protagonist: { name: PROTAGONIST, model: 'character/bartender' },
+  })
+  await save('conversation', { id: 'talk', character: 'bartender', entry: nodes[0].id, nodes })
+}
+
+test.describe('Game dialogue editor — acceptance for #1501', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setExtraHTTPHeaders(AUTH_HEADERS)
+  })
+
+  test('Editing a conversation', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [line('l1', 'Hello.', null)])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Add line' }).click()
+      await page.getByRole('textbox', { name: 'Text' }).fill('Nice to meet you.')
+      const added = page.locator('[data-node-id]').filter({ hasText: 'Nice to meet you.' })
+      const addedId = await added.getAttribute('data-node-id', SOON)
+      await page.locator('[data-node-id="l1"]').click()
+      await page.getByRole('combobox', { name: 'Next' }).selectOption(addedId!)
+
+      const edge = page.locator(`[data-edge="l1->${addedId}"]`)
+      await expect(edge).toBeVisible(SOON)
+      await page.reload()
+      await expect(added).toBeVisible(SOON)
+      await expect(edge).toBeVisible(SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test('Previewing a path', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [
+        line('l1', 'Can I help?', 'pitch'),
+        {
+          id: 'pitch',
+          type: 'improv',
+          persona: 'A dry, kind crow who tends the bar.',
+          knows: 'Everyone who has played here.',
+          mustNotReveal: 'That the kitchen is hiring.',
+          mustSay: [],
+          goal: 'convince her I am staying',
+          escalation: ['polite', 'pushy', 'desperate'],
+          outcomes: [{ id: 'stays', when: 'she believes he is staying', effects: [], next: 'l2' }],
+          fallback: { effects: [], next: null },
+          canned: 'Busy night, kid.',
+          turnLimit: 8,
+        },
+        line('l2', 'Welcome to Punland.', null),
+      ])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Preview' }).click()
+      const preview = page.getByRole('region', { name: 'Preview' })
+      await expect(preview.getByRole('button', { name: 'stays' })).toBeVisible(SOON)
+      await expect(preview.getByRole('button', { name: 'fallback' })).toBeVisible(SOON)
+      await preview.getByRole('button', { name: 'stays' }).click()
+      await expect(preview).toContainText('Welcome to Punland.', SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test('A node that leads nowhere', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [
+        line('opening', 'First.', 'farewell'),
+        line('farewell', 'Second.', null),
+      ])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.locator('[data-node-id="farewell"]').click()
+      await page.getByRole('button', { name: 'Delete node' }).click()
+
+      const opening = page.locator('[data-node-id="opening"]')
+      await expect(opening).toHaveAttribute('aria-invalid', 'true', SOON)
+      await expect(opening).toHaveAccessibleErrorMessage(/farewell/, SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test("The protagonist's name", async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [line('l1', 'Hi {protagonist}', null)])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Preview' }).click()
+      await expect(page.getByRole('region', { name: 'Preview' })).toContainText(`Hi ${PROTAGONIST}`, SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
   })
 })
