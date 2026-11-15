@@ -17,6 +17,8 @@ describe("game-export", () => {
     describe("Requirement: The bundle", () => {
         it.fails("Exporting a game", async () => {
             const { game, projectId } = await seededGame();
+            const improv = improvNode({ mustSay: [{ text: "The kitchen always needs a pair of paws.", unlessHas: "map" }] });
+            await game.save(projectId, "conversation", { id: "bartender-talk", character: "bartender", entry: "improv", nodes: [improv] });
 
             const { files } = await game.exportGame(projectId);
 
@@ -52,9 +54,10 @@ describe("game-export", () => {
                 ]),
             });
             // The improv node's character sheet, in the engine's shape; what the character knows goes in the sheet's text.
-            const improv = improvNode();
             const sheet = json(files, "backend/src/punland_api/content/characters/bartender.json") as Record<string, unknown>;
-            expect(Object.keys(sheet).sort()).toEqual(["canned", "goal", "name", "sheet"]);
+            expect(Object.keys(sheet).sort()).toEqual(["canned", "goal", "must_say", "name", "sheet"]);
+            // The engine's backend reads must_say as line and unless_carrying (punland_api/characters.py).
+            expect(sheet.must_say).toEqual([{ line: "The kitchen always needs a pair of paws.", unless_carrying: "map" }]);
             expect(sheet).toMatchObject({ name: "Bartender", goal: improv.goal, canned: improv.canned });
             expect(sheet.sheet).toEqual(expect.stringContaining(improv.persona));
             expect(sheet.sheet).toEqual(expect.stringContaining(improv.knows));

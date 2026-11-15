@@ -1143,17 +1143,21 @@ const line = (id: string, text: string, next: string | null): DialogueNode => ({
  * A game project whose bartender has the conversation `talk`, entering at the first node.
  * Saved in the order seedGame keeps: nothing names an object saved after it.
  */
-async function createConversation(
-  request: APIRequestContext,
-  nodes: DialogueNode[],
-): Promise<string> {
+async function createGameProject(request: APIRequestContext): Promise<string> {
   const res = await request.post('/api/projects', {
     headers: AUTH_HEADERS,
     data: { title: `E2E Game ${Date.now()}`, projectType: 'GAME' },
   })
   expect(res.status()).toBe(201)
-  const projectId: string = (await res.json()).id
+  return (await res.json()).id
+}
 
+/** Seeds the project; the caller holds the id first, so a failed step still deletes it. */
+async function seedConversation(
+  request: APIRequestContext,
+  projectId: string,
+  nodes: DialogueNode[],
+): Promise<void> {
   const save = async <K extends Kind>(kind: K, object: GameObjectInput[K]) => {
     const put = await request.put(
       `/api/projects/${projectId}/game/objects/${kind}/${encodeURIComponent(object.id)}`,
@@ -1173,7 +1177,6 @@ async function createConversation(
     protagonist: { name: PROTAGONIST, model: 'character/bartender' },
   })
   await save('conversation', { id: 'talk', character: 'bartender', entry: nodes[0].id, nodes })
-  return projectId
 }
 
 test.describe('Game dialogue editor — acceptance for #1501', () => {
@@ -1185,7 +1188,8 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
     test.fail()
     let projectId: string | undefined
     try {
-      projectId = await createConversation(request, [line('l1', 'Hello.', null)])
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [line('l1', 'Hello.', null)])
       await page.goto(`/project/${projectId}/conversations/talk`)
 
       await page.getByRole('button', { name: 'Add line' }).click()
@@ -1209,7 +1213,8 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
     test.fail()
     let projectId: string | undefined
     try {
-      projectId = await createConversation(request, [
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [
         line('l1', 'Can I help?', 'pitch'),
         {
           id: 'pitch',
@@ -1244,7 +1249,8 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
     test.fail()
     let projectId: string | undefined
     try {
-      projectId = await createConversation(request, [
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [
         line('opening', 'First.', 'farewell'),
         line('farewell', 'Second.', null),
       ])
@@ -1265,7 +1271,8 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
     test.fail()
     let projectId: string | undefined
     try {
-      projectId = await createConversation(request, [line('l1', 'Hi {protagonist}', null)])
+      projectId = await createGameProject(request)
+      await seedConversation(request, projectId, [line('l1', 'Hi {protagonist}', null)])
       await page.goto(`/project/${projectId}/conversations/talk`)
 
       await page.getByRole('button', { name: 'Preview' }).click()
