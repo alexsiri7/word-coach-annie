@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test'
 import type { DialogueNode, GameObjectInput, Kind } from '../src/__tests__/game-acceptance'
+import { PROTAGONIST, model, room } from '../src/__tests__/game-fixtures'
 
 // ── Auth config ─────────────────────────────────────────────────────────
 const API_TOKEN = process.env.API_TOKEN || 'e2e-test-token'
@@ -1160,44 +1161,16 @@ async function createConversation(
     )
     expect(put.status()).toBe(200)
   }
-  await save('model', {
-    id: 'character/bartender',
-    kind: 'character',
-    file: 'models/characters/bartender.glb',
-    height: 1.55,
-    artSpec: { prompt: 'A crow in an apron', notes: '', referenceImages: [] },
-    status: 'placeholder',
-  })
-  await save('model', {
-    id: 'scene/street',
-    kind: 'scene',
-    file: 'models/scenes/street.glb',
-    artSpec: { prompt: 'A street at night', notes: '', referenceImages: [] },
-    status: 'placeholder',
-  })
+  await save('model', model('character/bartender', { height: 1.55, status: 'placeholder' }))
+  await save('model', model('scene/street', { status: 'placeholder' }))
   await save('world', { id: 'street', name: 'Street', start: 'street' })
-  await save('room', {
-    id: 'street',
-    world: 'street',
-    model: 'scene/street',
-    label: 'PUNLAND · STREET',
-    place: { verb: 'On', name: 'street' },
-    hint: 'The street.',
-    start: { x: 640, y: 600 },
-    walkable: [
-      { x: 100, y: 560 },
-      { x: 1180, y: 560 },
-      { x: 1180, y: 630 },
-      { x: 100, y: 630 },
-    ],
-    hotspots: [],
-  })
+  await save('room', room('street', []))
   await save('character', { id: 'bartender', name: 'Bartender', model: 'character/bartender' })
   await save('game', {
     id: 'game',
     name: 'Tune Street',
     start: { room: 'street', items: [] },
-    protagonist: { name: 'Mo', model: 'character/bartender' },
+    protagonist: { name: PROTAGONIST, model: 'character/bartender' },
   })
   await save('conversation', { id: 'talk', character: 'bartender', entry: nodes[0].id, nodes })
   return projectId
@@ -1296,7 +1269,7 @@ test.describe('Game dialogue editor — acceptance for #1501', () => {
       await page.goto(`/project/${projectId}/conversations/talk`)
 
       await page.getByRole('button', { name: 'Preview' }).click()
-      await expect(page.getByRole('region', { name: 'Preview' })).toContainText('Hi Mo', SOON)
+      await expect(page.getByRole('region', { name: 'Preview' })).toContainText(`Hi ${PROTAGONIST}`, SOON)
     } finally {
       if (projectId) await deleteProject(request, projectId)
     }

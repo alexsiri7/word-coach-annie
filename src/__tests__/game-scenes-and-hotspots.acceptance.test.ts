@@ -64,6 +64,8 @@ describe("game-scenes-and-hotspots", () => {
                 interactions: [{ verb: "go", effects: [{ goTo: "cellar", at: { x: 640, y: 600 } }] }],
             };
             await game.save(projectId, "room", streetWith(stairs));
+            const street = await game.get(projectId, "room", "street");
+            expect(street.hotspots.find((h) => h.id === "stairs")?.interactions).toEqual(stairs.interactions);
         });
 
         it.fails("A floor that is not convex", async () => {
@@ -155,6 +157,7 @@ describe("game-scenes-and-hotspots", () => {
                 expect.objectContaining({ id: "character/cop", kind: "character", height: 1.7, artSpec, status: "placeholder", placeholder: true }),
             );
             await game.save(projectId, "character", { id: "cop", name: "Cop", model: "character/cop" });
+            expect(await game.get(projectId, "character", "cop")).toMatchObject({ model: "character/cop" });
         });
 
         it.fails("Replacing a placeholder", async () => {
