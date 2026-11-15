@@ -155,6 +155,7 @@ const Hotspot = z.strictObject({
   presentWhen: Conditions.optional(),
 });
 
+/** The project's one `game` object: what manifest.json and the protagonist are made from. */
 const GameSettings = z.strictObject({
   id: z.literal("game"),
   name: Name,
@@ -205,6 +206,7 @@ const World = z
     }
   });
 
+/** `requires` makes it available, `solvedWhen` marks it done, `grants` runs when it is. */
 const Puzzle = z.strictObject({ id: Id, name: Name, requires: Conditions, solvedWhen: ConditionSchema, grants: Effects });
 
 const Character = z.strictObject({ id: Id, name: Name, model: Id, onGoal: z.array(Reaction).optional() });
@@ -214,6 +216,7 @@ const Prop = z.strictObject({ id: Id, name: Name, model: Id });
 const Model = z.strictObject({
   id: Id,
   kind: z.enum(["scene", "character", "object"]),
+  /** Its path under the engine's frontend/public/; Annie never holds the file. */
   file: z.string().min(1, "A file is required"),
   height: z.number().optional(),
   artSpec: z.strictObject({ prompt: z.string(), notes: z.string(), referenceImages: z.array(z.string()) }),
@@ -228,13 +231,20 @@ const Room = z.strictObject({
   place: z.strictObject({ verb: z.string(), name: z.string() }),
   hint: z.string(),
   start: FloorPoint,
+  /** The floor: a convex polygon. */
   walkable: z.array(FloorPoint),
   hotspots: z.array(Hotspot),
   onStart: z.array(Reaction).optional(),
 });
 
+/** A node id, or null to end the conversation. */
 const Next = Id.nullable();
 
+/**
+ * The spec's action node is two shapes, so each has its own tag: `action` applies effects,
+ * `branch` branches on a condition. An improv node's fallback is not one of its `outcomes`:
+ * it is what the node does at the turn limit or without the AI.
+ */
 const DialogueNode = z.discriminatedUnion("type", [
   z.strictObject({ id: Id, type: z.literal("line"), speaker: Id, text: z.string(), next: Next }),
   z.strictObject({
@@ -284,8 +294,24 @@ export const GameObjectEntrySchema = z.discriminatedUnion("kind", [
 
 export type GameObjectEntry = z.infer<typeof GameObjectEntrySchema>;
 export type GameObject = GameObjectEntry["object"];
+export type Reaction = z.infer<typeof Reaction>;
+export type Interaction = z.infer<typeof Interaction>;
+export type Hotspot = z.infer<typeof Hotspot>;
+export type HotspotTarget = Hotspot["target"];
+export type GameSettings = z.infer<typeof GameSettings>;
+export type Item = z.infer<typeof Item>;
+export type Flag = z.infer<typeof Flag>;
+export type Stat = z.infer<typeof Stat>;
 export type Act = z.infer<typeof Act>;
+export type World = z.infer<typeof World>;
 export type Puzzle = z.infer<typeof Puzzle>;
+export type Character = z.infer<typeof Character>;
+export type Prop = z.infer<typeof Prop>;
+export type Model = z.infer<typeof Model>;
+export type Room = z.infer<typeof Room>;
+export type DialogueNode = z.infer<typeof DialogueNode>;
+export type ImprovNode = Extract<DialogueNode, { type: "improv" }>;
+export type Conversation = z.infer<typeof Conversation>;
 
 export type Path = readonly (string | number)[];
 

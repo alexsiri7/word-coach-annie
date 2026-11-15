@@ -19,140 +19,24 @@ import { testPrisma } from "./setup";
 
 // ─── The engine's vocabulary ─────────────────────────────────────────────────
 
-export interface FloorPoint { x: number; y: number }
-export type FlagValue = boolean | number | string;
+import type {
+    Act, Character, Conversation, Effect, Flag, GameSettings, Item, Model, Prop, Puzzle, Room, Stat, World,
+} from "@/schemas/game-objects";
 
-export type Condition =
-    | { has: string }
-    | { pickedUp: string }
-    | { gathered: string }
-    | { flag: string; is?: FlagValue }
-    | { stat: string; atLeast: number }
-    | { act: string }
-    | { goal: string }
-    | { visited: string }
-    | { world: string }
-    | { not: Condition };
-
-/** Each effect, keyed by its name: the key it carries. */
-interface EffectShapes {
-    say: { say: string; by?: string };
-    goTo: { goTo: string; at?: FloorPoint };
-    goBack: { goBack: true };
-    wait: { wait: number };
-    pickUp: { pickUp: string };
-    give: { give: string };
-    take: { take: string };
-    gather: { gather: string };
-    set: { set: string; to: FlagValue };
-    talk: { talk: string };
-    changeStat: { changeStat: string; by: number };
-    reachGoal: { reachGoal: string };
-}
-
-export type Effect = EffectShapes[keyof EffectShapes];
-export type EffectName = keyof EffectShapes;
-
-const effectNames: { [K in EffectName]: K extends keyof EffectShapes[K] ? true : never } = {
-    say: true, goTo: true, goBack: true, wait: true, pickUp: true, give: true,
-    take: true, gather: true, set: true, talk: true, changeStat: true, reachGoal: true,
-};
-
-export const EFFECT_NAMES = Object.keys(effectNames) as EffectName[];
-
-export interface Reaction { when?: Condition[]; effects: Effect[] }
-
-export interface Interaction {
-    verb: "look" | "use" | "talk" | "pickup" | "go";
-    item?: string;
-    when?: Condition[];
-    effects: Effect[];
-}
-
-export type HotspotTarget = { entity: string; at: FloorPoint } | { node: string };
-
-export interface Hotspot {
-    id: string;
-    name: string;
-    verb: string;
-    target: HotspotTarget;
-    walkTo: FloorPoint;
-    interactions: Interaction[];
-    presentWhen?: Condition[];
-}
-
-// ─── Game objects, by kind ───────────────────────────────────────────────────
-
-/** The project's one `game` object: what manifest.json and the protagonist are made from. */
-export interface GameSettings {
-    id: "game";
-    name: string;
-    start: { room: string; items: string[] };
-    protagonist: { name: string; model: string };
-}
-
-export interface Item { id: string; name: string; noUse: string; uses?: { item: string; when?: Condition[]; effects: Effect[] }[]; onUse?: Reaction[] }
-export interface Flag { id: string; description?: string }
-export interface Stat { id: string; name: string; start: number }
-export interface Act { id: string; name: string; goals: { id: string; name: string }[]; next?: { act: string; when?: Condition[] }[] }
-export interface World { id: string; name: string; start: string; locked?: string; unlockWhen?: Condition[] }
-/** `requires` makes it available, `solvedWhen` marks it done, `grants` runs when it is. */
-export interface Puzzle { id: string; name: string; requires: Condition[]; solvedWhen: Condition; grants: Effect[] }
-export interface Character { id: string; name: string; model: string; onGoal?: Reaction[] }
-export interface Prop { id: string; name: string; model: string }
-
-export interface Model {
-    id: string;
-    kind: "scene" | "character" | "object";
-    /** Its path under the engine's frontend/public/; Annie never holds the file. */
-    file: string;
-    height?: number;
-    artSpec: { prompt: string; notes: string; referenceImages: string[] };
-    status: "placeholder" | "in progress" | "final";
-}
-
-export interface Room {
-    id: string;
-    world: string;
-    model: string;
-    label: string;
-    place: { verb: string; name: string };
-    hint: string;
-    start: FloorPoint;
-    /** The floor: a convex polygon. */
-    walkable: FloorPoint[];
-    hotspots: Hotspot[];
-    onStart?: Reaction[];
-}
+export type {
+    Act, Character, Condition, Conversation, DialogueNode, Effect, FlagValue, FloorPoint, Flag, GameSettings, Hotspot,
+    HotspotTarget, ImprovNode, Interaction, Item, Model, Prop, Puzzle, Reaction, Room, Stat, World,
+} from "@/schemas/game-objects";
 
 /**
- * `next` is a node id, or null to end the conversation. The spec's action node is two
- * shapes, so each has its own tag: `action` applies effects, `branch` branches on a condition.
+ * The engine's effects, written out here rather than imported, so a test can check that
+ * Annie's own list names every one of them.
  */
-export type DialogueNode =
-    | { id: string; type: "line"; speaker: string; text: string; next: string | null }
-    | { id: string; type: "choice"; options: { text: string; when?: Condition[]; next: string | null }[] }
-    | { id: string; type: "action"; effects: Effect[]; next: string | null }
-    | { id: string; type: "branch"; if: Condition[]; then: string | null; else: string | null }
-    | ImprovNode;
+export const EFFECT_NAMES = [
+    "say", "goTo", "goBack", "wait", "pickUp", "give", "take", "gather", "set", "talk", "changeStat", "reachGoal",
+] as const;
 
-/** The fallback is not one of `outcomes`: it is what the node does at the turn limit or without the AI. */
-export interface ImprovNode {
-    id: string;
-    type: "improv";
-    persona: string;
-    knows: string;
-    mustNotReveal: string;
-    mustSay: { text: string; unlessHas?: string }[];
-    goal: string;
-    escalation: string[];
-    outcomes: { id: string; when: string; effects: Effect[]; next: string | null }[];
-    fallback?: { effects: Effect[]; next: string | null };
-    canned: string;
-    turnLimit?: number;
-}
-
-export interface Conversation { id: string; character: string; entry: string; nodes: DialogueNode[] }
+// ─── Game objects, by kind ───────────────────────────────────────────────────
 
 /** What `save_game_object` takes, by kind. */
 export interface GameObjectInput {
