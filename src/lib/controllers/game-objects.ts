@@ -138,8 +138,9 @@ function checkDroppedGoals(act: Act, stored: GameObjectEntry | undefined, others
 }
 
 /**
- * Checks a whole game at once, as an import brings it: no object twice, no goal in two
- * acts, and every rule naming an object the game has.
+ * Checks a whole game at once, as an import brings it: no object twice and no goal in two
+ * acts. A rule naming an object the game lacks is restored as it was exported: a confirmed
+ * delete leaves such rules behind, and reporting them is the linter's.
  */
 export function checkGame(entries: GameObjectEntry[]) {
     entries.forEach((entry, i) => {
@@ -148,7 +149,6 @@ export function checkGame(entries: GameObjectEntry[]) {
         if (earlier.some((e) => isSame(e, kind, object.id))) throw new UserFacingError(`there are two of ${kind} "${object.id}"`);
         try {
             if (entry.kind === "act") checkGoalsAreUnique(entry.object, earlier);
-            checkReferences(entry, entries);
         } catch (error) {
             if (error instanceof UserFacingError) throw new UserFacingError(`${kind} "${object.id}": ${error.message}`);
             throw error;

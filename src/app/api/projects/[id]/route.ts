@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ProjectsController } from "@/lib/controllers/projects";
+import { UserFacingError } from "@/lib/controllers/errors";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess, verifyProjectReadAccess } from "@/lib/api-auth";
@@ -58,8 +59,8 @@ export async function PATCH(
     if (message.includes("Project not found")) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    if (message.includes("No fields to update")) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    if (error instanceof UserFacingError) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     logger.error("PATCH /api/projects/[id] error", error);
     return NextResponse.json(

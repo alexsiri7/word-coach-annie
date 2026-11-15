@@ -1,5 +1,8 @@
 // Shared types used across the app
-export type ProjectType = "FICTION" | "ARTICLE_COLLECTION" | "GENERAL" | "GAME";
+import type { z } from "zod";
+import type { ProjectType as ProjectTypeSchema } from "@/schemas/projects";
+
+export type ProjectType = z.infer<typeof ProjectTypeSchema>;
 
 export interface Project {
   id: string;

@@ -6,8 +6,8 @@ import {
     PROJECT_TYPE_LABELS,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { ProjectType } from "@/schemas/projects";
 import type {
-    ProjectType,
     SceneBlock,
     SceneStatus,
     StoryObjectType,
@@ -38,8 +38,7 @@ describe("constants", () => {
     });
 
     it("defines PROJECT_TYPE_LABELS for all project types", () => {
-        const projectTypes: ProjectType[] = ["FICTION", "ARTICLE_COLLECTION", "GENERAL"];
-        for (const pt of projectTypes) {
+        for (const pt of ProjectType.options) {
             expect(PROJECT_TYPE_LABELS[pt]).toBeDefined();
             expect(PROJECT_TYPE_LABELS[pt].PART).toBeDefined();
             expect(PROJECT_TYPE_LABELS[pt].CHAPTER).toBeDefined();
