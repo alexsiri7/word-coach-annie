@@ -150,11 +150,7 @@ Test setup: `src/__tests__/globalSetup.ts` — creates a fresh in-memory SQLite 
 
 **Never mock the database** — tests use a real SQLite DB seeded per test. This is intentional to catch schema/query issues that mocks would hide.
 
-**Game-authoring acceptance tests** (`src/__tests__/game-*.acceptance.test.ts`, #1501) are marked `it.fails` until the issue that builds each scenario makes it pass; that issue changes the mark to `it`. "Migrating Tune Story" needs a checkout of `alexsiri7/punland`, so it is skipped unless `PUNLAND_DIR` (optional) points at one inside the container. Mount your checkout into a one-off container:
-
-```bash
-docker compose -f docker-compose.dev.yml run --rm -v /path/to/punland:/punland -e PUNLAND_DIR=/punland app npm run test:run -- game-import
-```
+**Game-authoring acceptance tests** (`src/__tests__/game-*.acceptance.test.ts`, #1501) are marked `it.fails` until the issue that builds each scenario makes it pass; that issue changes the mark to `it`.
 
 ### TypeScript
 

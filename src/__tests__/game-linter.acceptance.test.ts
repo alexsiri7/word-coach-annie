@@ -132,7 +132,7 @@ describe("game-linter", () => {
     describe("Requirement: Where it runs", () => {
         it.fails("An agent lints a game", async () => {
             const { game, projectId } = await seededGame();
-            await game.save(projectId, "model", model("scene/cellar", { status: "placeholder", fileData: undefined }));
+            await game.save(projectId, "model", model("scene/cellar", { status: "placeholder" }));
             await game.save(projectId, "room", room("cellar", []));
 
             const lint = await game.lint(projectId);

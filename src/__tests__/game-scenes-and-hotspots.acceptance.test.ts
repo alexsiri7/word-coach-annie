@@ -149,7 +149,7 @@ describe("game-scenes-and-hotspots", () => {
             const { game, projectId } = await seededGame();
             const artSpec = { prompt: "A crow in a police cap", notes: "Stern, but tired.", referenceImages: [] };
 
-            await game.save(projectId, "model", model("character/cop", { height: 1.7, artSpec, status: "placeholder", fileData: undefined }));
+            await game.save(projectId, "model", model("character/cop", { height: 1.7, artSpec, status: "placeholder" }));
 
             expect(await game.list(projectId, "model")).toContainEqual(
                 expect.objectContaining({ id: "character/cop", kind: "character", height: 1.7, artSpec, status: "placeholder", placeholder: true }),
@@ -159,7 +159,7 @@ describe("game-scenes-and-hotspots", () => {
 
         it.fails("Replacing a placeholder", async () => {
             const { game, projectId } = await seededGame();
-            await game.save(projectId, "model", model("scene/cellar", { status: "placeholder", fileData: undefined }));
+            await game.save(projectId, "model", model("scene/cellar", { status: "placeholder" }));
             await game.save(projectId, "room", room("cellar", []));
             const before = await game.get(projectId, "room", "cellar");
 

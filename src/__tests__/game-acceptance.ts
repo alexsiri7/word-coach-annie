@@ -1,7 +1,7 @@
 /**
  * Harness for the game-authoring acceptance tests (#1501): the contract that the
- * game-world-model, game-scenes-and-hotspots, game-dialogue, game-linter, game-export and
- * game-import specs are built against (#1502–#1508). Tests reach the game only through
+ * game-world-model, game-scenes-and-hotspots, game-dialogue, game-linter and game-export
+ * specs are built against (#1502–#1507). Tests reach the game only through
  * Annie's MCP tools and the app's routes, so the storage behind them stays the
  * implementation's choice.
  *
@@ -104,13 +104,11 @@ export interface Prop { id: string; name: string; model: string }
 export interface Model {
     id: string;
     kind: "scene" | "character" | "object";
-    /** Its path under the bundle's frontend/public/. */
+    /** Its path under the engine's frontend/public/; Annie never holds the file. */
     file: string;
     height?: number;
     artSpec: { prompt: string; notes: string; referenceImages: string[] };
     status: "placeholder" | "in progress" | "final";
-    /** The model file, base64; write-only. */
-    fileData?: string;
 }
 
 export interface Room {
@@ -180,7 +178,7 @@ export interface GameObjectOutput extends Omit<GameObjectInput, "act" | "puzzle"
     act: Act & { final: boolean };
     /** Puzzle ids, through the flags one's grants set and another's requires read. */
     puzzle: Puzzle & { dependsOn: string[]; unlocks: string[] };
-    model: Omit<Model, "fileData"> & { placeholder: boolean };
+    model: Model & { placeholder: boolean };
     /** The LOCATION story object that holds the room. */
     room: Room & { storyObjectId: string };
 }
@@ -228,16 +226,12 @@ export interface PreviewResult {
 
 // ─── Mocks every test file installs ──────────────────────────────────────────
 
-/**
- * Supabase Storage held in memory, for model files and snapshot screenshots. An
- * implementation that keeps model files there reads them back with `downloadObject`,
- * which the storage module does not have yet.
- */
+/** Object storage held in memory, for snapshot screenshots. */
 const stored = new Map<string, Buffer>();
 
 type StorageModule = typeof import("@/lib/storage/object-storage");
 
-export function fakeStorage(actual: StorageModule): StorageModule & { downloadObject(path: string): Promise<Buffer> } {
+export function fakeStorage(actual: StorageModule): StorageModule {
     const signed = (path: string) => `https://storage.test/signed/${path}?token=t`;
     return {
         ...actual,
@@ -245,11 +239,6 @@ export function fakeStorage(actual: StorageModule): StorageModule & { downloadOb
         createSignedUrl: vi.fn(async (path: string) => signed(path)),
         createSignedUrls: vi.fn(async (paths: string[]) => new Map(paths.map((p) => [p, signed(p)]))),
         removeObjects: vi.fn(async (paths: string[]) => { for (const p of paths) stored.delete(p); }),
-        downloadObject: vi.fn(async (path: string) => {
-            const data = stored.get(path);
-            if (!data) throw new Error(`No stored object at ${path}`);
-            return data;
-        }),
     };
 }
 
@@ -332,7 +321,6 @@ export const FLOOR: FloorPoint[] = [
     { x: 100, y: 630 },
 ];
 
-const FILE_DATA = Buffer.from("glTF").toString("base64");
 
 export function model(id: string, overrides: Partial<Model> = {}): Model {
     const [kind, name] = id.split("/") as [Model["kind"], string];
@@ -342,7 +330,6 @@ export function model(id: string, overrides: Partial<Model> = {}): Model {
         file: `models/${kind}s/${name}.glb`,
         artSpec: { prompt: `A ${name}`, notes: "", referenceImages: [] },
         status: "final",
-        fileData: FILE_DATA,
         ...overrides,
     };
 }

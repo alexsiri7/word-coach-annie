@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Where a game happens: the rooms the player walks around, the things to look at and use, and the exits between rooms. In the engine a room is a 3D scene model seen through one fixed camera, so Annie holds the room's data and the registry that says which model each room, character and object uses, together with the art spec and status an artist works from. The model files themselves are assets.
+Where a game happens: the rooms the player walks around, the things to look at and use, and the exits between rooms. In the engine a room is a 3D scene model seen through one fixed camera, so Annie holds the room's data and the registry that says which model each room, character and object uses, together with the art spec and status an artist works from. The model files themselves stay in the engine's repository: Annie names each one by its path and never holds the file.
 
 ## Requirements
 
@@ -44,14 +44,14 @@ An exit SHALL be a hotspot with a goTo effect to another room, arriving at a flo
 - THEN Annie refuses it
 
 ### Requirement: Model registry
-The registry SHALL list every model by id and kind (scene, character or object), with its model file, whether it is still a placeholder and, for a character, its height. For each entry Annie SHALL also keep the art spec the artist works from (a prompt, notes and reference images) and a status (placeholder, in progress or final). Annie MUST refuse a room, character or object that names a model that is not in the registry or is of the wrong kind.
+The registry SHALL list every model by id and kind (scene, character or object), with the path of its model file in the engine, whether it is still a placeholder and, for a character, its height. For each entry Annie SHALL also keep the art spec the artist works from (a prompt, notes and reference images) and a status (placeholder, in progress or final). Annie MUST refuse a room, character or object that names a model that is not in the registry or is of the wrong kind.
 
 #### Scenario: Adding a model
 - WHEN the author adds a character model with a height and an art spec
 - THEN characters can use it, and it shows as a placeholder until its file is final
 
 #### Scenario: Replacing a placeholder
-- WHEN the author attaches the final file to a model and marks it final
+- WHEN the artist's final file is in the engine and the author marks the model final
 - THEN the entry is no longer a placeholder and the rooms that use it need no change
 
 #### Scenario: A model of the wrong kind

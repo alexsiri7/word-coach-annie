@@ -11,7 +11,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: 
 vi.mock("@/lib/storage/object-storage", async (importOriginal) =>
     (await import("./game-acceptance")).fakeStorage(await importOriginal()));
 
-import { CONTENT, app, bundleFile, improvNode, json, model, seededGame, unreachableEnding } from "./game-acceptance";
+import { CONTENT, app, improvNode, json, seededGame, unreachableEnding } from "./game-acceptance";
 
 describe("game-export", () => {
     describe("Requirement: The bundle", () => {
@@ -58,10 +58,8 @@ describe("game-export", () => {
             expect(sheet).toMatchObject({ name: "Bartender", goal: improv.goal, canned: improv.canned });
             expect(sheet.sheet).toEqual(expect.stringContaining(improv.persona));
             expect(sheet.sheet).toEqual(expect.stringContaining(improv.knows));
-            const street = model("scene/street");
-            expect(bundleFile(files, `frontend/public/${street.file}`)).toEqual({
-                path: `frontend/public/${street.file}`, encoding: "base64", content: street.fileData,
-            });
+            // The model files stay in the engine's repository: the registry names them, the bundle holds none.
+            expect(files.filter((f) => f.path.startsWith("frontend/public/") || f.encoding === "base64")).toEqual([]);
         });
     });
 
