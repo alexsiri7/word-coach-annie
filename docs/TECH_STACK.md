@@ -63,7 +63,7 @@ Core models for hierarchical story structure:
 | MediumCredential | Medium API token storage |
 | MediumExport | Medium publish tracking |
 | WorldObjectTimelineEntry | Timeline events for world objects |
-| LocationImage | Images attached to a location story object (files in Supabase Storage) |
+| LocationImage | Images attached to a location story object (files in a Cloudflare R2 bucket) |
 | LocationMap | Top-down sketch of a location (size, optional background image, item list) |
 
 ## Frontend
@@ -177,8 +177,8 @@ Visual regression screenshots live in `e2e/visual.spec.ts-snapshots/`.
 | `JWT_SECRET` | OAuth session signing | No |
 | `ENCRYPTION_KEY` | Data-at-rest encryption | Production |
 | `ENCRYPTION_KEY_PREVIOUS` | Older encryption keys, decrypt-only (key rotation) | No |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Private Supabase Storage bucket for location images; the key is the service role / secret key (server only, never `NEXT_PUBLIC`) | No (image upload and image URLs answer 503 without them) |
-| `SUPABASE_STORAGE_BUCKET` | Bucket name (default: `location-images`) | No |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Private Cloudflare R2 bucket for location images and snapshots; the keys are an R2 API token scoped to that bucket (server only, never `NEXT_PUBLIC`) | No (image upload and image URLs answer 503 without them) |
+| `R2_BUCKET` | Bucket name (default: `annie-location-images`) | No |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Error tracking | No |
 | `RAILWAY_TOKEN` | Railway API (for deploy pipeline) | CI only |
 | `RAILWAY_STAGING_SERVICE_ID` | Staging service ID | CI only |
@@ -192,7 +192,7 @@ See `.env.example` for the full list.
 | Service | Purpose | Auth |
 |---------|---------|------|
 | Supabase PostgreSQL | Production database | Connection string |
-| Supabase Storage | Location images (private bucket, signed URLs) | `SUPABASE_SERVICE_ROLE_KEY` |
+| Cloudflare R2 | Location images and snapshots (private bucket, presigned URLs, no egress fees) | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` |
 | Railway | Hosting (staging + production) | API token |
 | Google AI | Gemini 2.0 Flash (via @google/adk) | `GEMINI_API_KEY` |
 | Google Docs/Drive | Document export & sync | OAuth2 |

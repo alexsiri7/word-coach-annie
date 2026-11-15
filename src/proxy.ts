@@ -35,14 +35,10 @@ function sentryCspReportUri(dsn: string | undefined): string | null {
     }
 }
 
-/** Location images redirect to signed URLs on this origin, and CSP checks redirect targets. */
-function storageImageOrigin(url: string | undefined): string | null {
-    if (!url) return null;
-    try {
-        return new URL(url).origin;
-    } catch {
-        return null;
-    }
+
+/** The R2 bucket's S3 origin, where location images' presigned URLs point; null when unset. */
+function r2StorageOrigin(accountId: string | undefined): string | null {
+    return accountId && /^[0-9a-f]{32}$/.test(accountId) ? `https://${accountId}.r2.cloudflarestorage.com` : null;
 }
 
 /**
@@ -58,7 +54,8 @@ const LIBRARY_STYLE_HASHES = [
 
 function buildCsp(nonce: string): string {
     const reportUri = sentryCspReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN);
-    const storageOrigin = storageImageOrigin(process.env.SUPABASE_URL);
+    // Location images redirect to presigned URLs on the bucket's origin, and CSP checks redirect targets.
+    const storageOrigin = r2StorageOrigin(process.env.R2_ACCOUNT_ID);
     return [
         "default-src 'self'",
         // Nonce allows next-themes FOUC inline script; unsafe-inline removed (SEC-07).

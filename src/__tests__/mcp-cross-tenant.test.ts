@@ -12,8 +12,8 @@ vi.mock("../lib/controllers/google-auth", () => ({
     },
 }));
 
-vi.mock("@/lib/storage/supabase-storage", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@/lib/storage/supabase-storage")>();
+vi.mock("@/lib/storage/object-storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/storage/object-storage")>();
     return {
         ...actual,
         uploadObject: vi.fn(async () => {}),

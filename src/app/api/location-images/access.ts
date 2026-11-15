@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { NotFoundError, UserFacingError } from "@/lib/controllers/errors";
-import { StorageNotConfiguredError } from "@/lib/storage/supabase-storage";
+import { StorageNotConfiguredError } from "@/lib/storage/object-storage";
 import { logger } from "@/lib/logger";
 
 /** Location images are owner-only (#1478), so shared readers and editors get 403. */
