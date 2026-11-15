@@ -38,10 +38,15 @@ function checkedKind(kind: string): GameObjectKind {
     return kind;
 }
 
+/** A stored row as the object it holds: its data with its id. */
+export function storedObject(row: { key: string; data: Prisma.JsonValue }): Prisma.JsonObject {
+    const data = typeof row.data === "object" && row.data !== null && !Array.isArray(row.data) ? row.data : {};
+    return { ...data, id: row.key };
+}
+
 /** Rows are written only through parseGameObject, so a stored object is read with the same schema. */
 function entryOf(row: Row): GameObjectEntry {
-    const data = typeof row.data === "object" && row.data !== null && !Array.isArray(row.data) ? row.data : {};
-    return GameObjectEntrySchema.parse({ kind: row.kind, object: { ...data, id: row.key } });
+    return GameObjectEntrySchema.parse({ kind: row.kind, object: storedObject(row) });
 }
 
 function withoutDerived(kind: GameObjectKind, input: unknown): unknown {
@@ -72,6 +77,8 @@ async function projectEntries(db: DbClient, projectId: string, kind?: GameObject
     });
     return rows.sort(rowOrder).map(entryOf);
 }
+
+const isSame = (a: GameObjectEntry, kind: GameObjectKind, id: string) => a.kind === kind && a.object.id === id;
 
 /** The ids of the game's objects, by kind; goals count as a kind, holding every act's goals. */
 function existingIds(entries: GameObjectEntry[]): Map<string, Set<string>> {
@@ -115,7 +122,39 @@ function usesOf(target: GameObjectEntry, others: GameObjectEntry[]): UsedBy[] {
     );
 }
 
-const isSame = (a: GameObjectEntry, kind: GameObjectKind, id: string) => a.kind === kind && a.object.id === id;
+/** An act saved without a goal it had would leave the rules that name that goal pointing at nothing. */
+function checkDroppedGoals(act: Act, stored: GameObjectEntry | undefined, others: GameObjectEntry[]) {
+    if (stored?.kind !== "act") return;
+    const kept = new Set(act.goals.map((goal) => goal.id));
+    const dropped = new Set(stored.object.goals.map((goal) => goal.id).filter((id) => !kept.has(id)));
+    for (const other of others) {
+        const ref = referencesOf(other).find((r) => r.kind === "goal" && dropped.has(r.id));
+        if (ref) {
+            throw new UserFacingError(
+                `goals: goal "${ref.id}" is still named by ${other.kind} "${other.object.id}" at ${formatPath(ref.path, other.object)}`,
+            );
+        }
+    }
+}
+
+/**
+ * Checks a whole game at once, as an import brings it: no object twice, no goal in two
+ * acts, and every rule naming an object the game has.
+ */
+export function checkGame(entries: GameObjectEntry[]) {
+    entries.forEach((entry, i) => {
+        const earlier = entries.slice(0, i);
+        const { kind, object } = entry;
+        if (earlier.some((e) => isSame(e, kind, object.id))) throw new UserFacingError(`there are two of ${kind} "${object.id}"`);
+        try {
+            if (entry.kind === "act") checkGoalsAreUnique(entry.object, earlier);
+            checkReferences(entry, entries);
+        } catch (error) {
+            if (error instanceof UserFacingError) throw new UserFacingError(`${kind} "${object.id}": ${error.message}`);
+            throw error;
+        }
+    });
+}
 
 export class GameObjectsController {
     static async list(projectId: string, kind: string): Promise<GameObjectView[]> {
@@ -149,8 +188,12 @@ export class GameObjectsController {
             if (project.projectType !== "GAME") {
                 throw new UserFacingError(`Game objects belong to game projects; this is a ${project.projectType} project`);
             }
-            const others = (await projectEntries(tx, projectId)).filter((e) => !isSame(e, checked, id));
-            if (entry.kind === "act") checkGoalsAreUnique(entry.object, others);
+            const entries = await projectEntries(tx, projectId);
+            const others = entries.filter((e) => !isSame(e, checked, id));
+            if (entry.kind === "act") {
+                checkGoalsAreUnique(entry.object, others);
+                checkDroppedGoals(entry.object, entries.find((e) => isSame(e, checked, id)), others);
+            }
             const game = [...others, entry];
             checkReferences(entry, game);
 

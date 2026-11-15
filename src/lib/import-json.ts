@@ -9,6 +9,9 @@ import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 import { NodeType, SceneStatus } from "@/schemas/nodes";
 import { ProjectType } from "@/schemas/projects";
 import { hasExactlyOneEndpoint } from "@/schemas/relationships";
+import { checkGame } from "@/lib/controllers/game-objects";
+import { UserFacingError } from "@/lib/controllers/errors";
+import { isGameObjectKind, parseGameObject, unknownKindMessage, type GameObjectEntry } from "@/schemas/game-objects";
 
 interface ExportData {
   exportVersion: number;
@@ -66,6 +69,12 @@ interface ExportData {
     role: string;
     content: string;
   }>;
+  /** Absent from exports made before game projects. */
+  gameObjects?: Array<{
+    kind: string;
+    object: unknown;
+    createdAt?: string;
+  }>;
 }
 
 export class ImportValidationError extends Error {
@@ -82,6 +91,8 @@ const MAX_IMPORT_ITEMS = {
   annotations: 20_000,
   relationships: 20_000,
 } as const;
+
+const MAX_IMPORT_GAME_OBJECTS = 20_000;
 
 // Bounded by the Postgres `int4` column, not NodeOrderIndex: node creation
 // via `insertAfterIndex` is unbounded, so real exports can exceed that range.
@@ -117,6 +128,35 @@ function assertImportable(data: ExportData) {
   }
 }
 
+/** Validates game objects with the schema every save uses; they keep their ids, which rules name. */
+function importableGameObjects(data: ExportData): { entry: GameObjectEntry; createdAt?: Date }[] {
+  const gameObjects = data.gameObjects ?? [];
+  if (!Array.isArray(gameObjects)) throw new ImportValidationError("gameObjects must be an array");
+  if (gameObjects.length > MAX_IMPORT_GAME_OBJECTS) {
+    throw new ImportValidationError(`gameObjects exceeds the maximum of ${MAX_IMPORT_GAME_OBJECTS}`);
+  }
+  if (!gameObjects.every((item) => typeof item === "object" && item !== null && !Array.isArray(item))) {
+    throw new ImportValidationError("gameObjects entries must be objects");
+  }
+  if (gameObjects.length > 0 && data.project.projectType !== "GAME") {
+    throw new ImportValidationError("Only a GAME project has game objects");
+  }
+  const imported = gameObjects.map(({ kind, object, createdAt }) => {
+    if (!isGameObjectKind(kind)) throw new ImportValidationError(unknownKindMessage(String(kind)));
+    const parsed = parseGameObject(kind, object);
+    if (!parsed.success) throw new ImportValidationError(`Invalid ${kind}: ${parsed.error}`);
+    const time = Date.parse(createdAt ?? "");
+    return { entry: parsed.entry, ...(!Number.isNaN(time) && { createdAt: new Date(time) }) };
+  });
+  try {
+    checkGame(imported.map(({ entry }) => entry));
+  } catch (error) {
+    if (error instanceof UserFacingError) throw new ImportValidationError(`Invalid game objects: ${error.message}`);
+    throw error;
+  }
+  return imported;
+}
+
 /**
  * Import a project from the standard export JSON format.
  * Generates new IDs for all entities while preserving internal references.
@@ -128,6 +168,7 @@ export async function importProjectJson(
   options?: { userId?: string; isSample?: boolean }
 ): Promise<{ projectId: string }> {
   assertImportable(data);
+  const gameObjects = importableGameObjects(data);
 
   // Build ID mapping tables: old ID -> new ID
   const nodeIdMap = new Map<string, string>();
@@ -257,6 +298,14 @@ export async function importProjectJson(
           toNodeId,
           toObjectId,
         },
+      });
+    }
+
+    // 7. Create game objects; their created times keep the order the game lists them in
+    for (const { entry, createdAt } of gameObjects) {
+      const { id: key, ...object } = entry.object;
+      await tx.gameObject.create({
+        data: { projectId, kind: entry.kind, key, data: object as Prisma.InputJsonObject, ...(createdAt && { createdAt }) },
       });
     }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

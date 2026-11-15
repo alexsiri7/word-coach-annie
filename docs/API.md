@@ -92,6 +92,7 @@ Export all personal data for the authenticated user as a ZIP archive (GDPR Artic
   - `writing-tasks.json` — practice tasks not tied to a project
   - `projects/<title>-<id>.json` — full project JSON for each project (the id keeps titles that sanitize alike from colliding), including:
     - structure nodes, story objects, chat messages, annotations, relationships
+    - `gameObjects` — a GAME project's world model, each as `{ kind, object, createdAt }` with the object in the shape `save_game_object` takes
     - `writingSessions` — word count and duration records per scene
     - `conversations` — AI chat threads (title, type, summary; messages excluded)
     - `googleDocExports` — Google Docs sync records (credential tokens **omitted**)
@@ -1171,9 +1172,9 @@ Create the sample project (Sherlock Holmes) for new users. No-op if the user alr
 ### `POST /api/projects/import`
 Import a project from a JSON export file.
 
-**Body**: JSON export data (project object). A story object with a missing or blank `type` is imported as `NOTE`; any other `type` is kept as-is.
+**Body**: JSON export data (project object). A story object with a missing or blank `type` is imported as `NOTE`; any other `type` is kept as-is. `gameObjects` keep their ids and are validated as `save_game_object` validates them, every rule naming an object of the imported game.
 
-**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
+**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, an invalid game object or one in a project that is not `GAME`, more than 20,000 game objects, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
 
 ---
 

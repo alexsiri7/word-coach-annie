@@ -112,7 +112,7 @@ model Project {
 }
 
 /// An object of a GAME project's world model (#1502). `data` is the object without its id,
-/// validated by GameObjectSchemas (src/schemas/game-objects.ts) on every write.
+/// validated by GameObjectEntrySchema (src/schemas/game-objects.ts) on every write.
 model GameObject {
   id        String   @id @default(cuid())
   projectId String

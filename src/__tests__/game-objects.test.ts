@@ -1,5 +1,5 @@
-// What a save of a game object refuses and a delete does, beyond the game-world-model
-// acceptance scenarios (#1502).
+// What a save of a game object refuses, what a delete does, and how a project export
+// carries the objects, beyond the game-world-model acceptance scenarios (#1502).
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/api-auth", async (importOriginal) => {
@@ -10,7 +10,11 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: 
 vi.mock("@/lib/storage/object-storage", async (importOriginal) =>
     (await import("./game-acceptance")).fakeStorage(await importOriginal()));
 
-import { CONDITION_NAMES } from "@/schemas/game-objects";
+import { NextRequest } from "next/server";
+import { CONDITION_NAMES, GAME_OBJECT_KINDS } from "@/schemas/game-objects";
+import { exportProjectJson } from "@/lib/export-json";
+import { importProjectJson } from "@/lib/import-json";
+import { PUT } from "@/app/api/projects/[id]/game/objects/[kind]/[objectId]/route";
 import { DOOR, FLYER, room, seededGame, type Condition, type Hotspot } from "./game-acceptance";
 
 function sign(interaction: Hotspot["interactions"][number]): Hotspot {
@@ -52,6 +56,30 @@ describe("save_game_object", () => {
         const reason = await game.saveRefusal(projectId, "act", { id: "2", name: "Act 2", goals: [{ id: "enter-shop", name: "Again" }] });
 
         expect(reason).toBe('goals[0].id: goal "enter-shop" already belongs to act "1"');
+    });
+
+    it("refuses a goal listed twice in one act", async () => {
+        const { game, projectId } = await seededGame();
+        const twice = [{ id: "encore", name: "Encore" }, { id: "encore", name: "Again" }];
+
+        expect(await game.saveRefusal(projectId, "act", { id: "2", name: "Act 2", goals: twice }))
+            .toBe('goals[1].id: goal "encore" is listed twice');
+    });
+
+    it("refuses to drop a goal from an act while a rule names it", async () => {
+        const { game, projectId } = await seededGame();
+
+        const reason = await game.saveRefusal(projectId, "act", { id: "1", name: "Act 1", goals: [] });
+
+        expect(reason).toBe('goals: goal "enter-shop" is still named by room "shop" at hotspots[counter].interactions[0].effects[1].reachGoal');
+        expect((await game.get(projectId, "act", "1")).goals).toEqual([{ id: "enter-shop", name: "Get into the shop" }]);
+    });
+
+    it("refuses unlock conditions on a world that is not locked", async () => {
+        const { game, projectId } = await seededGame();
+
+        expect(await game.saveRefusal(projectId, "world", { id: "city", name: "City", start: "street", unlockWhen: [{ has: "map" }] }))
+            .toBe("unlockWhen: only a locked world has unlock conditions");
     });
 
     it("refuses game objects in a project that is not a game", async () => {
@@ -97,5 +125,40 @@ describe("delete_game_object", () => {
         const { game, projectId } = await seededGame();
 
         expect(await game.refusal("delete_game_object", { projectId, kind: "flag", id: "nope" })).toBe('There is no flag "nope" in this game');
+    });
+});
+
+describe("PUT /api/projects/[id]/game/objects/[kind]/[objectId]", () => {
+    it("refuses a body whose id is not the one in the address", async () => {
+        const { projectId } = await seededGame();
+        const params = { id: projectId, kind: "flag", objectId: "lamp-on" };
+        const req = new NextRequest(`http://localhost/api/projects/${projectId}/game/objects/flag/lamp-on`, {
+            method: "PUT",
+            headers: { "content-type": "application/json", "x-csrf-protection": "1" },
+            body: JSON.stringify({ id: "door-open" }),
+        });
+
+        const res = await PUT(req, { params: Promise.resolve(params) });
+
+        expect(res.status).toBe(400);
+        expect((await res.json()).error).toBe('The object\'s id "door-open" does not match the address "lamp-on"');
+    });
+});
+
+describe("project JSON export and import", () => {
+    it("carries a game's objects to the imported project", async () => {
+        const { game, projectId } = await seededGame();
+        const { projectId: imported } = await importProjectJson(await exportProjectJson(projectId), { userId: "game-author" });
+
+        for (const kind of GAME_OBJECT_KINDS) expect(await game.list(imported, kind)).toEqual(await game.list(projectId, kind));
+    });
+
+    it("refuses to import a rule that names an object the game does not have", async () => {
+        const { projectId } = await seededGame();
+        const data = await exportProjectJson(projectId);
+        const gameObjects = data.gameObjects.filter((g) => !(g.kind === "flag" && g.object.id === "door-open"));
+
+        await expect(importProjectJson({ ...data, gameObjects }, { userId: "game-author" }))
+            .rejects.toThrow('Invalid game objects: room "street": hotspots[flyer].interactions[0].effects[1].set: there is no flag "door-open" in this game');
     });
 });

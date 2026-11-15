@@ -1,5 +1,6 @@
 import type { GoogleDocExport, Relationship } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { storedObject } from "@/lib/controllers/game-objects";
 
 export async function exportProjectJson(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -9,7 +10,7 @@ export async function exportProjectJson(projectId: string) {
   const [
     structureNodes, storyObjects, chatMessages, annotations, relationships,
     writingSessions, conversations, googleDocExports, hashnodeExports,
-    locationImages, locationMaps, locationSnapshots, snapshotAnnotations,
+    locationImages, locationMaps, locationSnapshots, snapshotAnnotations, gameObjects,
   ] = await Promise.all([
       prisma.structureNode.findMany({
         where: { projectId },
@@ -71,6 +72,10 @@ export async function exportProjectJson(projectId: string) {
       prisma.snapshotAnnotation.findMany({
         where: { location: { projectId } },
         orderBy: { createdAt: "asc" },
+      }),
+      prisma.gameObject.findMany({
+        where: { projectId },
+        orderBy: [{ createdAt: "asc" }, { key: "asc" }],
       }),
     ]);
 
@@ -235,6 +240,11 @@ export async function exportProjectJson(projectId: string) {
       status: a.status,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
+    })),
+    gameObjects: gameObjects.map((g) => ({
+      kind: g.kind,
+      object: storedObject(g),
+      createdAt: g.createdAt.toISOString(),
     })),
   };
 }

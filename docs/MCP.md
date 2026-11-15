@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **106 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **116 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -635,7 +635,7 @@ Rules use only the engine's vocabulary, each condition or effect an object keyed
 - **Conditions**: `has`, `pickedUp`, `gathered`, `flag` (with optional `is`), `stat` (with `atLeast`), `act`, `goal`, `visited`, `world`, `not`.
 - **Effects**: `say` (optional `by`), `goTo` (optional `at` floor point), `goBack`, `wait`, `pickUp`, `give`, `take`, `gather`, `set` (with `to`), `talk`, `changeStat` (with `by`), `reachGoal`.
 
-A save is refused, with the field and the problem, when an object has an unknown or misspelt field, a condition or effect outside the vocabulary, or a rule naming an item, flag, stat, act, goal, room, world or character the game does not have. Also refused: an interaction whose verb is not `look`, `use`, `talk`, `pickup` or `go`; an item on any verb but `use`, or none on `use`; a goal id another act already has; an act whose last `next` entry has a condition (it could get stuck); `unlockWhen` on a world that is not `locked`; any object in a project that is not a `GAME`. A world's start room and the models objects use are not checked on save.
+A save is refused, with the field and the problem, when an object has an unknown or misspelt field, a condition or effect outside the vocabulary, or a rule naming an item, flag, stat, act, goal, room, world or character the game does not have. Also refused: an interaction whose verb is not `look`, `use`, `talk`, `pickup` or `go`; an item on any verb but `use`, or none on `use`; a goal id another act already has, or one listed twice; an act saved without a goal that a rule still names; an act whose last `next` entry has a condition (it could get stuck); `unlockWhen` on a world that is not `locked`; any object in a project that is not a `GAME`. A world's start room and the models objects use are not checked on save.
 
 Reads add fields Annie derives; writes ignore them: an act's `final` (it has no `next` entries — an ending), and a puzzle's `dependsOn` and `unlocks` (puzzle ids, through the flags one's `grants` set and another's `requires` read).
 
