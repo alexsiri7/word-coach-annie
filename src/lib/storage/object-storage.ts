@@ -57,11 +57,19 @@ async function request(client: AwsClient, url: string, init: RequestInit): Promi
 /** Objects are immutable once written (an existing path is refused), so they carry a one-year cache lifetime. */
 export async function uploadObject(path: string, data: Buffer, contentType: string): Promise<void> {
     const { client, base } = config();
-    await request(client, `${base}/${encodePath(path)}`, {
+    const body = new Uint8Array(data);
+    // aws4fetch's own fetch re-sends the body as a stream, which Node sends chunked, and R2
+    // refuses a PUT without Content-Length (411). Sign, then send the bytes so fetch sets it.
+    const signed = await client.sign(`${base}/${encodePath(path)}`, {
         method: "PUT",
         headers: { "content-type": contentType, "cache-control": "max-age=31536000", "if-none-match": "*" },
-        body: new Uint8Array(data),
+        body,
     });
+    const res = await fetch(signed.url, { method: "PUT", headers: signed.headers, body });
+    if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).slice(0, 200);
+        throw new Error(`Object storage PUT failed: ${res.status} ${detail}`);
+    }
 }
 
 /** Signing is local: no request reaches the bucket until the browser follows the URL. */
