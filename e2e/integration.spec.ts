@@ -1119,3 +1119,156 @@ test.describe('Integration tests — real server, real data', () => {
     expect(violations).toEqual([])
   })
 })
+
+// ── Game dialogue editor — acceptance for #1501 ─────────────────────────
+// The visual editor's scenarios in openspec/specs/game-dialogue. Each is marked
+// test.fail() until #1505 makes it pass; then the mark comes off. The routes and
+// object shapes are the ones src/__tests__/game-acceptance.ts fixes.
+
+const GAME_WRITE_HEADERS = { ...AUTH_HEADERS, 'x-csrf-protection': '1' }
+const SOON = { timeout: 5_000 }
+
+type DialogueNode = Record<string, unknown> & { id: string }
+
+const line = (id: string, text: string, next: string | null): DialogueNode => ({
+  id,
+  type: 'line',
+  speaker: 'bartender',
+  text,
+  next,
+})
+
+/** A game project whose bartender has the conversation `talk`, entering at the first node. */
+async function createConversation(
+  request: APIRequestContext,
+  nodes: DialogueNode[],
+): Promise<string> {
+  const res = await request.post('/api/projects', {
+    headers: AUTH_HEADERS,
+    data: { title: `E2E Game ${Date.now()}`, projectType: 'GAME' },
+  })
+  expect(res.status()).toBe(201)
+  const projectId: string = (await res.json()).id
+
+  const save = async (kind: string, object: Record<string, unknown> & { id: string }) => {
+    const put = await request.put(
+      `/api/projects/${projectId}/game/objects/${kind}/${encodeURIComponent(object.id)}`,
+      { headers: GAME_WRITE_HEADERS, data: object },
+    )
+    expect(put.status()).toBe(200)
+  }
+  await save('model', {
+    id: 'character/bartender',
+    kind: 'character',
+    file: 'models/characters/bartender.glb',
+    height: 1.55,
+    artSpec: { prompt: 'A crow in an apron', notes: '', referenceImages: [] },
+    status: 'placeholder',
+  })
+  await save('character', { id: 'bartender', name: 'Bartender', model: 'character/bartender' })
+  await save('game', {
+    id: 'game',
+    name: 'Tune Street',
+    start: { room: 'street', items: [] },
+    protagonist: { name: 'Mo', model: 'character/bartender' },
+  })
+  await save('conversation', { id: 'talk', character: 'bartender', entry: nodes[0].id, nodes })
+  return projectId
+}
+
+test.describe('Game dialogue editor — acceptance for #1501', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setExtraHTTPHeaders(AUTH_HEADERS)
+  })
+
+  test('Editing a conversation', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createConversation(request, [line('l1', 'Hello.', null)])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Add line' }).click()
+      await page.getByRole('textbox', { name: 'Text' }).fill('Nice to meet you.')
+      const added = page.locator('[data-node-id]').filter({ hasText: 'Nice to meet you.' })
+      const addedId = await added.getAttribute('data-node-id', SOON)
+      await page.locator('[data-node-id="l1"]').click()
+      await page.getByRole('combobox', { name: 'Next' }).selectOption(addedId!)
+
+      const edge = page.locator(`[data-edge="l1->${addedId}"]`)
+      await expect(edge).toBeVisible(SOON)
+      await page.reload()
+      await expect(added).toBeVisible(SOON)
+      await expect(edge).toBeVisible(SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test('Previewing a path', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createConversation(request, [
+        line('l1', 'Can I help?', 'pitch'),
+        {
+          id: 'pitch',
+          type: 'improv',
+          persona: 'A dry, kind crow who tends the bar.',
+          knows: 'Everyone who has played here.',
+          mustNotReveal: 'That the kitchen is hiring.',
+          mustSay: [],
+          goal: 'convince her I am staying',
+          escalation: ['polite', 'pushy', 'desperate'],
+          outcomes: [{ id: 'stays', when: 'she believes he is staying', effects: [], next: 'l2' }],
+          fallback: { effects: [], next: null },
+          canned: 'Busy night, kid.',
+          turnLimit: 8,
+        },
+        line('l2', 'Welcome to Punland.', null),
+      ])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Preview' }).click()
+      const preview = page.getByRole('region', { name: 'Preview' })
+      await expect(preview.getByRole('button', { name: 'stays' })).toBeVisible(SOON)
+      await expect(preview.getByRole('button', { name: 'fallback' })).toBeVisible(SOON)
+      await preview.getByRole('button', { name: 'stays' }).click()
+      await expect(preview).toContainText('Welcome to Punland.', SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test('A node that leads nowhere', async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createConversation(request, [line('a', 'First.', 'b'), line('b', 'Second.', null)])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.locator('[data-node-id="b"]').click()
+      await page.getByRole('button', { name: 'Delete node' }).click()
+
+      const a = page.locator('[data-node-id="a"]')
+      await expect(a).toHaveAttribute('aria-invalid', 'true', SOON)
+      await expect(a).toContainText('b', SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+
+  test("The protagonist's name", async ({ page, request }) => {
+    test.fail()
+    let projectId: string | undefined
+    try {
+      projectId = await createConversation(request, [line('l1', 'Hi {protagonist}', null)])
+      await page.goto(`/project/${projectId}/conversations/talk`)
+
+      await page.getByRole('button', { name: 'Preview' }).click()
+      await expect(page.getByRole('region', { name: 'Preview' })).toContainText('Hi Mo', SOON)
+    } finally {
+      if (projectId) await deleteProject(request, projectId)
+    }
+  })
+})
