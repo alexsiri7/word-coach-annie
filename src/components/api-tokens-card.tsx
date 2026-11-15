@@ -30,6 +30,7 @@ const SCOPE_LABELS: Record<string, string> = {
   read: "Read only",
   write: "Read & write scenes",
   snapshots: "Post location snapshots",
+  "mark-sent": "Mark snapshot annotations sent",
 } satisfies Record<PersonalTokenScope, string>;
 
 function isScope(value: string): value is PersonalTokenScope {
@@ -133,7 +134,7 @@ export function ApiTokensCard() {
           <h2 className="text-lg font-semibold text-text-primary">API tokens</h2>
         </div>
         <p className="text-sm text-text-secondary mb-4">
-          Let another app read or edit your scenes as you, or let a game post snapshots of its locations. Tokens can reach nothing else.
+          Let another app read or edit your scenes as you, let a game post snapshots of its locations, or let the story sync mark the snapshot annotations it exported sent. Tokens can reach nothing else.
         </p>
 
         {loading ? (
@@ -213,6 +214,7 @@ export function ApiTokensCard() {
                     <SelectItem value="read">{SCOPE_LABELS.read}</SelectItem>
                     <SelectItem value="write">{SCOPE_LABELS.write}</SelectItem>
                     <SelectItem value="snapshots">{SCOPE_LABELS.snapshots}</SelectItem>
+                    <SelectItem value="mark-sent">{SCOPE_LABELS["mark-sent"]}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

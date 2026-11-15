@@ -1,7 +1,8 @@
 /**
  * Personal API tokens: long-lived bearer credentials a user mints in Settings so another
- * app (e.g. a game's scene editor) can read or edit their scenes as them, or a game's
- * build job can post location snapshots.
+ * app (e.g. a game's scene editor) can read or edit their scenes as them, a game's
+ * build job can post location snapshots, or the story sync can mark the snapshot
+ * annotations it exported sent.
  *
  * Verified by src/proxy.ts, which runs on the Node.js runtime. Only the SHA-256 hash of a
  * token is stored; the plaintext exists once, in the create response.
@@ -13,7 +14,7 @@ import { isEmailAllowed } from "@/lib/auth";
 
 export const PERSONAL_TOKEN_PREFIX = "annie_pat_";
 
-export const PERSONAL_TOKEN_SCOPES = ["read", "write", "snapshots"] as const;
+export const PERSONAL_TOKEN_SCOPES = ["read", "write", "snapshots", "mark-sent"] as const;
 export type PersonalTokenScope = (typeof PERSONAL_TOKEN_SCOPES)[number];
 
 export function isPersonalTokenScope(value: unknown): value is PersonalTokenScope {
@@ -122,10 +123,14 @@ function isUnder(pathname: string, prefix: string): boolean {
 /** POST /api/projects/{id}/locations/{slug}/snapshots: the one route a snapshots token reaches. */
 export const SNAPSHOT_INGEST_PATH = /^\/api\/projects\/[^/]+\/locations\/[^/]+\/snapshots$/;
 
+/** POST /api/projects/{id}/snapshot-annotations/sent: the one route a mark-sent token reaches. */
+export const ANNOTATIONS_SENT_PATH = /^\/api\/projects\/[^/]+\/snapshot-annotations\/sent$/;
+
 /**
  * Read and write tokens reach only the scene/node REST routes and the MCP endpoint (whose
  * tools are filtered by scope in createServer); a read token may only GET or HEAD the REST
- * routes. A snapshots token may only post location snapshots.
+ * routes. A snapshots token may only post location snapshots, and a mark-sent token may
+ * only mark a project's snapshot annotations sent.
  */
 export function isPersonalTokenRequestAllowed(
     pathname: string,
@@ -134,6 +139,9 @@ export function isPersonalTokenRequestAllowed(
 ): "ok" | "read-only" | "out-of-scope" {
     if (scope === "snapshots") {
         return method === "POST" && SNAPSHOT_INGEST_PATH.test(pathname) ? "ok" : "out-of-scope";
+    }
+    if (scope === "mark-sent") {
+        return method === "POST" && ANNOTATIONS_SENT_PATH.test(pathname) ? "ok" : "out-of-scope";
     }
     if (isUnder(pathname, "/api/mcp")) return "ok";
     if (isUnder(pathname, "/api/nodes")) {

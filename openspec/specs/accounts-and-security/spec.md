@@ -52,6 +52,15 @@ A personal API token SHALL act as its user with a read, read+write-scenes or pos
 - WHEN it posts a location snapshot, then reads a scene
 - THEN the snapshot is stored and the read is refused with 403
 
+### Requirement: A mark-sent token only marks snapshot annotations sent
+
+A personal API token MAY instead have a mark-annotations-sent scope. Such a token SHALL reach only marking its owner's open snapshot annotations of a project sent, SHALL change nothing else on them, and SHALL be refused with 403 elsewhere.
+
+#### Scenario: Story sync marks exported annotations sent
+- GIVEN a mark-sent token and open annotations on the owner's locations
+- WHEN the story sync marks them sent, then tries to mark another user's annotation or change an annotation's text
+- THEN the owner's annotations show as sent and the other two are refused
+
 ### Requirement: Sessions last while the author is active
 
 A signed-in author SHALL stay signed in for at least 30 days of inactivity and indefinitely while active, with short-lived sessions refreshed transparently so autosave never fails on an expired session. Signing out SHALL revoke the refresh credential so it cannot be reused.

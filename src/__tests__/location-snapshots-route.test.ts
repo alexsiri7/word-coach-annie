@@ -38,6 +38,7 @@ import { POST as annotateRoute } from "@/app/api/location-snapshots/[id]/annotat
 import { PATCH as patchRoute, DELETE as deleteRoute } from "@/app/api/snapshot-annotations/[id]/route";
 import { DELETE as deleteStoryObject } from "@/app/api/story-objects/[id]/route";
 import { DELETE as deleteProject } from "@/app/api/projects/[id]/route";
+import { POST as markSentRoute } from "@/app/api/projects/[id]/snapshot-annotations/sent/route";
 
 const OWNER = "snapshot-owner";
 const STRANGER = "snapshot-stranger";
@@ -99,6 +100,8 @@ const annotate = (snapshotId: string, body: unknown) =>
     annotateRoute(jsonRequest(`/api/location-snapshots/${snapshotId}/annotations`, "POST", body, { "x-csrf-protection": "1" }), params(snapshotId));
 const patch = (id: string, body: unknown) => patchRoute(jsonRequest(`/api/snapshot-annotations/${id}`, "PATCH", body), params(id));
 const remove = (id: string) => deleteRoute(jsonRequest(`/api/snapshot-annotations/${id}`, "DELETE"), params(id));
+const markSent = (projectId: string, body: unknown, headers: Record<string, string> = { "x-token-scope": "mark-sent" }) =>
+    markSentRoute(jsonRequest(`/api/projects/${projectId}/snapshot-annotations/sent`, "POST", body, headers), params(projectId));
 
 describe("location snapshots", () => {
     beforeEach(async () => {
@@ -339,6 +342,70 @@ describe("location snapshots", () => {
             const snapshot = await ingestOk(project.id);
             const edit = await (await annotate(snapshot.id, { kind: "description", thingKey: "lamp", text: "x" })).json();
             expect((await patch(edit.id, { region: { type: "point", x: 1, y: 1 } })).status).toBe(400);
+        });
+    });
+
+    describe("marking sent", () => {
+        const addNote = (locationId: string, text: string, status = "open") =>
+            prisma.snapshotAnnotation.create({
+                data: { locationId, kind: "note", text, status, region: { type: "point", x: 1, y: 2 } },
+            });
+
+        it("moves only the listed open annotations to sent, without a CSRF header for a mark-sent token", async () => {
+            const { location } = await setup();
+            const a = await addNote(location.id, "a");
+            const b = await addNote(location.id, "b");
+            const done = await addNote(location.id, "resolved", "done");
+            const sent = await addNote(location.id, "exported", "sent");
+            const untouched = await addNote(location.id, "not listed");
+
+            const res = await markSent(location.projectId, { ids: [a.id, b.id, b.id, done.id, sent.id] });
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual({ updated: 2 });
+
+            const rows = await prisma.snapshotAnnotation.findMany({ orderBy: { text: "asc" } });
+            expect(rows.map((r) => [r.id, r.status, r.text])).toEqual([
+                [a.id, "sent", "a"],
+                [b.id, "sent", "b"],
+                [sent.id, "sent", "exported"],
+                [untouched.id, "open", "not listed"],
+                [done.id, "done", "resolved"],
+            ]);
+            expect(rows[0].region).toEqual({ type: "point", x: 1, y: 2 });
+        });
+
+        it("changes nothing when any id is not an annotation of this project", async () => {
+            const { project, location } = await setup();
+            const mine = await addNote(location.id, "mine");
+            const strangers = await prisma.project.create({ data: { title: "Theirs", userId: STRANGER } });
+            const theirLocation = await prisma.storyObject.create({ data: { projectId: strangers.id, type: "LOCATION", name: "Keep" } });
+            const theirs = await addNote(theirLocation.id, "theirs");
+
+            expect((await markSent(project.id, { ids: [mine.id, theirs.id] })).status).toBe(404);
+            expect((await markSent(project.id, { ids: [mine.id, "missing"] })).status).toBe(404);
+            expect((await markSent(strangers.id, { ids: [theirs.id] })).status).toBe(403);
+            expect(await prisma.snapshotAnnotation.findMany({ select: { status: true } })).toEqual([
+                { status: "open" },
+                { status: "open" },
+            ]);
+        });
+
+        it.each([
+            ["another field", { ids: ["x"], status: "done" }],
+            ["text", { ids: ["x"], text: "changed" }],
+            ["no ids", { ids: [] }],
+            ["no body", undefined],
+        ])("refuses a body with %s", async (_label, body) => {
+            const { project, location } = await setup();
+            await addNote(location.id, "a");
+            expect((await markSent(project.id, body)).status).toBe(400);
+        });
+
+        it("needs the CSRF header from any caller but a mark-sent token", async () => {
+            const { project, location } = await setup();
+            const a = await addNote(location.id, "a");
+            expect((await markSent(project.id, { ids: [a.id] }, { "x-token-scope": "snapshots" })).status).toBe(403);
+            expect((await markSent(project.id, { ids: [a.id] }, { "x-csrf-protection": "1" })).status).toBe(200);
         });
     });
 

@@ -57,7 +57,7 @@ model ApiToken {
   id         String    @id @default(cuid())
   userId     String
   name       String
-  scope      String    // "read" | "write" | "snapshots"
+  scope      String    // "read" | "write" | "snapshots" | "mark-sent"
   tokenHash  String    @unique // SHA-256 hex of the full token; the token itself is never stored
   hint       String    // last 4 characters, so the owner can tell tokens apart
   createdAt  DateTime  @default(now())

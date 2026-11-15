@@ -2,7 +2,7 @@
 
 All endpoints are REST JSON APIs under `/api/`. Requests that modify data require authentication when `API_TOKEN` is set (see [SETUP.md](SETUP.md)).
 
-**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`.
+**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`; a `mark-sent` token reaches only `POST /api/projects/:id/snapshot-annotations/sent`.
 
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 
@@ -181,13 +181,14 @@ A personal API token (`annie_pat_…`) lets another app act as the user who crea
 
 - A `read` or `write` token reaches only `/api/nodes/**` and `/api/mcp`. Any other path returns `403 { "error": "Personal API tokens can only access scenes" }`, including these token endpoints.
 - A `snapshots` token reaches only [`POST /api/projects/:id/locations/:slug/snapshots`](#post-apiprojectsidlocationsslugsnapshots), for a game's build job. Any other path, `/api/mcp` included, returns `403 { "error": "This API token can only post location snapshots" }`.
+- A `mark-sent` token reaches only [`POST /api/projects/:id/snapshot-annotations/sent`](#post-apiprojectsidsnapshot-annotationssent), for the story sync. Any other path, `/api/mcp` included, returns `403 { "error": "This API token can only mark snapshot annotations sent" }`.
 - A `read` token may only `GET`/`HEAD` the node routes; a write returns `403 { "error": "This API token is read-only" }`. A `write` token may read and write scenes. Over `/api/mcp`, a token sees only its scope's scene tools (see [MCP.md](MCP.md#personal-api-tokens)).
 - An unknown or revoked token returns `401`. Each token has its own rate limits (120 reads and 60 writes per minute).
 
 ### `GET /api/account/api-tokens`
 Lists the current user's tokens, newest first. The token itself is never returned again.
 
-**Response**: `{ "tokens": [{ "id", "name", "scope": "read" | "write" | "snapshots", "hint", "createdAt", "lastUsedAt" }] }` — `hint` is the token's last four characters; `lastUsedAt` is `null` until first use and updates at most once a minute.
+**Response**: `{ "tokens": [{ "id", "name", "scope": "read" | "write" | "snapshots" | "mark-sent", "hint", "createdAt", "lastUsedAt" }] }` — `hint` is the token's last four characters; `lastUsedAt` is `null` until first use and updates at most once a minute.
 
 **Errors**: `401` if not signed in.
 
@@ -196,7 +197,7 @@ Lists the current user's tokens, newest first. The token itself is never returne
 ### `POST /api/account/api-tokens`
 Creates a token. Requires the `X-CSRF-Protection: 1` header.
 
-**Body**: `{ "name": "Punland editor", "scope": "read" | "write" | "snapshots" }` — `name` is 1–100 characters.
+**Body**: `{ "name": "Punland editor", "scope": "read" | "write" | "snapshots" | "mark-sent" }` — `name` is 1–100 characters.
 
 **Response**: `201 { "token": "annie_pat_…", "apiToken": { "id", "name", "scope", "hint", "createdAt", "lastUsedAt" } }`. This is the only time the token is shown.
 
@@ -588,6 +589,17 @@ Annotate a snapshot. Requires the `X-CSRF-Protection: 1` header.
 **Body**: `{ text?, status?: "open" | "sent" | "done", region?, storyObjectId?: string | null }` — `region` and `storyObjectId` only for notes; `null` unlinks. `sent` means exported by the story sync; `done` resolves it.
 
 **Errors**: `400` invalid or empty body; `404` annotation not found.
+
+---
+
+### `POST /api/projects/:id/snapshot-annotations/sent`
+Mark annotations the story sync exported as sent. Authenticate with a `mark-sent` personal API token (no CSRF header needed); a signed-in owner may also call it with the `X-CSRF-Protection: 1` header.
+
+**Body**: `{ "ids": ["…"] }` — 1–500 annotation ids of this project; no other key is accepted.
+
+**Response**: `200 { "updated": 2 }` — only `open` annotations move to `sent`; `sent` and `done` ones are left as they are and not counted.
+
+**Errors**: `400` invalid body; `403` not the project's owner; `404` project not found, or any id is not an annotation of this project — then nothing changes.
 
 ---
 
