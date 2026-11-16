@@ -292,10 +292,13 @@ coverage:
   status: partial
   code_paths:
   - src/app/api/chat/route.ts
+  - src/lib/controllers/chat.ts
+  - src/lib/ai/chat-context.ts
   - src/lib/ai/chat-compression.ts
   - src/app/api/conversations
   test_paths:
   - src/__tests__/chat-route.test.ts
+  - src/__tests__/chat-context.test.ts
   - src/__tests__/chat-compression.test.ts
   - src/__tests__/conversations-route.test.ts
   notes: Disconnect mid-stream and assistant-turn persistence untested; reply is buffered then re-chunked, not streamed from the model.

@@ -19,9 +19,9 @@ Three new MCP tools are available on the Annie server:
 
 2. `get_peer_reviews(projectId, limit?)` — returns the stored peer review records for a project, ordered newest-first. Default limit is 5. Each record includes all four result fields (publisher, reader, writer, consensus) as structured objects, not opaque blobs. Claude can use this to surface any past review without running a new one.
 
-3. `get_peer_review_prompts()` — returns the full prompt/lens text for each of the three reviewer personas (editor, fan, author) as a structured object, keyed by persona name. The prompts are sourced from a shared constants module so that mcp/index.ts and api/chat/route.ts both draw from the same single source of truth rather than duplicating the strings.
+3. `get_peer_review_prompts()` — returns the full prompt/lens text for each of the three reviewer personas (editor, fan, author) as a structured object, keyed by persona name. The prompts are sourced from a shared constants module so that mcp/index.ts and the in-app chat (src/lib/ai/chat-context.ts, reached from api/chat/route.ts via ChatController) both draw from the same single source of truth rather than duplicating the strings.
 
-The persona lens strings are extracted from mcp/index.ts into a shared module (e.g. lib/review-personas.ts), analogous to how REVIEW_SKILL_BY_STATUS lives in lib/review-routing.ts. Both mcp/index.ts and api/chat/route.ts import from this shared module.
+The persona lens strings are extracted from mcp/index.ts into a shared module (e.g. lib/review-personas.ts), analogous to how REVIEW_SKILL_BY_STATUS lives in lib/review-routing.ts. Both mcp/index.ts and src/lib/ai/chat-context.ts import from this shared module.
 
 ## Issues
 
