@@ -358,7 +358,7 @@ coverage:
   status: covered
   code_paths:
   - src/mcp/index.ts
-  - src/mcp/annie-voice.ts
+  - src/lib/ai/annie-voice.ts
   test_paths:
   - src/__tests__/mcp-guardrails.test.ts
   notes: Every criterion checked, mostly by source-text inspection.

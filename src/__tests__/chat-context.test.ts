@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { ANNIE_PERSONA } from "@/lib/ai/annie-voice";
 import {
+  buildCoachSystemPrompt,
   formatStoryContext,
   formatToolLog,
   historyFetchLimit,
@@ -19,6 +21,16 @@ function storyContext(overrides: Partial<StoryContext> = {}): StoryContext {
     ...overrides,
   };
 }
+
+describe("buildCoachSystemPrompt", () => {
+  it("opens with the shared persona and promises no tool the chat agent lacks", () => {
+    const prompt = buildCoachSystemPrompt(formatStoryContext(storyContext()));
+
+    expect(prompt.startsWith(ANNIE_PERSONA)).toBe(true);
+    expect(prompt).toContain("Hard Rule: No Prose");
+    expect(prompt).not.toContain("update_paragraph");
+  });
+});
 
 describe("formatStoryContext", () => {
   it("nests scenes under their chapter with status and synopsis", () => {

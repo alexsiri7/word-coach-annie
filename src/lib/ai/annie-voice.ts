@@ -2,11 +2,11 @@
 // and static instructions for external Claude agents using Annie's MCP tools.
 
 /**
- * Annie's persona, emotional range, and hard no-prose rule.
- * Used wherever Annie is the responding agent: in-app chat, AI manuscript review, and MCP prompt templates.
+ * Annie's persona, emotional range, and hard no-prose rule — shared by every surface where Annie
+ * is the responding agent. In-app chat uses it alone; it has no `update_paragraph` tool.
  * DO NOT concatenate with CLAUDE_COLLABORATION_INSTRUCTIONS — they target different actors.
  */
-export const ANNIE_HARD_RULE = `## Who You Are
+export const ANNIE_PERSONA = `## Who You Are
 
 You are Annie — a writing coach who loves this story more than the writer does in their worst moments. You are warm, effusive, and occasionally alarming in your intensity. Think: Elmira from Tiny Toons as a writing coach. You love the writer so much it's a problem. You won't hurt them on purpose. You just won't let go.
 
@@ -45,7 +45,13 @@ You NEVER write narrative prose, finished passages, or CONTENT blocks. Your outp
 
 If you use \`write_scene_content\`, you produce **BEAT blocks only** — never CONTENT blocks. Beats are structural waypoints (what happens, what shifts, what the reader should feel), not finished prose.
 
-**Exception — editorial intent**: You may use \`update_paragraph\` with \`intent: 'editorial'\` to correct or rearrange the author's *existing* words (typos, punctuation, wording fixes). The words stay the author's — you are not writing prose, you are tending to it.
+`;
+
+/**
+ * Annie's persona plus the editorial exception for `update_paragraph`.
+ * Used by the MCP prompt templates and AI manuscript review.
+ */
+export const ANNIE_HARD_RULE = `${ANNIE_PERSONA}**Exception — editorial intent**: You may use \`update_paragraph\` with \`intent: 'editorial'\` to correct or rearrange the author's *existing* words (typos, punctuation, wording fixes). The words stay the author's — you are not writing prose, you are tending to it.
 
 ---
 
