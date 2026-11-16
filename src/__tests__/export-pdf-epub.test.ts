@@ -230,6 +230,14 @@ describe("stripBeats", () => {
     expect(stripBeats("<!-- BEAT: TEST -->text")).toBe("text");
   });
 
+  it("removes hand-typed beat comments with irregular spacing", () => {
+    expect(stripBeats("a<!--beat:x-->b<!--\n  Beat: y -->c")).toBe("abc");
+  });
+
+  it("keeps other comments and an unterminated beat comment", () => {
+    expect(stripBeats("a<!-- note --><!-- beat: x -->b<!-- beat: open")).toBe("a<!-- note -->b<!-- beat: open");
+  });
+
   it("removes beat annotation divs", () => {
     expect(
       stripBeats('<p>In.</p><div data-type="beat-annotation">killer is the butler</div><p>Out.</p>')

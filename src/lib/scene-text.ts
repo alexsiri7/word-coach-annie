@@ -1,12 +1,12 @@
+import { stripBeatComments } from "@/lib/beat-comment";
+
 /**
  * Removes beat annotations in both storage formats: the HTML comment the
  * editor's save path writes (`<!-- beat: ... -->`) and the TipTap node div
  * (`data-type="beat-annotation"`) that MCP or direct writes can store as-is.
  */
 export function stripBeats(html: string): string {
-  return html
-    .replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, "")
-    .replace(/<!--\s*beat:[\s\S]*?-->/gi, "");
+  return stripBeatComments(html.replace(/<div[^>]*data-type="beat-annotation"[^>]*>[\s\S]*?<\/div>/g, ""));
 }
 
 export function countSceneWords(html: string): number {
