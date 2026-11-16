@@ -4,7 +4,7 @@ import { computeContentHash } from "@/mcp/content-hash";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
-import { NodeOrderIndex } from "@/schemas/nodes";
+import { NodeOrderIndex, NodeType, SceneStatus } from "@/schemas/nodes";
 import { UserFacingError } from "@/lib/controllers/errors";
 
 export class ConflictError extends UserFacingError {
@@ -252,14 +252,12 @@ export class StructureController {
         });
         if (!project) throw new UserFacingError("Project not found");
 
-        const validTypes = ["PART", "CHAPTER", "SCENE"];
-        if (!validTypes.includes(type)) {
-            throw new UserFacingError(`type must be one of: ${validTypes.join(", ")}`);
+        if (!NodeType.safeParse(type).success) {
+            throw new UserFacingError(`type must be one of: ${NodeType.options.join(", ")}`);
         }
 
-        const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
-        if (status && !validStatuses.includes(status)) {
-            throw new UserFacingError(`status must be one of: ${validStatuses.join(", ")}`);
+        if (status && !SceneStatus.safeParse(status).success) {
+            throw new UserFacingError(`status must be one of: ${SceneStatus.options.join(", ")}`);
         }
 
         if (parentId) {
@@ -340,9 +338,8 @@ export class StructureController {
         const existing = await prisma.structureNode.findUnique({ where: { id: nodeId } });
         if (!existing) throw new UserFacingError("Node not found");
 
-        const validStatuses = ["OUTLINE", "DRAFT", "REVISED", "FINAL"];
-        if (data.status && !validStatuses.includes(data.status)) {
-            throw new UserFacingError(`status must be one of: ${validStatuses.join(", ")}`);
+        if (data.status && !SceneStatus.safeParse(data.status).success) {
+            throw new UserFacingError(`status must be one of: ${SceneStatus.options.join(", ")}`);
         }
 
         if (data.orderIndex !== undefined) {
