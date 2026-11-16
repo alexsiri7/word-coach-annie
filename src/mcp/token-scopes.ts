@@ -19,10 +19,12 @@ const WRITE_TOOLS = [
 
 /**
  * The MCP tools a personal API token may see and call, per scope: scenes only. The proxy
- * already keeps snapshots tokens off /api/mcp; their empty set holds even if it did not.
+ * already keeps snapshots and mark-sent tokens off /api/mcp; their empty sets hold even if it
+ * did not.
  */
 export const TOKEN_SCOPE_TOOLS: Record<PersonalTokenScope, ReadonlySet<string>> = {
     read: new Set(READ_TOOLS),
     write: new Set(WRITE_TOOLS),
     snapshots: new Set(),
+    "mark-sent": new Set(),
 };

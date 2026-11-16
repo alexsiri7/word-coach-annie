@@ -36,4 +36,14 @@ describe("runSerializable", () => {
         const run = runSerializable("label", "please try again", {}, async () => "never");
         await expect(run).rejects.toThrow(UserFacingError);
     });
+
+    it("rethrows any other adapter error unchanged", async () => {
+        const adapterError = Object.assign(new Error("boom"), {
+            name: "DriverAdapterError",
+            cause: { kind: "postgres" },
+        });
+        vi.spyOn(prisma, "$transaction").mockRejectedValueOnce(adapterError);
+        const run = runSerializable("label", "please try again", {}, async () => "never");
+        await expect(run).rejects.toBe(adapterError);
+    });
 });

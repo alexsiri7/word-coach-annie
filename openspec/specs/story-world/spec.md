@@ -83,6 +83,15 @@ A game's build job SHALL be able to post a screenshot of a location, named by th
 - WHEN a later snapshot carries that description
 - THEN the request is marked done
 
+### Requirement: Exported snapshot annotations can be marked sent
+
+The story sync SHALL be able to mark the snapshot annotations it exported as sent; a request already done SHALL stay done.
+
+#### Scenario: A request resolved before the sync marks it
+- GIVEN an exported name request that a later snapshot marked done
+- WHEN the story sync marks the exported annotations sent
+- THEN the request stays done and the other exported annotations show as sent
+
 ### Requirement: Typed relationships between entities
 
 The author or an agent SHALL be able to link any two entities — scenes, story objects, or world objects of a universe the project is linked to — with a typed relationship such as appears in, located at, part of plotline or related to. Every relationship SHALL be visible from both ends, and each entity SHALL show all relationships touching it.

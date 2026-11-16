@@ -289,6 +289,24 @@ export class LocationSnapshotController {
         });
     }
 
+    /**
+     * The story sync marks the annotations it exported. Every id must be one of the project's
+     * annotations or nothing changes; only open ones move, so a request a later snapshot
+     * resolved stays done.
+     */
+    static async markAnnotationsSent(projectId: string, ids: string[]): Promise<{ updated: number }> {
+        const unique = [...new Set(ids)];
+        const found = await prisma.snapshotAnnotation.count({
+            where: { id: { in: unique }, location: { projectId } },
+        });
+        if (found < unique.length) throw new NotFoundError("Snapshot annotation not found");
+        const { count } = await prisma.snapshotAnnotation.updateMany({
+            where: { id: { in: unique }, status: "open", location: { projectId } },
+            data: { status: "sent" },
+        });
+        return { updated: count };
+    }
+
     static async deleteAnnotation(annotationId: string): Promise<{ deleted: true; id: string }> {
         const { count } = await prisma.snapshotAnnotation.deleteMany({ where: { id: annotationId } });
         if (count === 0) throw new NotFoundError("Snapshot annotation not found");

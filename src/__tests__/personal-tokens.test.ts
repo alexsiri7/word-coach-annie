@@ -119,6 +119,14 @@ describe("personal API tokens", () => {
             ["/api/mcp", "POST", "snapshots", "out-of-scope"],
             ["/api/nodes/x/content", "GET", "snapshots", "out-of-scope"],
             ["/api/projects/p/locations/keep/snapshots", "POST", "write", "out-of-scope"],
+            ["/api/projects/p/snapshot-annotations/sent", "POST", "mark-sent", "ok"],
+            ["/api/projects/p/snapshot-annotations/sent", "PATCH", "mark-sent", "out-of-scope"],
+            ["/api/snapshot-annotations/a1", "PATCH", "mark-sent", "out-of-scope"],
+            ["/api/projects/p/locations/keep/snapshots", "POST", "mark-sent", "out-of-scope"],
+            ["/api/mcp", "POST", "mark-sent", "out-of-scope"],
+            ["/api/nodes/x/content", "GET", "mark-sent", "out-of-scope"],
+            ["/api/projects/p/snapshot-annotations/sent", "POST", "snapshots", "out-of-scope"],
+            ["/api/projects/p/snapshot-annotations/sent", "POST", "write", "out-of-scope"],
         ] as const)("%s %s with %s → %s", (path, method, scope, expected) => {
             expect(isPersonalTokenRequestAllowed(path, method, scope)).toBe(expected);
         });

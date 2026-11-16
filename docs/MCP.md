@@ -41,7 +41,7 @@ For another app's backend (for example a game's scene editor), create a token in
 | `read` | `list_projects`, `get_project`, `get_outline`, `read_scene_content`, `get_scene_versions` |
 | `write` | the `read` tools plus `write_scene_content`, `update_paragraph`, `insert_beat`, `delete_beat`, `restore_scene_version` |
 
-A `snapshots` token cannot reach `/api/mcp` at all; it only posts location snapshots over REST.
+A `snapshots` or `mark-sent` token cannot reach `/api/mcp` at all; it only posts location snapshots, or marks snapshot annotations sent, over REST.
 
 Other tools are absent from `tools/list`, and calling one fails as an unknown tool. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
 

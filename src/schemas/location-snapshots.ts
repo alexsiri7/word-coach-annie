@@ -96,5 +96,14 @@ export const SnapshotAnnotationUpdateSchema = z
     message: "No fields to update",
   });
 
+export const SnapshotAnnotationsSentSchema = z
+  .object({
+    ids: z
+      .array(z.string().min(1).max(200))
+      .min(1, "ids must list at least one annotation")
+      .max(500, "At most 500 ids per request"),
+  })
+  .strict();
+
 export type SnapshotAnnotationCreateInput = z.infer<typeof SnapshotAnnotationCreateSchema>;
 export type SnapshotAnnotationUpdateInput = z.infer<typeof SnapshotAnnotationUpdateSchema>;
