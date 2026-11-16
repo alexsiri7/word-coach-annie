@@ -665,7 +665,7 @@ import {
 } from "@/mcp/tools/coaching";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
 import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
-import { assertCanAccess, assertOwnerRole, type Principal, type ResourceRef } from "@/lib/access/resource-access";
+import { assertCanAccess, assertOwnerRole, type ChatRole, type Principal, type ResourceRef } from "@/lib/access/resource-access";
 
 // ─── Chat tool scoping (SEC-01) ───────────────────────────────────────────────
 
@@ -674,7 +674,7 @@ export interface ToolContext {
   userId: string | null;
   userEmail: string | null;
   projectId: string;
-  role: "OWNER" | "EDITOR" | null;
+  role: ChatRole;
 }
 
 /** Tools that must never be reachable from the web chat (credentials). */

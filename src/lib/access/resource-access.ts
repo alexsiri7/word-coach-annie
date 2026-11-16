@@ -22,11 +22,14 @@ export interface OwnerPrincipal {
     userId: string | null;
 }
 
+/** The caller's role on the chat's project; null in single-user mode. */
+export type ChatRole = "OWNER" | "EDITOR" | null;
+
 /** A web-chat turn: every project-scoped resource must belong to `pinnedProjectId` (SEC-01). */
 export interface ChatPrincipal {
     userId: string | null;
     pinnedProjectId: string;
-    role: "OWNER" | "EDITOR" | null;
+    role: ChatRole;
 }
 
 export type Principal = OwnerPrincipal | ChatPrincipal;
