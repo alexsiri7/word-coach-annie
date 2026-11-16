@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StructureController } from "../lib/controllers/structure";
+import { parseSceneContent, serializeSceneContent } from "../lib/scene-document";
 import { exportManuscript } from "../mcp/tools/export";
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
@@ -187,7 +188,7 @@ describe("Scene Beats", () => {
     describe("Parsing and Logic (StructureController)", () => {
         it("should parse content into blocks correctly", () => {
             const raw = "<p>Opening.</p><!-- beat: Action --> <p>Closing.</p>";
-            const blocks = StructureController.parseSceneContent(raw);
+            const blocks = parseSceneContent(raw);
 
             expect(blocks).toHaveLength(3);
             expect(blocks[0]).toEqual({ type: "CONTENT", content: "<p>Opening.</p>" });
@@ -212,7 +213,7 @@ describe("Scene Beats", () => {
                 { type: "CONTENT", content: "<p>End</p>" }
             ] as any; // Cast to avoid TS issues if defining blocks manually in test without full type import
 
-            const serialized = StructureController.serializeSceneContent(blocks);
+            const serialized = serializeSceneContent(blocks);
             expect(serialized).toBe("<p>Start</p><!-- beat: Middle Beat --><p>End</p>");
         });
 

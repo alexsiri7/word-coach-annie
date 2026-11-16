@@ -1,4 +1,5 @@
 import { StructureController } from "../src/lib/controllers/structure";
+import { parseSceneContent, serializeSceneContent } from "../src/lib/scene-document";
 import { prisma } from "../src/lib/db";
 
 async function main() {
@@ -14,7 +15,7 @@ async function main() {
 <p>Closing paragraph.</p>
 `;
 
-    const blocks = StructureController.parseSceneContent(rawContent);
+    const blocks = parseSceneContent(rawContent);
     console.log("Parsed blocks:", JSON.stringify(blocks, null, 2));
 
     if (blocks.length !== 5) {
@@ -26,7 +27,7 @@ async function main() {
         process.exit(1);
     }
 
-    const serialized = StructureController.serializeSceneContent(blocks);
+    const serialized = serializeSceneContent(blocks);
     console.log("Serialized content matches raw content?", serialized.trim() === rawContent.trim());
     if (serialized.trim() !== rawContent.trim()) {
         console.log("Serialized:", serialized);

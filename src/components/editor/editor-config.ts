@@ -4,6 +4,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
 import { HarperSpellcheck, type SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
+import { beatCommentRegex } from "@/lib/beat-comment";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
@@ -55,8 +56,11 @@ export function getEditorExtensions(options?: {
 
 // Helper to convert HTML comments to beat nodes for Tiptap
 export const commentsToBeats = (html: string) => {
-  return html.replace(/<!-- beat: ([\s\S]*?) -->/g, (_match, content) => {
-    const safe = content
+  return html.replace(beatCommentRegex(), (match, inner: string) => {
+    // The editor only recognises the canonical `<!-- beat: text -->` spacing.
+    if (inner.length < 2 || !inner.startsWith(" ") || !inner.endsWith(" ")) return match;
+    const safe = inner
+      .slice(1, -1)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
