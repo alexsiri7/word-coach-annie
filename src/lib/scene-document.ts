@@ -1,6 +1,6 @@
 import type { SceneBlock } from "@/lib/types";
 import { UserFacingError } from "@/lib/controllers/errors";
-import { BEAT_COMMENT_CLOSE, BEAT_COMMENT_OPEN, beatComment, beatCommentRegex } from "@/lib/beat-comment";
+import { BEAT_COMMENT_CLOSE, BEAT_COMMENT_OPEN, beatComment, findBeatComments } from "@/lib/beat-comment";
 import { computeContentHash } from "@/lib/content-hash";
 
 /**
@@ -23,16 +23,14 @@ const P_TAG_RE = /<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi;
 
 export function parseSceneContent(content: string): SceneBlock[] {
     const blocks: SceneBlock[] = [];
-    const regex = beatCommentRegex();
     let lastIndex = 0;
-    let match;
 
-    while ((match = regex.exec(content)) !== null) {
-        if (match.index > lastIndex) {
-            blocks.push({ type: "CONTENT", content: content.substring(lastIndex, match.index) });
+    for (const match of findBeatComments(content)) {
+        if (match.start > lastIndex) {
+            blocks.push({ type: "CONTENT", content: content.substring(lastIndex, match.start) });
         }
-        blocks.push({ type: "BEAT", content: match[1].trim() });
-        lastIndex = regex.lastIndex;
+        blocks.push({ type: "BEAT", content: match.content.trim() });
+        lastIndex = match.end;
     }
 
     if (lastIndex < content.length) {
