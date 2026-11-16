@@ -157,6 +157,8 @@ import {
     projectIdForNode,
     projectIdForSnapshotAnnotation,
     projectIdForStoryObject,
+    projectIdForContestSubmission,
+    projectIdForPublicationSubmission,
     universeIdForWorldObject,
     universeIdForTimelineEntry,
 } from "@/lib/ownership";
@@ -241,26 +243,6 @@ async function verifyWritingTaskAccess(taskId: string, uid: string | null): Prom
     if (!task) throw new AccessDeniedError("Writing task");
     if (task.projectId) return verifyProjectOwnership(task.projectId, uid);
     if (uid && task.userId !== uid) throw new AccessDeniedError("Writing task");
-}
-
-/** Look up the projectId that owns a contest submission. */
-async function getProjectIdForContestSubmission(submissionId: string): Promise<string> {
-    const submission = await prisma.contestSubmission.findUnique({
-        where: { id: submissionId },
-        select: { projectId: true },
-    });
-    if (!submission) throw new AccessDeniedError("Contest submission");
-    return submission.projectId;
-}
-
-/** Look up the projectId that owns a publication submission. */
-async function getProjectIdForPublicationSubmission(submissionId: string): Promise<string> {
-    const submission = await prisma.publicationSubmission.findUnique({
-        where: { id: submissionId },
-        select: { projectId: true },
-    });
-    if (!submission) throw new AccessDeniedError("Publication submission");
-    return submission.projectId;
 }
 
 // ─── Project Tools ───────────────────────────────────────────────────────────
@@ -1283,7 +1265,7 @@ server.tool(
     },
     async ({ submissionId, ...data }) =>
         mcpRun("update_contest_submission", "Error updating contest submission", async () => {
-            await verifyProjectOwnership(await getProjectIdForContestSubmission(submissionId), userId);
+            await verifyProjectOwnership(await projectIdForContestSubmission(submissionId), userId);
             return updateContestSubmission({ submissionId, userId, ...data });
         })
 );
@@ -1296,7 +1278,7 @@ server.tool(
     },
     async ({ submissionId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await getProjectIdForContestSubmission(submissionId), userId);
+        await verifyProjectOwnership(await projectIdForContestSubmission(submissionId), userId);
         const result = await deleteContestSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
@@ -1494,7 +1476,7 @@ server.tool(
     },
     async ({ submissionId, ...data }) =>
         mcpRun("update_publication_submission", "Error updating publication submission", async () => {
-            await verifyProjectOwnership(await getProjectIdForPublicationSubmission(submissionId), userId);
+            await verifyProjectOwnership(await projectIdForPublicationSubmission(submissionId), userId);
             return updatePublicationSubmission({ submissionId, ...data });
         })
 );
@@ -1507,7 +1489,7 @@ server.tool(
     },
     async ({ submissionId }) => {
         const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await getProjectIdForPublicationSubmission(submissionId), userId);
+        await verifyProjectOwnership(await projectIdForPublicationSubmission(submissionId), userId);
         const result = await deletePublicationSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }

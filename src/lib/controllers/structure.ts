@@ -82,6 +82,27 @@ export interface OutlineNode {
     hasNewFeedback?: boolean;
 }
 
+async function runBatch<T, R>(
+    items: T[],
+    emptyLabel: string,
+    maxLabel: string,
+    fn: (item: T, index: number) => Promise<R>,
+    describeError: (item: T, index: number) => Record<string, unknown>
+): Promise<{ results: (R & { index: number; success: true })[]; errors: Record<string, unknown>[] }> {
+    if (items.length === 0) throw new UserFacingError(`${emptyLabel} array must not be empty`);
+    if (items.length > 50) throw new UserFacingError(`Maximum 50 ${maxLabel} per batch`);
+    const results: (R & { index: number; success: true })[] = [];
+    const errors: Record<string, unknown>[] = [];
+    for (let i = 0; i < items.length; i++) {
+        try {
+            results.push({ index: i, success: true, ...(await fn(items[i], i)) });
+        } catch (e) {
+            errors.push({ index: i, success: false, ...describeError(items[i], i), error: e instanceof Error ? e.message : String(e) });
+        }
+    }
+    return { results, errors };
+}
+
 export class StructureController {
     static parseSceneContent(content: string): SceneBlock[] {
         const blocks: SceneBlock[] = [];
@@ -619,34 +640,19 @@ export class StructureController {
             status?: string;
         }>
     ) {
-        if (nodes.length === 0) throw new UserFacingError("nodes array must not be empty");
-        if (nodes.length > 50) throw new UserFacingError("Maximum 50 nodes per batch");
-
         const project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { id: true },
         });
         if (!project) throw new UserFacingError("Project not found");
 
-        const results = [];
-        const errors = [];
-
-        for (let i = 0; i < nodes.length; i++) {
-            try {
-                const result = await StructureController.createNode({
-                    projectId,
-                    ...nodes[i],
-                });
-                results.push({ index: i, success: true, ...result });
-            } catch (e) {
-                errors.push({
-                    index: i,
-                    success: false,
-                    title: nodes[i].title,
-                    error: e instanceof Error ? e.message : String(e),
-                });
-            }
-        }
+        const { results, errors } = await runBatch(
+            nodes,
+            "nodes",
+            "nodes",
+            (node) => StructureController.createNode({ projectId, ...node }),
+            (node) => ({ title: node.title })
+        );
 
         return { created: results, errors, totalCreated: results.length, totalErrors: errors.length };
     }
@@ -661,51 +667,25 @@ export class StructureController {
             parentId?: string | null;
         }>
     ) {
-        if (updates.length === 0) throw new UserFacingError("updates array must not be empty");
-        if (updates.length > 50) throw new UserFacingError("Maximum 50 updates per batch");
-
-        const results = [];
-        const errors = [];
-
-        for (let i = 0; i < updates.length; i++) {
-            const { nodeId, ...data } = updates[i];
-            try {
-                const result = await StructureController.updateNode(nodeId, data);
-                results.push({ index: i, success: true, ...result });
-            } catch (e) {
-                errors.push({
-                    index: i,
-                    success: false,
-                    nodeId,
-                    error: e instanceof Error ? e.message : String(e),
-                });
-            }
-        }
+        const { results, errors } = await runBatch(
+            updates,
+            "updates",
+            "updates",
+            ({ nodeId, ...data }) => StructureController.updateNode(nodeId, data),
+            ({ nodeId }) => ({ nodeId })
+        );
 
         return { updated: results, errors, totalUpdated: results.length, totalErrors: errors.length };
     }
 
     static async batchDeleteNodes(nodeIds: string[]) {
-        if (nodeIds.length === 0) throw new UserFacingError("nodeIds array must not be empty");
-        if (nodeIds.length > 50) throw new UserFacingError("Maximum 50 deletions per batch");
-
-        const results = [];
-        const errors = [];
-
-        for (let i = 0; i < nodeIds.length; i++) {
-            const nodeId = nodeIds[i];
-            try {
-                const result = await StructureController.deleteNode(nodeId);
-                results.push({ index: i, success: true, ...result });
-            } catch (e) {
-                errors.push({
-                    index: i,
-                    success: false,
-                    nodeId,
-                    error: e instanceof Error ? e.message : String(e),
-                });
-            }
-        }
+        const { results, errors } = await runBatch(
+            nodeIds,
+            "nodeIds",
+            "deletions",
+            (nodeId) => StructureController.deleteNode(nodeId),
+            (nodeId) => ({ nodeId })
+        );
 
         return { deleted: results, errors, totalDeleted: results.length, totalErrors: errors.length };
     }

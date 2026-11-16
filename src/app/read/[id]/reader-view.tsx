@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { sanitizeDisplayHtml } from "@/lib/sanitize-display";
+import { downloadBlob } from "@/lib/download-blob";
 import { countSceneWords, stripBeats } from "@/lib/scene-text";
 import type { Annotation, TextQuoteRange, WritingTask } from "@/lib/types";
 import { resolveAnnotationRanges } from "@/lib/annotation-anchoring";
@@ -769,12 +770,7 @@ export function ReaderView({ project, outline, isOwner }: ReaderViewProps) {
     const res = await fetch(`/api/projects/${project.id}/export/${format}`);
     if (!res.ok) return;
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.title}.${format}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${project.title}.${format}`);
   }
 
   return (

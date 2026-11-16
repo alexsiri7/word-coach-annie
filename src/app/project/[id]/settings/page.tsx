@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { downloadBlob } from "@/lib/download-blob";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -287,14 +288,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     const res = await fetch(`/api/projects/${projectId}/export?type=json`);
     if (res.ok) {
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title.replace(/[^a-z0-9]/gi, "_")}_backup.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${title.replace(/[^a-z0-9]/gi, "_")}_backup.json`);
       setDeleteExported(true);
       setDeleteCooldown(30);
     }

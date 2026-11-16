@@ -70,6 +70,18 @@ export async function projectIdForSnapshotAnnotation(annotationId: string): Prom
     return a.location.projectId;
 }
 
+export async function projectIdForContestSubmission(submissionId: string): Promise<string> {
+    const submission = await prisma.contestSubmission.findUnique({ where: { id: submissionId }, select: { projectId: true } });
+    if (!submission) throw new AccessDeniedError("Contest submission");
+    return submission.projectId;
+}
+
+export async function projectIdForPublicationSubmission(submissionId: string): Promise<string> {
+    const submission = await prisma.publicationSubmission.findUnique({ where: { id: submissionId }, select: { projectId: true } });
+    if (!submission) throw new AccessDeniedError("Publication submission");
+    return submission.projectId;
+}
+
 export async function universeIdForWorldObject(objectId: string): Promise<string> {
     const w = await prisma.worldObject.findUnique({ where: { id: objectId }, select: { universeId: true } });
     if (!w) throw new AccessDeniedError("World object");

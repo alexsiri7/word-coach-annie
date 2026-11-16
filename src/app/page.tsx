@@ -23,6 +23,7 @@ import {
   ListTodo,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { downloadBlob } from "@/lib/download-blob";
 import { cacheProjects, getCachedProjects } from "@/lib/offline/cache-reads";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
@@ -240,14 +241,7 @@ export default function Dashboard() {
     const res = await fetch(`/api/projects/${deleteTarget.id}/export?type=json`);
     if (res.ok) {
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${deleteTarget.title.replace(/[^a-z0-9]/gi, "_")}_backup.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${deleteTarget.title.replace(/[^a-z0-9]/gi, "_")}_backup.json`);
       setDeleteExported(true);
       // Start 30s cooldown
       setDeleteCooldown(30);
