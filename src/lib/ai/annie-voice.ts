@@ -3,7 +3,7 @@
 
 /**
  * Annie's persona, emotional range, and hard no-prose rule.
- * Used in MCP prompt templates where Annie is the responding agent.
+ * Used wherever Annie is the responding agent: in-app chat, AI manuscript review, and MCP prompt templates.
  * DO NOT concatenate with CLAUDE_COLLABORATION_INSTRUCTIONS — they target different actors.
  */
 export const ANNIE_HARD_RULE = `## Who You Are
