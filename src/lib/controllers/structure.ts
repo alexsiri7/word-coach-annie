@@ -104,12 +104,11 @@ function prepareSceneContent(rawContent: string) {
     return { content, wordCount: countSceneWords(content) };
 }
 
-// Same ordering as readSceneContent, so the hash a reader saw and the hash checked agree on ties.
-async function latestSceneVersion(tx: DbClient, nodeId: string) {
-    return tx.contentVersion.findFirst({
+// The one definition of a scene's current version: readers and the stale-write check must agree on it, ties included.
+async function latestSceneVersion(db: DbClient, nodeId: string) {
+    return db.contentVersion.findFirst({
         where: { nodeId },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        select: { content: true },
     });
 }
 
@@ -464,10 +463,7 @@ export class StructureController {
         });
         if (!node) throw new UserFacingError("Node not found");
 
-        const version = await prisma.contentVersion.findFirst({
-            where: { nodeId },
-            orderBy: latestVersionFirst,
-        });
+        const version = await latestSceneVersion(prisma, nodeId);
 
         const annotations = await prisma.annotation.findMany({
             where: { nodeId },

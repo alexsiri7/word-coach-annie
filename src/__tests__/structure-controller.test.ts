@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
-import { StructureController } from "@/lib/controllers/structure";
+import { InputTooLargeError, MAX_SCENE_CONTENT_LENGTH, StructureController } from "@/lib/controllers/structure";
 import { parseSceneContent, serializeSceneContent } from "@/lib/scene-document";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { deleteBeat, insertBeat, readSceneContent } from "@/mcp/tools/structure";
@@ -576,6 +576,28 @@ describe("StructureController", () => {
 
                 await expect(insertBeat(scene.id, 3, "Bad")).rejects.toThrow("out of range");
                 await expect(insertBeat(scene.id, -2, "Bad")).rejects.toThrow("out of range");
+            });
+
+            it("rejects an edit that makes the scene too large, leaving it unchanged", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+                const before = await StructureController.getSceneVersions(scene.id);
+
+                await expect(insertBeat(scene.id, 0, "x".repeat(MAX_SCENE_CONTENT_LENGTH + 1))).rejects.toThrow(InputTooLargeError);
+
+                expect((await StructureController.readSceneContent(scene.id)).content).toBe("<p>Hello</p>");
+                expect((await StructureController.getSceneVersions(scene.id)).versions).toHaveLength(before.versions.length);
+            });
+
+            it("rejects an edit that makes the scene malformed, leaving it unchanged", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+                const before = await StructureController.getSceneVersions(scene.id);
+
+                await expect(insertBeat(scene.id, 0, "evil <!-- nested")).rejects.toThrow("Malformed scene content");
+
+                expect((await StructureController.readSceneContent(scene.id)).content).toBe("<p>Hello</p>");
+                expect((await StructureController.getSceneVersions(scene.id)).versions).toHaveLength(before.versions.length);
             });
 
             it("accepts only one of two concurrent inserts based on the same scene hash", async () => {
