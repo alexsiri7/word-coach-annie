@@ -22,7 +22,7 @@ services:
   phoenix:
     # Pinned to arizephoenix/phoenix:latest as of 2026-05-30 (no stable version tags available)
     # To update: docker pull arizephoenix/phoenix:latest && docker inspect --format='{{index .RepoDigests 0}}'
-    image: arizephoenix/phoenix@sha256:1f9a144a5357b4973e93a15718f050247cb7a4ee7b7c6c06ecb91b5eed3fbaad
+    image: arizephoenix/phoenix@sha256:09ec48906c054a27dd09a88c8e6bcc24fe89649d3ecc94d3a8ed394e21279b31
     restart: unless-stopped
     ports:
       - "127.0.0.1:6006:6006"
