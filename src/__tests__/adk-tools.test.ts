@@ -7,11 +7,9 @@ import {
   getAdkCategories,
   loadToolsetTool,
   DynamicToolset,
-  getAllTools,
-  isChatExcludedTool,
-  isChatDestructiveTool,
   type ToolContext,
 } from "@/lib/ai/adk-tools";
+import { CHAT_TOOL_SPECS } from "@/lib/ai/tool-catalog";
 
 const spanAttributes = vi.hoisted(() => [] as Array<[string, unknown]>);
 
@@ -139,8 +137,8 @@ describe("ADK tools", () => {
   });
 
   describe("tool coverage", () => {
-    it("should have an ADK tool for every non-excluded tool definition", () => {
-      const registryTools = getAllTools().filter((t) => !isChatExcludedTool(t.name));
+    it("should have an ADK tool for every chat tool spec", () => {
+      const registryTools = CHAT_TOOL_SPECS;
       const adkTools = getAllAdkTools(ctx);
       const adkNames = new Set(adkTools.map((t) => t.name));
 
@@ -149,15 +147,14 @@ describe("ADK tools", () => {
       }
     });
 
-    it("should have the same total count as non-excluded tool definitions", () => {
-      const registryCount = getAllTools().filter((t) => !isChatExcludedTool(t.name)).length;
+    it("should have the same total count as chat tool specs", () => {
+      const registryCount = CHAT_TOOL_SPECS.length;
       const adkCount = getAllAdkTools(ctx).length;
       expect(adkCount).toBe(registryCount);
     });
 
     it("should preserve tool names and descriptions", () => {
-      const registryTools = getAllTools().filter((t) => !isChatExcludedTool(t.name));
-      for (const def of registryTools) {
+      for (const def of CHAT_TOOL_SPECS) {
         const adkTool = getAdkToolByName(ctx, def.name);
         expect(adkTool).toMatchObject({ name: expect.any(String), description: expect.any(String) });
         expect(adkTool!.name).toBe(def.name);
@@ -180,7 +177,7 @@ describe("ADK tools", () => {
       const coreTools = getAdkTools(ctx, ["core"]);
       expect(coreTools.length).toBeGreaterThan(0);
 
-      const registryCoreNames = getAllTools()
+      const registryCoreNames = CHAT_TOOL_SPECS
         .filter((t) => t.category === "core")
         .map((t) => t.name);
       const adkCoreNames = coreTools.map((t) => t.name);
@@ -195,10 +192,10 @@ describe("ADK tools", () => {
       expect(names).toContain("get_project");
     });
 
-    it("should match tool counts per category with non-excluded definitions", () => {
+    it("should match tool counts per category with chat tool specs", () => {
       const categories = getAdkCategories();
       for (const cat of categories) {
-        const registryCount = getAllTools().filter((t) => t.category === cat && !isChatExcludedTool(t.name)).length;
+        const registryCount = CHAT_TOOL_SPECS.filter((t) => t.category === cat).length;
         const adkCount = getAdkTools(ctx, [cat]).length;
         expect(adkCount).toBe(registryCount);
       }
@@ -374,10 +371,9 @@ describe("ADK tools", () => {
       expect(deleteNode).toHaveBeenCalledWith("node-in-P");
     });
 
-    it("gates every chat delete_ tool", () => {
-      const deletes = getAllAdkTools(ctx).map((t) => t.name).filter((n) => n.startsWith("delete_"));
-      expect(deletes.length).toBeGreaterThan(0);
-      for (const name of deletes) expect(isChatDestructiveTool(name)).toBe(true);
+    it("gates exactly the chat delete_ tools", () => {
+      expect(CHAT_TOOL_SPECS.some((spec) => spec.destructive)).toBe(true);
+      for (const spec of CHAT_TOOL_SPECS) expect(spec.destructive).toBe(spec.name.startsWith("delete_"));
     });
 
     it("leaves non-destructive writes working when the gate is off", async () => {
@@ -392,6 +388,13 @@ describe("ADK tools", () => {
       const tool = getAdkToolByName(ctx, "write_scene_content")!;
       await callTool(tool, { nodeId: "node-in-P", content: "x", contentHash: "h" });
       expect(writeSceneContent).toHaveBeenCalledWith("node-in-P", "x", "h");
+    });
+
+    it("rejects write_scene_content with neither content nor blocks", async () => {
+      const { writeSceneContent } = await import("@/mcp/tools/structure");
+      const tool = getAdkToolByName(ctx, "write_scene_content")!;
+      await expect(callTool(tool, { nodeId: "node-in-P", contentHash: "h" })).rejects.toThrow(/Either 'content' or 'blocks'/);
+      expect(writeSceneContent).not.toHaveBeenCalled();
     });
 
     it("rejects write_scene_content without contentHash", async () => {
