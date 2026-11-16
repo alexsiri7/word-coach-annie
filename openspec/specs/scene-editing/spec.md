@@ -28,7 +28,7 @@ Each save SHALL create a new version of the scene. The system SHALL keep at leas
 
 ### Requirement: Writes never silently clobber newer content
 
-Any scene write from an agent or a replayed offline edit SHALL name the content it expects to replace. When that does not match the scene's current content, the write SHALL be refused with a stale-content error and the scene SHALL be left unchanged.
+Any scene write from an agent or a replayed offline edit SHALL name the content it expects to replace. When that does not match the scene's current content, the write SHALL be refused with a stale-content error and the scene SHALL be left unchanged. A stale write that is also invalid on its own (oversized, malformed, or aimed at a node that is not a scene) MAY be refused with that error instead; either way the scene is left unchanged.
 
 #### Scenario: Stale write refused
 - GIVEN an agent read a scene, then the author edited it

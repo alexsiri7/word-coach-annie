@@ -4,7 +4,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
 import { HarperSpellcheck, type SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
-import { findBeatComments } from "@/lib/beat-comment";
+import { beatCommentData, findBeatComments } from "@/lib/beat-comment";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
@@ -88,7 +88,7 @@ export const beatsToComments = (html: string) => {
 
   beats.forEach((beat) => {
     const content = beat.innerHTML;
-    const comment = doc.createComment(` beat: ${content} `);
+    const comment = doc.createComment(beatCommentData(content));
     beat.replaceWith(comment);
   });
 

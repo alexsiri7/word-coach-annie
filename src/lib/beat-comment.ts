@@ -1,5 +1,6 @@
 // Client-safe on purpose: the editor imports this, so it must not pull in Node `crypto`.
 
+const COMMENT_OPEN = "<!--";
 export const BEAT_COMMENT_OPEN = "<!-- beat:";
 export const BEAT_COMMENT_CLOSE = "-->";
 
@@ -35,7 +36,12 @@ export function findBeatComments(input: string): BeatCommentMatch[] {
     return matches;
 }
 
+/** The data of a beat comment node (between `<!--` and `-->`), for building one through the DOM. */
+export function beatCommentData(content: string): string {
+    return `${BEAT_COMMENT_OPEN.slice(COMMENT_OPEN.length)} ${content} `;
+}
+
 /** The canonical stored form of a beat. */
 export function beatComment(text: string): string {
-    return `${BEAT_COMMENT_OPEN} ${text.trim()} ${BEAT_COMMENT_CLOSE}`;
+    return `${COMMENT_OPEN}${beatCommentData(text.trim())}${BEAT_COMMENT_CLOSE}`;
 }
