@@ -2,40 +2,28 @@ import { prisma } from "@/lib/db";
 import { readEncrypted } from "@/lib/crypto";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import {
+  DEFAULT_COMPRESSION,
+  DEFAULT_PREFERENCES,
+  type AiPreferences,
+  type ChatCompressionSettings,
+  type CoachingStyle,
+  type ResponseLength,
+} from "./settings-defaults";
 
 export interface AiProviderConfig {
   apiKey: string;
   model: string;
 }
 
-export const COACHING_STYLES = ["gentle", "balanced", "direct"] as const;
-export const RESPONSE_LENGTHS = ["concise", "moderate", "detailed"] as const;
-export type CoachingStyle = (typeof COACHING_STYLES)[number];
-export type ResponseLength = (typeof RESPONSE_LENGTHS)[number];
-
-export interface AiPreferences {
-  customInstructions: string;
-  coachingStyle: CoachingStyle;
-  responseLength: ResponseLength;
-}
-
-export interface ChatCompressionSettings {
-  chatWindowSize: number;
-  messagesUntilCompression: number;
-  compressionModel: string;
-}
-
-const DEFAULT_COMPRESSION: ChatCompressionSettings = {
-  chatWindowSize: 5,
-  messagesUntilCompression: 15,
-  compressionModel: "",
-};
-
-const DEFAULT_PREFERENCES: AiPreferences = {
-  customInstructions: "",
-  coachingStyle: "balanced",
-  responseLength: "moderate",
-};
+export {
+  COACHING_STYLES,
+  RESPONSE_LENGTHS,
+  type CoachingStyle,
+  type ResponseLength,
+  type AiPreferences,
+  type ChatCompressionSettings,
+} from "./settings-defaults";
 
 function getEnvDefaults(): AiProviderConfig {
   const apiKey = env.GEMINI_API_KEY || env.AI_API_KEY || env.REQUESTY_API_KEY || "";
@@ -126,8 +114,8 @@ export async function getAiPreferences(userId?: string | null): Promise<AiPrefer
     if (userSettings) {
       return {
         customInstructions: userSettings.customInstructions,
-        coachingStyle: (userSettings.coachingStyle as CoachingStyle) || "balanced",
-        responseLength: (userSettings.responseLength as ResponseLength) || "moderate",
+        coachingStyle: (userSettings.coachingStyle as CoachingStyle) || DEFAULT_PREFERENCES.coachingStyle,
+        responseLength: (userSettings.responseLength as ResponseLength) || DEFAULT_PREFERENCES.responseLength,
       };
     }
   } catch (err) {
