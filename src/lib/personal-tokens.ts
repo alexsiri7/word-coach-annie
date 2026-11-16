@@ -12,14 +12,11 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { isEmailAllowed } from "@/lib/auth";
 
+export { PERSONAL_TOKEN_SCOPES, isPersonalTokenScope } from "@/lib/personal-token-scopes";
+export type { PersonalTokenScope } from "@/lib/personal-token-scopes";
+import { isPersonalTokenScope, type PersonalTokenScope } from "@/lib/personal-token-scopes";
+
 export const PERSONAL_TOKEN_PREFIX = "annie_pat_";
-
-export const PERSONAL_TOKEN_SCOPES = ["read", "write", "snapshots", "mark-sent"] as const;
-export type PersonalTokenScope = (typeof PERSONAL_TOKEN_SCOPES)[number];
-
-export function isPersonalTokenScope(value: unknown): value is PersonalTokenScope {
-    return PERSONAL_TOKEN_SCOPES.includes(value as PersonalTokenScope);
-}
 
 /** How stale lastUsedAt may get before a request rewrites it: at most one write per token per minute. */
 const LAST_USED_RESOLUTION_MS = 60_000;

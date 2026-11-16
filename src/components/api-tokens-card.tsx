@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { PersonalTokenScope } from "@/lib/personal-tokens";
+import { PERSONAL_TOKEN_SCOPES, type PersonalTokenScope } from "@/lib/personal-token-scopes";
 
 interface ApiTokenSummary {
   id: string;
@@ -211,10 +211,11 @@ export function ApiTokensCard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="read">{SCOPE_LABELS.read}</SelectItem>
-                    <SelectItem value="write">{SCOPE_LABELS.write}</SelectItem>
-                    <SelectItem value="snapshots">{SCOPE_LABELS.snapshots}</SelectItem>
-                    <SelectItem value="mark-sent">{SCOPE_LABELS["mark-sent"]}</SelectItem>
+                    {PERSONAL_TOKEN_SCOPES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {SCOPE_LABELS[s]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
