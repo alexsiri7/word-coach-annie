@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { prisma } from "@/lib/db";
 
 vi.mock("../lib/controllers/google-auth", () => ({
@@ -471,6 +473,26 @@ describe("MCP cross-tenant access (SEC-02)", () => {
             const result = await callTool("owner-a", "get_location_snapshot", {});
             expect(result.isError).toBe(true);
             expect(result.content[0].text).toContain("Provide exactly one of snapshotId or storyObjectId");
+        });
+    });
+
+    describe("scene prompts", () => {
+        async function getPrompt(userId: string, name: string, args: Record<string, string>) {
+            const { createServer } = await import("../mcp/index");
+            const server = createServer({ userId });
+            const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+            const client = new Client({ name: "test", version: "1.0.0" });
+            await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+            return client.getPrompt({ name, arguments: args });
+        }
+
+        it("refuses review and plan_beats on a scene in another user's project", async () => {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const scene = await prisma.structureNode.create({ data: { projectId: project.id, type: "SCENE", title: "Secret scene" } });
+            for (const name of ["review", "plan_beats"]) {
+                await expect(getPrompt("owner-b", name, { sceneId: scene.id })).rejects.toThrow(/access denied/);
+                await expect(getPrompt("owner-a", name, { sceneId: scene.id })).resolves.toBeDefined();
+            }
         });
     });
 

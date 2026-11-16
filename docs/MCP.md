@@ -43,7 +43,7 @@ For another app's backend (for example a game's scene editor), create a token in
 
 A `snapshots` or `mark-sent` token cannot reach `/api/mcp` at all; it only posts location snapshots, or marks snapshot annotations sent, over REST.
 
-Other tools are absent from `tools/list`, and calling one fails as an unknown tool. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
+Other tools are absent from `tools/list`, and calling one fails as an unknown tool. No prompts are registered for a personal token. See [API.md](API.md#personal-api-tokens) for the token endpoints and REST limits.
 
 To enable destructive tools (delete tools), set `MCP_ALLOW_DESTRUCTIVE=true`.
 
@@ -950,7 +950,7 @@ Gather character profiles and scene dialogue for voice consistency analysis.
 
 ### Writing Tasks
 
-Tasks either belong to a project or are **practice tasks** with no project. Project tasks are authorized through their project (`verifyProjectOwnership`); practice tasks are owned by the user who created them. `update_writing_task` and `complete_writing_task` enforce the same ownership.
+Tasks either belong to a project or are **practice tasks** with no project. Project tasks are authorized through their project; practice tasks are owned by the user who created them. `update_writing_task` and `complete_writing_task` enforce the same ownership.
 
 A returned `WritingTask` carries `projectId` (`null` for a practice task), `sceneId`, `name`, `whatIsNeeded`, `importance`, `size`, `energy`, `kind`, `capacity`, `dueDate` (ISO 8601 or `null`), `completed`, `createdAt`, `updatedAt` and `scene`.
 
@@ -1045,7 +1045,7 @@ Returns the updated `WritingTask` object.
 
 ### Submissions
 
-Track story submissions to literary contests and publication venues. Providers (contest/publication organizers) are scoped to the **current user**, not to a project — ownership is enforced by matching `userId`. Contest and publication submissions are scoped to a **project** — ownership is enforced the same way as other project-scoped tools (via `verifyProjectOwnership`).
+Track story submissions to literary contests and publication venues. Providers (contest/publication organizers) are scoped to the **current user**, not to a project — ownership is enforced by matching `userId`. Contest and publication submissions are scoped to a **project** — ownership is enforced the same way as other project-scoped tools (a declared `project` access, checked by `src/lib/access/resource-access.ts`).
 
 #### `list_providers`
 List all submission providers (publications and contest-running organizations) for the current user.

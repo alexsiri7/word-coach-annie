@@ -123,3 +123,15 @@ export async function assertRelationshipOwner(relationshipId: string, uid: strin
     if (owner.projectId) return assertProjectOwner(owner.projectId, uid);
     if (owner.universeId) return assertUniverseOwner(owner.universeId, uid);
 }
+
+/** A writing task's owner: its project, or — for a practice task with no project — its user. */
+export async function writingTaskOwner(taskId: string): Promise<{ projectId: string | null; userId: string | null }> {
+    const task = await prisma.writingTask.findUnique({ where: { id: taskId }, select: { projectId: true, userId: true } });
+    if (!task) throw new AccessDeniedError("Writing task");
+    return task;
+}
+
+export async function linkedUniverseId(projectId: string): Promise<string | null> {
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { universeId: true } });
+    return project?.universeId ?? null;
+}

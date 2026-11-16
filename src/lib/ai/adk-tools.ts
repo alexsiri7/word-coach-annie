@@ -664,17 +664,8 @@ import {
   getVoiceContext,
 } from "@/mcp/tools/coaching";
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
-import { prisma } from "@/lib/db";
 import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
-import {
-  assertUniverseOwner,
-  projectIdForNode,
-  projectIdForStoryObject,
-  projectIdForAnnotation,
-  universeIdForWorldObject,
-  universeIdForTimelineEntry,
-  relationshipOwner,
-} from "@/lib/ownership";
+import { assertCanAccess, assertOwnerRole, type Principal, type ResourceRef } from "@/lib/access/resource-access";
 
 // ─── Chat tool scoping (SEC-01) ───────────────────────────────────────────────
 
@@ -714,188 +705,203 @@ function guardDestructive(executor: (args: Args) => Promise<unknown>): (args: Ar
 
 type Args = Record<string, unknown>;
 
-/**
- * Builds the tool executors for one chat turn, pinned to `ctx.projectId`.
- * A `projectId` argument that differs from the pin is rejected; node/object/
- * annotation/relationship IDs are resolved to their owning project and compared.
- * Universe tools are allowed only for the project's own linked universe or a
- * universe `ctx.userId` owns directly.
- */
-function buildToolExecutors(ctx: ToolContext): Record<string, (args: Args) => Promise<unknown>> {
-  const forbidden = (what: string) => new Error(`Forbidden: ${what} is outside the current project`);
+/** A chat tool: the resources it touches, checked before `run` (see `src/lib/access/resource-access.ts`). */
+interface ChatTool {
+  access?: (a: Args) => ResourceRef[];
+  /** Refused to an EDITOR — only the project owner may run it. */
+  ownerOnly?: true;
+  run: (a: Args) => Promise<unknown>;
+}
 
-  const requireProject = (projectId: unknown): void => {
-    if (projectId !== ctx.projectId) throw forbidden("project");
-  };
-  const requireNode = async (nodeId: string) => requireProject(await projectIdForNode(nodeId));
-  const requireStoryObject = async (objectId: string) => requireProject(await projectIdForStoryObject(objectId));
-  const requireAnnotation = async (id: string) => requireProject(await projectIdForAnnotation(id));
-  const requireUniverse = async (universeId: string) => {
-    const project = await prisma.project.findUnique({ where: { id: ctx.projectId }, select: { universeId: true } });
-    if (project?.universeId === universeId) return; // the project's own linked universe
-    await assertUniverseOwner(universeId, ctx.userId); // or one the caller owns (no-op when userId is null)
-  };
-  const requireWorldObject = async (objectId: string) => requireUniverse(await universeIdForWorldObject(objectId));
-  const requireTimelineEntry = async (entryId: string) => requireUniverse(await universeIdForTimelineEntry(entryId));
-  const requireRelationship = async (relationshipId: string) => {
-    const owner = await relationshipOwner(relationshipId);
-    if (owner.projectId) return requireProject(owner.projectId);
-    if (owner.universeId) return requireUniverse(owner.universeId);
-    throw forbidden("relationship");
-  };
-  const requireOwnerRole = () => {
-    if (ctx.userId && ctx.role !== "OWNER") throw new Error("Forbidden: only the project owner may do this");
-  };
+const project = (id: unknown): ResourceRef => ({ kind: "project", id: id as string });
+const node = (id: unknown): ResourceRef => ({ kind: "node", id: id as string });
+const storyObject = (id: unknown): ResourceRef => ({ kind: "storyObject", id: id as string });
+const annotation = (id: unknown): ResourceRef => ({ kind: "annotation", id: id as string });
+const universe = (id: unknown): ResourceRef => ({ kind: "universe", id: id as string });
+const worldObject = (id: unknown): ResourceRef => ({ kind: "worldObject", id: id as string });
+const timelineEntry = (id: unknown): ResourceRef => ({ kind: "timelineEntry", id: id as string });
+const optional = (id: unknown, ref: (id: unknown) => ResourceRef): ResourceRef[] => (id ? [ref(id)] : []);
+
+/**
+ * Builds the chat tools for one turn, pinned to `ctx.projectId`. Each tool
+ * declares the resources it touches; the chat principal accepts only those in
+ * the pinned project, its linked universe, or a universe `ctx.userId` owns.
+ */
+function buildChatTools(ctx: ToolContext): Record<string, ChatTool> {
   const pid = ctx.projectId;
 
   return {
     // Core — chat is scoped to one project, so listing returns only that project.
-    list_projects: async () => ({ projects: [await getProject(null, pid)], total: 1 }),
-    get_project: async (a) => { requireProject(a.projectId); return getProject(null, pid); },
-    get_outline: async (a) => { requireProject(a.projectId); return getOutline(pid); },
-    read_scene_content: async (a) => { await requireNode(a.nodeId as string); return readSceneContent(a.nodeId as string); },
-    list_story_objects: async (a) => { requireProject(a.projectId); return listStoryObjects(a as Parameters<typeof listStoryObjects>[0]); },
-    get_project_summary: async () => getProjectSummary(pid),
-    get_open_annotations: async () => getOpenAnnotations(pid), // never cross-project from chat
-    list_skills: async () => listSkills(),
-    get_plot_thread_status: async (a) => { requireProject(a.projectId); return getPlotThreadStatus(pid); },
-    get_scene_focus: async (a) => { await requireNode(a.sceneId as string); return getSceneFocus(a.sceneId as string); },
-    get_manuscript_context: async (a) => { requireProject(a.projectId); return getManuscriptContext(pid); },
-    get_consistency_context: async (a) => {
-      requireProject(a.projectId);
-      if (a.sceneId) await requireNode(a.sceneId as string);
-      return getConsistencyContext(pid, a.sceneId as string | undefined);
+    list_projects: { run: async () => ({ projects: [await getProject(null, pid)], total: 1 }) },
+    get_project: { access: (a) => [project(a.projectId)], run: async () => getProject(null, pid) },
+    get_outline: { access: (a) => [project(a.projectId)], run: async () => getOutline(pid) },
+    read_scene_content: { access: (a) => [node(a.nodeId)], run: async (a) => readSceneContent(a.nodeId as string) },
+    list_story_objects: { access: (a) => [project(a.projectId)], run: async (a) => listStoryObjects(a as Parameters<typeof listStoryObjects>[0]) },
+    get_project_summary: { run: async () => getProjectSummary(pid) },
+    get_open_annotations: { run: async () => getOpenAnnotations(pid) }, // never cross-project from chat
+    list_skills: { run: async () => listSkills() },
+    get_plot_thread_status: { access: (a) => [project(a.projectId)], run: async () => getPlotThreadStatus(pid) },
+    get_scene_focus: { access: (a) => [node(a.sceneId)], run: async (a) => getSceneFocus(a.sceneId as string) },
+    get_manuscript_context: { access: (a) => [project(a.projectId)], run: async () => getManuscriptContext(pid) },
+    get_consistency_context: {
+      access: (a) => [project(a.projectId), ...optional(a.sceneId, node)],
+      run: async (a) => getConsistencyContext(pid, a.sceneId as string | undefined),
     },
-    get_voice_context: async (a) => { requireProject(a.projectId); await requireNode(a.sceneId as string); return getVoiceContext(pid, a.sceneId as string); },
+    get_voice_context: {
+      access: (a) => [project(a.projectId), node(a.sceneId)],
+      run: async (a) => getVoiceContext(pid, a.sceneId as string),
+    },
 
     // Structure
-    create_node: async (a) => {
-      requireProject(a.projectId);
-      if (a.parentId) await requireNode(a.parentId as string);
-      return createNode(a as Parameters<typeof createNode>[0]);
+    create_node: {
+      access: (a) => [project(a.projectId), ...optional(a.parentId, node)],
+      run: async (a) => createNode(a as Parameters<typeof createNode>[0]),
     },
-    update_node: async (a) => {
-      const { nodeId, contentHash, ...data } = a;
-      await requireNode(nodeId as string);
-      if (data.parentId) await requireNode(data.parentId as string);
-      return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1], contentHash as string);
+    update_node: {
+      access: (a) => [node(a.nodeId), ...optional(a.parentId, node)],
+      run: async (a) => {
+        const { nodeId, contentHash, ...data } = a;
+        return updateNode(nodeId as string, data as Parameters<typeof updateNode>[1], contentHash as string);
+      },
     },
-    delete_node: async (a) => { await requireNode(a.nodeId as string); return deleteNode(a.nodeId as string); },
-    write_scene_content: async (a) => {
-      await requireNode(a.nodeId as string);
-      if (a.blocks) {
-        return writeSceneContentFromBlocks(
-          a.nodeId as string,
-          a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
-          a.contentHash as string,
-        );
-      }
-      return writeSceneContent(a.nodeId as string, a.content as string, a.contentHash as string);
+    delete_node: { access: (a) => [node(a.nodeId)], run: async (a) => deleteNode(a.nodeId as string) },
+    write_scene_content: {
+      access: (a) => [node(a.nodeId)],
+      run: async (a) => {
+        if (a.blocks) {
+          return writeSceneContentFromBlocks(
+            a.nodeId as string,
+            a.blocks as { type: "CONTENT" | "BEAT"; content: string }[],
+            a.contentHash as string,
+          );
+        }
+        return writeSceneContent(a.nodeId as string, a.content as string, a.contentHash as string);
+      },
     },
-    get_scene_versions: async (a) => { await requireNode(a.nodeId as string); return getSceneVersions(a.nodeId as string, a.limit as number); },
-    restore_scene_version: async (a) => { await requireNode(a.nodeId as string); return restoreSceneVersion(a.nodeId as string, a.versionId as string); },
-    add_annotation: async (a) => {
-      await requireNode(a.nodeId as string);
-      return addAnnotation(a.nodeId as string, a.content as string, a.range as string, a.selectedText as string | null);
+    get_scene_versions: { access: (a) => [node(a.nodeId)], run: async (a) => getSceneVersions(a.nodeId as string, a.limit as number) },
+    restore_scene_version: { access: (a) => [node(a.nodeId)], run: async (a) => restoreSceneVersion(a.nodeId as string, a.versionId as string) },
+    add_annotation: {
+      access: (a) => [node(a.nodeId)],
+      run: async (a) => addAnnotation(a.nodeId as string, a.content as string, a.range as string, a.selectedText as string | null),
     },
-    update_annotation: async (a) => {
-      const { annotationId, ...data } = a;
-      await requireAnnotation(annotationId as string);
-      return updateAnnotation(annotationId as string, data as Parameters<typeof updateAnnotation>[1]);
+    update_annotation: {
+      access: (a) => [annotation(a.annotationId)],
+      run: async (a) => {
+        const { annotationId, ...data } = a;
+        return updateAnnotation(annotationId as string, data as Parameters<typeof updateAnnotation>[1]);
+      },
     },
-    delete_annotation: async (a) => { await requireAnnotation(a.annotationId as string); return deleteAnnotation(a.annotationId as string); },
-    resolve_annotation: async (a) => { await requireAnnotation(a.annotationId as string); return resolveAnnotation(a.annotationId as string, a.resolved as boolean); },
+    delete_annotation: { access: (a) => [annotation(a.annotationId)], run: async (a) => deleteAnnotation(a.annotationId as string) },
+    resolve_annotation: { access: (a) => [annotation(a.annotationId)], run: async (a) => resolveAnnotation(a.annotationId as string, a.resolved as boolean) },
 
     // Characters / Story Objects
-    get_story_object: async (a) => { await requireStoryObject(a.objectId as string); return getStoryObject(a.objectId as string); },
-    create_story_object: async (a) => { requireProject(a.projectId); return createStoryObject(a as Parameters<typeof createStoryObject>[0]); },
-    update_story_object: async (a) => {
-      const { objectId, contentHash, ...data } = a;
-      await requireStoryObject(objectId as string);
-      return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1], contentHash as string);
+    get_story_object: { access: (a) => [storyObject(a.objectId)], run: async (a) => getStoryObject(a.objectId as string) },
+    create_story_object: { access: (a) => [project(a.projectId)], run: async (a) => createStoryObject(a as Parameters<typeof createStoryObject>[0]) },
+    update_story_object: {
+      access: (a) => [storyObject(a.objectId)],
+      run: async (a) => {
+        const { objectId, contentHash, ...data } = a;
+        return updateStoryObject(objectId as string, data as Parameters<typeof updateStoryObject>[1], contentHash as string);
+      },
     },
-    delete_story_object: async (a) => { await requireStoryObject(a.objectId as string); return deleteStoryObject(a.objectId as string); },
-    list_relationships: async (a) => { requireProject(a.projectId); return listRelationships(pid); },
-    create_relationship: async (a) => {
-      requireProject(a.projectId);
-      for (const k of ["fromNodeId", "toNodeId"] as const) if (a[k]) await requireNode(a[k] as string);
-      for (const k of ["fromObjectId", "toObjectId"] as const) if (a[k]) await requireStoryObject(a[k] as string);
-      return createRelationship(a as Parameters<typeof createRelationship>[0]);
+    delete_story_object: { access: (a) => [storyObject(a.objectId)], run: async (a) => deleteStoryObject(a.objectId as string) },
+    list_relationships: { access: (a) => [project(a.projectId)], run: async () => listRelationships(pid) },
+    create_relationship: {
+      access: (a) => [
+        project(a.projectId),
+        ...optional(a.fromNodeId, node), ...optional(a.toNodeId, node),
+        ...optional(a.fromObjectId, storyObject), ...optional(a.toObjectId, storyObject),
+      ],
+      run: async (a) => createRelationship(a as Parameters<typeof createRelationship>[0]),
     },
-    delete_relationship: async (a) => { await requireRelationship(a.relationshipId as string); return deleteRelationship(a.relationshipId as string); },
+    delete_relationship: {
+      access: (a) => [{ kind: "relationship", id: a.relationshipId as string }],
+      run: async (a) => deleteRelationship(a.relationshipId as string),
+    },
 
     // World Building
-    list_universes: async () => listUniverses(ctx.userId),
-    get_universe: async (a) => { await requireUniverse(a.universeId as string); return getUniverse(a.universeId as string); },
-    create_universe: async (a) => createUniverse(a as Parameters<typeof createUniverse>[0], ctx.userId),
-    update_universe: async (a) => {
-      const { universeId, contentHash, ...data } = a;
-      await requireUniverse(universeId as string);
-      return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1], contentHash as string);
+    list_universes: { run: async () => listUniverses(ctx.userId) },
+    get_universe: { access: (a) => [universe(a.universeId)], run: async (a) => getUniverse(a.universeId as string) },
+    create_universe: { run: async (a) => createUniverse(a as Parameters<typeof createUniverse>[0], ctx.userId) },
+    update_universe: {
+      access: (a) => [universe(a.universeId)],
+      run: async (a) => {
+        const { universeId, contentHash, ...data } = a;
+        return updateUniverse(universeId as string, data as Parameters<typeof updateUniverse>[1], contentHash as string);
+      },
     },
-    delete_universe: async (a) => { await requireUniverse(a.universeId as string); return deleteUniverse(a.universeId as string); },
-    list_world_objects: async (a) => { await requireUniverse(a.universeId as string); return listWorldObjects(a.universeId as string, a.type as string | undefined); },
-    get_world_object: async (a) => { await requireWorldObject(a.objectId as string); return getWorldObject(a.objectId as string); },
-    create_world_object: async (a) => { await requireUniverse(a.universeId as string); return createWorldObject(a as Parameters<typeof createWorldObject>[0]); },
-    update_world_object: async (a) => {
-      const { objectId, contentHash, ...data } = a;
-      await requireWorldObject(objectId as string);
-      return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1], contentHash as string);
+    delete_universe: { access: (a) => [universe(a.universeId)], run: async (a) => deleteUniverse(a.universeId as string) },
+    list_world_objects: {
+      access: (a) => [universe(a.universeId)],
+      run: async (a) => listWorldObjects(a.universeId as string, a.type as string | undefined),
     },
-    delete_world_object: async (a) => { await requireWorldObject(a.objectId as string); return deleteWorldObject(a.objectId as string); },
-    add_timeline_entry: async (a) => {
-      await requireWorldObject(a.worldObjectId as string);
-      if (a.projectId) requireProject(a.projectId);
-      return addTimelineEntry(a as Parameters<typeof addTimelineEntry>[0]);
+    get_world_object: { access: (a) => [worldObject(a.objectId)], run: async (a) => getWorldObject(a.objectId as string) },
+    create_world_object: {
+      access: (a) => [universe(a.universeId)],
+      run: async (a) => createWorldObject(a as Parameters<typeof createWorldObject>[0]),
     },
-    update_timeline_entry: async (a) => {
-      const { entryId, contentHash, ...data } = a;
-      await requireTimelineEntry(entryId as string);
-      return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1], contentHash as string);
+    update_world_object: {
+      access: (a) => [worldObject(a.objectId)],
+      run: async (a) => {
+        const { objectId, contentHash, ...data } = a;
+        return updateWorldObject(objectId as string, data as Parameters<typeof updateWorldObject>[1], contentHash as string);
+      },
     },
-    delete_timeline_entry: async (a) => { await requireTimelineEntry(a.entryId as string); return deleteTimelineEntry(a.entryId as string); },
-    reorder_timeline_entries: async (a) => {
-      await requireWorldObject(a.worldObjectId as string);
-      return reorderTimelineEntries(a.worldObjectId as string, a.orderedIds as string[]);
+    delete_world_object: { access: (a) => [worldObject(a.objectId)], run: async (a) => deleteWorldObject(a.objectId as string) },
+    add_timeline_entry: {
+      access: (a) => [worldObject(a.worldObjectId), ...optional(a.projectId, project)],
+      run: async (a) => addTimelineEntry(a as Parameters<typeof addTimelineEntry>[0]),
     },
-    transfer_story_object_to_universe: async (a) => {
-      await requireStoryObject(a.storyObjectId as string);
-      await requireUniverse(a.universeId as string);
-      return transferStoryObjectToUniverse(a.storyObjectId as string, a.universeId as string);
+    update_timeline_entry: {
+      access: (a) => [timelineEntry(a.entryId)],
+      run: async (a) => {
+        const { entryId, contentHash, ...data } = a;
+        return updateTimelineEntry(entryId as string, data as Parameters<typeof updateTimelineEntry>[1], contentHash as string);
+      },
     },
-    link_project_to_universe: async (a) => {
-      requireProject(a.projectId);
-      await assertUniverseOwner(a.universeId as string, ctx.userId);
-      return linkProjectToUniverse(pid, a.universeId as string);
+    delete_timeline_entry: { access: (a) => [timelineEntry(a.entryId)], run: async (a) => deleteTimelineEntry(a.entryId as string) },
+    reorder_timeline_entries: {
+      access: (a) => [worldObject(a.worldObjectId)],
+      run: async (a) => reorderTimelineEntries(a.worldObjectId as string, a.orderedIds as string[]),
     },
-    unlink_project_from_universe: async (a) => { requireProject(a.projectId); return unlinkProjectFromUniverse(pid); },
+    transfer_story_object_to_universe: {
+      access: (a) => [storyObject(a.storyObjectId), universe(a.universeId)],
+      run: async (a) => transferStoryObjectToUniverse(a.storyObjectId as string, a.universeId as string),
+    },
+    link_project_to_universe: {
+      access: (a) => [project(a.projectId), { kind: "ownedUniverse", id: a.universeId as string }],
+      run: async (a) => linkProjectToUniverse(pid, a.universeId as string),
+    },
+    unlink_project_from_universe: { access: (a) => [project(a.projectId)], run: async () => unlinkProjectFromUniverse(pid) },
 
     // Export
-    export_manuscript: async (a) => { requireProject(a.projectId); return exportManuscript(pid); },
-    export_story_bible: async (a) => { requireProject(a.projectId); return exportStoryBible(pid); },
-    export_hashnode: async (a) => {
-      requireProject(a.projectId);
-      if (a.nodeId) await requireNode(a.nodeId as string);
-      return exportHashnode(pid, a.nodeId as string | undefined);
+    export_manuscript: { access: (a) => [project(a.projectId)], run: async () => exportManuscript(pid) },
+    export_story_bible: { access: (a) => [project(a.projectId)], run: async () => exportStoryBible(pid) },
+    export_hashnode: {
+      access: (a) => [project(a.projectId), ...optional(a.nodeId, node)],
+      run: async (a) => exportHashnode(pid, a.nodeId as string | undefined),
     },
-    export_to_google_docs: async (a) => {
-      const { projectId, universeId, exportMode } = a as { projectId?: string; universeId?: string; exportMode: "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER" };
-      requireOwnerRole();
-      if (exportMode === "UNIVERSE") {
-        if (!universeId) throw new Error("universeId is required for UNIVERSE mode");
-        await requireUniverse(universeId);
-        return GoogleDocsExporter.exportToGoogleDocs(universeId, exportMode, ctx.userId);
-      }
-      requireProject(projectId);
-      return GoogleDocsExporter.exportToGoogleDocs(pid, exportMode, ctx.userId);
+    export_to_google_docs: {
+      ownerOnly: true,
+      access: (a) => (a.exportMode === "UNIVERSE" ? optional(a.universeId, universe) : [project(a.projectId)]),
+      run: async (a) => {
+        const { universeId, exportMode } = a as { universeId?: string; exportMode: "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER" };
+        if (exportMode === "UNIVERSE") {
+          if (!universeId) throw new Error("universeId is required for UNIVERSE mode");
+          return GoogleDocsExporter.exportToGoogleDocs(universeId, exportMode, ctx.userId);
+        }
+        return GoogleDocsExporter.exportToGoogleDocs(pid, exportMode, ctx.userId);
+      },
     },
 
     // Admin (project-level only; credential tools are excluded from chat)
-    create_project: async (a) => createProject({ ...(a as Parameters<typeof createProject>[0]), userId: ctx.userId }),
-    update_project: async (a) => {
-      const { projectId, contentHash, ...data } = a;
-      requireProject(projectId);
-      return updateProject(null, pid, data as Parameters<typeof updateProject>[2], contentHash as string | undefined);
+    create_project: { run: async (a) => createProject({ ...(a as Parameters<typeof createProject>[0]), userId: ctx.userId }) },
+    update_project: {
+      access: (a) => [project(a.projectId)],
+      run: async (a) => {
+        const { projectId: _projectId, contentHash, ...data } = a;
+        return updateProject(null, pid, data as Parameters<typeof updateProject>[2], contentHash as string | undefined);
+      },
     },
   };
 }
@@ -942,13 +948,19 @@ function buildAdkToolMaps(ctx: ToolContext): {
   byName: Map<string, FunctionTool>;
   byCategory: Map<ToolCategory, FunctionTool[]>;
 } {
-  const executors = buildToolExecutors(ctx);
+  const chatTools = buildChatTools(ctx);
+  const principal: Principal = { userId: ctx.userId, pinnedProjectId: ctx.projectId, role: ctx.role };
   const byName = new Map<string, FunctionTool>();
   const byCategory = new Map<ToolCategory, FunctionTool[]>();
   for (const def of getAllTools()) {
     if (CHAT_EXCLUDED_TOOLS.has(def.name)) continue;
-    const executor = executors[def.name];
-    if (!executor) throw new Error(`No executor found for tool: ${def.name}`);
+    const chatTool = chatTools[def.name];
+    if (!chatTool) throw new Error(`No executor found for tool: ${def.name}`);
+    const executor = async (a: Args) => {
+      if (chatTool.ownerOnly) assertOwnerRole(principal);
+      await assertCanAccess(principal, chatTool.access?.(a) ?? []);
+      return chatTool.run(a);
+    };
     const tool = toAdkTool(def, isChatDestructiveTool(def.name) ? guardDestructive(executor) : executor);
     byName.set(def.name, tool);
     const list = byCategory.get(def.category) ?? [];

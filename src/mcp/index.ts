@@ -146,22 +146,7 @@ import {
 } from "./tools/coaching";
 import { GoogleAuthController } from "../lib/controllers/google-auth";
 import { GoogleDocsExporter } from "../lib/export/google-docs-exporter";
-import {
-    AccessDeniedError,
-    assertProjectOwner as verifyProjectOwnership,
-    assertUniverseOwner as verifyUniverseOwnership,
-    assertRelationshipOwner,
-    projectIdForAnnotation,
-    projectIdForLocationImage,
-    projectIdForLocationSnapshot,
-    projectIdForNode,
-    projectIdForSnapshotAnnotation,
-    projectIdForStoryObject,
-    projectIdForContestSubmission,
-    projectIdForPublicationSubmission,
-    universeIdForWorldObject,
-    universeIdForTimelineEntry,
-} from "@/lib/ownership";
+import { assertCanAccess, type ResourceRef } from "@/lib/access/resource-access";
 
 interface McpServerOptions {
     /** Allow destructive tools (delete, restore). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
@@ -170,7 +155,7 @@ interface McpServerOptions {
     userId?: string | null;
     /**
      * Set when the caller authenticated with a personal API token (x-token-scope header).
-     * Only the tools in that scope's allowlist are registered; absent means every tool.
+     * Only the tools in that scope's allowlist are registered, and no prompts; absent means everything.
      */
     tokenScope?: PersonalTokenScope;
 }
@@ -223,26 +208,45 @@ server.tool = ((...args: unknown[]) => {
     return (_originalTool as (...a: unknown[]) => unknown)(...args);
 }) as typeof server.tool;
 
-/** Guard for destructive tools — returns error if not allowed. */
-function destructiveGuard(): McpResult | null {
-    if (!allowDestructive) {
-        return {
-            content: [{ type: "text", text: DESTRUCTIVE_TOOL_DISABLED_MESSAGE }],
-            isError: true,
-        };
-    }
-    return null;
+// A personal token's surface is its scope's scene tools only, so its server registers no prompts.
+const _originalPrompt = server.prompt.bind(server);
+server.prompt = ((...args: unknown[]) =>
+    allowedTools ? undefined : (_originalPrompt as (...a: unknown[]) => unknown)(...args)) as typeof server.prompt;
+
+const principal = { userId };
+
+interface ToolPolicy<A> {
+    /** Resources the caller must be allowed to touch, checked in order before the handler runs. */
+    access?: (args: A) => ResourceRef[];
+    /** Refused unless destructive tools are allowed — checked before access. */
+    destructive?: true;
+    /** Render an access denial as an `isError` result with this prefix, like the handler's own mcpRun/toolError; without it the denial throws. */
+    errorPrefix?: string;
 }
 
-/** Verify userId may modify a writing task — via its project, or its own owner when it has none. No-op in single-user mode. */
-async function verifyWritingTaskAccess(taskId: string, uid: string | null): Promise<void> {
-    const task = await prisma.writingTask.findUnique({
-        where: { id: taskId },
-        select: { projectId: true, userId: true },
-    });
-    if (!task) throw new AccessDeniedError("Writing task");
-    if (task.projectId) return verifyProjectOwnership(task.projectId, uid);
-    if (uid && task.userId !== uid) throw new AccessDeniedError("Writing task");
+/** Enforces a tool's declared policy, then runs its handler. */
+function guarded<A, R>(toolName: string, policy: ToolPolicy<A>, handler: (args: A) => Promise<R>): (args: A) => Promise<R | McpResult> {
+    return async (args) => {
+        if (policy.destructive && !allowDestructive) {
+            return { content: [{ type: "text", text: DESTRUCTIVE_TOOL_DISABLED_MESSAGE }], isError: true };
+        }
+        try {
+            await assertCanAccess(principal, policy.access?.(args) ?? []);
+        } catch (e) {
+            if (policy.errorPrefix === undefined) throw e;
+            logger.error(`${toolName}: failed`, e);
+            return toolError(policy.errorPrefix, e);
+        }
+        return handler(args);
+    };
+}
+
+/** Prompt counterpart of `guarded`: a denial throws, which the SDK returns as a JSON-RPC error. */
+function guardedPrompt<A, R>(access: (args: A) => ResourceRef[], handler: (args: A) => Promise<R>): (args: A) => Promise<R> {
+    return async (args) => {
+        await assertCanAccess(principal, access(args));
+        return handler(args);
+    };
 }
 
 // ─── Project Tools ───────────────────────────────────────────────────────────
@@ -310,11 +314,10 @@ server.tool(
         worldObjectId: z.string(),
         orderedIds: z.array(z.string()),
     },
-    async ({ worldObjectId, orderedIds }: { worldObjectId: string; orderedIds: string[] }) => {
-        await verifyUniverseOwnership(await universeIdForWorldObject(worldObjectId), userId);
+    guarded("reorder_timeline_entries", { access: ({ worldObjectId }) => [{ kind: "worldObject", id: worldObjectId }] }, async ({ worldObjectId, orderedIds }: { worldObjectId: string; orderedIds: string[] }) => {
         const result = await reorderTimelineEntries(worldObjectId, orderedIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -324,12 +327,10 @@ server.tool(
         storyObjectId: z.string(),
         universeId: z.string(),
     },
-    async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
-        await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-        await verifyUniverseOwnership(universeId, userId);
+    guarded("transfer_story_object_to_universe", { access: ({ storyObjectId, universeId }) => [{ kind: "storyObject", id: storyObjectId }, { kind: "universe", id: universeId }] }, async ({ storyObjectId, universeId }: { storyObjectId: string; universeId: string }) => {
         const result = await transferStoryObjectToUniverse(storyObjectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -339,12 +340,10 @@ server.tool(
         projectId: z.string().describe("The project ID"),
         universeId: z.string().describe("The universe ID"),
     },
-    async ({ projectId, universeId }) => {
-        await verifyProjectOwnership(projectId, userId);
-        await verifyUniverseOwnership(universeId, userId);
+    guarded("link_project_to_universe", { access: ({ projectId, universeId }) => [{ kind: "project", id: projectId }, { kind: "universe", id: universeId }] }, async ({ projectId, universeId }) => {
         const result = await linkProjectToUniverse(projectId, universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -353,11 +352,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("unlink_project_from_universe", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await unlinkProjectFromUniverse(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Structure & Outline Tools ───────────────────────────────────────────────
@@ -368,11 +366,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_outline", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await getOutline(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -387,11 +384,10 @@ server.tool(
         status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("Scene status (default OUTLINE)"),
         insertAfterIndex: z.number().optional().describe("Insert after this order index (appends to end if omitted)"),
     },
-    async (params) => {
-        await verifyProjectOwnership(params.projectId, userId);
+    guarded("create_node", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async (params) => {
         const result = await createNode(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -406,11 +402,9 @@ server.tool(
         orderIndex: NodeOrderIndex.optional().describe("New order index"),
         parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
     },
-    async ({ nodeId, contentHash, ...data }) =>
-        mcpRun("update_node", "Error updating node", async () => {
-            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
-            return updateNode(nodeId, data, contentHash);
-        })
+    guarded("update_node", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], errorPrefix: "Error updating node" }, async ({ nodeId, contentHash, ...data }) =>
+        mcpRun("update_node", "Error updating node", () =>
+            updateNode(nodeId, data, contentHash)))
 );
 
 server.tool(
@@ -419,12 +413,10 @@ server.tool(
     {
         nodeId: z.string().describe("The node ID to delete"),
     },
-    async ({ nodeId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+    guarded("delete_node", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], destructive: true }, async ({ nodeId }) => {
         const result = await deleteNode(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Scene Content Tools ─────────────────────────────────────────────────────
@@ -435,11 +427,10 @@ server.tool(
     {
         nodeId: z.string().describe("The scene node ID"),
     },
-    async ({ nodeId }) => {
-        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+    guarded("read_scene_content", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }] }, async ({ nodeId }) => {
         const result = await readSceneContent(nodeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -454,13 +445,12 @@ server.tool(
             content: z.string()
         })).optional().describe("Structured content blocks")
     },
-    async ({ nodeId, contentHash, content, blocks }) =>
+    guarded("write_scene_content", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], errorPrefix: "Error writing scene content" }, async ({ nodeId, contentHash, content, blocks }) =>
         mcpRun("write_scene_content", "Error writing scene content", async () => {
-            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
             if (blocks) return writeSceneContentFromBlocks(nodeId, blocks as { type: "CONTENT" | "BEAT"; content: string }[], contentHash);
             if (content !== undefined) return writeSceneContent(nodeId, content, contentHash);
             throw new UserFacingError("Either 'content' or 'blocks' must be provided");
-        })
+        }))
 );
 
 server.tool(
@@ -474,11 +464,9 @@ server.tool(
         sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
         intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     },
-    async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) =>
-        mcpRun("update_paragraph", "Error updating paragraph", async () => {
-            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
-            return updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash);
-        })
+    guarded("update_paragraph", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], errorPrefix: "Error updating paragraph" }, async ({ nodeId, index, content, paragraphContentHash, sceneContentHash }) =>
+        mcpRun("update_paragraph", "Error updating paragraph", () =>
+            updateParagraph(nodeId, index, content, paragraphContentHash, sceneContentHash)))
 );
 
 // Note: insert_beat bypasses the prose-writing guard because the payload is beat
@@ -500,11 +488,9 @@ server.tool(
             .optional()
             .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
     },
-    async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) =>
-        mcpRun("insert_beat", "Error inserting beat", async () => {
-            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
-            return insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash);
-        })
+    guarded("insert_beat", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], errorPrefix: "Error inserting beat" }, async ({ nodeId, afterParagraphIndex, beatContent, sceneContentHash }) =>
+        mcpRun("insert_beat", "Error inserting beat", () =>
+            insertBeat(nodeId, afterParagraphIndex, beatContent, sceneContentHash)))
 );
 
 server.tool(
@@ -516,11 +502,9 @@ server.tool(
         paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
         sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
     },
-    async ({ nodeId, index, paragraphContentHash, sceneContentHash }) =>
-        mcpRun("delete_beat", "Error deleting beat", async () => {
-            await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
-            return deleteBeat(nodeId, index, paragraphContentHash, sceneContentHash);
-        })
+    guarded("delete_beat", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }], errorPrefix: "Error deleting beat" }, async ({ nodeId, index, paragraphContentHash, sceneContentHash }) =>
+        mcpRun("delete_beat", "Error deleting beat", () =>
+            deleteBeat(nodeId, index, paragraphContentHash, sceneContentHash)))
 );
 
 server.tool(
@@ -530,11 +514,10 @@ server.tool(
         nodeId: z.string().describe("The scene node ID"),
         limit: z.number().optional().describe("Max versions to return (default 20)"),
     },
-    async ({ nodeId, limit }) => {
-        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+    guarded("get_scene_versions", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }] }, async ({ nodeId, limit }) => {
         const result = await getSceneVersions(nodeId, limit);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -544,11 +527,10 @@ server.tool(
         nodeId: z.string().describe("The scene node ID"),
         versionId: z.string().describe("The version ID to restore"),
     },
-    async ({ nodeId, versionId }) => {
-        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+    guarded("restore_scene_version", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }] }, async ({ nodeId, versionId }) => {
         const result = await restoreSceneVersion(nodeId, versionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -560,11 +542,10 @@ server.tool(
         range: z.string().optional(),
         selectedText: z.string().optional(),
     },
-    async ({ nodeId, content, range, selectedText }: { nodeId: string; content: string; range?: string; selectedText?: string }) => {
-        await verifyProjectOwnership(await projectIdForNode(nodeId), userId);
+    guarded("add_annotation", { access: ({ nodeId }) => [{ kind: "node", id: nodeId }] }, async ({ nodeId, content, range, selectedText }: { nodeId: string; content: string; range?: string; selectedText?: string }) => {
         const result = await addAnnotation(nodeId, content, range, selectedText);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -575,11 +556,10 @@ server.tool(
         content: z.string().optional(),
         resolved: z.boolean().optional(),
     },
-    async ({ annotationId, ...data }) => {
-        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
+    guarded("update_annotation", { access: ({ annotationId }) => [{ kind: "annotation", id: annotationId }] }, async ({ annotationId, ...data }) => {
         const result = await updateAnnotation(annotationId, data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -588,12 +568,10 @@ server.tool(
     {
         annotationId: z.string(),
     },
-    async ({ annotationId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
+    guarded("delete_annotation", { access: ({ annotationId }) => [{ kind: "annotation", id: annotationId }], destructive: true }, async ({ annotationId }) => {
         const result = await deleteAnnotation(annotationId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -603,11 +581,10 @@ server.tool(
         annotationId: z.string(),
         resolved: z.boolean(),
     },
-    async ({ annotationId, resolved }) => {
-        await verifyProjectOwnership(await projectIdForAnnotation(annotationId), userId);
+    guarded("resolve_annotation", { access: ({ annotationId }) => [{ kind: "annotation", id: annotationId }] }, async ({ annotationId, resolved }) => {
         const result = await resolveAnnotation(annotationId, resolved);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -616,11 +593,10 @@ server.tool(
     {
         projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns the caller's open annotations across all their projects."),
     },
-    async ({ projectId }) => {
-        if (projectId) await verifyProjectOwnership(projectId, userId);
+    guarded("get_open_annotations", { access: ({ projectId }) => (projectId ? [{ kind: "project", id: projectId }] : []) }, async ({ projectId }) => {
         const result = await getOpenAnnotations(projectId, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Story Object Tools ──────────────────────────────────────────────────────
@@ -635,11 +611,10 @@ server.tool(
         limit: z.number().optional().describe("Max objects to return (default 50)"),
         offset: z.number().optional().describe("Offset for pagination"),
     },
-    async (params) => {
-        await verifyProjectOwnership(params.projectId, userId);
+    guarded("list_story_objects", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async (params) => {
         const result = await listStoryObjects(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -648,11 +623,10 @@ server.tool(
     {
         objectId: z.string(),
     },
-    async ({ objectId }: { objectId: string }) => {
-        await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
+    guarded("get_story_object", { access: ({ objectId }) => [{ kind: "storyObject", id: objectId }] }, async ({ objectId }: { objectId: string }) => {
         const result = await getStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -667,11 +641,10 @@ server.tool(
         role: z.string().optional().describe("Role (for characters: protagonist, antagonist, supporting, minor)"),
         tags: z.string().optional().describe("Comma-separated tags"),
     },
-    async (params) => {
-        await verifyProjectOwnership(params.projectId, userId);
+    guarded("create_story_object", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async (params) => {
         const result = await createStoryObject(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -686,11 +659,9 @@ server.tool(
         role: z.string().nullable().optional().describe("New role (null to clear)"),
         tags: z.string().optional().describe("New comma-separated tags"),
     },
-    async ({ objectId, contentHash, ...data }) =>
-        mcpRun("update_story_object", "Error updating story object", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
-            return updateStoryObject(objectId, data, contentHash);
-        })
+    guarded("update_story_object", { access: ({ objectId }) => [{ kind: "storyObject", id: objectId }], errorPrefix: "Error updating story object" }, async ({ objectId, contentHash, ...data }) =>
+        mcpRun("update_story_object", "Error updating story object", () =>
+            updateStoryObject(objectId, data, contentHash)))
 );
 
 server.tool(
@@ -699,12 +670,10 @@ server.tool(
     {
         objectId: z.string().describe("The story object ID to delete"),
     },
-    async ({ objectId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await projectIdForStoryObject(objectId), userId);
+    guarded("delete_story_object", { access: ({ objectId }) => [{ kind: "storyObject", id: objectId }], destructive: true }, async ({ objectId }) => {
         const result = await deleteStoryObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Location Image Tools ────────────────────────────────────────────────────
@@ -715,11 +684,9 @@ server.tool(
     {
         storyObjectId: z.string().describe("The LOCATION story object ID"),
     },
-    async ({ storyObjectId }) =>
-        mcpRun("list_location_images", "Error listing location images", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return listLocationImages(storyObjectId);
-        })
+    guarded("list_location_images", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error listing location images" }, async ({ storyObjectId }) =>
+        mcpRun("list_location_images", "Error listing location images", () =>
+            listLocationImages(storyObjectId)))
 );
 
 server.tool(
@@ -732,11 +699,9 @@ server.tool(
         kind: LocationImageKindSchema.optional().describe("reference (default), mood or sketch"),
         caption: LocationImageCaptionSchema.optional().describe("Caption"),
     },
-    async (params) =>
-        mcpRun("add_location_image", "Error adding location image", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(params.storyObjectId), userId);
-            return addLocationImage(params);
-        })
+    guarded("add_location_image", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error adding location image" }, async (params) =>
+        mcpRun("add_location_image", "Error adding location image", () =>
+            addLocationImage(params)))
 );
 
 server.tool(
@@ -749,13 +714,12 @@ server.tool(
         orderIndex: z.number().int().min(0).optional().describe("New position, 0-based"),
         isCover: z.boolean().optional().describe("true to make this the cover, false to clear it"),
     },
-    async ({ imageId, ...changes }) =>
+    guarded("update_location_image", { access: ({ imageId }) => [{ kind: "locationImage", id: imageId }], errorPrefix: "Error updating location image" }, async ({ imageId, ...changes }) =>
         mcpRun("update_location_image", "Error updating location image", async () => {
-            await verifyProjectOwnership(await projectIdForLocationImage(imageId), userId);
             const parsed = LocationImageUpdateSchema.safeParse(changes);
             if (!parsed.success) throw new UserFacingError(parsed.error.issues[0]?.message ?? "Invalid input");
             return updateLocationImage(imageId, parsed.data);
-        })
+        }))
 );
 
 server.tool(
@@ -764,13 +728,9 @@ server.tool(
     {
         imageId: z.string().describe("The location image ID to delete"),
     },
-    async ({ imageId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        return mcpRun("delete_location_image", "Error deleting location image", async () => {
-            await verifyProjectOwnership(await projectIdForLocationImage(imageId), userId);
-            return deleteLocationImage(imageId);
-        });
-    }
+    guarded("delete_location_image", { access: ({ imageId }) => [{ kind: "locationImage", id: imageId }], destructive: true, errorPrefix: "Error deleting location image" }, async ({ imageId }) =>
+        mcpRun("delete_location_image", "Error deleting location image", () =>
+            deleteLocationImage(imageId)))
 );
 
 // ─── Location Map Tools ──────────────────────────────────────────────────────
@@ -787,11 +747,9 @@ server.tool(
     {
         storyObjectId: z.string().describe("The LOCATION story object ID"),
     },
-    async ({ storyObjectId }) =>
-        mcpRun("get_location_map", "Error reading location map", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return getLocationMap(storyObjectId);
-        })
+    guarded("get_location_map", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error reading location map" }, async ({ storyObjectId }) =>
+        mcpRun("get_location_map", "Error reading location map", () =>
+            getLocationMap(storyObjectId)))
 );
 
 server.tool(
@@ -802,11 +760,9 @@ server.tool(
         map: z.record(z.string(), z.unknown()).describe("{ widthM, heightM, backgroundImageId?, items: [...] }"),
         contentHash: ContentHash.locationMap.optional(),
     },
-    async ({ storyObjectId, map, contentHash }) =>
-        mcpRun("set_location_map", "Error saving location map", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return setLocationMap(storyObjectId, map, contentHash);
-        })
+    guarded("set_location_map", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error saving location map" }, async ({ storyObjectId, map, contentHash }) =>
+        mcpRun("set_location_map", "Error saving location map", () =>
+            setLocationMap(storyObjectId, map, contentHash)))
 );
 
 server.tool(
@@ -816,11 +772,9 @@ server.tool(
         storyObjectId: z.string().describe("The LOCATION story object ID"),
         item: z.record(z.string(), z.unknown()).describe("The item; omit id to add a new one"),
     },
-    async ({ storyObjectId, item }) =>
-        mcpRun("upsert_location_map_item", "Error saving location map item", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return upsertLocationMapItem(storyObjectId, item);
-        })
+    guarded("upsert_location_map_item", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error saving location map item" }, async ({ storyObjectId, item }) =>
+        mcpRun("upsert_location_map_item", "Error saving location map item", () =>
+            upsertLocationMapItem(storyObjectId, item)))
 );
 
 server.tool(
@@ -830,13 +784,9 @@ server.tool(
         storyObjectId: z.string().describe("The LOCATION story object ID"),
         itemId: z.string().describe("The map item ID"),
     },
-    async ({ storyObjectId, itemId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        return mcpRun("delete_location_map_item", "Error deleting location map item", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return deleteLocationMapItem(storyObjectId, itemId);
-        });
-    }
+    guarded("delete_location_map_item", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], destructive: true, errorPrefix: "Error deleting location map item" }, async ({ storyObjectId, itemId }) =>
+        mcpRun("delete_location_map_item", "Error deleting location map item", () =>
+            deleteLocationMapItem(storyObjectId, itemId)))
 );
 
 // ─── Location Snapshot Tools ─────────────────────────────────────────────────
@@ -847,11 +797,9 @@ server.tool(
     {
         storyObjectId: z.string().describe("The LOCATION story object ID"),
     },
-    async ({ storyObjectId }) =>
-        mcpRun("list_location_snapshots", "Error listing location snapshots", async () => {
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId), userId);
-            return listLocationSnapshots(storyObjectId);
-        })
+    guarded("list_location_snapshots", { access: ({ storyObjectId }) => [{ kind: "storyObject", id: storyObjectId }], errorPrefix: "Error listing location snapshots" }, async ({ storyObjectId }) =>
+        mcpRun("list_location_snapshots", "Error listing location snapshots", () =>
+            listLocationSnapshots(storyObjectId)))
 );
 
 server.tool(
@@ -861,18 +809,20 @@ server.tool(
         snapshotId: z.string().optional().describe("The snapshot ID"),
         storyObjectId: z.string().optional().describe("A LOCATION story object ID, for its latest snapshot"),
     },
-    async ({ snapshotId, storyObjectId }) =>
+    guarded("get_location_snapshot", {
+        access: ({ snapshotId, storyObjectId }) =>
+            snapshotId !== undefined && storyObjectId === undefined ? [{ kind: "locationSnapshot", id: snapshotId }]
+            : storyObjectId !== undefined && snapshotId === undefined ? [{ kind: "storyObject", id: storyObjectId }]
+            : [],
+        errorPrefix: "Error getting location snapshot",
+    }, async ({ snapshotId, storyObjectId }) =>
         mcpRun("get_location_snapshot", "Error getting location snapshot", async () => {
             if ((snapshotId === undefined) === (storyObjectId === undefined)) {
                 throw new UserFacingError("Provide exactly one of snapshotId or storyObjectId");
             }
-            if (snapshotId !== undefined) {
-                await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
-                return getLocationSnapshot(snapshotId);
-            }
-            await verifyProjectOwnership(await projectIdForStoryObject(storyObjectId!), userId);
+            if (snapshotId !== undefined) return getLocationSnapshot(snapshotId);
             return getLocationSnapshot(await LocationSnapshotController.latestId(storyObjectId!));
-        })
+        }))
 );
 
 server.tool(
@@ -886,11 +836,9 @@ server.tool(
         region: SnapshotRegionSchema.optional().describe("Notes only: { type: point, x, y } | { type: rect, x, y, w, h } | { type: path, points: [[x, y], ...] }"),
         storyObjectId: z.string().optional().describe("Notes only: a story object of the same project the note is about"),
     },
-    async ({ snapshotId, ...input }) =>
-        mcpRun("add_snapshot_annotation", "Error adding snapshot annotation", async () => {
-            await verifyProjectOwnership(await projectIdForLocationSnapshot(snapshotId), userId);
-            return addSnapshotAnnotation(snapshotId, input);
-        })
+    guarded("add_snapshot_annotation", { access: ({ snapshotId }) => [{ kind: "locationSnapshot", id: snapshotId }], errorPrefix: "Error adding snapshot annotation" }, async ({ snapshotId, ...input }) =>
+        mcpRun("add_snapshot_annotation", "Error adding snapshot annotation", () =>
+            addSnapshotAnnotation(snapshotId, input)))
 );
 
 server.tool(
@@ -903,11 +851,9 @@ server.tool(
         region: SnapshotRegionSchema.optional().describe("Notes only: new region"),
         storyObjectId: z.string().nullable().optional().describe("Notes only: story object to link, or null to unlink"),
     },
-    async ({ annotationId, ...changes }) =>
-        mcpRun("update_snapshot_annotation", "Error updating snapshot annotation", async () => {
-            await verifyProjectOwnership(await projectIdForSnapshotAnnotation(annotationId), userId);
-            return updateSnapshotAnnotation(annotationId, changes);
-        })
+    guarded("update_snapshot_annotation", { access: ({ annotationId }) => [{ kind: "snapshotAnnotation", id: annotationId }], errorPrefix: "Error updating snapshot annotation" }, async ({ annotationId, ...changes }) =>
+        mcpRun("update_snapshot_annotation", "Error updating snapshot annotation", () =>
+            updateSnapshotAnnotation(annotationId, changes)))
 );
 
 // ─── Batch Tools ────────────────────────────────────────────────────────────
@@ -926,11 +872,10 @@ server.tool(
             tags: z.string().optional().describe("Comma-separated tags"),
         })).describe("Array of story objects to create"),
     },
-    async ({ projectId, objects }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("batch_create_story_objects", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, objects }) => {
         const result = await batchCreateStoryObjects(projectId, objects);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -946,12 +891,10 @@ server.tool(
             tags: z.string().optional().describe("New comma-separated tags"),
         })).describe("Array of updates to apply"),
     },
-    async ({ updates }) => {
-        const projectIds = await Promise.all(updates.map(u => projectIdForStoryObject(u.objectId)));
-        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
+    guarded("batch_update_story_objects", { access: ({ updates }) => [{ kind: "storyObject", ids: updates.map(u => u.objectId) }] }, async ({ updates }) => {
         const result = await batchUpdateStoryObjects(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -960,13 +903,10 @@ server.tool(
     {
         objectIds: z.array(z.string()).describe("Array of story object IDs to delete"),
     },
-    async ({ objectIds }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        const projectIds = await Promise.all(objectIds.map(id => projectIdForStoryObject(id)));
-        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
+    guarded("batch_delete_story_objects", { access: ({ objectIds }) => [{ kind: "storyObject", ids: objectIds }], destructive: true }, async ({ objectIds }) => {
         const result = await batchDeleteStoryObjects(objectIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Writing Task Tools ───────────────────────────────────────────────────────
@@ -984,11 +924,9 @@ server.tool(
         capacity: WritingTaskCapacity.optional().describe("Filter by the writer's state the task suits"),
         dueBefore: WritingTaskDueDate.optional().describe("ISO 8601 date or date-time — only tasks due on or before it"),
     },
-    async (params) =>
-        mcpRun("list_writing_tasks", "Error listing writing tasks", async () => {
-            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
-            return listWritingTasks({ ...params, userId });
-        })
+    guarded("list_writing_tasks", { access: ({ projectId }) => (projectId ? [{ kind: "project", id: projectId }] : []), errorPrefix: "Error listing writing tasks" }, async (params) =>
+        mcpRun("list_writing_tasks", "Error listing writing tasks", () =>
+            listWritingTasks({ ...params, userId })))
 );
 
 server.tool(
@@ -999,11 +937,9 @@ server.tool(
         kind: WritingTaskKind.optional().describe("Only tasks of this kind of work"),
         projectId: z.string().optional().describe("Only this project's tasks and the opportunities it is a candidate for"),
     },
-    async (params) =>
-        mcpRun("get_task_dashboard", "Error getting task dashboard", async () => {
-            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
-            return getTaskDashboard({ ...params, userId });
-        })
+    guarded("get_task_dashboard", { access: ({ projectId }) => (projectId ? [{ kind: "project", id: projectId }] : []), errorPrefix: "Error getting task dashboard" }, async (params) =>
+        mcpRun("get_task_dashboard", "Error getting task dashboard", () =>
+            getTaskDashboard({ ...params, userId })))
 );
 
 server.tool(
@@ -1021,11 +957,9 @@ server.tool(
         capacity: WritingTaskCapacity.optional().describe("The writer's state the task suits — distinct from energy (default: Full)"),
         dueDate: WritingTaskDueDate.optional().describe("Optional ISO 8601 due date or date-time"),
     },
-    async (params) =>
-        mcpRun("create_writing_task", "Error creating writing task", async () => {
-            if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
-            return createWritingTask({ ...params, userId });
-        })
+    guarded("create_writing_task", { access: ({ projectId }) => (projectId ? [{ kind: "project", id: projectId }] : []), errorPrefix: "Error creating writing task" }, async (params) =>
+        mcpRun("create_writing_task", "Error creating writing task", () =>
+            createWritingTask({ ...params, userId })))
 );
 
 server.tool(
@@ -1034,11 +968,9 @@ server.tool(
     {
         taskId: z.string().describe("The writing task ID to mark complete"),
     },
-    async ({ taskId }) =>
-        mcpRun("complete_writing_task", "Error completing writing task", async () => {
-            await verifyWritingTaskAccess(taskId, userId);
-            return completeWritingTask(taskId);
-        })
+    guarded("complete_writing_task", { access: ({ taskId }) => [{ kind: "writingTask", id: taskId }], errorPrefix: "Error completing writing task" }, async ({ taskId }) =>
+        mcpRun("complete_writing_task", "Error completing writing task", () =>
+            completeWritingTask(taskId)))
 );
 
 server.tool(
@@ -1056,11 +988,9 @@ server.tool(
         dueDate: WritingTaskDueDate.nullable().optional().describe("New ISO 8601 due date or date-time, or null to clear it"),
         completed: z.boolean().optional().describe("Mark task complete or incomplete"),
     },
-    async (params) =>
-        mcpRun("update_writing_task", "Error updating writing task", async () => {
-            await verifyWritingTaskAccess(params.taskId, userId);
-            return updateWritingTask(params);
-        })
+    guarded("update_writing_task", { access: ({ taskId }) => [{ kind: "writingTask", id: taskId }], errorPrefix: "Error updating writing task" }, async (params) =>
+        mcpRun("update_writing_task", "Error updating writing task", () =>
+            updateWritingTask(params)))
 );
 
 server.tool(
@@ -1076,11 +1006,10 @@ server.tool(
             status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("Scene status (default OUTLINE)"),
         })).describe("Array of nodes to create"),
     },
-    async ({ projectId, nodes }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("batch_create_nodes", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, nodes }) => {
         const result = await batchCreateNodes(projectId, nodes);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1096,12 +1025,10 @@ server.tool(
             parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
         })).describe("Array of updates to apply"),
     },
-    async ({ updates }) => {
-        const projectIds = await Promise.all(updates.map(u => projectIdForNode(u.nodeId)));
-        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
+    guarded("batch_update_nodes", { access: ({ updates }) => [{ kind: "node", ids: updates.map(u => u.nodeId) }] }, async ({ updates }) => {
         const result = await batchUpdateNodes(updates);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1110,13 +1037,10 @@ server.tool(
     {
         nodeIds: z.array(z.string()).describe("Array of node IDs to delete"),
     },
-    async ({ nodeIds }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        const projectIds = await Promise.all(nodeIds.map(id => projectIdForNode(id)));
-        await Promise.all([...new Set(projectIds)].map(pid => verifyProjectOwnership(pid, userId)));
+    guarded("batch_delete_nodes", { access: ({ nodeIds }) => [{ kind: "node", ids: nodeIds }], destructive: true }, async ({ nodeIds }) => {
         const result = await batchDeleteNodes(nodeIds);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Relationship Tools ──────────────────────────────────────────────────────
@@ -1127,11 +1051,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("list_relationships", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await listRelationships(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1146,11 +1069,10 @@ server.tool(
         toObjectId: z.string().optional().describe("Target story object ID"),
         label: z.string().optional().describe("Optional label/description for the relationship"),
     },
-    async (params) => {
-        await verifyProjectOwnership(params.projectId, userId);
+    guarded("create_relationship", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async (params) => {
         const result = await createRelationship(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1159,17 +1081,15 @@ server.tool(
     {
         relationshipId: z.string().describe("The relationship ID to delete"),
     },
-    async ({ relationshipId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await assertRelationshipOwner(relationshipId, userId);
+    guarded("delete_relationship", { access: ({ relationshipId }) => [{ kind: "relationship", id: relationshipId }], destructive: true }, async ({ relationshipId }) => {
         const result = await deleteRelationship(relationshipId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Provider Tools (user-scoped) ────────────────────────────────────────────
 // Providers (publications/contest organizers) belong to the current user, not to
-// a project, so these tools check ownership via userId rather than verifyProjectOwnership.
+// a project, so their implementations check ownership via userId instead of a declared access.
 
 server.tool(
     "list_providers",
@@ -1210,11 +1130,10 @@ server.tool(
     {
         providerId: z.string().describe("The provider ID to delete"),
     },
-    async ({ providerId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
+    guarded("delete_provider", { destructive: true }, async ({ providerId }) => {
         const result = await deleteProvider(providerId, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Contest Submission Tools (project-scoped) ───────────────────────────────
@@ -1225,11 +1144,9 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async (params) =>
-        mcpRun("list_contest_submissions", "Error listing contest submissions", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return listContestSubmissions(params);
-        })
+    guarded("list_contest_submissions", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error listing contest submissions" }, async (params) =>
+        mcpRun("list_contest_submissions", "Error listing contest submissions", () =>
+            listContestSubmissions(params)))
 );
 
 server.tool(
@@ -1244,11 +1161,9 @@ server.tool(
         submissionUrl: HttpUrl.optional().describe("URL of the submission or contest listing"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("Submission status (default \"submitted\")"),
     },
-    async (params) =>
-        mcpRun("create_contest_submission", "Error creating contest submission", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return createContestSubmission({ ...params, userId });
-        })
+    guarded("create_contest_submission", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error creating contest submission" }, async (params) =>
+        mcpRun("create_contest_submission", "Error creating contest submission", () =>
+            createContestSubmission({ ...params, userId })))
 );
 
 server.tool(
@@ -1263,11 +1178,9 @@ server.tool(
         submissionUrl: HttpUrl.optional().describe("New submission URL"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("New submission status"),
     },
-    async ({ submissionId, ...data }) =>
-        mcpRun("update_contest_submission", "Error updating contest submission", async () => {
-            await verifyProjectOwnership(await projectIdForContestSubmission(submissionId), userId);
-            return updateContestSubmission({ submissionId, userId, ...data });
-        })
+    guarded("update_contest_submission", { access: ({ submissionId }) => [{ kind: "contestSubmission", id: submissionId }], errorPrefix: "Error updating contest submission" }, async ({ submissionId, ...data }) =>
+        mcpRun("update_contest_submission", "Error updating contest submission", () =>
+            updateContestSubmission({ submissionId, userId, ...data })))
 );
 
 server.tool(
@@ -1276,12 +1189,10 @@ server.tool(
     {
         submissionId: z.string().describe("The contest submission ID to delete"),
     },
-    async ({ submissionId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await projectIdForContestSubmission(submissionId), userId);
+    guarded("delete_contest_submission", { access: ({ submissionId }) => [{ kind: "contestSubmission", id: submissionId }], destructive: true }, async ({ submissionId }) => {
         const result = await deleteContestSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Opportunity Tools (user-scoped) ─────────────────────────────────────────
@@ -1357,11 +1268,10 @@ server.tool(
     {
         opportunityId: z.string().describe("The opportunity ID to delete"),
     },
-    async ({ opportunityId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
+    guarded("delete_opportunity", { destructive: true }, async ({ opportunityId }) => {
         const result = await deleteOpportunity(opportunityId, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Opportunity Candidate Tools ─────────────────────────────────────────────
@@ -1415,11 +1325,10 @@ server.tool(
     {
         candidateId: z.string().describe("The candidate ID to delete"),
     },
-    async ({ candidateId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
+    guarded("delete_opportunity_candidate", { destructive: true }, async ({ candidateId }) => {
         const result = await deleteOpportunityCandidate(candidateId, userId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1442,11 +1351,9 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async (params) =>
-        mcpRun("list_publication_submissions", "Error listing publication submissions", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return listPublicationSubmissions(params);
-        })
+    guarded("list_publication_submissions", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error listing publication submissions" }, async (params) =>
+        mcpRun("list_publication_submissions", "Error listing publication submissions", () =>
+            listPublicationSubmissions(params)))
 );
 
 server.tool(
@@ -1458,11 +1365,9 @@ server.tool(
         submissionDate: z.string().describe("ISO 8601 date/time the story was submitted"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("Submission status (default \"submitted\")"),
     },
-    async (params) =>
-        mcpRun("create_publication_submission", "Error creating publication submission", async () => {
-            await verifyProjectOwnership(params.projectId, userId);
-            return createPublicationSubmission(params);
-        })
+    guarded("create_publication_submission", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error creating publication submission" }, async (params) =>
+        mcpRun("create_publication_submission", "Error creating publication submission", () =>
+            createPublicationSubmission(params)))
 );
 
 server.tool(
@@ -1474,11 +1379,9 @@ server.tool(
         submissionDate: z.string().optional().describe("New ISO 8601 submission date/time"),
         status: z.enum(["submitted", "accepted", "rejected", "withdrawn"]).optional().describe("New submission status"),
     },
-    async ({ submissionId, ...data }) =>
-        mcpRun("update_publication_submission", "Error updating publication submission", async () => {
-            await verifyProjectOwnership(await projectIdForPublicationSubmission(submissionId), userId);
-            return updatePublicationSubmission({ submissionId, ...data });
-        })
+    guarded("update_publication_submission", { access: ({ submissionId }) => [{ kind: "publicationSubmission", id: submissionId }], errorPrefix: "Error updating publication submission" }, async ({ submissionId, ...data }) =>
+        mcpRun("update_publication_submission", "Error updating publication submission", () =>
+            updatePublicationSubmission({ submissionId, ...data })))
 );
 
 server.tool(
@@ -1487,12 +1390,10 @@ server.tool(
     {
         submissionId: z.string().describe("The publication submission ID to delete"),
     },
-    async ({ submissionId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyProjectOwnership(await projectIdForPublicationSubmission(submissionId), userId);
+    guarded("delete_publication_submission", { access: ({ submissionId }) => [{ kind: "publicationSubmission", id: submissionId }], destructive: true }, async ({ submissionId }) => {
         const result = await deletePublicationSubmission(submissionId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Export & Summary Tools ──────────────────────────────────────────────────
@@ -1503,11 +1404,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("export_manuscript", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const markdown = await exportManuscript(projectId);
         return { content: [{ type: "text", text: markdown }] };
-    }
+    })
 );
 
 server.tool(
@@ -1516,11 +1416,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("export_story_bible", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const markdown = await exportStoryBible(projectId);
         return { content: [{ type: "text", text: markdown }] };
-    }
+    })
 );
 
 server.tool(
@@ -1530,12 +1429,11 @@ server.tool(
         projectId: z.string().describe("The project ID"),
         nodeId: z.string().optional().describe("The specific node ID to export (e.g. an Article ID). If omitted, exports all."),
     },
-    async ({ projectId, nodeId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("export_hashnode", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, nodeId }) => {
         const { exportHashnode } = await import("./tools/export");
         const markdown = await exportHashnode(projectId, nodeId);
         return { content: [{ type: "text", text: markdown }] };
-    }
+    })
 );
 
 server.tool(
@@ -1544,11 +1442,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_project_summary", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await getProjectSummary(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Universe Tools ──────────────────────────────────────────────────────────
@@ -1569,11 +1466,10 @@ server.tool(
     {
         universeId: z.string().describe("The universe ID"),
     },
-    async ({ universeId }) => {
-        await verifyUniverseOwnership(universeId, userId);
+    guarded("get_universe", { access: ({ universeId }) => [{ kind: "universe", id: universeId }] }, async ({ universeId }) => {
         const result = await getUniverse(universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1598,11 +1494,9 @@ server.tool(
         title: z.string().optional().describe("New title"),
         description: z.string().optional().describe("New description"),
     },
-    async ({ universeId, contentHash, ...data }) =>
-        mcpRun("update_universe", "Error updating universe", async () => {
-            await verifyUniverseOwnership(universeId, userId);
-            return updateUniverse(universeId, data, contentHash);
-        })
+    guarded("update_universe", { access: ({ universeId }) => [{ kind: "universe", id: universeId }], errorPrefix: "Error updating universe" }, async ({ universeId, contentHash, ...data }) =>
+        mcpRun("update_universe", "Error updating universe", () =>
+            updateUniverse(universeId, data, contentHash)))
 );
 
 server.tool(
@@ -1611,12 +1505,10 @@ server.tool(
     {
         universeId: z.string().describe("The universe ID"),
     },
-    async ({ universeId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyUniverseOwnership(universeId, userId);
+    guarded("delete_universe", { access: ({ universeId }) => [{ kind: "universe", id: universeId }], destructive: true }, async ({ universeId }) => {
         const result = await deleteUniverse(universeId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1626,11 +1518,10 @@ server.tool(
         universeId: z.string().describe("The universe ID"),
         type: z.string().optional().describe("Filter by type (CHARACTER, LOCATION, WORLD_ELEMENT)"),
     },
-    async ({ universeId, type }) => {
-        await verifyUniverseOwnership(universeId, userId);
+    guarded("list_world_objects", { access: ({ universeId }) => [{ kind: "universe", id: universeId }] }, async ({ universeId, type }) => {
         const result = await listWorldObjects(universeId, type);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1639,11 +1530,10 @@ server.tool(
     {
         objectId: z.string().describe("The world object ID"),
     },
-    async ({ objectId }) => {
-        await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
+    guarded("get_world_object", { access: ({ objectId }) => [{ kind: "worldObject", id: objectId }] }, async ({ objectId }) => {
         const result = await getWorldObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1657,11 +1547,10 @@ server.tool(
         notes: z.string().optional().describe("Additional notes"),
         tags: z.string().optional().describe("Comma-separated tags"),
     },
-    async (params) => {
-        await verifyUniverseOwnership(params.universeId, userId);
+    guarded("create_world_object", { access: ({ universeId }) => [{ kind: "universe", id: universeId }] }, async (params) => {
         const result = await createWorldObject(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1676,11 +1565,9 @@ server.tool(
         tags: z.string().optional().describe("New tags"),
         type: z.string().optional().describe("New type"),
     },
-    async ({ objectId, contentHash, ...data }) =>
-        mcpRun("update_world_object", "Error updating world object", async () => {
-            await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
-            return updateWorldObject(objectId, data, contentHash);
-        })
+    guarded("update_world_object", { access: ({ objectId }) => [{ kind: "worldObject", id: objectId }], errorPrefix: "Error updating world object" }, async ({ objectId, contentHash, ...data }) =>
+        mcpRun("update_world_object", "Error updating world object", () =>
+            updateWorldObject(objectId, data, contentHash)))
 );
 
 server.tool(
@@ -1689,12 +1576,10 @@ server.tool(
     {
         objectId: z.string().describe("The world object ID"),
     },
-    async ({ objectId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyUniverseOwnership(await universeIdForWorldObject(objectId), userId);
+    guarded("delete_world_object", { access: ({ objectId }) => [{ kind: "worldObject", id: objectId }], destructive: true }, async ({ objectId }) => {
         const result = await deleteWorldObject(objectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1708,12 +1593,12 @@ server.tool(
         projectId: z.string().optional().describe("Optional project ID this entry relates to"),
         orderIndex: z.number().optional().describe("Order index (appends to end if omitted)"),
     },
-    async (params) => {
-        await verifyUniverseOwnership(await universeIdForWorldObject(params.worldObjectId), userId);
-        if (params.projectId) await verifyProjectOwnership(params.projectId, userId);
+    guarded("add_timeline_entry", { access: ({ worldObjectId, projectId }) => projectId
+        ? [{ kind: "worldObject", id: worldObjectId }, { kind: "project", id: projectId }]
+        : [{ kind: "worldObject", id: worldObjectId }] }, async (params) => {
         const result = await addTimelineEntry(params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1727,11 +1612,9 @@ server.tool(
         attributes: z.string().optional().describe("New JSON blob"),
         orderIndex: z.number().optional().describe("New order index"),
     },
-    async ({ entryId, contentHash, ...data }) =>
-        mcpRun("update_timeline_entry", "Error updating timeline entry", async () => {
-            await verifyUniverseOwnership(await universeIdForTimelineEntry(entryId), userId);
-            return updateTimelineEntry(entryId, data, contentHash);
-        })
+    guarded("update_timeline_entry", { access: ({ entryId }) => [{ kind: "timelineEntry", id: entryId }], errorPrefix: "Error updating timeline entry" }, async ({ entryId, contentHash, ...data }) =>
+        mcpRun("update_timeline_entry", "Error updating timeline entry", () =>
+            updateTimelineEntry(entryId, data, contentHash)))
 );
 
 server.tool(
@@ -1740,12 +1623,10 @@ server.tool(
     {
         entryId: z.string().describe("The entry ID"),
     },
-    async ({ entryId }) => {
-        const guard = destructiveGuard(); if (guard) return guard;
-        await verifyUniverseOwnership(await universeIdForTimelineEntry(entryId), userId);
+    guarded("delete_timeline_entry", { access: ({ entryId }) => [{ kind: "timelineEntry", id: entryId }], destructive: true }, async ({ entryId }) => {
         const result = await deleteTimelineEntry(entryId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Google Docs Tools ───────────────────────────────────────────────────────
@@ -1796,11 +1677,10 @@ server.tool(
     "google_auth_disconnect",
     "Revoke and delete stored Google credentials",
     {},
-    async () => {
-        const guard = destructiveGuard(); if (guard) return guard;
+    guarded("google_auth_disconnect", { destructive: true }, async () => {
         await GoogleAuthController.disconnect(userId);
         return { content: [{ type: "text", text: "Disconnected from Google." }] };
-    }
+    })
 );
 
 server.tool(
@@ -1811,7 +1691,12 @@ server.tool(
         universeId: z.string().optional().describe("Universe ID to export"),
         exportMode: z.enum(['UNIVERSE', 'STORY_INTERNAL', 'STORY_READER']).describe("Export mode"),
     },
-    async ({ projectId, universeId, exportMode }) => {
+    guarded("export_to_google_docs", {
+        access: ({ projectId, universeId, exportMode }) => exportMode === "UNIVERSE"
+            ? (universeId ? [{ kind: "universe", id: universeId }] : [])
+            : (projectId ? [{ kind: "project", id: projectId }] : []),
+        errorPrefix: "Export failed",
+    }, async ({ projectId, universeId, exportMode }) => {
         if (!projectId && !universeId) {
             return { content: [{ type: "text", text: "Either projectId or universeId must be provided." }], isError: true };
         }
@@ -1823,11 +1708,6 @@ server.tool(
         }
 
         try {
-            if (exportMode === 'UNIVERSE') {
-                await verifyUniverseOwnership(universeId!, userId);
-            } else {
-                await verifyProjectOwnership(projectId!, userId);
-            }
             const entityId = exportMode === 'UNIVERSE' ? universeId! : projectId!;
             const result = await GoogleDocsExporter.exportToGoogleDocs(entityId, exportMode as "UNIVERSE" | "STORY_INTERNAL" | "STORY_READER", userId);
             return { content: [{ type: "text", text: `Export successful! Document: ${result.googleDocUrl}` }] };
@@ -1835,7 +1715,7 @@ server.tool(
             logger.error("export_to_google_docs: export failed", e);
             return toolError("Export failed", e);
         }
-    }
+    })
 );
 
 // ─── Coaching & Analysis Tools ───────────────────────────────────────────────
@@ -1846,11 +1726,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_plot_thread_status", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await getPlotThreadStatus(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1859,11 +1738,10 @@ server.tool(
     {
         sceneId: z.string().describe("The scene node ID"),
     },
-    async ({ sceneId }) => {
-        await verifyProjectOwnership(await projectIdForNode(sceneId), userId);
+    guarded("get_scene_focus", { access: ({ sceneId }) => [{ kind: "node", id: sceneId }] }, async ({ sceneId }) => {
         const result = await getSceneFocus(sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1872,11 +1750,10 @@ server.tool(
     {
         projectId: z.string().describe("The project ID"),
     },
-    async ({ projectId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_manuscript_context", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId }) => {
         const result = await getManuscriptContext(projectId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1886,11 +1763,10 @@ server.tool(
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 20 scenes)"),
     },
-    async ({ projectId, sceneId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_consistency_context", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, sceneId }) => {
         const result = await getConsistencyContext(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1900,11 +1776,10 @@ server.tool(
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().optional().describe("Focus on a specific scene (if omitted, checks up to 15 scenes)"),
     },
-    async ({ projectId, sceneId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("cross_reference_story_bible", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, sceneId }) => {
         const result = await getStoryBibleCrossReference(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 server.tool(
@@ -1914,11 +1789,10 @@ server.tool(
         projectId: z.string().describe("The project ID"),
         sceneId: z.string().describe("The scene to analyze"),
     },
-    async ({ projectId, sceneId }) => {
-        await verifyProjectOwnership(projectId, userId);
+    guarded("get_voice_context", { access: ({ projectId }) => [{ kind: "project", id: projectId }] }, async ({ projectId, sceneId }) => {
         const result = await getVoiceContext(projectId, sceneId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    }
+    })
 );
 
 // ─── Coaching Prompts ───────────────────────────────────────────────────────
@@ -1999,7 +1873,7 @@ server.prompt(
         sceneId: z.string().describe("The scene node ID to review"),
         projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
     },
-    async (args) => {
+    guardedPrompt(({ sceneId }) => [{ kind: "node", id: sceneId }], async (args) => {
         const focus = await getSceneFocus(args.sceneId);
         const status = focus.scene.status as string;
         const projectId = args.projectId || focus.scene.projectId;
@@ -2033,7 +1907,7 @@ server.prompt(
                 },
             }],
         };
-    }
+    })
 );
 
 server.prompt(
@@ -2043,7 +1917,7 @@ server.prompt(
         sceneId: z.string().describe("The scene node ID to plan beats for"),
         projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
     },
-    async (args) => {
+    guardedPrompt(({ sceneId }) => [{ kind: "node", id: sceneId }], async (args) => {
         const focus = await getSceneFocus(args.sceneId);
         const projectId = args.projectId || focus.scene.projectId;
         const skill = loadSkill("scene-drafting-assistant");
@@ -2071,7 +1945,7 @@ server.prompt(
                 },
             }],
         };
-    }
+    })
 );
 
 function buildSceneContextHeader(focus: SceneFocus, projectId: string, statusLine: string): string {
@@ -2323,11 +2197,9 @@ server.tool(
     "run_peer_review",
     "Trigger a full peer review of the project — runs four agents (editor, fan reader, peer author, comedy writer) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
     { projectId: z.string() },
-    async ({ projectId }) =>
-        mcpRun("run_peer_review", "Error running peer review", async () => {
-            await verifyProjectOwnership(projectId, userId);
-            return runPeerReview(projectId);
-        })
+    guarded("run_peer_review", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error running peer review" }, async ({ projectId }) =>
+        mcpRun("run_peer_review", "Error running peer review", () =>
+            runPeerReview(projectId)))
 );
 
 // ─── Get Peer Reviews Tool ────────────────────────────────────────────────────
@@ -2339,10 +2211,9 @@ server.tool(
         projectId: z.string(),
         limit: z.number().int().optional().default(5).describe("Max reviews to return (1–20, default 5, max 20)"),
     },
-    async ({ projectId, limit }) => {
+    guarded("get_peer_reviews", { access: ({ projectId }) => [{ kind: "project", id: projectId }], errorPrefix: "Error fetching peer reviews" }, async ({ projectId, limit }) => {
         const clampedLimit = Math.min(Math.max(limit, 1), 20);
         try {
-            await verifyProjectOwnership(projectId, userId);
             const rows = await prisma.peerReview.findMany({
                 where: { projectId },
                 orderBy: { createdAt: "desc" },
@@ -2353,7 +2224,7 @@ server.tool(
             logger.error("get_peer_reviews: failed", e);
             return toolError("Error fetching peer reviews", e);
         }
-    }
+    })
 );
 
 // ─── Register Skills as MCP Prompts ──────────────────────────────────────────

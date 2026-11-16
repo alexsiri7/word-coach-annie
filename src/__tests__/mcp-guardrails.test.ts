@@ -123,7 +123,7 @@ describe("CLAUDE_COLLABORATION_INSTRUCTIONS content", () => {
 describe("update_paragraph intent field", () => {
     const updateParagraphSection = mcpSource.slice(
         mcpSource.indexOf('"update_paragraph"'),
-        mcpSource.indexOf('"update_paragraph"') + 1500
+        mcpSource.indexOf('"update_paragraph"') + 2000
     );
 
     it("should include intent enum in the update_paragraph schema", () => {

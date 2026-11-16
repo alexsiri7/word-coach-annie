@@ -70,6 +70,16 @@ describe("MCP tools for personal API tokens", () => {
         expect(await registeredTools("snapshots")).toEqual([]);
     });
 
+    it("registers no prompts for a personal token", async () => {
+        const { createServer } = await import("../mcp/index");
+        const promptsFor = (tokenScope?: PersonalTokenScope) => Object.keys(
+            (createServer({ userId: "u", tokenScope }) as unknown as { _registeredPrompts: Record<string, unknown> })._registeredPrompts,
+        );
+        expect(promptsFor("read")).toEqual([]);
+        expect(promptsFor("write")).toEqual([]);
+        expect(promptsFor()).toEqual(expect.arrayContaining(["review", "plan_beats"]));
+    });
+
     it("registers every tool without a token scope", async () => {
         const tools = await registeredTools();
         expect(tools).toContain("delete_beat");

@@ -219,6 +219,7 @@ vi.mock("@/lib/ownership", () => ({
   universeIdForWorldObject: vi.fn(async () => "u-1"),
   universeIdForTimelineEntry: vi.fn(async () => "u-1"),
   relationshipOwner: vi.fn(async () => ({ projectId: "proj-1" })),
+  linkedUniverseId: vi.fn(async () => null),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
