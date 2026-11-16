@@ -119,18 +119,17 @@ Controllers live in `src/lib/controllers/` and contain all business logic. They 
 ## Adding an MCP Tool
 
 1. Add the implementation function to the appropriate file in `src/mcp/tools/`
-2. Register the tool in `src/mcp/index.ts` via `server.tool(name, schema, handler)`
+2. Register the tool in `src/mcp/index.ts` via `server.tool(name, description, schema, guarded(name, policy, handler))`: `policy.access` declares the resources the tool touches as `ResourceRef[]` (checked by `src/lib/access/resource-access.ts` before `handler` runs), and `policy.errorPrefix` renders a denial as an `isError` result instead of throwing. A tool registered without `guarded` gets no ownership check
 3. Use the same Zod schema as the corresponding controller method where possible
 4. Update tool count in `docs/ARCHITECTURE.md` if registering a new tool
 
 The MCP server uses `@modelcontextprotocol/sdk`. Tools are registered with Zod input schemas; the SDK handles JSON-Schema conversion.
 
-For destructive tools: check `process.env.MCP_ALLOW_DESTRUCTIVE` before registering:
+For destructive tools, set `destructive: true` in the policy; `guarded` refuses the call unless `MCP_ALLOW_DESTRUCTIVE` is `"true"`:
 
 ```typescript
-if (process.env.MCP_ALLOW_DESTRUCTIVE === "true") {
-  server.tool("delete_thing", schema, handler);
-}
+server.tool("delete_thing", description, schema,
+  guarded("delete_thing", { access: ({ thingId }) => [{ kind: "node", id: thingId }], destructive: true }, handler));
 ```
 
 ---
