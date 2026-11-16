@@ -201,7 +201,7 @@ export const getOpenAnnotationsSpec = defineTool({
     destructive: false,
     category: "core",
     parameters: z.object({
-        projectId: z.string().optional().describe("Optional project ID to filter by. If omitted, returns open annotations across every project you can access."),
+        projectId: z.string().optional().describe("Optional project ID to filter by."),
     }),
 });
 
