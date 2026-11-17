@@ -195,4 +195,20 @@ describe("active project limit on unarchive", () => {
     const after = await testPrisma.project.findUniqueOrThrow({ where: { id: archived.id } });
     expect(after.archivedAt).toBeNull();
   });
+
+  it("concurrent unarchives one slot below the limit activate only one project", async () => {
+    const user = await userWithProjects(2);
+    const [a, b] = await Promise.all(
+      ["A", "B"].map((title) =>
+        testPrisma.project.create({ data: { title, userId: user.id, archivedAt: new Date() } })
+      )
+    );
+
+    const responses = await Promise.all([unarchive(a.id), unarchive(b.id)]);
+
+    const statuses = responses.map((r) => r.status).sort();
+    expect(statuses[0]).toBe(200);
+    expect([403, 409]).toContain(statuses[1]);
+    expect(await testPrisma.project.count({ where: { userId: user.id, archivedAt: null } })).toBe(3);
+  });
 });
