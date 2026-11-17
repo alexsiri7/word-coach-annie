@@ -83,14 +83,14 @@ export const writeSceneContentSpec = defineTool({
 
 export const updateParagraphSpec = defineTool({
     name: "update_paragraph",
-    description: "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Optionally also accepts sceneContentHash for scene-level stale detection. Set intent: 'editorial' when correcting or rearranging the author's existing words rather than replacing them with AI-generated prose.",
+    description: "Patch a single paragraph or beat within a scene by its index (from read_scene_content paragraphs array). Requires paragraphContentHash from the paragraph entry to prevent stale overwrites. Rejects the write if any part of the scene changed after this tool read it. Set intent: 'editorial' when correcting or rearranging the author's existing words rather than replacing them with AI-generated prose.",
     destructive: false,
     parameters: z.object({
         nodeId: z.string().describe("The scene node ID"),
         index: z.number().int().describe("The paragraph index from the paragraphs array"),
         content: z.string().describe("New content for this paragraph (must match the existing type — CONTENT or BEAT)"),
         paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
-        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content. The whole scene is always re-checked against what this tool read before writing; this hash only adds an earlier check against the version you read"),
         intent: z.enum(["editorial", "creative"]).optional().describe("Intent signal: 'editorial' means the author's existing words are being corrected or rearranged (not replaced with AI-generated prose) — the prose-writing guard does not apply. When absent or 'creative', standard prose-writing rules apply."),
     }),
 });
@@ -111,7 +111,7 @@ export const insertBeatSpec = defineTool({
         sceneContentHash: z
             .string()
             .optional()
-            .describe("Optional scene-level contentHash from read_scene_content for stale detection"),
+            .describe("Optional scene-level contentHash from read_scene_content. The whole scene is always re-checked against what this tool read before writing; this hash only adds an earlier check against the version you read"),
     }),
 });
 
@@ -123,7 +123,7 @@ export const deleteBeatSpec = defineTool({
         nodeId: z.string().describe("The scene node ID"),
         index: z.number().int().describe("The paragraph index of the beat, from the paragraphs array"),
         paragraphContentHash: z.string().describe("The contentHash from the paragraphs[index] entry in read_scene_content"),
-        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content for additional stale protection"),
+        sceneContentHash: z.string().optional().describe("Optional scene-level contentHash from read_scene_content. The whole scene is always re-checked against what this tool read before writing; this hash only adds an earlier check against the version you read"),
     }),
 });
 
