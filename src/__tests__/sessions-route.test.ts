@@ -15,7 +15,8 @@ import { POST } from "@/app/api/projects/[id]/sessions/route";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { MAX_SESSION_WORDS } from "@/schemas/sessions";
 
-const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+// Two days ahead, so it stays beyond the clock-skew tolerance even just before UTC midnight.
+const future = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
 
 function post(projectId: string, body: unknown) {
   const req = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
@@ -59,9 +60,9 @@ describe("POST /api/projects/[id]/sessions", () => {
     ["a negative durationSeconds", { durationSeconds: -1 }],
     ["a non-ISO date", { date: "15/03/2026" }],
     ["a non-ISO startedAt", { startedAt: "yesterday" }],
-    ["a future date", { date: tomorrow.toISOString().slice(0, 10) }],
-    ["a future startedAt", { startedAt: tomorrow.toISOString() }],
-    ["a future endedAt", { endedAt: tomorrow.toISOString() }],
+    ["a future date", { date: future.toISOString().slice(0, 10) }],
+    ["a future startedAt", { startedAt: future.toISOString() }],
+    ["a future endedAt", { endedAt: future.toISOString() }],
   ])("returns 400 for %s and stores nothing", async (_label, body) => {
     const res = await post(projectId, body);
     expect(res.status).toBe(400);
@@ -74,6 +75,18 @@ describe("POST /api/projects/[id]/sessions", () => {
   ])("creates a session %s", async (_label, body) => {
     const res = await post(projectId, body);
     expect(res.status).toBe(201);
+  });
+
+  it("stores a session dated tomorrow by a fast clock near midnight under the server's today", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-15T23:58:00.000Z"));
+    try {
+      const res = await post(projectId, { date: "2026-03-16" });
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({ date: "2026-03-15" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns 404 for a nodeId from another project", async () => {
