@@ -1,4 +1,7 @@
+import { fetchCurrentUser } from "@/hooks/use-auth";
 import {
+  deleteProjectData,
+  idbGet,
   idbPut,
   idbGetAll,
   idbGetNodesByProject,
@@ -45,17 +48,32 @@ export async function cacheStoryObjects(
 
 // ─── Cache Readers ─────────────────────────────────────────────────────────
 
+/** Resolving the signed-in user claims the cache, so a previous user's data is cleared before it can be read. */
+async function claimedCache(): Promise<void> {
+  await fetchCurrentUser();
+}
+
 /** Return all cached projects from IndexedDB. */
 export async function getCachedProjects(): Promise<
   AnnieDBSchema["projects"]["value"][]
 > {
+  await claimedCache();
   return idbGetAll("projects");
+}
+
+/** Return one cached project from IndexedDB. */
+export async function getCachedProject(
+  projectId: string
+): Promise<AnnieDBSchema["projects"]["value"] | undefined> {
+  await claimedCache();
+  return idbGet("projects", projectId);
 }
 
 /** Rebuild an OutlineNode tree from cached flat structure nodes. */
 export async function getCachedOutline(
   projectId: string
 ): Promise<OutlineNode[]> {
+  await claimedCache();
   const nodes = await idbGetNodesByProject(projectId);
   return buildTree(nodes);
 }
@@ -64,6 +82,7 @@ export async function getCachedOutline(
 export async function getCachedContent(
   nodeId: string
 ): Promise<AnnieDBSchema["contentVersions"]["value"] | undefined> {
+  await claimedCache();
   const versions = await idbGetContentByNode(nodeId);
   if (versions.length === 0) return undefined;
   return versions.reduce((latest, v) =>
@@ -75,7 +94,13 @@ export async function getCachedContent(
 export async function getCachedStoryObjects(
   projectId: string
 ): Promise<AnnieDBSchema["storyObjects"]["value"][]> {
+  await claimedCache();
   return idbGetStoryObjectsByProject(projectId);
+}
+
+/** Drop a project the server no longer lets this user read from the device's cache. */
+export async function purgeCachedProject(projectId: string): Promise<void> {
+  await deleteProjectData(projectId);
 }
 
 // ─── Internal Helpers ──────────────────────────────────────────────────────

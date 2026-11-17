@@ -45,6 +45,7 @@ describe("clearClientData", () => {
     store.clear();
     store.set("consent:sentry_replay", "true");
     store.set("setup-wizard-dismissed", "true");
+    store.set("annie-offline-owner", "u1");
     store.set("theme", "dark");
     cacheNames.clear();
     for (const name of ["app-shell", "pages", "others", "workbox-precache-v2-https://example.test/"]) {
@@ -58,6 +59,7 @@ describe("clearClientData", () => {
     expect(clearOfflineData).toHaveBeenCalledOnce();
     expect(store.has("consent:sentry_replay")).toBe(false);
     expect(store.has("setup-wizard-dismissed")).toBe(false);
+    expect(store.has("annie-offline-owner")).toBe(false);
     expect(store.get("theme")).toBe("dark");
   });
 

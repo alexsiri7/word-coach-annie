@@ -219,15 +219,38 @@ export async function idbClear<S extends StoreName>(store: S): Promise<void> {
 }
 
 /**
- * Clear every store in one transaction (logout / account deletion).
+ * Clear every store in one transaction (logout / account deletion), or every
+ * store but the unsynced write queue when keepPendingOps is set.
  * Clears instead of deleteDatabase: a delete stays blocked while any tab or
  * the service worker holds an open connection, and those are never closed.
  */
-export async function clearOfflineData(): Promise<void> {
+export async function clearOfflineData({ keepPendingOps = false } = {}): Promise<void> {
     const db = await getDB();
-    const names = [...db.objectStoreNames];
+    const names = [...db.objectStoreNames].filter((s) => !(keepPendingOps && s === "pendingOps"));
     const tx = db.transaction(names, "readwrite");
     await Promise.all([...names.map((s) => tx.objectStore(s).clear()), tx.done]);
+}
+
+/** Delete one project's cached records (project, outline, scene text, annotations, story objects) in one transaction. */
+export async function deleteProjectData(projectId: string): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction(
+        ["projects", "structureNodes", "contentVersions", "storyObjects", "annotations"],
+        "readwrite"
+    );
+    const nodes = tx.objectStore("structureNodes");
+    const versions = tx.objectStore("contentVersions").index("by-nodeId");
+    const annotations = tx.objectStore("annotations").index("by-nodeId");
+    const storyObjects = tx.objectStore("storyObjects");
+
+    for (const nodeId of await nodes.index("by-projectId").getAllKeys(projectId)) {
+        for (const key of await versions.getAllKeys(nodeId)) await tx.objectStore("contentVersions").delete(key);
+        for (const key of await annotations.getAllKeys(nodeId)) await tx.objectStore("annotations").delete(key);
+        await nodes.delete(nodeId);
+    }
+    for (const key of await storyObjects.index("by-projectId").getAllKeys(projectId)) await storyObjects.delete(key);
+    await tx.objectStore("projects").delete(projectId);
+    await tx.done;
 }
 
 // ─── Pending Ops Helpers ────────────────────────────────────────────────────

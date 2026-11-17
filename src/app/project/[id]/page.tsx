@@ -28,13 +28,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { offlineFetch } from "@/lib/offline/sync-queue";
-import { idbGet } from "@/lib/offline/idb";
 import {
   cacheProjects,
   cacheStructureNodes,
   getCachedOutline,
+  getCachedProject,
   cacheStoryObjects,
   getCachedStoryObjects,
+  purgeCachedProject,
 } from "@/lib/offline/cache-reads";
 import {
   Dialog,
@@ -158,9 +159,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         const data = await res.json();
         setProject(data);
         cacheProjects([data]);
+      } else if (res.status === 403 || res.status === 404) {
+        purgeCachedProject(projectId);
       }
     } catch {
-      const cached = await idbGet("projects", projectId);
+      const cached = await getCachedProject(projectId);
       if (cached) {
         setProject(cached as unknown as Project);
         setFromCache(true);

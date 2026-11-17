@@ -58,3 +58,6 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, Record<string, string>> = 
 
 /** localStorage flag recording this browser's Sentry session-replay consent. */
 export const SENTRY_REPLAY_CONSENT_KEY = "consent:sentry_replay";
+
+/** localStorage key recording which signed-in user this device's offline cache belongs to. */
+export const OFFLINE_CACHE_OWNER_KEY = "annie-offline-owner";
