@@ -35,16 +35,20 @@ describe("telemetry", () => {
     await shutdownTelemetry();
   });
 
-  it("keeps ADK from copying message content into spans", async () => {
-    process.env.OTEL_ENABLED = "true";
-    process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS = "true";
-    const { initTelemetry, shutdownTelemetry } = await import(
-      "../lib/telemetry"
-    );
-    initTelemetry();
-    expect(process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS).toBe("false");
-    await shutdownTelemetry();
-  });
+  it.each([undefined, "true"])(
+    "disables ADK message-content capture in spans when OTEL_ENABLED is %s",
+    async (otelEnabled) => {
+      if (otelEnabled === undefined) delete process.env.OTEL_ENABLED;
+      else process.env.OTEL_ENABLED = otelEnabled;
+      delete process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS;
+      const { initTelemetry, shutdownTelemetry } = await import(
+        "../lib/telemetry"
+      );
+      initTelemetry();
+      expect(process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS).toBe("false");
+      await shutdownTelemetry();
+    },
+  );
 
   it("shutdownTelemetry is safe to call when not initialized", async () => {
     delete process.env.OTEL_ENABLED;
