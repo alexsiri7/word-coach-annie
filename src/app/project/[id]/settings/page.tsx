@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Save, Check, PenLine, FileText, BookOpen, Braces, Archive, ArchiveRestore, Trash2, AlertTriangle, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { useToast } from "@/components/ui/toast";
 import { downloadBlob } from "@/lib/download-blob";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const resolvedParams = use(params);
   const projectId = resolvedParams.id;
   const router = useRouter();
+  const { error: toastError } = useToast();
   const [project, setProject] = useState<ProjectSettings | null>(null);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -273,7 +275,8 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
 
   const handleUnarchive = async () => {
     setArchiving(true);
-    await offlineFetch(`/api/projects/${projectId}/archive`, { method: "DELETE" });
+    const unarchiveRes = await offlineFetch(`/api/projects/${projectId}/archive`, { method: "DELETE" });
+    if (!unarchiveRes.ok) toastError((await unarchiveRes.json().catch(() => null))?.error ?? "Failed to unarchive project.");
     const res = await fetch(`/api/projects/${projectId}`);
     const data = await res.json();
     setProject(data);

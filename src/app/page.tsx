@@ -23,6 +23,7 @@ import {
   ListTodo,
 } from "lucide-react";
 import { offlineFetch } from "@/lib/offline/sync-queue";
+import { useToast } from "@/components/ui/toast";
 import { downloadBlob } from "@/lib/download-blob";
 import { cacheProjects, getCachedProjects } from "@/lib/offline/cache-reads";
 import { SiteFooter } from "@/components/site-footer";
@@ -91,6 +92,7 @@ function formatWordCount(count: number) {
 /* ------------------------------------------------------------------ */
 export default function Dashboard() {
   const router = useRouter();
+  const { error: toastError } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -231,7 +233,8 @@ export default function Dashboard() {
   };
 
   const handleUnarchive = async (project: Project) => {
-    await offlineFetch(`/api/projects/${project.id}/archive`, { method: "DELETE" });
+    const res = await offlineFetch(`/api/projects/${project.id}/archive`, { method: "DELETE" });
+    if (!res.ok) toastError((await res.json().catch(() => null))?.error ?? "Failed to unarchive project.");
     fetchProjects();
   };
 
