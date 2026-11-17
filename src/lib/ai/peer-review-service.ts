@@ -179,7 +179,8 @@ export const MANUSCRIPT_EMPTY = "Manuscript is empty";
 export const AI_NOT_CONFIGURED = "AI not configured";
 
 // Per process: a second request for a project whose review is still running receives
-// that pending run instead of starting another. Not shared across replicas.
+// that pending run — run with the first caller's AI config — instead of starting another.
+// Not shared across replicas.
 const inFlightReviews = new Map<string, ReturnType<typeof executePeerReview>>();
 
 export function runPeerReview(projectId: string, userId?: string | null) {

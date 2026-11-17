@@ -283,6 +283,17 @@ describe("runPeerReview concurrency", () => {
     expect(prisma.peerReview.create).toHaveBeenCalledTimes(1);
   });
 
+  it("runs a joined review with the first caller's AI config, not the joiner's", async () => {
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1", "user-A");
+    const second = runPeerReview("proj-1", "user-B");
+    release();
+
+    await Promise.all([first, second]);
+    expect(getAiConfig).toHaveBeenCalledTimes(1);
+    expect(getAiConfig).toHaveBeenCalledWith("user-A");
+  });
+
   it("runs reviews for different projects independently", async () => {
     await Promise.all([runPeerReview("proj-1"), runPeerReview("proj-2")]);
     expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);

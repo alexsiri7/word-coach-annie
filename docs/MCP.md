@@ -1353,7 +1353,7 @@ Return stored peer review results for a project, newest first. Use `run_peer_rev
 | `projectId` | string | ID of the project |
 | `limit` | integer? | Max reviews to return (1–20, default 5) |
 
-Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy` (nullable — absent on reviews created before this field was added), and `consensus` fields.
+Returns a JSON array of `PeerReview` records ordered newest-first. Each record includes `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy` (nullable — absent on reviews created before this field was added), `actor` (nullable — absent on reviews created before this field was added), and `consensus` fields.
 
 ---
 
@@ -1364,7 +1364,7 @@ No parameters.
 
 Returns a JSON object mapping each persona ID (`review-editor`, `review-fan`, `review-author`, `review-comedy`, `review-actor`) to its `mode` and `lens` fields.
 
-**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author), [`review-comedy`](#review-comedy) prompts.
+**See also**: [`review-editor`](#review-editor), [`review-fan`](#review-fan), [`review-author`](#review-author), [`review-comedy`](#review-comedy), [`review-actor`](#review-actor) prompts.
 
 ---
 
@@ -1478,6 +1478,17 @@ Uses `export_manuscript` to load the full manuscript, then applies craft-level p
 Review manuscript as a TV comedy writer — comedy craft feedback on setup, payoff, timing, and character-specific humour.
 
 Uses `export_manuscript` to load the full manuscript, then applies a comedy-craft lens: does the setup plant exactly what the punchline needs, is the punchline inevitable-in-retrospect, is the humour character-specific or generic, does comic relief earn its place.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project ID to review |
+
+---
+
+#### `review-actor`
+Review manuscript as an acting coach — emotional truth, earned feeling, subtext, and whether emotional peaks have enough runway.
+
+Uses `export_manuscript` to load the full manuscript, then applies an acting-coach lens: is each emotion justified by its setup or merely declared, is the character's internal state legible without being stated, do subtext and text work together, do emotional peaks have enough runway, and is humour rooted in who the character is.
 
 | Param | Type | Description |
 |-------|------|-------------|
