@@ -1103,6 +1103,17 @@ List the project's existing Hashnode exports. Owner or editor.
 
 ## Writing Sessions
 
+### `POST /api/projects/[id]/sessions`
+Record a writing session. Owner only — sessions count toward the owner's heatmap, so editors cannot add them.
+
+**Body**: `{ nodeId?: string | null, startedAt?: string, endedAt?: string, wordsWritten?: number, durationSeconds?: number, date?: "YYYY-MM-DD" }`
+
+**Response**: `201` with the created session.
+
+**Errors**: `400` invalid body, or a `date`, `startedAt` or `endedAt` in the future (beyond five minutes of client clock skew; a `date` within that skew is stored as the server's current UTC day); `403` not the project owner; `404` project not found or `nodeId` from another project
+
+---
+
 ### `GET /api/sessions/heatmap`
 Get a 28-day activity heatmap (word counts per day).
 
