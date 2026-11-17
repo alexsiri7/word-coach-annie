@@ -12,8 +12,9 @@ export class ActiveProjectLimitError extends Error {
 
 /**
  * Throws ActiveProjectLimitError when `userId` already owns `maxActiveProjects`
- * unarchived projects. Call it inside the transaction that creates the project,
- * run at Serializable isolation, so concurrent creates cannot both pass the count.
+ * unarchived projects. Call it inside the transaction that creates or unarchives
+ * the project, run at Serializable isolation, so concurrent activations cannot
+ * both pass the count.
  * No userId (API_TOKEN/dev mode) means no limit.
  */
 export async function assertActiveProjectLimit(
