@@ -134,6 +134,7 @@ Business logic is separated into controller classes under `src/lib/controllers/`
 | `FocusController` | Focus mode scene context + related elements |
 | `GoogleAuthController` | Google OAuth flow + Docs export |
 | `WritingTaskController` | Writing task CRUD, completion tracking |
+| `ChatController` | Chat history, compaction trigger, system-prompt assembly and agent turns for `/api/chat` |
 
 ## AI Architecture
 
