@@ -911,7 +911,7 @@ Get current AI provider settings.
 
 **Response**: `{ baseUrl, apiKey, model, hasApiKey, scope: "user|global" }`
 
-For `scope: "user"`, `apiKey` is the caller's own key masked to its first and last 4 characters. For `scope: "global"`, `apiKey` is the fixed placeholder `"****"` when a shared key is configured (never derived from the key) and `""` otherwise. `PUT` returns the same shape.
+For `scope: "user"`, `apiKey` is the caller's own key masked to its first and last 4 characters (`"****"` if the key is 8 characters or fewer), or `""` if the caller has no key of their own saved. For `scope: "global"`, `apiKey` is the fixed placeholder `"****"` when a shared key is configured (never derived from the key) and `""` otherwise. `PUT` returns the same shape.
 
 ---
 
