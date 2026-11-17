@@ -59,14 +59,14 @@ export function escapeMarkdown(input: string): string {
 }
 
 /**
- * Insert a zero-width space after every `@`, `#`, the `:` of `://` and a `www`
- * before `.`, so GitHub cannot turn the text into @mentions (which notify
- * people), #N references, or autolinked URLs (a full issue or pull request URL
- * is also a cross-reference). A backslash escape does not stop these: GitHub
+ * Insert a zero-width space after every `@`, `#`, the `GH` of `GH-<number>`,
+ * the `:` of `://` and a `www` before `.`, so GitHub cannot turn the text into
+ * @mentions (which notify people), #N or GH-N references, or autolinked URLs
+ * (a full issue or pull request URL is also a cross-reference). A backslash escape does not stop these: GitHub
  * links them in rendered text.
  */
 export function neutralizeGitHubReferences(input: string): string {
-  return input.replace(/[@#]|:(?=\/\/)|\bwww(?=\.)/gi, "$&\u200B");
+  return input.replace(/[@#]|:(?=\/\/)|\bwww(?=\.)|\bgh(?=-\d)/gi, "$&\u200B");
 }
 
 /**

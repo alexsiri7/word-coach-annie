@@ -138,6 +138,12 @@ describe("neutralizeGitHubReferences", () => {
         );
     });
 
+    it("breaks the GH-N alias for #N", () => {
+        expect(neutralizeGitHubReferences("GH-12 and gh-3, not GHz-1 or GH-x")).toBe(
+            "GH\u200B-12 and gh\u200B-3, not GHz-1 or GH-x"
+        );
+    });
+
     it("breaks URL autolinks so a full issue URL is no cross-reference", () => {
         expect(
             neutralizeGitHubReferences("https://github.com/o/r/issues/12 or WWW.github.com")
