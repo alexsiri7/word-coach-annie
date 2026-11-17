@@ -438,6 +438,21 @@ describe("proxy", () => {
             expect(res.status).toBe(403);
             expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
         });
+
+        it("does not spend rate-limit quota on refused requests", async () => {
+            for (let i = 0; i < 70; i++) {
+                const refused = await proxy(createRequest("/api/account/api-tokens", {
+                    method: "POST",
+                    headers: { authorization: "Bearer mcp-token" },
+                }));
+                expect(refused.status).toBe(403);
+            }
+            const res = await proxy(createRequest("/api/mcp", {
+                method: "POST",
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
     });
 
     describe("identity header stripping (SEC-03)", () => {

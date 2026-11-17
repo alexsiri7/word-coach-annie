@@ -26,7 +26,7 @@ Every request outside a public set — health check, sign-in and sign-out, landi
 
 ### Requirement: MCP OAuth tokens reach only the MCP endpoint
 
-An MCP OAuth access token SHALL act as its user only on the MCP endpoint, and SHALL be refused with 403 on every other route.
+An MCP OAuth access token SHALL act as its user only on the MCP endpoint, and SHALL be refused with 403 on every other route, except the metrics endpoint, which refuses every bearer other than the API token with 401.
 
 #### Scenario: MCP client calls an account route
 - GIVEN an MCP client the user approved
