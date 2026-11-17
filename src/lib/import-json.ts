@@ -239,14 +239,16 @@ export async function importProjectJson(
     }
 
     // 6. Create relationships, skipping any whose from or to side doesn't
-    // resolve to a node or object in this import
+    // resolve to exactly one node or object in this import (the same shape
+    // RelationshipCreateSchema enforces on the live route)
     const resolve = (map: Map<string, string>, id: string | null) => (id ? map.get(id) ?? null : null);
+    const exactlyOne = (nodeId: string | null, objectId: string | null) => !nodeId !== !objectId;
     for (const rel of data.relationships) {
       const fromNodeId = resolve(nodeIdMap, rel.fromNodeId);
       const fromObjectId = resolve(objectIdMap, rel.fromObjectId);
       const toNodeId = resolve(nodeIdMap, rel.toNodeId);
       const toObjectId = resolve(objectIdMap, rel.toObjectId);
-      if (!(fromNodeId || fromObjectId) || !(toNodeId || toObjectId)) continue;
+      if (!exactlyOne(fromNodeId, fromObjectId) || !exactlyOne(toNodeId, toObjectId)) continue;
       await tx.relationship.create({
         data: {
           type: rel.type,

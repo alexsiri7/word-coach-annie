@@ -114,7 +114,7 @@ describe("importProjectJson", () => {
         {
           id: "cv1",
           nodeId: "sc1",
-          content: "<p>Hello world</p>",
+          content: "<script>spam spam spam</script><p>Hello world</p>",
           wordCount: 999_999,
         },
       ],
@@ -253,7 +253,7 @@ describe("importProjectJson", () => {
     expect(rels[0].type).toBe("PARTNER");
   });
 
-  it("skips relationships whose endpoints are not in the import", async () => {
+  it("skips relationships whose endpoints are not exactly one node or object in the import", async () => {
     const holmes = {
       id: "char1",
       type: "CHARACTER",
@@ -265,6 +265,17 @@ describe("importProjectJson", () => {
     };
     const data = {
       ...minimalExport,
+      structureNodes: [
+        {
+          id: "sc1",
+          parentId: null,
+          type: "SCENE",
+          title: "Scene 1",
+          synopsis: "",
+          status: "DRAFT",
+          orderIndex: 0,
+        },
+      ],
       storyObjects: [holmes],
       relationships: [
         {
@@ -282,6 +293,15 @@ describe("importProjectJson", () => {
           label: "",
           fromObjectId: "missing",
           fromNodeId: "also-missing",
+          toObjectId: "char1",
+          toNodeId: null,
+        },
+        {
+          id: "rel3",
+          type: "PARTNER",
+          label: "",
+          fromObjectId: "char1",
+          fromNodeId: "sc1",
           toObjectId: "char1",
           toNodeId: null,
         },
