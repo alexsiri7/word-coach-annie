@@ -1335,13 +1335,13 @@ Returns `{ candidate: OpportunityCandidate, submission: ContestSubmission }`.
 ### Peer Review
 
 #### `run_peer_review`
-Trigger a full peer review of a project. Runs **five** AI reviewer personas in parallel — an acquisitions editor, an enthusiastic reader, a published novelist, an acting coach, and a TV comedy writer — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
+Trigger a full peer review of a project. Runs **five** AI reviewer personas in parallel — an acquisitions editor, a fan reader, a peer author, an acting coach, and a TV comedy writer, each using the lens returned by `get_peer_review_prompts` — then synthesises their feedback into a consensus. Results are stored and returned as a `PeerReview` record. Equivalent to clicking **Peer Review** in the web UI.
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `projectId` | string | ID of the project to review |
 
-Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy`, `actor`, and `consensus` fields. If a peer review is already running for the project, the in-progress run is returned instead of starting another. If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
+Returns the newly created `PeerReview` record with `id`, `projectId`, `createdAt`, `publisher`, `reader`, `writer`, `comedy`, `actor`, and `consensus` fields. If a peer review is already running for the project, the in-progress run is returned instead of starting another (within one server process only, not across replicas; the run uses the AI config of the request that started it). If synthesis fails (e.g. rate-limit), the response also includes a `consensusError` string and `consensus` falls back to a default placeholder.
 
 ---
 

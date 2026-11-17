@@ -10,7 +10,7 @@ export const getPeerReviewPromptsSpec = defineTool({
 
 export const runPeerReviewSpec = defineTool({
     name: "run_peer_review",
-    description: "Trigger a full peer review of the project — five reviewer personas (acquisitions editor, fan reader, peer author, acting coach, comedy writer) read it in parallel, then a consensus is synthesised and the result is stored. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record; if a peer review is already running for this project, returns that run's record instead of starting another.",
+    description: "Trigger a full peer review of the project — five reviewer personas (acquisitions editor, fan reader, peer author, acting coach, comedy writer) read it in parallel, then a consensus is synthesised and the result is stored. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record; if a peer review is already running for this project, returns that run's record instead of starting another (within one server process only, not across replicas; the run uses the AI config of the request that started it).",
     destructive: false,
     parameters: z.object({ projectId: z.string() }),
 });

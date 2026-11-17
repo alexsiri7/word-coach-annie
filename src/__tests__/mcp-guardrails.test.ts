@@ -4,7 +4,7 @@ import { resolve } from "path";
 import { z } from "zod";
 import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "../lib/ai/annie-voice";
 import { writeSceneContentSpec, updateParagraphSpec } from "../lib/ai/tool-catalog/structure";
-import { getPeerReviewsSpec } from "../lib/ai/tool-catalog/peer-review";
+import { getPeerReviewsSpec, runPeerReviewSpec } from "../lib/ai/tool-catalog/peer-review";
 
 const read = (path: string) => readFileSync(resolve(__dirname, path), "utf-8");
 const readDir = (dir: string) =>
@@ -276,8 +276,8 @@ describe("run_peer_review and get_peer_reviews tools", () => {
     });
 
     it("run_peer_review description names all five personas", () => {
-        expect(runSection).toContain("acting coach");
-        expect(runSection).not.toContain("four agents");
+        expect(runPeerReviewSpec.description).toContain("acting coach");
+        expect(runPeerReviewSpec.description).not.toContain("four agents");
     });
 
     it("get_peer_reviews clamps limit with Math.min(Math.max(...))", () => {

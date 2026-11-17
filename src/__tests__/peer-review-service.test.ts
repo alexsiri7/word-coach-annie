@@ -29,6 +29,9 @@ vi.mock("@/lib/db", () => ({
     peerReview: {
       create: vi.fn(),
     },
+    project: {
+      findUniqueOrThrow: vi.fn(),
+    },
   },
 }));
 
@@ -38,6 +41,7 @@ import { exportManuscript } from "@/mcp/tools/export";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
+import { REVIEW_PERSONAS } from "@/lib/review-personas";
 
 const DEFAULT_SAVED = {
   id: "rev-1",
@@ -66,6 +70,7 @@ describe("runPeerReview", () => {
       })
     );
     vi.mocked(prisma.peerReview.create).mockResolvedValue(DEFAULT_SAVED as never);
+    vi.mocked(prisma.project.findUniqueOrThrow).mockResolvedValue({ title: "Test Novel" } as never);
   });
 
   it("throws when manuscript is empty", async () => {
@@ -112,6 +117,15 @@ describe("runPeerReview", () => {
       expect(arg.systemPrompt).not.toBe("");
       expect(arg.userMessage).toContain("<manuscript>");
     }
+  });
+
+  it("builds every reviewer's system prompt from the shared persona lens", async () => {
+    await runPeerReview("proj-1");
+    const systemPrompts = vi.mocked(runSimpleCompletion).mock.calls.slice(0, 5).map(([arg]) => arg.systemPrompt);
+    const lenses = ["review-editor", "review-fan", "review-author", "review-comedy", "review-actor"].map((id) =>
+      REVIEW_PERSONAS[id].lens("Test Novel")
+    );
+    expect(systemPrompts.map((prompt, i) => prompt?.startsWith(lenses[i]))).toEqual([true, true, true, true, true]);
   });
 
   it("synthesis call uses only userMessage with no systemPrompt", async () => {
@@ -258,6 +272,7 @@ describe("runPeerReview concurrency", () => {
     vi.mocked(exportManuscript).mockResolvedValue("Once upon a time in a land far away...");
     vi.mocked(runSimpleCompletion).mockResolvedValue(JSON.stringify(DEFAULT_SAVED.publisher));
     vi.mocked(prisma.peerReview.create).mockResolvedValue(DEFAULT_SAVED as never);
+    vi.mocked(prisma.project.findUniqueOrThrow).mockResolvedValue({ title: "Test Novel" } as never);
   });
 
   function holdManuscriptExport() {
