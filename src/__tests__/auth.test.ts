@@ -476,6 +476,7 @@ describe("isAllowedRedirect", () => {
         expect(isAllowedRedirect("//evil.com")).toBe(false);
         expect(isAllowedRedirect("javascript:alert(1)")).toBe(false);
         expect(isAllowedRedirect("/\\evil.com")).toBe(false);
+        expect(isAllowedRedirect("/%09/evil.com")).toBe(false);
         expect(isAllowedRedirect("/path?redirect=http://evil.com")).toBe(false);
     });
 
