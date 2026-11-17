@@ -2,7 +2,7 @@
 
 All endpoints are REST JSON APIs under `/api/`. Requests that modify data require authentication when `API_TOKEN` is set (see [SETUP.md](SETUP.md)).
 
-**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. When Google sign-in is configured, `API_TOKEN` is accepted only by `GET /api/metrics`; use a Google session, a personal API token or MCP OAuth. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`; a `mark-sent` token reaches only `POST /api/projects/:id/snapshot-annotations/sent`.
+**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. When Google sign-in is configured, `API_TOKEN` is accepted only by `GET /api/metrics`; use a Google session, a personal API token or MCP OAuth. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`; a `mark-sent` token reaches only `POST /api/projects/:id/snapshot-annotations/sent`. An MCP OAuth access token (from the `/oauth/*` flow) reaches only `/api/mcp`; other authenticated routes refuse it with 403.
 
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 

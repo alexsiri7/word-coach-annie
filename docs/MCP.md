@@ -32,6 +32,8 @@ Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for detai
 
 Over HTTP, `/api/mcp` acts as a user, so each request needs a credential that carries one: an MCP OAuth access token (from the `/oauth/*` flow), a signed-in session, or a personal API token. The shared `API_TOKEN` bearer carries no user, so `/api/mcp` refuses it while auth is enabled; it is only useful with auth disabled for local development. The stdio server needs no credential.
 
+An MCP OAuth access token reaches only `/api/mcp`; any other authenticated route refuses it with 403 `MCP access tokens can only access the MCP endpoint`.
+
 #### Personal API tokens
 
 For another app's backend (for example a game's scene editor), create a token in **Settings → API tokens** and send `Authorization: Bearer annie_pat_…` to `POST /api/mcp`. The server then registers only the scene tools the token's scope allows:
