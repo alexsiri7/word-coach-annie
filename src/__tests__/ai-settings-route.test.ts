@@ -5,9 +5,11 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/db", () => ({
   prisma: {
     aiSettings: {
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
     userAiSettings: {
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
   },
@@ -29,10 +31,11 @@ vi.mock("@/lib/logger", () => ({
   logger: {
     error: vi.fn(),
     info: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
-import { PUT } from "@/app/api/ai-settings/route";
+import { GET, PUT } from "@/app/api/ai-settings/route";
 import { prisma } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
@@ -45,6 +48,57 @@ function makePutRequest(body: Record<string, unknown>, userId?: string): NextReq
     body: JSON.stringify(body),
   });
 }
+
+const SHARED_KEY = "AIzaSharedSecret1234";
+
+function makeGetRequest(userId?: string): NextRequest {
+  vi.mocked(getCurrentUserId).mockReturnValue(userId ?? null);
+  return new NextRequest("http://localhost:3000/api/ai-settings");
+}
+
+function expectNoSharedKeyChars(apiKey: string) {
+  expect(apiKey).toBe("****");
+  expect(apiKey).not.toContain(SHARED_KEY.slice(0, 4));
+  expect(apiKey).not.toContain(SHARED_KEY.slice(-4));
+}
+
+describe("GET /api/ai-settings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.aiSettings.findUnique).mockResolvedValue({
+      id: "default",
+      apiKey: `enc:${SHARED_KEY}`,
+      model: "global-model",
+    } as never);
+  });
+
+  it.each([
+    ["an unauthenticated caller", undefined],
+    ["a user without their own settings", "user-123"],
+  ])("reveals no characters of the shared key to %s", async (_label, userId) => {
+    vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue(null);
+
+    const data = await (await GET(makeGetRequest(userId))).json();
+
+    expect(data.scope).toBe("global");
+    expect(data.hasApiKey).toBe(true);
+    expectNoSharedKeyChars(data.apiKey);
+  });
+
+  it("still masks a user's own key with its first and last 4 characters", async () => {
+    vi.mocked(prisma.userAiSettings.findUnique).mockResolvedValue({
+      id: "u1",
+      userId: "user-123",
+      apiKey: "enc:AIzaUserOwnKey9876",
+      model: "user-model",
+    } as never);
+
+    const data = await (await GET(makeGetRequest("user-123"))).json();
+
+    expect(data.scope).toBe("user");
+    expect(data.apiKey).toBe("AIza...9876");
+  });
+});
 
 describe("PUT /api/ai-settings", () => {
   beforeEach(() => {
@@ -153,6 +207,20 @@ describe("PUT /api/ai-settings", () => {
     const data = await res.json();
     expect(data.scope).toBe("global");
     expect(prisma.userAiSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("reveals no characters of the shared key after saving it", async () => {
+    vi.mocked(prisma.aiSettings.upsert).mockResolvedValue({
+      id: "default",
+      apiKey: `enc:${SHARED_KEY}`,
+      model: "",
+    } as never);
+
+    const data = await (await PUT(makePutRequest({ apiKey: SHARED_KEY }))).json();
+
+    expect(data.scope).toBe("global");
+    expect(data.hasApiKey).toBe(true);
+    expectNoSharedKeyChars(data.apiKey);
   });
 
   it.each([
