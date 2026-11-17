@@ -56,7 +56,7 @@ function createServer(options?: McpServerOptions): McpServer {
     registerCoachingTools(ctx);
     registerSkillTools(ctx);
     // A personal token's surface is its scope's scene tools only, so its server registers no prompts.
-    if (!ctx.allowedTools) registerPrompts(server);
+    if (!ctx.allowedTools) registerPrompts(server, ctx.userId);
 
     return server;
 }

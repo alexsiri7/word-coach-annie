@@ -5,6 +5,7 @@ import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
 import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
 import { getSceneFocus } from "@/mcp/tools/coaching";
+import { assertProjectOwner as verifyProjectOwnership, projectIdForNode } from "@/lib/ownership";
 
 type SceneFocus = Awaited<ReturnType<typeof getSceneFocus>>;
 
@@ -47,7 +48,7 @@ function buildReviewPrompt(projectId: string, mode: string, lens: string) {
     };
 }
 
-export function registerPrompts(server: McpServer): void {
+export function registerPrompts(server: McpServer, userId: string | null): void {
     server.prompt(
         "scene-coaching",
         "Status-aware coaching for a scene. Adapts review approach based on whether the scene is OUTLINE, DRAFT, REVISED, or FINAL — each stage gets different coaching focus.",
@@ -121,6 +122,7 @@ Structure your response as:
             projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
         },
         async (args) => {
+            await verifyProjectOwnership(await projectIdForNode(args.sceneId), userId);
             const focus = await getSceneFocus(args.sceneId);
             const status = focus.scene.status as string;
             const projectId = args.projectId || focus.scene.projectId;
@@ -165,6 +167,7 @@ Structure your response as:
             projectId: z.string().optional().describe("The project ID (auto-detected from scene if omitted)"),
         },
         async (args) => {
+            await verifyProjectOwnership(await projectIdForNode(args.sceneId), userId);
             const focus = await getSceneFocus(args.sceneId);
             const projectId = args.projectId || focus.scene.projectId;
             const skill = loadSkill("scene-drafting-assistant");
