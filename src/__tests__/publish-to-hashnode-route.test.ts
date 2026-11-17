@@ -8,6 +8,7 @@ import { UpstreamServiceError } from "@/lib/controllers/errors";
 
 vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => "test-user-id"),
+  verifyProjectAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
 }));
 
