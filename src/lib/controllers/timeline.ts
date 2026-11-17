@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { StructureNode, StoryObject, Relationship } from "@/lib/types";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export interface TimelineData {
     scenes: StructureNode[];
@@ -9,12 +10,18 @@ export interface TimelineData {
 
 export class TimelineController {
 
-    static async getTimelineData(projectId: string): Promise<TimelineData> {
+    static async getTimelineData(
+        projectId: string,
+        { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
+    ): Promise<TimelineData> {
         // 1. Fetch all structure nodes for the project to rebuild hierarchy
-        const allNodes = await prisma.structureNode.findMany({
+        const projectNodes = await prisma.structureNode.findMany({
             where: { projectId },
             orderBy: { orderIndex: "asc" },
         });
+        const allNodes = excludeOutlineScenes
+            ? projectNodes.filter((n) => !isHiddenOutlineScene(n))
+            : projectNodes;
 
         // 2. Build tree and flatten scenes in order
         const nodeMap = new Map<string, StructureNode>();

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
-import { UserFacingError } from "@/lib/controllers/errors";
+import { ForbiddenError, UserFacingError } from "@/lib/controllers/errors";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 // ─── Plot Thread Status ─────────────────────────────────────────────────────
 
@@ -104,18 +105,25 @@ export async function getPlotThreadStatus(projectId: string): Promise<ScenePlotT
 
 // ─── Scene Focus ─────────────────────────────────────────────────────────────
 
-export async function getSceneFocus(sceneId: string) {
+export async function getSceneFocus(
+  sceneId: string,
+  { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
+) {
   const scene = await prisma.structureNode.findUnique({
     where: { id: sceneId },
     include: { project: { select: { title: true, id: true } } },
   });
   if (!scene) throw new UserFacingError("Scene not found");
+  if (excludeOutlineScenes && isHiddenOutlineScene(scene)) throw new ForbiddenError("Forbidden");
 
-  const siblings = await prisma.structureNode.findMany({
+  const projectScenes = await prisma.structureNode.findMany({
     where: { projectId: scene.projectId, type: "SCENE" },
     orderBy: [{ parent: { orderIndex: "asc" } }, { orderIndex: "asc" }],
-    select: { id: true, title: true, orderIndex: true, status: true, parent: { select: { title: true } } },
+    select: { id: true, type: true, title: true, orderIndex: true, status: true, parent: { select: { title: true } } },
   });
+  const siblings = excludeOutlineScenes
+    ? projectScenes.filter((s) => !isHiddenOutlineScene(s))
+    : projectScenes;
 
   const currentIndex = siblings.findIndex((s) => s.id === sceneId);
   const prevScene = currentIndex > 0 ? siblings[currentIndex - 1] : null;

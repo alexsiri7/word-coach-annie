@@ -18,6 +18,14 @@ export function isHiddenOutlineScene(node: { type: string; status: string }): bo
     return node.type === "SCENE" && node.status === "OUTLINE";
 }
 
+export async function isHiddenOutlineSceneId(nodeId: string): Promise<boolean> {
+    const node = await prisma.structureNode.findUnique({
+        where: { id: nodeId },
+        select: { type: true, status: true },
+    });
+    return node !== null && isHiddenOutlineScene(node);
+}
+
 export async function buildOutlineTree(
     projectId: string,
     { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
