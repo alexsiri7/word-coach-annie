@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
-import { UserFacingError } from "@/lib/controllers/errors";
+import { ForbiddenError, UserFacingError } from "@/lib/controllers/errors";
 import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 // ─── Plot Thread Status ─────────────────────────────────────────────────────
@@ -114,6 +114,7 @@ export async function getSceneFocus(
     include: { project: { select: { title: true, id: true } } },
   });
   if (!scene) throw new UserFacingError("Scene not found");
+  if (excludeOutlineScenes && isHiddenOutlineScene(scene)) throw new ForbiddenError("Forbidden");
 
   const projectScenes = await prisma.structureNode.findMany({
     where: { projectId: scene.projectId, type: "SCENE" },
