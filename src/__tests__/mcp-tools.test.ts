@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
 import * as structureTools from "@/mcp/tools/structure";
@@ -207,6 +207,30 @@ describe("MCP Structure Tools", () => {
             { type: "CONTENT", content: "<p>More text</p>" }
         ], contentHash);
         expect(result.wordCount).toBeGreaterThan(0);
+    });
+
+    describe.each([
+        ["updateParagraph", (id: string) => structureTools.updateParagraph(id, 0, "<p>Edited</p>")],
+        ["insertBeat", (id: string) => structureTools.insertBeat(id, 0, "New beat")],
+        ["deleteBeat", (id: string) => structureTools.deleteBeat(id, 1)],
+    ])("%s racing an editor autosave", (_name, edit) => {
+        it("rejects instead of overwriting the autosave that landed after its read", async () => {
+            const scene = await structureTools.createNode({ projectId, type: "SCENE", title: "S1" });
+            await StructureController.writeSceneContent(scene.id, "<p>Draft</p><!-- beat: Beat -->");
+            const autosave = "<p>Autosaved</p><!-- beat: Beat -->";
+            const realRead = StructureController.readSceneContent.bind(StructureController);
+            const readSpy = vi.spyOn(StructureController, "readSceneContent").mockImplementationOnce(async (id) => {
+                const seen = await realRead(id);
+                await StructureController.writeSceneContent(id, autosave);
+                return seen;
+            });
+            try {
+                await expect(edit(scene.id)).rejects.toThrow(StaleWriteError);
+            } finally {
+                readSpy.mockRestore();
+            }
+            expect((await StructureController.readSceneContent(scene.id)).content).toBe(autosave);
+        });
     });
 
     it("writeSceneContent sanitizes markup before storing it", async () => {

@@ -1,7 +1,7 @@
-import { StructureController, type OutlineNode } from "@/lib/controllers/structure";
+import { StructureController, ConflictError, type OutlineNode } from "@/lib/controllers/structure";
 import { trace } from "@opentelemetry/api";
 import { mcpCache } from "@/lib/cache";
-import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
+import { computeContentHash, verifyContentHash, StaleWriteError } from "@/mcp/content-hash";
 import { UserFacingError } from "@/lib/controllers/errors";
 
 /** Invalidate caches affected by structure/content changes. */
@@ -168,17 +168,45 @@ export async function readSceneContent(nodeId: string) {
     };
 }
 
+/**
+ * Scene writes hand their `contentHash` to the controller, whose staleness
+ * check runs under the scene lock, so a concurrent write (editor autosave or
+ * another MCP call) can't land between the check and this write's insert.
+ */
+async function commitSceneWrite<T>(nodeId: string, write: () => Promise<T>): Promise<T> {
+    let result: T;
+    try {
+        result = await write();
+    } catch (e) {
+        if (e instanceof ConflictError) throw new StaleWriteError("read_scene_content");
+        throw e;
+    }
+    mcpCache.delete(`sceneContent:${nodeId}`);
+    invalidateStructureCaches();
+    return result;
+}
+
+/**
+ * Edit tools write the whole scene back, so `readHash` (the hash of the full
+ * content they read) is what must still be current when the write lands, not
+ * just the edited paragraph.
+ */
+async function readSceneForEdit(nodeId: string, sceneContentHash?: string) {
+    const current = await StructureController.readSceneContent(nodeId);
+    const readHash = computeContentHash(current.content);
+    if (sceneContentHash !== undefined) {
+        verifyContentHash(sceneContentHash, readHash, "read_scene_content");
+    }
+    return { blocks: current.blocks, readHash };
+}
+
 async function resolveParagraphForEdit(
     nodeId: string,
     index: number,
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
-    const current = await StructureController.readSceneContent(nodeId);
-    if (sceneContentHash !== undefined) {
-        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
-    }
-    const blocks = current.blocks;
+    const { blocks, readHash } = await readSceneForEdit(nodeId, sceneContentHash);
     const flat = flattenBlocksToParagraphs(blocks);
     if (index < 0 || index >= flat.length) {
         throw new UserFacingError(`Paragraph index ${index} out of range (0–${flat.length - 1})`);
@@ -188,7 +216,7 @@ async function resolveParagraphForEdit(
         const expected = computeContentHash(String(index), entry.type, entry.content);
         verifyContentHash(paragraphContentHash, expected, "read_scene_content");
     }
-    return { blocks, entry };
+    return { blocks, entry, readHash };
 }
 
 export async function updateParagraph(
@@ -198,7 +226,7 @@ export async function updateParagraph(
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
-    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
+    const { blocks, entry, readHash } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
     if (entry.type === "BEAT") {
         blocks[entry.blockIndex] = { type: "BEAT", content };
     } else {
@@ -216,10 +244,7 @@ export async function updateParagraph(
             blocks[entry.blockIndex] = { type: "CONTENT", content: before + content + after };
         }
     }
-    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
-    mcpCache.delete(`sceneContent:${nodeId}`);
-    invalidateStructureCaches();
-    return result;
+    return writeSceneContentFromBlocks(nodeId, blocks, readHash);
 }
 
 export async function deleteBeat(
@@ -228,15 +253,12 @@ export async function deleteBeat(
     paragraphContentHash?: string,
     sceneContentHash?: string,
 ) {
-    const { blocks, entry } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
+    const { blocks, entry, readHash } = await resolveParagraphForEdit(nodeId, index, paragraphContentHash, sceneContentHash);
     if (entry.type !== "BEAT") {
         throw new UserFacingError(`Paragraph ${index} is prose, not a beat — delete_beat only removes beats`);
     }
     blocks.splice(entry.blockIndex, 1);
-    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
-    mcpCache.delete(`sceneContent:${nodeId}`);
-    invalidateStructureCaches();
-    return result;
+    return writeSceneContentFromBlocks(nodeId, blocks, readHash);
 }
 
 export async function insertBeat(
@@ -245,11 +267,7 @@ export async function insertBeat(
     beatContent: string,
     sceneContentHash?: string,
 ) {
-    const current = await StructureController.readSceneContent(nodeId);
-    if (sceneContentHash !== undefined) {
-        verifyContentHash(sceneContentHash, computeContentHash(current.content), "read_scene_content");
-    }
-    const blocks = current.blocks;
+    const { blocks, readHash } = await readSceneForEdit(nodeId, sceneContentHash);
     const flat = flattenBlocksToParagraphs(blocks);
     const totalParagraphs = flat.length;
     // afterParagraphIndex of -1 means "insert at the very beginning"
@@ -283,21 +301,11 @@ export async function insertBeat(
             blocks.splice(entry.blockIndex, 1, ...replacement);
         }
     }
-    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
-    mcpCache.delete(`sceneContent:${nodeId}`);
-    invalidateStructureCaches();
-    return result;
+    return writeSceneContentFromBlocks(nodeId, blocks, readHash);
 }
 
 export async function writeSceneContent(nodeId: string, content: string, contentHash?: string) {
-    if (contentHash !== undefined) {
-        const current = await StructureController.readSceneContent(nodeId);
-        verifyContentHash(contentHash, computeContentHash(current.content), "read_scene_content");
-    }
-    const result = await StructureController.writeSceneContent(nodeId, content);
-    mcpCache.delete(`sceneContent:${nodeId}`);
-    invalidateStructureCaches();
-    return result;
+    return commitSceneWrite(nodeId, () => StructureController.writeSceneContent(nodeId, content, contentHash));
 }
 
 export async function writeSceneContentFromBlocks(
@@ -305,14 +313,8 @@ export async function writeSceneContentFromBlocks(
     blocks: { type: "CONTENT" | "BEAT"; content: string }[],
     contentHash?: string
 ) {
-    if (contentHash !== undefined) {
-        const current = await StructureController.readSceneContent(nodeId);
-        verifyContentHash(contentHash, computeContentHash(current.content), "read_scene_content");
-    }
-    const result = await StructureController.writeSceneContentFromBlocks(nodeId, blocks);
-    mcpCache.delete(`sceneContent:${nodeId}`);
-    invalidateStructureCaches();
-    return result;
+    return commitSceneWrite(nodeId, () =>
+        StructureController.writeSceneContentFromBlocks(nodeId, blocks, contentHash));
 }
 
 export async function getSceneVersions(nodeId: string, limit: number = 20) {

@@ -509,7 +509,7 @@ export class StructureController {
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
                     where: { nodeId },
-                    orderBy: { createdAt: "desc" },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                     select: { content: true },
                 });
                 if (latest) {
@@ -539,9 +539,9 @@ export class StructureController {
         };
     }
 
-    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[]) {
+    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[], contentHash?: string | null) {
         const content = StructureController.serializeSceneContent(blocks);
-        return StructureController.writeSceneContent(nodeId, content);
+        return StructureController.writeSceneContent(nodeId, content, contentHash);
     }
 
     static async getSceneVersions(nodeId: string, limit: number = 20) {
