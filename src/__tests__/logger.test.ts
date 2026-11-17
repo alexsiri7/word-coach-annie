@@ -56,6 +56,31 @@ describe("logger", () => {
         expect(output.error).toEqual({ code: 42, reason: "timeout" });
     });
 
+    it("redacts manuscript-derived and upstream body fields from console output", () => {
+        logger.error("AI response parse failed", {
+            projectId: "p1",
+            rawContent: "She walked into the rain",
+            upstream: { status: 502, body: "<html>Bad gateway</html>" },
+        });
+        const line = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("She walked into the rain");
+        expect(line).not.toContain("Bad gateway");
+        expect(JSON.parse(line).error).toEqual({
+            projectId: "p1",
+            rawContent: "[REDACTED]",
+            upstream: { status: 502, body: "[REDACTED]" },
+        });
+    });
+
+    it("masks emails in console messages and Error details", () => {
+        logger.warn("lookup for jane@example.com failed", new Error("no user jane@example.com"));
+        const line = (console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("jane@example.com");
+        const output = JSON.parse(line);
+        expect(output.message).toBe("lookup for [EMAIL] failed");
+        expect(output.error.message).toBe("no user [EMAIL]");
+    });
+
     it("omits error field when no metadata provided", () => {
         logger.info("clean");
         const output = JSON.parse((console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]);

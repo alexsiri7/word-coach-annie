@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { maskEmails, redact } from "./redact";
 
 type LogLevel = "error" | "warn" | "info";
 
@@ -6,14 +7,14 @@ function formatLog(level: LogLevel, message: string, meta?: unknown): void {
   const entry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     level,
-    message,
+    message: maskEmails(message),
   };
 
   if (meta !== undefined) {
     entry.error =
       meta instanceof Error
-        ? { message: meta.message, stack: meta.stack }
-        : meta;
+        ? { message: maskEmails(meta.message), stack: meta.stack && maskEmails(meta.stack) }
+        : redact(meta);
   }
 
   const json = JSON.stringify(entry);
