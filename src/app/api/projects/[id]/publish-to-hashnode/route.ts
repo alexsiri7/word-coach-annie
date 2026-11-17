@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUserId, verifyProjectWriteAccess } from '@/lib/api-auth';
+import { getCurrentUserId, verifyProjectAccess, verifyProjectWriteAccess } from '@/lib/api-auth';
 import { HashnodePublishController } from '@/lib/controllers/hashnode-publish';
 import { HashnodeNotConnectedError } from '@/lib/controllers/hashnode-auth';
 import { UpstreamServiceError } from '@/lib/controllers/errors';
@@ -14,6 +14,9 @@ import { logger } from '@/lib/logger';
  *   tags?: string[],
  *   canonicalUrl?: string
  * }
+ *
+ * Owner-only: the post goes to the caller's own Hashnode account, so an editor
+ * must not be able to publish the owner's manuscript to their blog.
  */
 export async function POST(
     request: NextRequest,
@@ -22,7 +25,7 @@ export async function POST(
     try {
         const { id } = await params;
         const userId = getCurrentUserId(request);
-        const access = await verifyProjectWriteAccess(id, userId, request.headers.get('x-user-email'));
+        const access = await verifyProjectAccess(id, userId);
         if (!access.authorized) return access.response;
 
         const body = await request.json();

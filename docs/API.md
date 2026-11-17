@@ -907,9 +907,11 @@ Event shapes:
 ## AI Settings
 
 ### `GET /api/ai-settings`
-Get current AI provider settings. Returns masked API key.
+Get current AI provider settings.
 
-**Response**: `{ baseUrl, apiKey (masked), model, hasApiKey, scope: "user|global" }`
+**Response**: `{ baseUrl, apiKey, model, hasApiKey, scope: "user|global" }`
+
+For `scope: "user"`, `apiKey` is the caller's own key masked to its first and last 4 characters (`"****"` if the key is 8 characters or fewer), or `""` if the caller has no key of their own saved. For `scope: "global"`, `apiKey` is the fixed placeholder `"****"` when a shared key is configured (never derived from the key) and `""` otherwise. `PUT` returns the same shape.
 
 ---
 
@@ -1078,6 +1080,24 @@ Connect a Hashnode account with an API access token.
 Disconnect the Hashnode account (removes stored credential).
 
 **Response**: `{ ok: true }`
+
+---
+
+### `POST /api/projects/[id]/publish-to-hashnode`
+Publish the project, or one node of it, to the caller's connected Hashnode account. Re-publishing updates the existing post.
+
+**Auth**: Project owner only.
+
+**Body**: `{ nodeId?: string, titleOverride?: string, publishStatus?: "draft" | "unlisted" | "public", tags?: string[], canonicalUrl?: string }`
+
+**Response**: `{ hashnodePostUrl, hashnodePostId, publishStatus }` (201), or with `updated: true` (200) when an existing post was updated.
+
+---
+
+### `GET /api/projects/[id]/publish-to-hashnode`
+List the project's existing Hashnode exports. Owner or editor.
+
+**Response**: `{ exports: [{ hashnodePostId, hashnodePostUrl, publishStatus, nodeId, lastSyncedAt }] }`
 
 ---
 
