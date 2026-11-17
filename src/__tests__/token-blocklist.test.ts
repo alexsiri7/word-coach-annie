@@ -11,7 +11,14 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
-import { claimToken, revokeToken, isTokenRevoked } from "@/lib/token-blocklist";
+import {
+    claimToken,
+    revokeToken,
+    isTokenRevoked,
+    isTokenFamilyRevoked,
+    revokeFamilyOnReuse,
+    REFRESH_REUSE_GRACE_MS,
+} from "@/lib/token-blocklist";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -107,6 +114,77 @@ describe("token-blocklist", () => {
             const result = await isTokenRevoked("jti-1");
             expect(result).toBe(false);
             expect(prisma.revokedToken.findUnique).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("isTokenFamilyRevoked", () => {
+        it("looks up the family's blocklist key", async () => {
+            vi.mocked(prisma.revokedToken.findUnique).mockResolvedValueOnce({ jti: "family:F" } as never);
+            expect(await isTokenFamilyRevoked("F")).toBe(true);
+            expect(prisma.revokedToken.findUnique).toHaveBeenCalledWith({ where: { jti: "family:F" } });
+        });
+    });
+
+    describe("revokeFamilyOnReuse", () => {
+        const claimedAgo = (ms: number) =>
+            vi.mocked(prisma.revokedToken.findUnique).mockResolvedValueOnce({
+                revokedAt: new Date(Date.now() - ms),
+            } as never);
+
+        it("revokes the family when the jti was claimed outside the grace window", async () => {
+            claimedAgo(REFRESH_REUSE_GRACE_MS * 2);
+            const exp = new Date();
+            expect(await revokeFamilyOnReuse("jti-1", "F", "user-1", exp)).toBe(true);
+            expect(prisma.revokedToken.findUnique).toHaveBeenCalledWith({
+                where: { jti: "jti-1" },
+                select: { revokedAt: true },
+            });
+            expect(prisma.revokedToken.create).toHaveBeenCalledWith({
+                data: { jti: "family:F", userId: "user-1", expiresAt: exp },
+            });
+        });
+
+        it("treats a reuse inside the grace window as a concurrent double-use", async () => {
+            claimedAgo(5_000);
+            expect(await revokeFamilyOnReuse("jti-1", "F", "user-1", new Date())).toBe(false);
+            expect(prisma.revokedToken.create).not.toHaveBeenCalled();
+        });
+
+        it("does nothing for a token without a family", async () => {
+            expect(await revokeFamilyOnReuse("jti-1", undefined, "user-1", new Date())).toBe(false);
+            expect(prisma.revokedToken.findUnique).not.toHaveBeenCalled();
+            expect(prisma.revokedToken.create).not.toHaveBeenCalled();
+        });
+
+        it("does nothing when no claim row exists", async () => {
+            vi.mocked(prisma.revokedToken.findUnique).mockResolvedValueOnce(null);
+            expect(await revokeFamilyOnReuse("jti-1", "F", "user-1", new Date())).toBe(false);
+            expect(prisma.revokedToken.create).not.toHaveBeenCalled();
+        });
+
+        it("reports an already revoked family as revoked", async () => {
+            claimedAgo(REFRESH_REUSE_GRACE_MS * 2);
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(
+                new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+                    code: "P2002",
+                    clientVersion: "5.0.0",
+                    meta: {},
+                })
+            );
+            expect(await revokeFamilyOnReuse("jti-1", "F", "user-1", new Date())).toBe(true);
+        });
+
+        it("fails closed (rejects) when the lookup throws", async () => {
+            const dbErr = new Error("Connection refused");
+            vi.mocked(prisma.revokedToken.findUnique).mockRejectedValueOnce(dbErr);
+            await expect(revokeFamilyOnReuse("jti-1", "F", "user-1", new Date())).rejects.toBe(dbErr);
+        });
+
+        it("fails closed (rejects) when writing the family row throws", async () => {
+            claimedAgo(REFRESH_REUSE_GRACE_MS * 2);
+            const dbErr = new Error("Connection refused");
+            vi.mocked(prisma.revokedToken.create).mockRejectedValueOnce(dbErr);
+            await expect(revokeFamilyOnReuse("jti-1", "F", "user-1", new Date())).rejects.toBe(dbErr);
         });
     });
 });

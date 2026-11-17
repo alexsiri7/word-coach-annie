@@ -66,3 +66,50 @@ export async function isTokenRevoked(jti: string): Promise<boolean> {
         throw err;
     }
 }
+
+/**
+ * Two concurrent uses of one refresh token — e.g. two tabs renewing together —
+ * land within this window of the first claim and are not treated as theft.
+ */
+export const REFRESH_REUSE_GRACE_MS = 30_000;
+
+const familyKey = (familyId: string) => `family:${familyId}`;
+
+/** Check whether a token family (one login's lineage) has been revoked. Fail-closed like isTokenRevoked. */
+export async function isTokenFamilyRevoked(familyId: string): Promise<boolean> {
+    return isTokenRevoked(familyKey(familyId));
+}
+
+/**
+ * Called after claimToken returned false for `jti`. If that jti was claimed
+ * longer than REFRESH_REUSE_GRACE_MS ago, the token chain has forked (a stolen
+ * copy is in play), so revoke its whole family until `expiresAt`, which must
+ * outlive every family member. Returns true when the family was revoked.
+ * Throws on DB errors; callers reject the request either way.
+ */
+export async function revokeFamilyOnReuse(
+    jti: string,
+    familyId: string | undefined,
+    userId: string,
+    expiresAt: Date
+): Promise<boolean> {
+    if (isEdgeRuntime() || !familyId) return false;
+    let claim;
+    try {
+        claim = await prisma.revokedToken.findUnique({ where: { jti }, select: { revokedAt: true } });
+    } catch (err) {
+        logger.error("[token-blocklist] Reuse lookup failed:", err);
+        throw err;
+    }
+    if (!claim || Date.now() - claim.revokedAt.getTime() < REFRESH_REUSE_GRACE_MS) return false;
+    try {
+        await prisma.revokedToken.create({ data: { jti: familyKey(familyId), userId, expiresAt } });
+    } catch (err) {
+        // P2002: the family is already revoked.
+        if ((err as { code?: string }).code !== "P2002") {
+            logger.error("[token-blocklist] Failed to revoke token family:", err);
+            throw err;
+        }
+    }
+    return true;
+}

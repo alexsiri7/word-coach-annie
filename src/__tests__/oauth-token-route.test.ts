@@ -20,15 +20,17 @@ vi.mock("@/lib/oauth-tokens", () => ({
 
 vi.mock("@/lib/token-blocklist", () => ({
   claimToken: vi.fn(async () => true),
+  isTokenFamilyRevoked: vi.fn(async () => false),
+  revokeFamilyOnReuse: vi.fn(async () => false),
 }));
 
 vi.mock("@/lib/auth-server", () => ({
   getActiveUser: vi.fn(),
 }));
 
-import { consumeAuthCode, findAuthCode, getClient } from "@/lib/oauth-store";
+import { consumeAuthCode, findAuthCode, getClient, type ClientRegistration } from "@/lib/oauth-store";
 import { createMcpToken, verifyMcpToken, verifyPkce } from "@/lib/oauth-tokens";
-import { claimToken } from "@/lib/token-blocklist";
+import { claimToken, isTokenFamilyRevoked, revokeFamilyOnReuse } from "@/lib/token-blocklist";
 import { getActiveUser } from "@/lib/auth-server";
 import { POST } from "@/app/oauth/token/route";
 
@@ -68,6 +70,8 @@ describe("POST /oauth/token", () => {
     vi.clearAllMocks();
     vi.mocked(getActiveUser).mockResolvedValue({ userId: "user-1", email: "user@test.com", name: "", picture: undefined });
     vi.mocked(claimToken).mockResolvedValue(true);
+    vi.mocked(isTokenFamilyRevoked).mockResolvedValue(false);
+    vi.mocked(revokeFamilyOnReuse).mockResolvedValue(false);
     vi.mocked(consumeAuthCode).mockResolvedValue(true);
   });
 
@@ -414,5 +418,92 @@ describe("POST /oauth/token", () => {
     expect(vi.mocked(createMcpToken)).toHaveBeenCalledWith(
       expect.objectContaining({ email: "new@test.com", type: "mcp_refresh" }), 2592000
     );
+  });
+
+  describe("token family revocation (#1578)", () => {
+    const refreshClient: ClientRegistration = { client_id: "client-1", client_name: "App", redirect_uris: [], grant_types: ["authorization_code", "refresh_token"], registered_at: 0 };
+    const refreshBody = { grant_type: "refresh_token", refresh_token: "refresh", client_id: "client-1" };
+    const familyToken = { userId: "user-1", email: "user@test.com", clientId: "client-1", jti: "jti-f", exp: Math.floor(Date.now() / 1000) + 2592000, familyId: "fam-1" };
+
+    function familyOf(type: "mcp_access" | "mcp_refresh") {
+      return vi.mocked(createMcpToken).mock.calls.find(([payload]) => payload.type === type)?.[0].familyId;
+    }
+
+    it("authorization_code grant starts one family shared by both tokens", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(findAuthCode).mockResolvedValue(mockAuthCode);
+      vi.mocked(verifyPkce).mockResolvedValue(true);
+
+      await POST(makeTokenRequest(validAuthCodeBody));
+
+      expect(familyOf("mcp_access")).toEqual(expect.any(String));
+      expect(familyOf("mcp_refresh")).toBe(familyOf("mcp_access"));
+    });
+
+    it("refresh_token grant keeps the presented token's family", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(verifyMcpToken).mockResolvedValue(familyToken);
+
+      const res = await POST(makeTokenRequest(refreshBody));
+
+      expect(res.status).toBe(200);
+      expect(familyOf("mcp_access")).toBe("fam-1");
+      expect(familyOf("mcp_refresh")).toBe("fam-1");
+    });
+
+    it("refresh_token grant rejects a revoked family without claiming or minting", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(verifyMcpToken).mockResolvedValue(familyToken);
+      vi.mocked(isTokenFamilyRevoked).mockResolvedValue(true);
+
+      const res = await POST(makeTokenRequest(refreshBody));
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_grant");
+      expect(isTokenFamilyRevoked).toHaveBeenCalledWith("fam-1");
+      expect(claimToken).not.toHaveBeenCalled();
+      expect(createMcpToken).not.toHaveBeenCalled();
+    });
+
+    it("refresh_token grant returns 500 when the family check throws", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(verifyMcpToken).mockResolvedValue(familyToken);
+      vi.mocked(isTokenFamilyRevoked).mockRejectedValue(new Error("Connection refused"));
+
+      const res = await POST(makeTokenRequest(refreshBody));
+
+      expect(res.status).toBe(500);
+      expect(claimToken).not.toHaveBeenCalled();
+      expect(createMcpToken).not.toHaveBeenCalled();
+    });
+
+    it("refresh_token grant hands a reused token to family revocation with an expiry outliving the family", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(verifyMcpToken).mockResolvedValue({ ...familyToken, exp: Math.floor(Date.now() / 1000) + 60 });
+      vi.mocked(claimToken).mockResolvedValue(false);
+      vi.mocked(revokeFamilyOnReuse).mockResolvedValue(true);
+
+      const res = await POST(makeTokenRequest(refreshBody));
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_grant");
+      expect(revokeFamilyOnReuse).toHaveBeenCalledWith("jti-f", "fam-1", "user-1", expect.any(Date));
+      const familyExpiresAt = vi.mocked(revokeFamilyOnReuse).mock.calls[0][3];
+      expect(familyExpiresAt.getTime()).toBeGreaterThan(Date.now() + 2592000 * 1000 - 60_000);
+      expect(createMcpToken).not.toHaveBeenCalled();
+    });
+
+    it("refresh_token grant still answers invalid_grant when family revocation throws", async () => {
+      vi.mocked(getClient).mockResolvedValue(refreshClient);
+      vi.mocked(verifyMcpToken).mockResolvedValue(familyToken);
+      vi.mocked(claimToken).mockResolvedValue(false);
+      vi.mocked(revokeFamilyOnReuse).mockRejectedValue(new Error("Connection refused"));
+
+      const res = await POST(makeTokenRequest(refreshBody));
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_grant");
+      expect(createMcpToken).not.toHaveBeenCalled();
+    });
   });
 });

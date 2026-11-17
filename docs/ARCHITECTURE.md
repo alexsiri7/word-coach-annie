@@ -203,6 +203,8 @@ On logout and account deletion, both tokens' `jti` claims are written to the `Re
 
 Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
 
+Session, refresh and MCP tokens carry a `familyId` shared by everything minted from one login (Google sign-in or MCP `authorization_code` grant); tokens minted before this claim existed join a new family at their next rotation. Reusing a refresh token whose `jti` was claimed more than 30 seconds earlier (`REFRESH_REUSE_GRACE_MS`) means the chain has forked, so a `family:<id>` row is written to `RevokedToken` and the whole lineage stops working: `verifyRefreshToken`, `verifySessionTokenNode`, `/api/auth/refresh` and the `/oauth/token` refresh grant reject revoked families. A reuse inside that window is treated as a concurrent double-use (two tabs renewing together) and only that request is rejected. The Edge/proxy session check and MCP access tokens still rely on their 1-hour lifetime.
+
 ### Personal API Tokens
 
 A signed-in user can mint named personal API tokens in Settings (`/api/account/api-tokens`) so another app — for example a game's scene editor — can read or edit their scenes as them. Send `Authorization: Bearer annie_pat_…`.

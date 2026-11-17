@@ -23,6 +23,7 @@ export interface McpTokenPayload {
   email: string;
   type: "mcp_access" | "mcp_refresh";
   clientId: string;
+  familyId?: string; // login lineage, revoked as a whole on refresh-token reuse; absent on older tokens
 }
 
 /** Create a signed MCP access or refresh token. */
@@ -45,7 +46,7 @@ export async function createMcpToken(
 export async function verifyMcpToken(
   token: string,
   expectedType: "mcp_access" | "mcp_refresh"
-): Promise<{ userId: string; email: string; clientId: string; jti: string | undefined; exp: number | undefined } | null> {
+): Promise<{ userId: string; email: string; clientId: string; jti: string | undefined; exp: number | undefined; familyId?: string } | null> {
   try {
     const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key, {
@@ -67,6 +68,7 @@ export async function verifyMcpToken(
       clientId: payload.clientId as string,
       jti: payload.jti as string | undefined,
       exp: payload.exp as number | undefined,
+      familyId: payload.familyId as string | undefined,
     };
   } catch (err) {
     // Expected: expired, tampered, wrong algorithm, mismatched issuer/audience — treat as invalid.

@@ -7,12 +7,12 @@ import {
 } from "@/lib/auth";
 import {
     verifySessionTokenNode,
-    verifyRefreshToken,
+    verifyRefreshTokenClaims,
     createSessionToken,
     createRefreshToken,
     getActiveUser,
 } from "@/lib/auth-server";
-import { claimToken } from "@/lib/token-blocklist";
+import { claimToken, isTokenFamilyRevoked, revokeFamilyOnReuse } from "@/lib/token-blocklist";
 import { logger } from "@/lib/logger";
 
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
             try {
                 const user = await getActiveUser(session.userId);
                 if (!user) return unauthorized();
-                const freshJwt = await createSessionToken(user);
+                const freshJwt = await createSessionToken({ ...user, familyId: session.familyId });
                 const response = NextResponse.json({ ok: true });
                 setSessionCookie(response, freshJwt);
                 return response;
@@ -64,11 +64,13 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // Path 2: session expired — try the long-lived refresh token (blocklist checked).
+    // Path 2: session expired — try the long-lived refresh token. claimToken is its
+    // jti blocklist check, so a replayed (already rotated) token reaches reuse detection.
     if (refreshCookie) {
-        const refresh = await verifyRefreshToken(refreshCookie);
+        const refresh = await verifyRefreshTokenClaims(refreshCookie);
         if (refresh) {
             try {
+                if (refresh.familyId && (await isTokenFamilyRevoked(refresh.familyId))) return unauthorized();
                 const user = await getActiveUser(refresh.userId);
                 if (!user) return unauthorized();
                 // Rotate the refresh token: atomically claim the old jti before issuing a new one,
@@ -76,12 +78,22 @@ export async function POST(request: NextRequest) {
                 if (refresh.jti) {
                     const expiresAt = new Date(Date.now() + REFRESH_MAX_AGE * 1000);
                     if (!(await claimToken(refresh.jti, refresh.userId, expiresAt))) {
-                        logger.warn("POST /api/auth/refresh: refresh token reuse detected", { userId: refresh.userId });
+                        const familyRevoked = await revokeFamilyOnReuse(
+                            refresh.jti,
+                            refresh.familyId,
+                            refresh.userId,
+                            expiresAt
+                        );
+                        logger.warn("POST /api/auth/refresh: refresh token reuse detected", {
+                            userId: refresh.userId,
+                            familyRevoked,
+                        });
                         return unauthorized();
                     }
                 }
-                const freshJwt = await createSessionToken(user);
-                const freshRefreshJwt = await createRefreshToken(user);
+                const familyId = refresh.familyId ?? crypto.randomUUID();
+                const freshJwt = await createSessionToken({ ...user, familyId });
+                const freshRefreshJwt = await createRefreshToken({ ...user, familyId });
                 const response = NextResponse.json({ ok: true });
                 setSessionCookie(response, freshJwt);
                 setRefreshCookie(response, freshRefreshJwt);
