@@ -36,11 +36,11 @@ describe("telemetry", () => {
   });
 
   it.each([undefined, "true"])(
-    "disables ADK message-content capture in spans when OTEL_ENABLED is %s",
+    "overrides a pre-set ADK message-content capture flag when OTEL_ENABLED is %s",
     async (otelEnabled) => {
       if (otelEnabled === undefined) delete process.env.OTEL_ENABLED;
       else process.env.OTEL_ENABLED = otelEnabled;
-      delete process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS;
+      process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS = "true";
       const { initTelemetry, shutdownTelemetry } = await import(
         "../lib/telemetry"
       );
