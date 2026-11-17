@@ -561,6 +561,7 @@ describe("middleware auth logic", () => {
             delete process.env.API_TOKEN;
         }
         vi.restoreAllMocks();
+        vi.unstubAllEnvs();
     });
 
     describe("login endpoint logic", () => {
@@ -626,6 +627,21 @@ describe("middleware auth logic", () => {
             expect(first).not.toBe(second);
             expect(await verifyLegacySessionCookie(first, TEST_TOKEN)).toBe(true);
             expect(await verifyLegacySessionCookie(second, TEST_TOKEN)).toBe(true);
+        });
+
+        it("refuses token sign-in in Google-auth mode, even with the right token (SEC-005)", async () => {
+            process.env.API_TOKEN = TEST_TOKEN;
+            vi.stubEnv("GOOGLE_CLIENT_ID", "test-client-id");
+            const { POST } = await import("@/app/api/auth/login/route");
+            const req = new Request("http://localhost/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: TEST_TOKEN }),
+            });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const res = await POST(req as any);
+            expect(res.status).toBe(403);
+            expect(res.headers.get("set-cookie")).toBeNull();
         });
 
         it("sets session cookie on valid token", async () => {

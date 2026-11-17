@@ -3,12 +3,13 @@ import {
     SESSION_COOKIE_NAME,
     verifySessionToken,
     verifyLegacySessionCookie,
+    isGoogleAuthMode,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
 
 /**
  * GET /api/auth/me — Return current user info.
- * Returns user data from JWT session, or anonymous for API_TOKEN sessions.
+ * Returns user data from JWT session, or anonymous for API_TOKEN sessions outside Google-auth mode.
  */
 export async function GET(request: NextRequest) {
     const cookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Check legacy API_TOKEN session
     const apiToken = env.API_TOKEN;
-    if (apiToken && await verifyLegacySessionCookie(cookie, apiToken)) {
+    if (apiToken && !isGoogleAuthMode() && await verifyLegacySessionCookie(cookie, apiToken)) {
         return NextResponse.json({
             authenticated: true,
             user: null,

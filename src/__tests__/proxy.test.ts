@@ -46,11 +46,12 @@ vi.mock("@/lib/auth", async (importOriginal) => {
         verifyLegacySessionCookie: actual.verifyLegacySessionCookie,
         verifySessionToken: vi.fn(async () => null),
         isAuthEnabled: vi.fn(() => false),
+        isGoogleAuthMode: vi.fn(() => false),
         safeEqual: (a: string, b: string) => a === b,
     };
 });
 
-import { isAuthEnabled, createLegacySessionCookie, verifySessionToken, SESSION_MAX_AGE } from "@/lib/auth";
+import { isAuthEnabled, isGoogleAuthMode, createLegacySessionCookie, verifySessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 
 function createRequest(path: string, options?: {
     method?: string;
@@ -76,6 +77,7 @@ describe("proxy", () => {
     beforeEach(() => {
         origApiToken = process.env.API_TOKEN;
         vi.clearAllMocks();
+        vi.mocked(isGoogleAuthMode).mockReturnValue(false);
         resetRateLimitStore();
     });
 
@@ -264,6 +266,58 @@ describe("proxy", () => {
             const legacy = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
             const res = await proxy(legacyRequest(legacy));
             expect(res.status).toBe(401);
+        });
+    });
+
+    describe("Google-auth mode (SEC-005)", () => {
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(isGoogleAuthMode).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+            process.env.API_TOKEN = "my-token";
+        });
+
+        it("rejects the API_TOKEN bearer on API routes", async () => {
+            const res = await proxy(createRequest("/api/projects", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(401);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("redirects a page request carrying only the API_TOKEN bearer to login", async () => {
+            const res = await proxy(createRequest("/project/abc", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(307);
+            expect(res.headers.get("location")).toContain("/login");
+        });
+
+        it("still allows the API_TOKEN bearer on /api/metrics", async () => {
+            const res = await proxy(createRequest("/api/metrics", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
+
+        it("rejects a valid API_TOKEN login cookie", async () => {
+            const res = await proxy(createRequest("/api/projects", {
+                cookies: { annie_session: await createLegacySessionCookie("my-token") },
+            }));
+            expect(res.status).toBe(401);
+        });
+
+        it("still allows a JWT session cookie with its user", async () => {
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const res = await proxy(createRequest("/api/projects", {
+                cookies: { annie_session: "valid-jwt-token" },
+            }));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
         });
     });
 
