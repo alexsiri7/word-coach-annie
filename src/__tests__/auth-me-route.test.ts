@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/auth/me/route";
-import { createLegacySessionCookie, SESSION_MAX_AGE } from "@/lib/auth";
+import { createLegacySessionCookie, createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 
 const API_TOKEN = "me-route-token";
 
@@ -54,5 +54,47 @@ describe("GET /api/auth/me with a legacy API_TOKEN session cookie", () => {
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("annie-session:" + API_TOKEN));
         const legacy = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
         expect((await GET(meRequest(legacy))).status).toBe(401);
+    });
+});
+
+describe("GET /api/auth/me with a JWT session", () => {
+    let origJwtSecret: string | undefined;
+    let origApiToken: string | undefined;
+
+    beforeEach(() => {
+        origJwtSecret = process.env.JWT_SECRET;
+        origApiToken = process.env.API_TOKEN;
+        process.env.JWT_SECRET = "me-route-jwt-session-secret-0123456789abcdef";
+        delete process.env.API_TOKEN;
+    });
+
+    afterEach(() => {
+        if (origJwtSecret !== undefined) process.env.JWT_SECRET = origJwtSecret;
+        else delete process.env.JWT_SECRET;
+        if (origApiToken !== undefined) process.env.API_TOKEN = origApiToken;
+        else delete process.env.API_TOKEN;
+    });
+
+    it("returns 401 with authenticated: false when there is no session cookie", async () => {
+        const res = await GET(new NextRequest("http://localhost/api/auth/me"));
+        expect(res.status).toBe(401);
+        expect(await res.json()).toEqual({ authenticated: false });
+    });
+
+    it("returns the session user for a valid JWT, without jti or other token fields", async () => {
+        const jwt = await createSessionToken({ userId: "u1", email: "a@b.c", name: "A", picture: "https://p" });
+        const res = await GET(meRequest(jwt));
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({
+            authenticated: true,
+            user: { userId: "u1", email: "a@b.c", name: "A", picture: "https://p" },
+        });
+    });
+
+    it("returns 401 for a JWT signed with a different secret (API_TOKEN unset)", async () => {
+        const jwt = await createSessionToken({ userId: "u1", email: "a@b.c", name: "A", picture: "https://p" });
+        process.env.JWT_SECRET = "a-totally-different-jwt-secret-0123456789ab";
+        const res = await GET(meRequest(jwt));
+        expect(res.status).toBe(401);
     });
 });

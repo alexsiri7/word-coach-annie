@@ -7,6 +7,11 @@ import {
     projectIdForNode,
     projectIdForStoryObject,
     projectIdForAnnotation,
+    projectIdForLocationImage,
+    projectIdForLocationSnapshot,
+    projectIdForSnapshotAnnotation,
+    projectIdForContestSubmission,
+    projectIdForPublicationSubmission,
     universeIdForWorldObject,
     universeIdForTimelineEntry,
     relationshipOwner,
@@ -85,6 +90,45 @@ describe("ownership", () => {
             await expect(projectIdForNode("missing")).rejects.toThrow(AccessDeniedError);
             await expect(projectIdForStoryObject("missing")).rejects.toThrow(AccessDeniedError);
             await expect(projectIdForAnnotation("missing")).rejects.toThrow(AccessDeniedError);
+        });
+    });
+
+    describe("projectIdForLocationImage / projectIdForLocationSnapshot / projectIdForSnapshotAnnotation / projectIdForContestSubmission / projectIdForPublicationSubmission", () => {
+        it.each([
+            [projectIdForLocationImage, "Location image"],
+            [projectIdForLocationSnapshot, "Location snapshot"],
+            [projectIdForSnapshotAnnotation, "Snapshot annotation"],
+            [projectIdForContestSubmission, "Contest submission"],
+            [projectIdForPublicationSubmission, "Publication submission"],
+        ] as const)("throws AccessDeniedError for a missing %s", async (fn, label) => {
+            await expect(fn("does-not-exist")).rejects.toThrow(AccessDeniedError);
+            await expect(fn("does-not-exist")).rejects.toThrow(`${label} not found or access denied`);
+        });
+
+        it("resolves the owning project for a contest submission", async () => {
+            const project = await prisma.project.create({ data: { title: "P" } });
+            const provider = await prisma.provider.create({ data: { name: "Litmag" } });
+            const submission = await prisma.contestSubmission.create({
+                data: {
+                    projectId: project.id,
+                    providerId: provider.id,
+                    contestName: "Spring Contest",
+                    submissionDate: new Date("2026-01-01"),
+                },
+            });
+            await expect(projectIdForContestSubmission(submission.id)).resolves.toBe(project.id);
+        });
+
+        it("resolves the owning project for a publication submission", async () => {
+            const project = await prisma.project.create({ data: { title: "P" } });
+            const submission = await prisma.publicationSubmission.create({
+                data: {
+                    projectId: project.id,
+                    venueName: "Lit Journal",
+                    submissionDate: new Date("2026-01-01"),
+                },
+            });
+            await expect(projectIdForPublicationSubmission(submission.id)).resolves.toBe(project.id);
         });
     });
 

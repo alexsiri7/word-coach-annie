@@ -229,3 +229,171 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(safeEqual).toHaveBeenCalledOnce();
     });
 });
+
+describe("Google OAuth callback — rejection branches", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockGetToken.mockResolvedValue({
+            tokens: { access_token: "tok", refresh_token: "ref" },
+        });
+    });
+
+    it("returns 400 when the code parameter is missing", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const url = new URL("http://localhost:3000/api/auth/google/callback");
+        url.searchParams.set("state", makeSignedState());
+        const response = await GET(new NextRequest(url));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "Missing authorization code" });
+        expect(mockGetToken).not.toHaveBeenCalled();
+    });
+
+    it("returns 501 when Google OAuth is not configured", async () => {
+        const { env } = await import("@/lib/env");
+        const original = env.GOOGLE_CLIENT_ID;
+        env.GOOGLE_CLIENT_ID = "";
+        try {
+            const { GET } = await import("@/app/api/auth/google/callback/route");
+            const response = await GET(makeRequest());
+            expect(response.status).toBe(501);
+        } finally {
+            env.GOOGLE_CLIENT_ID = original;
+        }
+    });
+
+    it("redirects to invalid_state when there is no oauth_state cookie", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { safeEqual } = await import("@/lib/auth");
+        const url = new URL("http://localhost:3000/api/auth/google/callback");
+        url.searchParams.set("code", "test-code");
+        url.searchParams.set("state", makeSignedState());
+        const response = await GET(new NextRequest(url));
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location") ?? "").toContain("/login?error=invalid_state");
+        expect(safeEqual).not.toHaveBeenCalled();
+    });
+
+    it("redirects to invalid_state when the cookie state doesn't match the URL state", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const url = new URL("http://localhost:3000/api/auth/google/callback");
+        url.searchParams.set("code", "test-code");
+        url.searchParams.set("state", makeSignedState("nonce-a"));
+        const req = new NextRequest(url, {
+            headers: new Headers({ cookie: `oauth_state=${makeSignedState("nonce-b")}` }),
+        });
+        const response = await GET(req);
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location") ?? "").toContain("/login?error=invalid_state");
+    });
+
+    it("redirects to invalid_state when the state has no dot separator", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { safeEqual } = await import("@/lib/auth");
+        const url = new URL("http://localhost:3000/api/auth/google/callback");
+        url.searchParams.set("code", "test-code");
+        url.searchParams.set("state", "nodotstate");
+        const req = new NextRequest(url, {
+            headers: new Headers({ cookie: "oauth_state=nodotstate" }),
+        });
+        const response = await GET(req);
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location") ?? "").toContain("/login?error=invalid_state");
+        expect(safeEqual).not.toHaveBeenCalled();
+    });
+
+    it("redirects to invalid_code when the token exchange fails", async () => {
+        mockGetToken.mockRejectedValueOnce(new Error("invalid_grant"));
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { prisma } = await import("@/lib/db");
+        const response = await GET(makeRequest());
+
+        expect(response.headers.get("location") ?? "").toContain("/login?error=invalid_code");
+        expect(prisma.user.upsert).not.toHaveBeenCalled();
+        expect(response.headers.getSetCookie().some((c) => c.startsWith("session="))).toBe(false);
+    });
+
+    it.each([
+        { id: "g1", verified_email: true },
+        { email: "a@b.c", verified_email: true },
+    ])("returns 400 when userinfo is missing email or id ($email/$id)", async (data) => {
+        mockUserinfoGet.mockResolvedValue({ data });
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { prisma } = await import("@/lib/db");
+        const response = await GET(makeRequest());
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "Could not retrieve user info from Google" });
+        expect(prisma.user.upsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("Google OAuth callback — session issuance", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockGetToken.mockResolvedValue({
+            tokens: { access_token: "tok", refresh_token: "ref" },
+        });
+        mockUserinfoGet.mockResolvedValue({
+            data: {
+                email: "verified@example.com",
+                id: "google-789",
+                verified_email: true,
+                name: "Verified User",
+                picture: null,
+            },
+        });
+    });
+
+    it("issues a session even when refresh-token minting fails", async () => {
+        const { createRefreshToken } = await import("@/lib/auth-server");
+        vi.mocked(createRefreshToken).mockRejectedValueOnce(new Error("no key"));
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const { logger } = await import("@/lib/logger");
+        const response = await GET(makeRequest());
+
+        expect(response.status).toBe(307);
+        expect(response.headers.get("location")).toBe("http://localhost:3000/");
+        const setCookie = response.headers.getSetCookie();
+        expect(setCookie.some((c) => c.startsWith("session=mock-jwt-token"))).toBe(true);
+        expect(setCookie.some((c) => c.startsWith("annie_refresh="))).toBe(false);
+        expect(logger.error).toHaveBeenCalledOnce();
+    });
+
+    it("honours an allowed oauth_redirect cookie", async () => {
+        const { isAllowedRedirect } = await import("@/lib/auth");
+        vi.mocked(isAllowedRedirect).mockReturnValueOnce(true);
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const response = await GET(makeRequest({}, { oauth_redirect: "/read/p1" }));
+
+        expect(response.headers.get("location")).toBe("http://localhost:3000/read/p1");
+        const setCookie = response.headers.getSetCookie();
+        const redirectCookie = setCookie.find((c) => c.startsWith("oauth_redirect="));
+        const stateCookie = setCookie.find((c) => c.startsWith("oauth_state="));
+        expect(redirectCookie).toContain("Max-Age=0");
+        expect(stateCookie).toContain("Max-Age=0");
+    });
+
+    it("falls back to home when the oauth_redirect cookie is not allowed", async () => {
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const response = await GET(makeRequest({}, { oauth_redirect: "//evil.example" }));
+
+        expect(response.headers.get("location")).toBe("http://localhost:3000/");
+    });
+
+    it("redirects to callback_failed without leaking the error on an unexpected failure", async () => {
+        const { prisma } = await import("@/lib/db");
+        vi.mocked(prisma.user.upsert).mockRejectedValueOnce(new Error("db down"));
+        const { GET } = await import("@/app/api/auth/google/callback/route");
+        const response = await GET(makeRequest());
+
+        expect(response.headers.get("location") ?? "").toContain("/login?error=callback_failed");
+        const setCookie = response.headers.getSetCookie();
+        expect(setCookie.some((c) => c.startsWith("session="))).toBe(false);
+        const body = await response.text();
+        expect(body).not.toContain("db down");
+    });
+});

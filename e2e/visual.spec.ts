@@ -609,54 +609,51 @@ async function createReaderTestData(baseURL: string): Promise<{
   projectId: string
   chapterId: string
   sceneId: string
-} | null> {
-  try {
-    // Create project
-    const projRes = await fetch(`${baseURL}/api/projects`, {
-      method: 'POST',
-      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: 'Visual Test — Reader View',
-        author: 'Jane Doe',
-        genre: 'Fantasy',
-        projectType: 'FICTION',
-      }),
-    })
-    if (!projRes.ok) return null
-    const proj = await projRes.json()
-    const projectId = proj.id as string
+}> {
+  // Create project
+  const projRes = await fetch(`${baseURL}/api/projects`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Visual Test — Reader View',
+      author: 'Jane Doe',
+      genre: 'Fantasy',
+      projectType: 'FICTION',
+    }),
+  })
+  if (!projRes.ok) throw new Error(`reader setup: POST /api/projects → ${projRes.status}`)
+  const proj = await projRes.json()
+  const projectId = proj.id as string
 
-    // Create chapter node
-    const chapterRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
-      method: 'POST',
-      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'CHAPTER', title: 'The Summons', status: 'FINAL', orderIndex: 0 }),
-    })
-    if (!chapterRes.ok) return null
-    const chapter = await chapterRes.json()
-    const chapterId = (chapter.id ?? chapter.node?.id) as string
+  // Create chapter node
+  const chapterRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'CHAPTER', title: 'The Summons', status: 'FINAL', orderIndex: 0 }),
+  })
+  if (!chapterRes.ok) throw new Error(`reader setup: POST /api/projects/${projectId}/nodes (chapter) → ${chapterRes.status}`)
+  const chapter = await chapterRes.json()
+  const chapterId = (chapter.id ?? chapter.node?.id) as string
 
-    // Create scene node
-    const sceneRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
-      method: 'POST',
-      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'SCENE', title: 'Throne Room', status: 'FINAL', orderIndex: 0, parentId: chapterId }),
-    })
-    if (!sceneRes.ok) return null
-    const scene = await sceneRes.json()
-    const sceneId = (scene.id ?? scene.node?.id) as string
+  // Create scene node
+  const sceneRes = await fetch(`${baseURL}/api/projects/${projectId}/nodes`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'SCENE', title: 'Throne Room', status: 'FINAL', orderIndex: 0, parentId: chapterId }),
+  })
+  if (!sceneRes.ok) throw new Error(`reader setup: POST /api/projects/${projectId}/nodes (scene) → ${sceneRes.status}`)
+  const scene = await sceneRes.json()
+  const sceneId = (scene.id ?? scene.node?.id) as string
 
-    // Write scene content
-    await fetch(`${baseURL}/api/nodes/${sceneId}/content`, {
-      method: 'POST',
-      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: '<p>The heavy oak doors groaned open, admitting a gust of winter wind and a figure wrapped in a travel-stained cloak. Queen Mira straightened on her throne.</p>' }),
-    })
+  // Write scene content
+  const contentRes = await fetch(`${baseURL}/api/nodes/${sceneId}/content`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: '<p>The heavy oak doors groaned open, admitting a gust of winter wind and a figure wrapped in a travel-stained cloak. Queen Mira straightened on her throne.</p>' }),
+  })
+  if (!contentRes.ok) throw new Error(`reader setup: POST /api/nodes/${sceneId}/content → ${contentRes.status}`)
 
-    return { projectId, chapterId, sceneId }
-  } catch {
-    return null
-  }
+  return { projectId, chapterId, sceneId }
 }
 
 /** Delete the test project created for reader view tests (best-effort). */
@@ -1332,17 +1329,13 @@ test.describe('Visual regression – Annie', () => {
 
   test('reader view default state', async ({ page, baseURL }) => {
     const testData = await createReaderTestData(baseURL ?? 'http://localhost:3001')
-    if (!testData) {
-      test.skip()
-      return
-    }
     const { projectId } = testData
     try {
       await mockReaderClientApis(page, projectId)
       await page.goto(`/read/${projectId}`)
       await page.waitForSelector('header', { timeout: 20_000 })
       // Wait for manuscript content to appear
-      await page.getByText('The Summons').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+      await expect(page.getByText('The Summons').first()).toBeVisible({ timeout: 10_000 })
       await disableAnimations(page)
 
       await expect(page).toHaveScreenshot('reader-view.png', {
@@ -1355,22 +1348,18 @@ test.describe('Visual regression – Annie', () => {
 
   test('reader view tasks drawer open', async ({ page, baseURL }) => {
     const testData = await createReaderTestData(baseURL ?? 'http://localhost:3001')
-    if (!testData) {
-      test.skip()
-      return
-    }
     const { projectId } = testData
     try {
       await mockReaderClientApis(page, projectId)
       await page.goto(`/read/${projectId}`)
       await page.waitForSelector('header', { timeout: 20_000 })
-      await page.getByText('The Summons').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+      await expect(page.getByText('The Summons').first()).toBeVisible({ timeout: 10_000 })
       await disableAnimations(page)
 
       // Open the tasks drawer via the header button
       await page.getByRole('button', { name: 'Writing tasks' }).click()
       // Wait for tasks to load (mocked to return immediately)
-      await page.getByText('Revise the opening confrontation').waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+      await expect(page.getByText('Revise the opening confrontation')).toBeVisible({ timeout: 5_000 })
 
       await expect(page).toHaveScreenshot('reader-view-tasks-drawer.png', {
         animations: 'disabled',
