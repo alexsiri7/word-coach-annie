@@ -6,6 +6,7 @@ import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex, NodeType, SceneStatus } from "@/schemas/nodes";
 import { UserFacingError } from "@/lib/controllers/errors";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export class ConflictError extends UserFacingError {
   constructor(public serverContent: string) {
@@ -687,7 +688,11 @@ export class StructureController {
         return { deleted: results, errors, totalDeleted: results.length, totalErrors: errors.length };
     }
 
-    static async getOpenAnnotations(projectId?: string, userId?: string | null) {
+    static async getOpenAnnotations(
+        projectId?: string,
+        userId?: string | null,
+        { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
+    ) {
         const where: Record<string, unknown> = { resolved: false };
         if (projectId) {
             where.node = { projectId };
@@ -703,14 +708,19 @@ export class StructureController {
                     select: {
                         id: true,
                         title: true,
+                        type: true,
+                        status: true,
                         project: { select: { title: true } }
                     }
                 }
             },
             orderBy: { createdAt: "desc" }
         });
+        const visible = excludeOutlineScenes
+            ? annotations.filter((a) => !isHiddenOutlineScene(a.node))
+            : annotations;
 
-        return annotations.map((a: { id: string; content: string; nodeId: string; selectedText: string | null; createdAt: Date; node: { title: string; project: { title: string } } }) => ({
+        return visible.map((a) => ({
             id: a.id,
             content: a.content,
             nodeId: a.nodeId,

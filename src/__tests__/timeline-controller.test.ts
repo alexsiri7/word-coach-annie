@@ -85,5 +85,29 @@ describe("TimelineController", () => {
             expect(data.scenes).toHaveLength(1);
             expect(data.scenes[0].title).toBe("Standalone Scene");
         });
+
+        it("drops OUTLINE scenes and their events when excludeOutlineScenes is set", async () => {
+            const hidden = await testPrisma.structureNode.create({
+                data: { projectId, type: "SCENE", title: "Hidden", orderIndex: 0, synopsis: "", status: "OUTLINE" },
+            });
+            const drafted = await testPrisma.structureNode.create({
+                data: { projectId, type: "SCENE", title: "Drafted", orderIndex: 1, synopsis: "", status: "DRAFT" },
+            });
+            const char = await testPrisma.storyObject.create({ data: { projectId, type: "CHARACTER", name: "Alice" } });
+            await testPrisma.relationship.createMany({
+                data: [
+                    { type: "APPEARS_IN", fromObjectId: char.id, toNodeId: hidden.id },
+                    { type: "APPEARS_IN", fromObjectId: char.id, toNodeId: drafted.id },
+                ],
+            });
+
+            const data = await TimelineController.getTimelineData(projectId, { excludeOutlineScenes: true });
+            expect(data.scenes.map((s) => s.title)).toEqual(["Drafted"]);
+            expect(data.events.map((e) => e.toNodeId)).toEqual([drafted.id]);
+
+            const full = await TimelineController.getTimelineData(projectId);
+            expect(full.scenes).toHaveLength(2);
+            expect(full.events).toHaveLength(2);
+        });
     });
 });

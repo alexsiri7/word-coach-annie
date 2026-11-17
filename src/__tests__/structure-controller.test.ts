@@ -389,6 +389,19 @@ describe("StructureController", () => {
                 expect(all).toHaveLength(2);
             });
 
+            it("getOpenAnnotations drops OUTLINE-scene annotations when excludeOutlineScenes is set", async () => {
+                const hidden = await StructureController.createNode({ projectId, type: "SCENE", title: "Hidden", status: "OUTLINE" });
+                const drafted = await StructureController.createNode({ projectId, type: "SCENE", title: "Drafted", status: "DRAFT" });
+                await StructureController.addAnnotation(hidden.id, "Hidden note");
+                await StructureController.addAnnotation(drafted.id, "Visible note");
+
+                const forReader = await StructureController.getOpenAnnotations(projectId, undefined, { excludeOutlineScenes: true });
+                expect(forReader.map((a) => a.content)).toEqual(["Visible note"]);
+
+                const forOwner = await StructureController.getOpenAnnotations(projectId);
+                expect(forOwner).toHaveLength(2);
+            });
+
             it("getOpenAnnotations includes selectedText in returned shape", async () => {
                 const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
                 await StructureController.addAnnotation(scene.id, "With text", "", "some selected passage");

@@ -4,7 +4,7 @@ import { StructureController, ConflictError, InputTooLargeError } from "@/lib/co
 import { getCurrentUserId, verifyProjectReadAccessByNode, verifyProjectWriteAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { computeContentHash } from "@/mcp/content-hash";
-import { isHiddenOutlineScene } from "@/lib/outline-tree";
+import { isHiddenOutlineSceneId } from "@/lib/outline-tree";
 
 export async function GET(
   request: NextRequest,
@@ -25,14 +25,8 @@ export async function GET(
     if (isReader && versionId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (isReader) {
-      const node = await prisma.structureNode.findUnique({
-        where: { id: nodeId },
-        select: { type: true, status: true },
-      });
-      if (node && isHiddenOutlineScene(node)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    if (isReader && (await isHiddenOutlineSceneId(nodeId))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // If a specific version is requested, return just that version

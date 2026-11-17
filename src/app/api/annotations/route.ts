@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
         if (!access.authorized) return access.response;
 
         // getOpenAnnotations returns unresolved by default
-        const annotations = await StructureController.getOpenAnnotations(projectId);
+        const annotations = await StructureController.getOpenAnnotations(projectId, undefined, {
+            excludeOutlineScenes: access.role === "READER",
+        });
 
         return NextResponse.json(annotations);
     } catch (error) {

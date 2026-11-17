@@ -26,6 +26,7 @@ function mockParams<T>(params: T): { params: Promise<T> } {
     return { params: Promise.resolve(params) };
 }
 
+import { verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
 
@@ -57,6 +58,35 @@ describe("Focus API route", () => {
             title: expect.any(String),
             status: expect.any(String),
             orderIndex: expect.any(Number),
+        });
+    });
+
+    describe("for a READER share", () => {
+        beforeEach(() => {
+            vi.mocked(verifyProjectReadAccessByNode).mockResolvedValueOnce({ authorized: true, projectId, role: "READER" });
+        });
+
+        it("refuses an OUTLINE scene", async () => {
+            const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "Hidden", status: "OUTLINE" });
+
+            const { GET } = await import("@/app/api/focus/[sceneId]/route");
+            const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: scene.id }));
+
+            expect((res as any).status).toBe(403);
+        });
+
+        it("leaves OUTLINE scenes out of the neighbours and timeline of a visible scene", async () => {
+            const first = await StructureController.createNode({ projectId, type: "SCENE", title: "First", status: "DRAFT" });
+            await StructureController.createNode({ projectId, type: "SCENE", title: "Hidden", status: "OUTLINE" });
+            const last = await StructureController.createNode({ projectId, type: "SCENE", title: "Last", status: "FINAL" });
+
+            const { GET } = await import("@/app/api/focus/[sceneId]/route");
+            const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: first.id }));
+
+            expect((res as any).status).toBe(200);
+            const body = await (res as any).json();
+            expect(body.timelineScenes.map((s: { title: string }) => s.title)).toEqual(["First", "Last"]);
+            expect(body.context.nextScene).toEqual({ id: last.id, title: "Last" });
         });
     });
 

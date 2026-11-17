@@ -27,6 +27,9 @@ vi.mock("@/lib/db", () => ({
       findMany: vi.fn(async () => []),
       create: vi.fn(async ({ data }: { data: unknown }) => data),
     },
+    structureNode: {
+      findUnique: vi.fn(async () => null),
+    },
   },
 }));
 
@@ -51,6 +54,45 @@ function makePostRequest(body: unknown): NextRequest {
 function mockParams(nodeId: string) {
   return { params: Promise.resolve({ id: nodeId }) };
 }
+
+describe("GET /api/nodes/[id]/annotations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({ authorized: true, projectId: "proj-1", role: "READER" });
+  });
+
+  function getRequest() {
+    return new NextRequest("http://localhost/api/nodes/node-1/annotations");
+  }
+
+  it("refuses a READER the annotations of an OUTLINE scene", async () => {
+    vi.mocked(prisma.structureNode.findUnique).mockResolvedValue({ type: "SCENE", status: "OUTLINE" } as never);
+    const { GET } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await GET(getRequest(), mockParams("node-1"));
+
+    expect(res.status).toBe(403);
+    expect(prisma.annotation.findMany).not.toHaveBeenCalled();
+  });
+
+  it("gives a READER the annotations of a drafted scene", async () => {
+    vi.mocked(prisma.structureNode.findUnique).mockResolvedValue({ type: "SCENE", status: "DRAFT" } as never);
+    const { GET } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await GET(getRequest(), mockParams("node-1"));
+
+    expect(res.status).toBe(200);
+    expect(prisma.annotation.findMany).toHaveBeenCalled();
+  });
+
+  it("gives the owner the annotations of an OUTLINE scene", async () => {
+    vi.mocked(verifyProjectReadAccessByNode).mockResolvedValue({ authorized: true, projectId: "proj-1", role: "OWNER" });
+    vi.mocked(prisma.structureNode.findUnique).mockResolvedValue({ type: "SCENE", status: "OUTLINE" } as never);
+    const { GET } = await import("@/app/api/nodes/[id]/annotations/route");
+    const res = await GET(getRequest(), mockParams("node-1"));
+
+    expect(res.status).toBe(200);
+    expect(prisma.annotation.findMany).toHaveBeenCalled();
+  });
+});
 
 describe("POST /api/nodes/[id]/annotations", () => {
   beforeEach(() => {
