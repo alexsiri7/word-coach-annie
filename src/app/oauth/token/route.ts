@@ -15,7 +15,7 @@ import {
   REFRESH_TOKEN_TTL,
 } from "@/lib/oauth-tokens";
 import { logger } from "@/lib/logger";
-import { claimToken } from "@/lib/token-blocklist";
+import { claimToken, isTokenFamilyRevoked, revokeFamilyOnReuse } from "@/lib/token-blocklist";
 import { getActiveUser } from "@/lib/auth-server";
 
 /**
@@ -135,13 +135,14 @@ async function handleAuthorizationCode(body: Record<string, string>) {
     return errorResponse("invalid_grant", "Authorization code has already been used");
   }
 
-  // Issue tokens
+  // Issue tokens; a fresh authorization starts a new token family
+  const familyId = crypto.randomUUID();
   const accessToken = await createMcpToken(
-    { userId: authCode.userId, email: authCode.email, type: "mcp_access", clientId: client_id },
+    { userId: authCode.userId, email: authCode.email, type: "mcp_access", clientId: client_id, familyId },
     ACCESS_TOKEN_TTL
   );
   const refreshToken = await createMcpToken(
-    { userId: authCode.userId, email: authCode.email, type: "mcp_refresh", clientId: client_id },
+    { userId: authCode.userId, email: authCode.email, type: "mcp_refresh", clientId: client_id, familyId },
     REFRESH_TOKEN_TTL
   );
 
@@ -188,6 +189,22 @@ async function handleRefreshToken(body: Record<string, string>) {
     return errorResponse("invalid_grant", "client_id mismatch");
   }
 
+  if (tokenData.familyId) {
+    let familyRevoked;
+    try {
+      familyRevoked = await isTokenFamilyRevoked(tokenData.familyId);
+    } catch {
+      return errorResponse("server_error", "Internal server error", 500);
+    }
+    if (familyRevoked) {
+      logger.warn("OAuth refresh rejected — token family revoked after reuse", {
+        userId: tokenData.userId,
+        clientId: tokenData.clientId,
+      });
+      return errorResponse("invalid_grant", "Refresh token has been revoked");
+    }
+  }
+
   let user;
   try {
     user = await getActiveUser(tokenData.userId);
@@ -218,22 +235,33 @@ async function handleRefreshToken(body: Record<string, string>) {
       return errorResponse("server_error", "Internal server error", 500);
     }
     if (!claimed) {
+      let familyRevoked;
+      try {
+        // The family row must outlive every member, the newest of which was minted after this token.
+        const familyExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
+        familyRevoked = await revokeFamilyOnReuse(tokenData.jti, tokenData.familyId, tokenData.userId, familyExpiresAt);
+      } catch (err) {
+        logger.error("OAuth refresh: token family revocation failed", err);
+        return errorResponse("server_error", "Internal server error", 500);
+      }
       logger.warn("OAuth refresh token reuse detected — concurrent or replayed use", {
         jti: tokenData.jti,
         userId: tokenData.userId,
         clientId: tokenData.clientId,
+        familyRevoked,
       });
       return errorResponse("invalid_grant", "Refresh token has already been used");
     }
   }
 
-  // Issue new tokens
+  // Issue new tokens in the presented token's family (legacy tokens without one start a family)
+  const familyId = tokenData.familyId ?? crypto.randomUUID();
   const accessToken = await createMcpToken(
-    { userId: user.userId, email: user.email, type: "mcp_access", clientId: tokenData.clientId },
+    { userId: user.userId, email: user.email, type: "mcp_access", clientId: tokenData.clientId, familyId },
     ACCESS_TOKEN_TTL
   );
   const newRefreshToken = await createMcpToken(
-    { userId: user.userId, email: user.email, type: "mcp_refresh", clientId: tokenData.clientId },
+    { userId: user.userId, email: user.email, type: "mcp_refresh", clientId: tokenData.clientId, familyId },
     REFRESH_TOKEN_TTL
   );
 

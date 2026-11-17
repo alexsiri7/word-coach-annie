@@ -17,11 +17,14 @@ import {
 import {
     createRefreshToken,
     verifyRefreshToken,
+    verifyRefreshTokenClaims,
     verifySessionTokenNode,
 } from "@/lib/auth-server";
+import { isTokenRevoked, isTokenFamilyRevoked } from "@/lib/token-blocklist";
 
 vi.mock("@/lib/token-blocklist", () => ({
     isTokenRevoked: vi.fn(async () => false),
+    isTokenFamilyRevoked: vi.fn(async () => false),
     revokeToken: vi.fn(async () => undefined),
 }));
 
@@ -205,6 +208,7 @@ describe("verifySessionTokenNode — blocklist integration", () => {
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+        vi.mocked(isTokenFamilyRevoked).mockReset().mockResolvedValue(false);
     });
 
     afterEach(() => {
@@ -253,6 +257,26 @@ describe("verifySessionTokenNode — blocklist integration", () => {
         expect(result).not.toBeNull();
         expect(isTokenRevoked).not.toHaveBeenCalled();
     });
+
+    it("returns null for a session whose token family is revoked", async () => {
+        vi.mocked(isTokenFamilyRevoked).mockResolvedValueOnce(true);
+
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U", familyId: "F" });
+        await expect(verifySessionTokenNode(token)).resolves.toBeNull();
+        expect(isTokenFamilyRevoked).toHaveBeenCalledWith("F");
+    });
+
+    it("returns null if the family check throws (fail closed)", async () => {
+        vi.mocked(isTokenFamilyRevoked).mockRejectedValueOnce(new Error("Connection refused"));
+
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U", familyId: "F" });
+        await expect(verifySessionTokenNode(token)).resolves.toBeNull();
+    });
+
+    it("carries the familyId claim through verification", async () => {
+        const token = await createSessionToken({ userId: "u1", email: "u@test.com", name: "U", familyId: "F" });
+        expect((await verifySessionTokenNode(token))?.familyId).toBe("F");
+    });
 });
 
 describe("refresh token functions", () => {
@@ -264,6 +288,7 @@ describe("refresh token functions", () => {
         const { isTokenRevoked } = await import("@/lib/token-blocklist");
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockReset();
         (isTokenRevoked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+        vi.mocked(isTokenFamilyRevoked).mockReset().mockResolvedValue(false);
     });
 
     afterEach(() => {
@@ -314,6 +339,34 @@ describe("refresh token functions", () => {
 
         const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test" });
         await expect(verifyRefreshToken(token)).resolves.toBeNull();
+    });
+
+    it("returns null for a refresh token whose family is revoked", async () => {
+        vi.mocked(isTokenFamilyRevoked).mockResolvedValueOnce(true);
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test", familyId: "F" });
+        expect(await verifyRefreshToken(token)).toBeNull();
+        expect(isTokenFamilyRevoked).toHaveBeenCalledWith("F");
+    });
+
+    it("returns null if the family check throws (fail closed)", async () => {
+        vi.mocked(isTokenFamilyRevoked).mockRejectedValueOnce(new Error("Connection refused"));
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test", familyId: "F" });
+        await expect(verifyRefreshToken(token)).resolves.toBeNull();
+        expect(isTokenFamilyRevoked).toHaveBeenCalledWith("F");
+    });
+
+    it("verifyRefreshTokenClaims returns the payload without consulting the blocklist", async () => {
+        vi.mocked(isTokenRevoked).mockResolvedValue(true);
+        vi.mocked(isTokenFamilyRevoked).mockResolvedValue(true);
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test", familyId: "F" });
+        const result = await verifyRefreshTokenClaims(token);
+        expect(result?.userId).toBe("u1");
+        expect(result?.familyId).toBe("F");
+        expect(isTokenRevoked).not.toHaveBeenCalled();
+        expect(isTokenFamilyRevoked).not.toHaveBeenCalled();
     });
 
     it("returns null for a tampered token", async () => {

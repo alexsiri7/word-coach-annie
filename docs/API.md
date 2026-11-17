@@ -57,11 +57,11 @@ Silently renew the session cookie. Called automatically by the client every 45 m
 
 Both paths re-load the user from the database and mint the new cookies from the current user row; a user whose account was deleted or whose email no longer passes `ALLOWED_EMAILS` gets `401`.
 
-**Path 1** (session still valid): Verifies the `annie_session` cookie and re-issues it with a fresh 1-hour `Max-Age`.
+**Path 1** (session still valid): Verifies the `annie_session` cookie and re-issues it with a fresh 1-hour `Max-Age`. Returns `401` if the session's token family was revoked by a refresh-token reuse detected elsewhere.
 
-**Path 2** (session expired): Falls back to the `annie_refresh` cookie (30-day lifetime, blocklist-checked). If valid, atomically claims the old refresh token (single use) and issues a new `annie_session` cookie and a rotated `annie_refresh` cookie. Presenting an already-claimed refresh token (e.g. a replayed or concurrently used cookie) returns `401`.
+**Path 2** (session expired): Falls back to the `annie_refresh` cookie (30-day lifetime, blocklist-checked). If valid, atomically claims the old refresh token (single use) and issues a new `annie_session` cookie and a rotated `annie_refresh` cookie. Presenting an already-claimed refresh token (e.g. a replayed or concurrently used cookie) returns `401`. If the claim is more than 30 seconds old (not a concurrent double-submit), the reuse also revokes the whole token family — every session and refresh token minted from the same login — so other tabs and devices on that login also get `401` until the user signs in again.
 
-**Response**: `200 { "ok": true }` with updated `Set-Cookie` header; `401 { "error": "Session expired or revoked" }` if the token is missing, expired, revoked, already used, or its user is deleted or no longer allowed (also when the revocation check itself fails — fail closed); `500 { "error": "Internal error" }` if the user lookup or refresh-token claim hits a database error.
+**Response**: `200 { "ok": true }` with updated `Set-Cookie` header; `401 { "error": "Session expired or revoked" }` if the token is missing, expired, revoked, already used, or its user is deleted or no longer allowed (also when the revocation check itself fails — fail closed); `500 { "error": "Internal error" }` if the user lookup refresh-token claim, or family revocation hits a database error.
 
 ---
 

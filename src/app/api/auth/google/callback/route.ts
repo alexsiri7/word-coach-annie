@@ -129,12 +129,14 @@ export async function GET(request: NextRequest) {
             },
         });
 
-        // Create JWT session
+        // Create JWT session; a login starts a new token family
+        const familyId = crypto.randomUUID();
         const jwt = await createSessionToken({
             userId: user.id,
             email: user.email,
             name: user.name,
             picture: user.picture || undefined,
+            familyId,
         });
 
         // Issue long-lived refresh token alongside session cookie (non-fatal: login proceeds even if this fails)
@@ -145,6 +147,7 @@ export async function GET(request: NextRequest) {
                 email: user.email,
                 name: user.name,
                 picture: user.picture || undefined,
+                familyId,
             });
         } catch (refreshErr) {
             // Non-fatal: session cookie is still issued. Log so ops can fix the key config.
