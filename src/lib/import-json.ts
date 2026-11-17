@@ -8,6 +8,7 @@ import { countSceneWords } from "@/lib/scene-text";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 import { NodeType, SceneStatus } from "@/schemas/nodes";
 import { ProjectType } from "@/schemas/projects";
+import { hasExactlyOneEndpoint } from "@/schemas/relationships";
 
 interface ExportData {
   exportVersion: number;
@@ -239,16 +240,14 @@ export async function importProjectJson(
     }
 
     // 6. Create relationships, skipping any whose from or to side doesn't
-    // resolve to exactly one node or object in this import (the same shape
-    // RelationshipCreateSchema enforces on the live route)
+    // resolve to exactly one node or object in this import
     const resolve = (map: Map<string, string>, id: string | null) => (id ? map.get(id) ?? null : null);
-    const exactlyOne = (nodeId: string | null, objectId: string | null) => !nodeId !== !objectId;
     for (const rel of data.relationships) {
       const fromNodeId = resolve(nodeIdMap, rel.fromNodeId);
       const fromObjectId = resolve(objectIdMap, rel.fromObjectId);
       const toNodeId = resolve(nodeIdMap, rel.toNodeId);
       const toObjectId = resolve(objectIdMap, rel.toObjectId);
-      if (!exactlyOne(fromNodeId, fromObjectId) || !exactlyOne(toNodeId, toObjectId)) continue;
+      if (!hasExactlyOneEndpoint(fromNodeId, fromObjectId) || !hasExactlyOneEndpoint(toNodeId, toObjectId)) continue;
       await tx.relationship.create({
         data: {
           type: rel.type,

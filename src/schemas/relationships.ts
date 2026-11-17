@@ -11,6 +11,11 @@ export const RelationshipType = z.enum([
   "FOLLOWS",
 ]);
 
+export const hasExactlyOneEndpoint = (
+  nodeId: string | null | undefined,
+  objectId: string | null | undefined
+) => [nodeId, objectId].filter(Boolean).length === 1;
+
 export const RelationshipCreateSchema = z
   .object({
     type: RelationshipType,
@@ -21,14 +26,14 @@ export const RelationshipCreateSchema = z
     toObjectId: z.string().optional(),
   })
   .refine(
-    (data) => [data.fromNodeId, data.fromObjectId].filter(Boolean).length === 1,
+    (data) => hasExactlyOneEndpoint(data.fromNodeId, data.fromObjectId),
     {
       message:
         "Exactly one from-field must be provided (fromNodeId or fromObjectId)",
     }
   )
   .refine(
-    (data) => [data.toNodeId, data.toObjectId].filter(Boolean).length === 1,
+    (data) => hasExactlyOneEndpoint(data.toNodeId, data.toObjectId),
     {
       message:
         "Exactly one to-field must be provided (toNodeId or toObjectId)",
