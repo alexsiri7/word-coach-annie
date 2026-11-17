@@ -5,7 +5,6 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/api-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api-auth")>()),
   getCurrentUserId: vi.fn(() => null),
-  verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -13,7 +12,10 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { POST } from "@/app/api/projects/[id]/sessions/route";
+import { getCurrentUserId } from "@/lib/api-auth";
 import { MAX_SESSION_WORDS } from "@/schemas/sessions";
+
+const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 function post(projectId: string, body: unknown) {
   const req = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
@@ -32,7 +34,7 @@ describe("POST /api/projects/[id]/sessions", () => {
     projectId = project.id;
   });
 
-  it("creates a session from the body the editor sends", async () => {
+  it("creates a session from the body the scene editor sends", async () => {
     const node = await testPrisma.structureNode.create({
       data: { projectId, type: "SCENE", title: "Scene", orderIndex: 0 },
     });
@@ -57,6 +59,9 @@ describe("POST /api/projects/[id]/sessions", () => {
     ["a negative durationSeconds", { durationSeconds: -1 }],
     ["a non-ISO date", { date: "15/03/2026" }],
     ["a non-ISO startedAt", { startedAt: "yesterday" }],
+    ["a future date", { date: tomorrow.toISOString().slice(0, 10) }],
+    ["a future startedAt", { startedAt: tomorrow.toISOString() }],
+    ["a future endedAt", { endedAt: tomorrow.toISOString() }],
   ])("returns 400 for %s and stores nothing", async (_label, body) => {
     const res = await post(projectId, body);
     expect(res.status).toBe(400);
@@ -71,5 +76,26 @@ describe("POST /api/projects/[id]/sessions", () => {
     const res = await post(projectId, { nodeId: foreign.id, wordsWritten: 10 });
     expect(res.status).toBe(404);
     expect(await testPrisma.writingSession.count()).toBe(0);
+  });
+
+  it("returns 403 for an editor of the project and stores nothing", async () => {
+    const owner = await testPrisma.user.create({ data: { email: "owner@example.com", googleId: "g-owner" } });
+    const editor = await testPrisma.user.create({ data: { email: "editor@example.com", googleId: "g-editor" } });
+    await testPrisma.project.update({ where: { id: projectId }, data: { userId: owner.id } });
+    await testPrisma.projectShare.create({ data: { projectId, email: editor.email, role: "EDITOR" } });
+    vi.mocked(getCurrentUserId).mockReturnValueOnce(editor.id);
+
+    const res = await post(projectId, { wordsWritten: 10 });
+    expect(res.status).toBe(403);
+    expect(await testPrisma.writingSession.count()).toBe(0);
+  });
+
+  it("creates a session for the project owner", async () => {
+    const owner = await testPrisma.user.create({ data: { email: "owner@example.com", googleId: "g-owner" } });
+    await testPrisma.project.update({ where: { id: projectId }, data: { userId: owner.id } });
+    vi.mocked(getCurrentUserId).mockReturnValueOnce(owner.id);
+
+    const res = await post(projectId, { wordsWritten: 10 });
+    expect(res.status).toBe(201);
   });
 });
