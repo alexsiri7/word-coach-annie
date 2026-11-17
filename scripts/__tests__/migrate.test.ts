@@ -1,16 +1,18 @@
 import { spawnSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import os from 'os';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { splitSqlStatements } from '../sql-tokenizer.mjs';
 
 const MIGRATE_SCRIPT = join(__dirname, '../migrate.mjs');
 
-function runMigrate(databaseUrl: string, extraEnv: NodeJS.ProcessEnv = {}) {
+function runMigrate(databaseUrl: string, extraEnv: NodeJS.ProcessEnv = {}, cwd?: string) {
   return spawnSync('node', [MIGRATE_SCRIPT], {
     env: { ...process.env, DATABASE_URL: databaseUrl, ...extraEnv },
     encoding: 'utf-8',
+    ...(cwd ? { cwd } : {}),
   });
 }
 
@@ -373,5 +375,96 @@ describe('migrate.mjs — first run as a role that only owns its schema', () => 
     ]);
     expect(owned[0].n).toBeGreaterThan(0n);
     expect(inPublic[0].n).toBe(0n);
+  }, 60_000);
+});
+
+describe('migrate.mjs — refuses destructive DDL on a populated database', () => {
+  const SCRATCH_DB = 'annie_migrate_destructive_test';
+  let admin: PrismaClient;
+  let scratchUrl: string;
+  let tmpDir: string;
+
+  const dropScratch = () =>
+    admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS ${SCRATCH_DB} WITH (FORCE)`);
+
+  beforeAll(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'migrate-destructive-'));
+    mkdirSync(join(tmpDir, 'prisma', 'migrations', '20990101000000_drop_widgets'), { recursive: true });
+    writeFileSync(
+      join(tmpDir, 'prisma', 'migrations', '20990101000000_drop_widgets', 'migration.sql'),
+      'DROP TABLE "widgets";'
+    );
+  });
+
+  afterAll(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  beforeEach(async () => {
+    const base = new URL(process.env.TEST_DATABASE_URL as string);
+    admin = new PrismaClient({ adapter: new PrismaPg({ connectionString: base.href }) });
+    await dropScratch();
+    await admin.$executeRawUnsafe(`CREATE DATABASE ${SCRATCH_DB}`);
+
+    base.pathname = `/${SCRATCH_DB}`;
+    scratchUrl = base.href;
+  }, 60_000);
+
+  afterEach(async () => {
+    await dropScratch();
+    await admin.$disconnect();
+  }, 60_000);
+
+  it('aborts and leaves live data intact instead of dropping a populated table', async () => {
+    const setup = new PrismaClient({ adapter: new PrismaPg({ connectionString: scratchUrl }) });
+    try {
+      await setup.$executeRawUnsafe(`CREATE TABLE "widgets" (id int)`);
+
+      // Insert through a separate connection, then disconnect it — disconnecting
+      // flushes the backend's pg_stat_user_tables counters.
+      const inserter = new PrismaClient({ adapter: new PrismaPg({ connectionString: scratchUrl }) });
+      await inserter.$executeRawUnsafe(`INSERT INTO "widgets" VALUES (1)`);
+      await inserter.$disconnect();
+
+      await vi.waitFor(async () => {
+        const [{ n }] = await setup.$queryRawUnsafe<{ n: bigint }[]>(
+          `SELECT COALESCE(SUM(n_tup_ins - n_tup_del),0)::bigint AS n FROM pg_stat_user_tables WHERE schemaname='public'`
+        );
+        expect(n).toBeGreaterThan(0n);
+      }, { timeout: 10_000, interval: 50 });
+
+      const result = runMigrate(scratchUrl, {}, tmpDir);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('ABORT 20990101000000_drop_widgets');
+
+      const [{ count }] = await setup.$queryRawUnsafe<{ count: bigint }[]>(`SELECT count(*) FROM "widgets"`);
+      expect(count).toBe(1n);
+
+      const recorded = await setup.$queryRawUnsafe<{ migration_name: string }[]>(
+        `SELECT migration_name FROM "_prisma_migrations" WHERE migration_name = $1`,
+        '20990101000000_drop_widgets'
+      );
+      expect(recorded).toHaveLength(0);
+    } finally {
+      await setup.$disconnect();
+    }
+  }, 60_000);
+
+  it('applies the migration when the database has no live rows', async () => {
+    const setup = new PrismaClient({ adapter: new PrismaPg({ connectionString: scratchUrl }) });
+    try {
+      await setup.$executeRawUnsafe(`CREATE TABLE "widgets" (id int)`);
+
+      const result = runMigrate(scratchUrl, {}, tmpDir);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('apply 20990101000000_drop_widgets');
+
+      const [{ to_regclass }] = await setup.$queryRawUnsafe<{ to_regclass: string | null }[]>(
+        `SELECT to_regclass('public.widgets')::text AS to_regclass`
+      );
+      expect(to_regclass).toBeNull();
+    } finally {
+      await setup.$disconnect();
+    }
   }, 60_000);
 });

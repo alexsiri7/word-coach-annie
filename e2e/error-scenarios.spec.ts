@@ -350,15 +350,16 @@ test.describe('E2E error scenarios — 401, 403, 500', () => {
     // Type in the editor to trigger auto-save
     const editor = page.locator('.tiptap, .ProseMirror').first()
     await editor.waitFor({ state: 'visible', timeout: 5_000 })
+
+    // Register the wait before typing so we don't race the debounced save
+    const saveResponse = page.waitForResponse(
+      (res) => res.url().includes('/api/nodes/sc-1/content') && res.request().method() === 'POST',
+      { timeout: 10_000 },
+    )
     await editor.click()
     await page.keyboard.press('End')
     await page.keyboard.type(' Additional text.')
-
-    // Wait for the debounced auto-save POST to fire and fail with 500
-    await page.waitForResponse(
-      (res) => res.url().includes('/api/nodes/sc-1/content') && res.request().method() === 'POST',
-      { timeout: 10_000 },
-    ).catch(() => {/* save may have already fired */})
+    expect((await saveResponse).status()).toBe(500)
 
     // Editor should still be functional — content should still be visible
     await expect(

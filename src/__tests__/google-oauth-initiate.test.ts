@@ -9,11 +9,13 @@ vi.mock("@/lib/env", () => ({
     },
 }));
 
+const mockGenerateAuthUrl = vi.fn().mockReturnValue("https://accounts.google.com/o/oauth2/auth?state=mocked");
+
 vi.mock("googleapis", () => ({
     google: {
         auth: {
             OAuth2: class {
-                generateAuthUrl = vi.fn().mockReturnValue("https://accounts.google.com/o/oauth2/auth?state=mocked");
+                generateAuthUrl = mockGenerateAuthUrl;
             },
         },
     },
@@ -68,5 +70,55 @@ describe("GET /api/auth/google — signed state format", () => {
         expect(response.status).toBe(307);
         const location = response.headers.get("location") ?? "";
         expect(location).toBeTruthy();
+    });
+});
+
+describe("GET /api/auth/google — configuration and redirect branches", () => {
+    it("returns 501 and sets no oauth_state cookie when OAuth is not configured", async () => {
+        const { env } = await import("@/lib/env");
+        const original = env.GOOGLE_REDIRECT_URI;
+        env.GOOGLE_REDIRECT_URI = "";
+        try {
+            const { GET } = await import("@/app/api/auth/google/route");
+            const response = await GET(new NextRequest("http://localhost:3000/api/auth/google"));
+            expect(response.status).toBe(501);
+            expect(response.headers.getSetCookie().some((c) => c.startsWith("oauth_state="))).toBe(false);
+        } finally {
+            env.GOOGLE_REDIRECT_URI = original;
+        }
+    });
+
+    it("sets an oauth_redirect cookie when `from` is an allowed redirect", async () => {
+        const { isAllowedRedirect } = await import("@/lib/auth");
+        vi.mocked(isAllowedRedirect).mockReturnValueOnce(true);
+        const { GET } = await import("@/app/api/auth/google/route");
+        const response = await GET(new NextRequest("http://localhost:3000/api/auth/google?from=/read/p1"));
+
+        expect(isAllowedRedirect).toHaveBeenCalledWith("/read/p1");
+        const setCookies = response.headers.getSetCookie();
+        const redirectCookie = setCookies.find((c) => c.startsWith("oauth_redirect="));
+        expect(redirectCookie).toBeDefined();
+        expect(redirectCookie).toMatch(/^oauth_redirect=(%2Fread%2Fp1|\/read\/p1);/);
+        expect(redirectCookie?.toLowerCase()).toContain("httponly");
+        expect(redirectCookie?.toLowerCase()).toContain("samesite=lax");
+        expect(redirectCookie).toContain("Max-Age=600");
+    });
+
+    it("does not set an oauth_redirect cookie when `from` is disallowed", async () => {
+        const { GET } = await import("@/app/api/auth/google/route");
+        const response = await GET(new NextRequest("http://localhost:3000/api/auth/google?from=https://evil.example"));
+        expect(response.headers.getSetCookie().some((c) => c.startsWith("oauth_redirect="))).toBe(false);
+    });
+
+    it("returns 500 and sets no oauth_state cookie when generateAuthUrl throws", async () => {
+        mockGenerateAuthUrl.mockImplementationOnce(() => {
+            throw new Error("boom");
+        });
+        const { GET } = await import("@/app/api/auth/google/route");
+        const response = await GET(new NextRequest("http://localhost:3000/api/auth/google"));
+
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: "Internal server error" });
+        expect(response.headers.getSetCookie().some((c) => c.startsWith("oauth_state="))).toBe(false);
     });
 });

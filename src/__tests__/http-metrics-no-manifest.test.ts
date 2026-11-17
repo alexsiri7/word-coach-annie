@@ -3,7 +3,7 @@
  * file from http-metrics.test.ts because diagnostics_channel subscriptions are
  * process-wide: a second startHttpMetrics there would double-count its requests.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -29,10 +29,10 @@ describe("HTTP request metrics without a routes manifest", () => {
   it("still serves and counts the request, labelled other", async () => {
     const res = await fetch(baseUrl + "/api/health");
     expect(await res.text()).toBe("ok");
-    // response.finish can fire just after the client has the body.
-    await new Promise((resolve) => setTimeout(resolve, 20));
 
-    const { values } = await httpRequestCounter.get();
-    expect(values).toContainEqual({ labels: { method: "GET", path: "other", status: "200" }, value: 1 });
+    await vi.waitFor(async () => {
+      const { values } = await httpRequestCounter.get();
+      expect(values).toContainEqual({ labels: { method: "GET", path: "other", status: "200" }, value: 1 });
+    }, { timeout: 2_000, interval: 10 });
   });
 });

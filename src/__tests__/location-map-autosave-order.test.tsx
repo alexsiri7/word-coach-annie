@@ -109,9 +109,8 @@ describe("LocationMap autosave queue", () => {
       commitItem!({ ...BASE_ITEM, x: 2 });
     });
     await act(async () => {
-      await wait(850);
+      await vi.waitFor(() => expect(puts).toHaveLength(1), { timeout: 3_000, interval: 20 });
     });
-    expect(puts).toHaveLength(1);
     expect(puts[0].body.items[0].x).toBe(2);
 
     // Second edit: its own debounce elapses too, but the queue must hold its PUT back
@@ -120,22 +119,22 @@ describe("LocationMap autosave queue", () => {
     await act(async () => {
       commitItem!({ ...BASE_ITEM, x: 3 });
     });
+    // Must exceed AUTOSAVE_MS (800) in location-map.tsx by a wide margin, since this is a
+    // negative check: too thin a margin could let the test pass before the debounce fires.
     await act(async () => {
-      await wait(850);
+      await wait(1_600);
     });
     expect(puts).toHaveLength(1);
 
     // Resolving the first PUT unblocks the second.
     await act(async () => {
       puts[0].resolve(mockResponse({}));
-      await wait(10);
+      await vi.waitFor(() => expect(puts).toHaveLength(2));
     });
-    expect(puts).toHaveLength(2);
     expect(puts[1].body.items[0].x).toBe(3);
 
     await act(async () => {
       puts[1].resolve(mockResponse({}));
-      await wait(10);
     });
   }, 20000);
 });
