@@ -331,6 +331,13 @@ describe("MCP Opportunity Tools", () => {
             await expect(listOpportunityCandidates(opportunityId, "someone-else")).rejects.toThrow("Forbidden");
         });
 
+        it("reflects a new candidate after the empty listing was cached", async () => {
+            await listOpportunityCandidates(opportunityId, userId);
+            await createOpportunityCandidate({ opportunityId, userId, projectId });
+            const { total } = await listOpportunityCandidates(opportunityId, userId);
+            expect(total).toBe(1);
+        });
+
         it("allows the same project to be a candidate only once per opportunity", async () => {
             await createOpportunityCandidate({ opportunityId, userId, projectId });
             await expect(createOpportunityCandidate({ opportunityId, userId, projectId })).rejects.toThrow();
