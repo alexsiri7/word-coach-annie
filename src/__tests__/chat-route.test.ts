@@ -557,7 +557,12 @@ describe("DELETE /api/chat", () => {
         { chatWindowSize: 5, messagesUntilCompression: 15, compressionModel: "" },
         { apiKey: "test-key", model: "test-model" }
       );
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await vi.waitFor(async () => {
+        const [{ n }] = await testPrisma.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*) AS n FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+        expect(n).toBeGreaterThan(BigInt(0));
+      }, { timeout: 5_000, interval: 20 });
     });
     await compression;
 
