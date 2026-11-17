@@ -214,6 +214,9 @@ const ALLOWED_REDIRECT_PATTERNS = [
     /^\/project\/[a-zA-Z0-9_-]+(\/.*)?$/,
     /^\/read\/[a-zA-Z0-9_-]+(\/.*)?$/,
     /^\/universe(\/[a-zA-Z0-9_-]+(\/.*)?)?$/,
+    /^\/tasks$/,
+    /^\/opportunities(\/[a-zA-Z0-9_-]+)?$/,
+    /^\/publishing$/,
     /^\/oauth\/authorize$/,
 ];
 

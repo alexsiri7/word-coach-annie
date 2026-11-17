@@ -6,6 +6,7 @@ import LoginPage from "@/app/login/page";
 
 const router = { push: vi.fn(), replace: vi.fn() };
 let searchParams = new URLSearchParams();
+let okUrl = "/api/auth/login";
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   useSearchParams: () => searchParams,
@@ -20,9 +21,10 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  okUrl = "/api/auth/login";
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => new Response(null, { status: url === "/api/auth/login" ? 200 : 401 }))
+    vi.fn(async (url: string) => new Response(null, { status: url === okUrl ? 200 : 401 }))
   );
 });
 
@@ -64,5 +66,23 @@ describe("access-token login redirect", () => {
   it("follows an allow-listed from", async () => {
     await loginWithToken("/project/abc123");
     expect(router.push).toHaveBeenCalledWith("/project/abc123");
+  });
+});
+
+describe("session-refresh redirect", () => {
+  async function renderWithLiveSession(from: string) {
+    okUrl = "/api/auth/refresh";
+    searchParams = new URLSearchParams({ from });
+    await act(async () => root.render(<LoginPage />));
+  }
+
+  it("falls back to / for an off-site from", async () => {
+    await renderWithLiveSession("/\\evil.com");
+    expect(router.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("follows an allow-listed from", async () => {
+    await renderWithLiveSession("/tasks");
+    expect(router.replace).toHaveBeenCalledWith("/tasks");
   });
 });
