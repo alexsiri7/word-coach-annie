@@ -12,10 +12,15 @@ vi.mock("@/lib/logger", () => ({
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("@/lib/personal-tokens", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/personal-tokens")>();
+    return { ...actual, revokePersonalToken: vi.fn(actual.revokePersonalToken) };
+});
+
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
-import { verifyPersonalToken } from "@/lib/personal-tokens";
+import { verifyPersonalToken, revokePersonalToken } from "@/lib/personal-tokens";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController } from "@/lib/controllers/structure";
 import { GET, POST } from "@/app/api/account/api-tokens/route";
@@ -115,6 +120,33 @@ describe("/api/account/api-tokens", () => {
         vi.mocked(getCurrentUserId).mockReturnValue("intruder");
         expect((await revoke(id)).status).toBe(404);
         expect(await verifyPersonalToken(token)).not.toBeNull();
+    });
+
+    it("requires the CSRF header to revoke", async () => {
+        const { token, id } = await createToken();
+        const res = await DELETE(request("DELETE", undefined, false), { params: Promise.resolve({ id }) });
+        expect(res.status).toBe(403);
+        expect(revokePersonalToken).not.toHaveBeenCalled();
+        expect(await verifyPersonalToken(token)).not.toBeNull();
+    });
+
+    it("rejects a CSRF header value of \"0\"", async () => {
+        const { token, id } = await createToken();
+        const req = new NextRequest("http://localhost/api/account/api-tokens", {
+            method: "DELETE",
+            headers: { "x-csrf-protection": "0" },
+        });
+        const res = await DELETE(req, { params: Promise.resolve({ id }) });
+        expect(res.status).toBe(403);
+        expect(await verifyPersonalToken(token)).not.toBeNull();
+    });
+
+    it("returns 500 when revokePersonalToken throws", async () => {
+        const { id } = await createToken();
+        vi.mocked(revokePersonalToken).mockRejectedValueOnce(new Error("db exploded"));
+        const res = await revoke(id);
+        expect(res.status).toBe(500);
+        expect(await res.json()).toEqual({ error: "Internal server error" });
     });
 
     it("lets a script replace a beat that the editor and version history then show", async () => {
