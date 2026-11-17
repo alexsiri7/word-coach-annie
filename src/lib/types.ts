@@ -74,8 +74,9 @@ export interface WorldObjectTimelineEntry {
   updatedAt: string;
 }
 
-export type StructureNodeType = "PART" | "CHAPTER" | "SCENE";
-export type SceneStatus = "OUTLINE" | "DRAFT" | "REVISED" | "FINAL";
+import type { NodeTypeValue as StructureNodeType, SceneStatusValue as SceneStatus } from "@/schemas/nodes";
+
+export type { StructureNodeType, SceneStatus };
 
 export interface StructureNode {
   id: string;

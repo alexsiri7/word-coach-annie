@@ -119,18 +119,15 @@ Controllers live in `src/lib/controllers/` and contain all business logic. They 
 ## Adding an MCP Tool
 
 1. Add the implementation function to the appropriate file in `src/mcp/tools/`
-2. Register the tool in `src/mcp/index.ts` via `server.tool(name, description, schema, guarded(name, policy, handler))`: `policy.access` declares the resources the tool touches as `ResourceRef[]` (checked by `src/lib/access/resource-access.ts` before `handler` runs), and `policy.errorPrefix` renders a denial as an `isError` result instead of throwing. A tool registered without `guarded` gets no ownership check
-3. Use the same Zod schema as the corresponding controller method where possible
+2. Define the tool once with `defineTool({ name, description, parameters, destructive })` in the matching file of `src/lib/ai/tool-catalog/`, reusing shared schemas from `src/schemas/` (such as `NodeType`, `SceneStatus`, `ContentHash`) where they exist
+3. Register its handler in the matching file of `src/mcp/register/` with `registerTool(ctx, thingSpec, handler)`; have the handler verify ownership itself (e.g. `assertProjectOwner`/`projectIdForNode` from `src/lib/ownership.ts`) before touching data
 4. Update tool count in `docs/ARCHITECTURE.md` if registering a new tool
 
 The MCP server uses `@modelcontextprotocol/sdk`. Tools are registered with Zod input schemas; the SDK handles JSON-Schema conversion.
 
-For destructive tools, set `destructive: true` in the policy; `guarded` refuses the call unless `MCP_ALLOW_DESTRUCTIVE` is `"true"`:
+For destructive tools, set `destructive: true` on the spec. The tool is always registered; `registerTool` refuses calls with an error result unless `MCP_ALLOW_DESTRUCTIVE=true`, and the in-app chat applies the same gate to the same flag.
 
-```typescript
-server.tool("delete_thing", description, schema,
-  guarded("delete_thing", { access: ({ thingId }) => [{ kind: "node", id: thingId }], destructive: true }, handler));
-```
+A tool's description is shared by MCP and chat, so it must be true on both: do not name a tool the other surface lacks.
 
 ---
 
@@ -235,9 +232,9 @@ The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/adk-tools.ts`
 - **Tier 2** (remaining tools): loaded on demand via a `load_toolset` meta-tool when the AI needs more capability
 
 When adding a tool to the in-app chat:
-1. Add a `ToolDefinition` entry to the `tools` array in `adk-tools.ts`, with its Zod schema and its `category` (`core` for tier 1, any other category for tier 2)
-2. Add its entry to `buildChatTools` in the same file: `run` executes it, `access` declares the resources it touches (checked by `src/lib/access/resource-access.ts` before `run`), and `ownerOnly` refuses editors
-3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and name delete tools `delete_*` so `isChatDestructiveTool` gates them behind `MCP_ALLOW_DESTRUCTIVE`
+1. Give the tool's catalog spec in `src/lib/ai/tool-catalog/` a `category` (`core` for tier 1, any other category for tier 2); a spec without one is MCP-only
+2. Add its entry to `buildChatTools` in `adk-tools.ts`: `run` executes it, `access` declares the resources it touches as `ResourceRef[]` (checked by `src/lib/access/resource-access.ts` before `run`), and `ownerOnly` refuses editors
+3. Pass the spec's `ContentHash` field through to the controller; a `destructive` spec is gated behind `MCP_ALLOW_DESTRUCTIVE` automatically
 
 This two-tier approach saves ~81% token overhead vs loading all tools upfront.
 

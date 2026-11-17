@@ -59,7 +59,8 @@ src/
 │   ├── timeline/               # Timeline view
 │   └── ui/                     # Shadcn/ui primitives
 ├── lib/
-│   ├── ai/                     # AI tool registry and executor (in-app chat)
+│   ├── ai/                     # In-app chat agent and tool executors
+│   │   └── tool-catalog/       # Every AI tool's name, description, schema (shared by MCP and chat)
 │   ├── controllers/            # Business logic (structure, projects, etc.)
 │   ├── export/                 # Google Docs exporter
 │   ├── api-auth.ts             # Request authentication helpers
@@ -70,7 +71,8 @@ src/
 │   ├── types.ts                # Shared TypeScript types
 │   └── utils.ts                # Shared utilities
 ├── mcp/
-│   ├── index.ts                # MCP server entrypoint (48 tools)
+│   ├── index.ts                # MCP server entrypoint (110 tools)
+│   ├── register/               # MCP handlers and prompts, registered from the tool catalog
 │   ├── tools/                  # Tool implementations by category
 │   └── skills.ts               # Writing skill loader (MCP Prompts)
 └── __tests__/                  # Test files (Vitest)
@@ -145,7 +147,7 @@ The chat endpoint (`POST /api/chat`) uses OpenAI-compatible streaming with dynam
 
 This saves ~81% of token overhead vs loading all 48 tools upfront.
 
-Tools are defined and executed in `src/lib/ai/adk-tools.ts`, built per chat turn and pinned to the conversation's project. MCP and chat tools both declare the resources they touch, and `src/lib/access/resource-access.ts` decides access: ownership for an MCP caller, the pinned project (or its linked universe) for chat. Delete tools follow the MCP destructive gate (`MCP_ALLOW_DESTRUCTIVE`), and writes require the `contentHash` from a prior read (WCA-053).
+Tool names, descriptions and schemas come from the shared catalog in `src/lib/ai/tool-catalog/`; the specs with a chat `category` are offered to the chat. `src/lib/ai/adk-tools.ts` holds their executors, built per chat turn and pinned to the conversation's project. MCP and chat tools both declare the resources they touch, and `src/lib/access/resource-access.ts` decides access: ownership for an MCP caller, the pinned project (or its linked universe) for chat. Tools whose spec is `destructive` follow the MCP destructive gate (`MCP_ALLOW_DESTRUCTIVE`), and writes require the `contentHash` from a prior read (WCA-053).
 
 ### Prompt Security (Prompt Injection Mitigation)
 
@@ -169,7 +171,7 @@ See `src/lib/sanitize-server.ts` for `wrapUserContent` and `src/lib/ai/peer-revi
 
 ### MCP Server (external agents)
 
-`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 70 tools organized by category (Projects, Structure, StoryObjects, Universes, WritingTasks, Export, GoogleAuth, Skills). Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
+`src/mcp/index.ts` runs as a separate process via `npx tsx src/mcp/index.ts` inside the Docker container. It uses stdio transport and exposes 110 tools, one per spec in `src/lib/ai/tool-catalog/`; `createServer` composes the per-category handler files in `src/mcp/register/`, whose `registerTool` applies the token scope, the OTEL span and the spec's `destructive` gate. Includes batch operations for bulk scene/object CRUD (`batch_create_nodes`, `batch_update_nodes`, `batch_delete_nodes`, `batch_create_story_objects`, `batch_update_story_objects`, `batch_delete_story_objects`).
 
 Six writing skills are registered as **MCP Prompts** (discoverable via `list_prompts`, invocable via `get_prompt`).
 

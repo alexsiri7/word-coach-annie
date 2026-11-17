@@ -1,603 +1,23 @@
 /**
- * ADK tool definitions — the single source of truth for tool schemas, categories,
- * and execution handlers. Uses Google ADK FunctionTool instances with Zod schemas
- * for automatic JSON schema generation.
- *
- * The category-based dynamic loading (load_toolset) is preserved via a custom
- * BaseToolset implementation that the ADK agent uses.
+ * In-app chat tools: the per-turn executors (pinned to one project, SEC-01), their
+ * wrapping as Google ADK FunctionTools, and the two-tier category loading
+ * (load_toolset + DynamicToolset). Tool names, descriptions and schemas live in
+ * src/lib/ai/tool-catalog/, shared with the MCP server.
  */
 import { FunctionTool, BaseToolset } from "@google/adk";
 import type { BaseTool, ToolPredicate, ToolInputParameters } from "@google/adk";
 import type { ReadonlyContext } from "@google/adk";
-import { z, ZodObject, ZodRawShape } from "zod";
-import { NodeOrderIndex } from "@/schemas/nodes";
-import { ContentHash } from "@/schemas/content-hash";
+import { z } from "zod";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { getTracer } from "@/lib/telemetry";
+import { CHAT_TOOL_SPECS, type ChatToolSpec, type ToolCategory } from "@/lib/ai/tool-catalog";
+
+export type { ToolCategory } from "@/lib/ai/tool-catalog";
 
 // ADK bundles its own zod v3 copy. The project's zod is structurally identical
 // but TypeScript treats them as separate types due to private fields. We cast
 // through ToolInputParameters to bridge the gap safely at compile time.
 type AdkParams = ToolInputParameters;
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-export type ToolCategory =
-    | "core"
-    | "structure"
-    | "characters"
-    | "world_building"
-    | "export"
-    | "admin"
-    | "skills";
-
-export interface ToolDefinition {
-    name: string;
-    description: string;
-    category: ToolCategory;
-    parameters: ZodObject<ZodRawShape>;
-}
-
-// ─── Tool Definitions ───────────────────────────────────────────────────────
-
-const tools: ToolDefinition[] = [
-    // ─── Core (always loaded, ~8 read-only tools) ───────────────────────────
-    {
-        name: "list_projects",
-        description: "List all writing projects with word counts and metadata",
-        category: "core",
-        parameters: z.object({
-            limit: z.number().optional().describe("Max projects to return (default 20)"),
-            offset: z.number().optional().describe("Offset for pagination"),
-        }),
-    },
-    {
-        name: "get_project",
-        description: "Get a single project's details by ID",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "get_outline",
-        description: "Get the full hierarchical manuscript outline (parts → chapters → scenes) with word counts and statuses",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "read_scene_content",
-        description: "Read the latest content of a scene (returns HTML content, word count, and list of annotations)",
-        category: "core",
-        parameters: z.object({
-            nodeId: z.string().describe("The scene node ID"),
-        }),
-    },
-    {
-        name: "list_story_objects",
-        description: "List story objects (characters, locations, plotlines, world elements, notes) with optional filtering",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            type: z.enum(["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"]).optional().describe("Filter by type"),
-            search: z.string().optional().describe("Search by name (case-insensitive contains)"),
-            limit: z.number().optional().describe("Max objects to return (default 50)"),
-            offset: z.number().optional().describe("Offset for pagination"),
-        }),
-    },
-    {
-        name: "get_project_summary",
-        description: "Get a structured overview of a project: metadata, node counts by type/status, story object counts by type, total word count",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "get_open_annotations",
-        description: "Get all unresolved annotations across the project (or filtered by project ID)",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().optional().describe("Optional project ID to filter by"),
-        }),
-    },
-    {
-        name: "list_skills",
-        description: "List all available writing skills (structured instruction sets for writing tasks)",
-        category: "core",
-        parameters: z.object({}),
-    },
-    {
-        name: "get_plot_thread_status",
-        description: "Track plotline engagement across scenes. Shows which plot threads are advancing, newly mentioned, or dormant in each scene.",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "get_scene_focus",
-        description: "Get complete context for coaching on a single scene: metadata, status, word count, adjacent scenes, linked characters/locations/plotlines, and open annotations.",
-        category: "core",
-        parameters: z.object({
-            sceneId: z.string().describe("The scene node ID"),
-        }),
-    },
-    {
-        name: "get_manuscript_context",
-        description: "Get the full manuscript context for analysis: outline with scene previews, character profiles, plotline summaries, and relationships.",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "get_consistency_context",
-        description: "Gather character profiles and scene text for consistency analysis. Optionally focus on a single scene.",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            sceneId: z.string().optional().describe("Focus on a specific scene"),
-        }),
-    },
-    {
-        name: "get_voice_context",
-        description: "Gather character profiles and scene dialogue for voice consistency analysis.",
-        category: "core",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            sceneId: z.string().describe("The scene to analyze"),
-        }),
-    },
-
-    // ─── Structure ──────────────────────────────────────────────────────────
-    {
-        name: "create_node",
-        description: "Create a new structure node (PART, CHAPTER, or SCENE) in the manuscript outline",
-        category: "structure",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            type: z.enum(["PART", "CHAPTER", "SCENE"]).describe("Node type"),
-            title: z.string().describe("Node title"),
-            parentId: z.string().optional().describe("Parent node ID"),
-            synopsis: z.string().optional().describe("Brief synopsis"),
-            status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("Scene status (default OUTLINE)"),
-            insertAfterIndex: z.number().optional().describe("Insert after this order index"),
-        }),
-    },
-    {
-        name: "update_node",
-        description: "Update a structure node's title, synopsis, status, order, or parent. Requires contentHash from get_outline to prevent stale overwrites.",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The node ID to update"),
-            contentHash: ContentHash.node,
-            title: z.string().optional().describe("New title"),
-            synopsis: z.string().optional().describe("New synopsis"),
-            status: z.enum(["OUTLINE", "DRAFT", "REVISED", "FINAL"]).optional().describe("New status"),
-            orderIndex: NodeOrderIndex.optional().describe("New order index"),
-            parentId: z.string().nullable().optional().describe("New parent node ID (null to make top-level)"),
-        }),
-    },
-    {
-        name: "delete_node",
-        description: "Delete a structure node and all its children, content versions, and relationships",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The node ID to delete"),
-        }),
-    },
-    {
-        name: "write_scene_content",
-        description: "Write new content to a scene. Provide either 'content' (HTML string) or 'blocks' (structured content/beat array). Requires contentHash from read_scene_content to prevent stale overwrites.",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The scene node ID"),
-            contentHash: ContentHash.scene,
-            content: z.string().optional().describe("The HTML content to write"),
-            blocks: z.array(z.object({
-                type: z.enum(["CONTENT", "BEAT"]),
-                content: z.string(),
-            })).optional().describe("Structured content blocks"),
-        }),
-    },
-    {
-        name: "get_scene_versions",
-        description: "List the version history of a scene (timestamps and word counts)",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The scene node ID"),
-            limit: z.number().optional().describe("Max versions to return (default 20)"),
-        }),
-    },
-    {
-        name: "restore_scene_version",
-        description: "Restore a previous version of a scene's content (non-destructive)",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The scene node ID"),
-            versionId: z.string().describe("The version ID to restore"),
-        }),
-    },
-    {
-        name: "add_annotation",
-        description: "Add an annotation to a node",
-        category: "structure",
-        parameters: z.object({
-            nodeId: z.string().describe("The node ID"),
-            content: z.string().describe("Annotation content"),
-            range: z.string().optional().describe("Text range"),
-            selectedText: z.string().optional().describe("Selected text"),
-        }),
-    },
-    {
-        name: "update_annotation",
-        description: "Update an existing annotation",
-        category: "structure",
-        parameters: z.object({
-            annotationId: z.string().describe("The annotation ID"),
-            content: z.string().optional().describe("New content"),
-            resolved: z.boolean().optional().describe("Resolved status"),
-        }),
-    },
-    {
-        name: "delete_annotation",
-        description: "Delete an annotation",
-        category: "structure",
-        parameters: z.object({
-            annotationId: z.string().describe("The annotation ID"),
-        }),
-    },
-    {
-        name: "resolve_annotation",
-        description: "Resolve or unresolve an annotation",
-        category: "structure",
-        parameters: z.object({
-            annotationId: z.string().describe("The annotation ID"),
-            resolved: z.boolean().describe("Resolved status"),
-        }),
-    },
-
-    // ─── Characters (story objects) ─────────────────────────────────────────
-    {
-        name: "get_story_object",
-        description: "Get a single story object with all its details and relationships",
-        category: "characters",
-        parameters: z.object({
-            objectId: z.string().describe("The story object ID"),
-        }),
-    },
-    {
-        name: "create_story_object",
-        description: "Create a new story object (character, location, plotline, world element, or note)",
-        category: "characters",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            type: z.enum(["CHARACTER", "LOCATION", "PLOTLINE", "WORLD_ELEMENT", "NOTE"]).describe("Object type"),
-            name: z.string().describe("Object name"),
-            description: z.string().optional().describe("Description"),
-            notes: z.string().optional().describe("Additional notes"),
-            role: z.string().optional().describe("Role (for characters)"),
-            tags: z.string().optional().describe("Comma-separated tags"),
-        }),
-    },
-    {
-        name: "update_story_object",
-        description: "Update a story object's fields. Requires contentHash from get_story_object to prevent stale overwrites.",
-        category: "characters",
-        parameters: z.object({
-            objectId: z.string().describe("The story object ID"),
-            contentHash: ContentHash.storyObject,
-            name: z.string().optional().describe("New name"),
-            description: z.string().optional().describe("New description"),
-            notes: z.string().optional().describe("New notes"),
-            role: z.string().nullable().optional().describe("New role (null to clear)"),
-            tags: z.string().optional().describe("New comma-separated tags"),
-        }),
-    },
-    {
-        name: "delete_story_object",
-        description: "Delete a story object and all its relationships",
-        category: "characters",
-        parameters: z.object({
-            objectId: z.string().describe("The story object ID to delete"),
-        }),
-    },
-    {
-        name: "list_relationships",
-        description: "List all relationships in a project",
-        category: "characters",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "create_relationship",
-        description: "Create a typed relationship between two entities",
-        category: "characters",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            type: z.enum(["APPEARS_IN", "LOCATED_AT", "PART_OF_PLOTLINE", "RELATED_TO", "INTERACTS_WITH", "CONTAINS", "PRECEDES", "FOLLOWS"]).describe("Relationship type"),
-            fromNodeId: z.string().optional().describe("Source structure node ID"),
-            fromObjectId: z.string().optional().describe("Source story object ID"),
-            toNodeId: z.string().optional().describe("Target structure node ID"),
-            toObjectId: z.string().optional().describe("Target story object ID"),
-            label: z.string().optional().describe("Optional label"),
-        }),
-    },
-    {
-        name: "delete_relationship",
-        description: "Delete a relationship between two entities",
-        category: "characters",
-        parameters: z.object({
-            relationshipId: z.string().describe("The relationship ID to delete"),
-        }),
-    },
-
-    // ─── World Building (universes) ─────────────────────────────────────────
-    {
-        name: "list_universes",
-        description: "List all universes",
-        category: "world_building",
-        parameters: z.object({}),
-    },
-    {
-        name: "get_universe",
-        description: "Get a universe by ID with its world objects and linked projects",
-        category: "world_building",
-        parameters: z.object({
-            universeId: z.string().describe("The universe ID"),
-        }),
-    },
-    {
-        name: "create_universe",
-        description: "Create a new universe",
-        category: "world_building",
-        parameters: z.object({
-            title: z.string().describe("Universe title"),
-            description: z.string().optional().describe("Universe description"),
-        }),
-    },
-    {
-        name: "update_universe",
-        description: "Update a universe's metadata. Requires contentHash from get_universe to prevent stale overwrites.",
-        category: "world_building",
-        parameters: z.object({
-            universeId: z.string().describe("The universe ID"),
-            contentHash: ContentHash.universe,
-            title: z.string().optional().describe("New title"),
-            description: z.string().optional().describe("New description"),
-        }),
-    },
-    {
-        name: "delete_universe",
-        description: "Delete a universe and all its world objects and timeline entries",
-        category: "world_building",
-        parameters: z.object({
-            universeId: z.string().describe("The universe ID"),
-        }),
-    },
-    {
-        name: "list_world_objects",
-        description: "List world objects in a universe",
-        category: "world_building",
-        parameters: z.object({
-            universeId: z.string().describe("The universe ID"),
-            type: z.string().optional().describe("Filter by type (CHARACTER, LOCATION, WORLD_ELEMENT)"),
-        }),
-    },
-    {
-        name: "get_world_object",
-        description: "Get a world object by ID with its full timeline",
-        category: "world_building",
-        parameters: z.object({
-            objectId: z.string().describe("The world object ID"),
-        }),
-    },
-    {
-        name: "create_world_object",
-        description: "Create a new world object in a universe",
-        category: "world_building",
-        parameters: z.object({
-            universeId: z.string().describe("The universe ID"),
-            type: z.enum(["CHARACTER", "LOCATION", "WORLD_ELEMENT"]).describe("Object type"),
-            name: z.string().describe("Object name"),
-            description: z.string().optional().describe("Description"),
-            notes: z.string().optional().describe("Additional notes"),
-            tags: z.string().optional().describe("Comma-separated tags"),
-        }),
-    },
-    {
-        name: "update_world_object",
-        description: "Update a world object's fields. Requires contentHash from get_world_object to prevent stale overwrites.",
-        category: "world_building",
-        parameters: z.object({
-            objectId: z.string().describe("The world object ID"),
-            contentHash: ContentHash.worldObject,
-            name: z.string().optional().describe("New name"),
-            description: z.string().optional().describe("New description"),
-            notes: z.string().optional().describe("New notes"),
-            tags: z.string().optional().describe("New tags"),
-            type: z.string().optional().describe("New type"),
-        }),
-    },
-    {
-        name: "delete_world_object",
-        description: "Delete a world object and its timeline",
-        category: "world_building",
-        parameters: z.object({
-            objectId: z.string().describe("The world object ID"),
-        }),
-    },
-    {
-        name: "add_timeline_entry",
-        description: "Add a state-history entry to a world object's timeline. Timeline entries track how an object changes over story time (e.g. 'Year 12 — apprenticed to the blacksmith'). Use this to record key life events, status changes, or turning points for story consistency.",
-        category: "world_building",
-        parameters: z.object({
-            worldObjectId: z.string().describe("The world object ID"),
-            label: z.string().describe("Period or event label (e.g. 'Year 12', 'Post-War', 'Age 20')"),
-            description: z.string().optional().describe("What is true about this object at this point in story time"),
-            attributes: z.string().optional().describe("JSON blob for structured data"),
-            projectId: z.string().optional().describe("Optional project ID this entry relates to"),
-            orderIndex: z.number().optional().describe("Order index"),
-        }),
-    },
-    {
-        name: "update_timeline_entry",
-        description: "Update a world object's timeline entry. Timeline entries are state-history records tracking how an object changes over story time. Requires contentHash from get_world_object (the entry's contentHash in the timeline array) to prevent stale overwrites.",
-        category: "world_building",
-        parameters: z.object({
-            entryId: z.string().describe("The entry ID"),
-            contentHash: ContentHash.timelineEntry,
-            label: z.string().optional().describe("New period or event label"),
-            description: z.string().optional().describe("Updated description of what is true at this point"),
-            attributes: z.string().optional().describe("New JSON blob"),
-            orderIndex: z.number().optional().describe("New order index"),
-        }),
-    },
-    {
-        name: "delete_timeline_entry",
-        description: "Delete a state-history entry from a world object's timeline",
-        category: "world_building",
-        parameters: z.object({
-            entryId: z.string().describe("The entry ID"),
-        }),
-    },
-    {
-        name: "reorder_timeline_entries",
-        description: "Reorder state-history entries on a world object's timeline",
-        category: "world_building",
-        parameters: z.object({
-            worldObjectId: z.string().describe("The world object ID"),
-            orderedIds: z.array(z.string()).describe("Ordered entry IDs"),
-        }),
-    },
-    {
-        name: "transfer_story_object_to_universe",
-        description: "Transfer a story object (from a project) into a universe as a world object",
-        category: "world_building",
-        parameters: z.object({
-            storyObjectId: z.string().describe("The story object ID"),
-            universeId: z.string().describe("The universe ID"),
-        }),
-    },
-    {
-        name: "link_project_to_universe",
-        description: "Link a project to a universe",
-        category: "world_building",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            universeId: z.string().describe("The universe ID"),
-        }),
-    },
-    {
-        name: "unlink_project_from_universe",
-        description: "Unlink a project from its universe",
-        category: "world_building",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-
-    // ─── Export ──────────────────────────────────────────────────────────────
-    {
-        name: "export_manuscript",
-        description: "Export the full manuscript as clean Markdown",
-        category: "export",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "export_story_bible",
-        description: "Export the story bible as Markdown (all characters, locations, plotlines, world elements, relationships)",
-        category: "export",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-        }),
-    },
-    {
-        name: "export_hashnode",
-        description: "Export a node or project in Hashnode-ready Markdown format",
-        category: "export",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            nodeId: z.string().optional().describe("Specific node ID to export"),
-        }),
-    },
-    {
-        name: "export_to_google_docs",
-        description: "Export/sync a project or universe to Google Docs",
-        category: "export",
-        parameters: z.object({
-            projectId: z.string().optional().describe("Project ID to export"),
-            universeId: z.string().optional().describe("Universe ID to export"),
-            exportMode: z.enum(["UNIVERSE", "STORY_INTERNAL", "STORY_READER"]).describe("Export mode"),
-        }),
-    },
-
-    // ─── Admin ──────────────────────────────────────────────────────────────
-    {
-        name: "create_project",
-        description: "Create a new writing project",
-        category: "admin",
-        parameters: z.object({
-            title: z.string().describe("Project title"),
-            author: z.string().optional().describe("Author name"),
-            synopsis: z.string().optional().describe("Project synopsis"),
-            genre: z.string().optional().describe("Genre"),
-        }),
-    },
-    {
-        name: "update_project",
-        description: "Update a project's metadata. Requires contentHash from get_project to prevent stale overwrites.",
-        category: "admin",
-        parameters: z.object({
-            projectId: z.string().describe("The project ID"),
-            contentHash: ContentHash.project,
-            title: z.string().optional().describe("New project title"),
-            author: z.string().optional().describe("New author name"),
-            synopsis: z.string().optional().describe("New synopsis"),
-            genre: z.string().optional().describe("New genre"),
-        }),
-    },
-    {
-        name: "google_auth_status",
-        description: "Check if Google credentials are configured and valid",
-        category: "admin",
-        parameters: z.object({}),
-    },
-    {
-        name: "google_auth_connect",
-        description: "Initiate OAuth flow; returns auth URL for the user to visit",
-        category: "admin",
-        parameters: z.object({}),
-    },
-    {
-        name: "google_auth_callback",
-        description: "Complete OAuth flow with the authorization code",
-        category: "admin",
-        parameters: z.object({
-            code: z.string().describe("The authorization code from the redirect URL"),
-        }),
-    },
-    {
-        name: "google_auth_disconnect",
-        description: "Revoke and delete stored Google credentials",
-        category: "admin",
-        parameters: z.object({}),
-    },
-
-    // ─── Skills ─────────────────────────────────────────────────────────────
-    // list_skills is in core; this category is reserved for skill invocation
-];
-
-/** Get all registered tool definitions */
-export function getAllTools(): ToolDefinition[] {
-    return tools;
-}
 
 // ─── Import all tool handler implementations ─────────────────────────────────
 
@@ -666,6 +86,7 @@ import {
 import { GoogleDocsExporter } from "@/lib/export/google-docs-exporter";
 import { env, DESTRUCTIVE_TOOL_DISABLED_MESSAGE } from "@/lib/env";
 import { assertCanAccess, assertOwnerRole, type ChatRole, type Principal, type ResourceRef } from "@/lib/access/resource-access";
+import { UserFacingError } from "@/lib/controllers/errors";
 
 // ─── Chat tool scoping (SEC-01) ───────────────────────────────────────────────
 
@@ -677,20 +98,7 @@ export interface ToolContext {
   role: ChatRole;
 }
 
-/** Tools that must never be reachable from the web chat (credentials). */
-const CHAT_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
-  "google_auth_status", "google_auth_connect", "google_auth_callback", "google_auth_disconnect",
-]);
-
-export function isChatExcludedTool(name: string): boolean {
-  return CHAT_EXCLUDED_TOOLS.has(name);
-}
-
-/** Destructive tools — every chat `delete_*` tool, blocked unless MCP_ALLOW_DESTRUCTIVE=true, the same gate as MCP (WCA-032). */
-export function isChatDestructiveTool(name: string): boolean {
-  return name.startsWith("delete_");
-}
-
+/** Blocks a destructive spec's executor unless MCP_ALLOW_DESTRUCTIVE=true, the same gate as MCP (WCA-032). */
 function guardDestructive(executor: (args: Args) => Promise<unknown>): (args: Args) => Promise<unknown> {
   return async (args) => {
     if (!env.MCP_ALLOW_DESTRUCTIVE) {
@@ -775,6 +183,7 @@ function buildChatTools(ctx: ToolContext): Record<string, ChatTool> {
             a.contentHash as string,
           );
         }
+        if (a.content === undefined) throw new UserFacingError("Either 'content' or 'blocks' must be provided");
         return writeSceneContent(a.nodeId as string, a.content as string, a.contentHash as string);
       },
     },
@@ -894,7 +303,7 @@ function buildChatTools(ctx: ToolContext): Record<string, ChatTool> {
       },
     },
 
-    // Admin (project-level only; credential tools are excluded from chat)
+    // Admin (project-level only; the Google credential tools have no chat category)
     create_project: { run: async (a) => createProject({ ...(a as Parameters<typeof createProject>[0]), userId: ctx.userId }) },
     update_project: {
       access: (a) => [project(a.projectId)],
@@ -908,8 +317,8 @@ function buildChatTools(ctx: ToolContext): Record<string, ChatTool> {
 
 // ─── Build ADK FunctionTool instances ────────────────────────────────────────
 
-/** Convert a ToolDefinition + executor into an ADK FunctionTool */
-function toAdkTool(def: ToolDefinition, executor: (args: Args) => Promise<unknown>): FunctionTool {
+/** Convert a chat tool spec + executor into an ADK FunctionTool */
+function toAdkTool(def: ChatToolSpec, executor: (args: Args) => Promise<unknown>): FunctionTool {
   return new FunctionTool({
     name: def.name,
     description: def.description,
@@ -952,8 +361,7 @@ function buildAdkToolMaps(ctx: ToolContext): {
   const principal: Principal = { userId: ctx.userId, pinnedProjectId: ctx.projectId, role: ctx.role };
   const byName = new Map<string, FunctionTool>();
   const byCategory = new Map<ToolCategory, FunctionTool[]>();
-  for (const def of getAllTools()) {
-    if (CHAT_EXCLUDED_TOOLS.has(def.name)) continue;
+  for (const def of CHAT_TOOL_SPECS) {
     const chatTool = chatTools[def.name];
     if (!chatTool) throw new Error(`No executor found for tool: ${def.name}`);
     const executor = async (a: Args) => {
@@ -961,7 +369,7 @@ function buildAdkToolMaps(ctx: ToolContext): {
       await assertCanAccess(principal, chatTool.access?.(a) ?? []);
       return chatTool.run(a);
     };
-    const tool = toAdkTool(def, isChatDestructiveTool(def.name) ? guardDestructive(executor) : executor);
+    const tool = toAdkTool(def, def.destructive ? guardDestructive(executor) : executor);
     byName.set(def.name, tool);
     const list = byCategory.get(def.category) ?? [];
     list.push(tool);
@@ -993,7 +401,7 @@ export const loadToolsetTool = new FunctionTool({
   execute: async (input) => {
     const { category } = input as { category: string };
     const cat = category as ToolCategory;
-    const names = getAllTools().filter((t) => t.category === cat && !CHAT_EXCLUDED_TOOLS.has(t.name)).map((t) => t.name);
+    const names = CHAT_TOOL_SPECS.filter((t) => t.category === cat).map((t) => t.name);
     return {
       loaded: cat,
       toolCount: names.length,
@@ -1029,7 +437,7 @@ export function getAdkToolByName(ctx: ToolContext, name: string): FunctionTool |
 
 /** Get the list of tool categories */
 export function getAdkCategories(): ToolCategory[] {
-  return Array.from(new Set(getAllTools().map((t) => t.category)));
+  return Array.from(new Set(CHAT_TOOL_SPECS.map((t) => t.category)));
 }
 
 // ─── DynamicToolset: ADK BaseToolset for load_toolset pattern ────────────────
