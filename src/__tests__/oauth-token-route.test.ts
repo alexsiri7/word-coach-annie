@@ -493,7 +493,7 @@ describe("POST /oauth/token", () => {
       expect(createMcpToken).not.toHaveBeenCalled();
     });
 
-    it("refresh_token grant still answers invalid_grant when family revocation throws", async () => {
+    it("refresh_token grant returns server_error when family revocation throws", async () => {
       vi.mocked(getClient).mockResolvedValue(refreshClient);
       vi.mocked(verifyMcpToken).mockResolvedValue(familyToken);
       vi.mocked(claimToken).mockResolvedValue(false);
@@ -501,8 +501,8 @@ describe("POST /oauth/token", () => {
 
       const res = await POST(makeTokenRequest(refreshBody));
 
-      expect(res.status).toBe(400);
-      expect((await res.json()).error).toBe("invalid_grant");
+      expect(res.status).toBe(500);
+      expect((await res.json()).error).toBe("server_error");
       expect(createMcpToken).not.toHaveBeenCalled();
     });
   });

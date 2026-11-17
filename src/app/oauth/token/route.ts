@@ -235,13 +235,14 @@ async function handleRefreshToken(body: Record<string, string>) {
       return errorResponse("server_error", "Internal server error", 500);
     }
     if (!claimed) {
-      let familyRevoked = false;
+      let familyRevoked;
       try {
         // The family row must outlive every member, the newest of which was minted after this token.
         const familyExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
         familyRevoked = await revokeFamilyOnReuse(tokenData.jti, tokenData.familyId, tokenData.userId, familyExpiresAt);
       } catch (err) {
         logger.error("OAuth refresh: token family revocation failed", err);
+        return errorResponse("server_error", "Internal server error", 500);
       }
       logger.warn("OAuth refresh token reuse detected — concurrent or replayed use", {
         jti: tokenData.jti,

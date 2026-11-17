@@ -42,11 +42,16 @@ export async function createMcpToken(
     .sign(key);
 }
 
+export type VerifiedMcpToken = Omit<McpTokenPayload, "type"> & {
+  jti: string | undefined;
+  exp: number | undefined;
+};
+
 /** Verify an MCP token and return its payload, or null if invalid. */
 export async function verifyMcpToken(
   token: string,
   expectedType: "mcp_access" | "mcp_refresh"
-): Promise<{ userId: string; email: string; clientId: string; jti: string | undefined; exp: number | undefined; familyId?: string } | null> {
+): Promise<VerifiedMcpToken | null> {
   try {
     const key = await getJwtKey();
     const { payload } = await jwtVerify(token, key, {

@@ -349,6 +349,14 @@ describe("refresh token functions", () => {
         expect(isTokenFamilyRevoked).toHaveBeenCalledWith("F");
     });
 
+    it("returns null if the family check throws (fail closed)", async () => {
+        vi.mocked(isTokenFamilyRevoked).mockRejectedValueOnce(new Error("Connection refused"));
+
+        const token = await createRefreshToken({ userId: "u1", email: "u@test.com", name: "Test", familyId: "F" });
+        await expect(verifyRefreshToken(token)).resolves.toBeNull();
+        expect(isTokenFamilyRevoked).toHaveBeenCalledWith("F");
+    });
+
     it("verifyRefreshTokenClaims returns the payload without consulting the blocklist", async () => {
         vi.mocked(isTokenRevoked).mockResolvedValue(true);
         vi.mocked(isTokenFamilyRevoked).mockResolvedValue(true);
