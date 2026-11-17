@@ -24,6 +24,15 @@ Every request outside a public set — health check, sign-in and sign-out, landi
 - WHEN a request is made to a project API
 - THEN it is refused as unauthenticated
 
+### Requirement: MCP OAuth tokens reach only the MCP endpoint
+
+An MCP OAuth access token SHALL act as its user only on the MCP endpoint, and SHALL be refused with 403 on every other route.
+
+#### Scenario: MCP client calls an account route
+- GIVEN an MCP client the user approved
+- WHEN it uses its access token to create a personal API token, export the user's data or delete the account
+- THEN the request is refused with 403
+
 ### Requirement: Users can issue personal API tokens
 
 A signed-in user SHALL be able to create named personal API tokens, list them with their scope and last use, and revoke them. A token SHALL be shown only once, at creation, and stored only as a hash. A revoked or unknown token SHALL be refused with 401. Requests made with a token SHALL be rate-limited per token, and each token's last use SHALL be recorded.

@@ -113,7 +113,7 @@ export async function verifyPersonalToken(token: string): Promise<VerifiedPerson
     return { tokenId: row.id, userId: row.user.id, email: row.user.email, scope: row.scope };
 }
 
-function isUnder(pathname: string, prefix: string): boolean {
+export function isUnder(pathname: string, prefix: string): boolean {
     return pathname === prefix || pathname.startsWith(prefix + "/");
 }
 
