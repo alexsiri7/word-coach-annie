@@ -689,18 +689,19 @@ requirements:
 
   - id: WCA-057
     title: Active project limit per user
-    statement: "When an authenticated user creates a project — via POST /api/projects, JSON import, or the MCP or chat-agent create_project tool — while already owning their configured maximum of unarchived projects (UserAiSettings.maxActiveProjects, default 3), the system shall reject the creation with an error that names the limit, and concurrent creations shall not exceed it."
+    statement: "When an authenticated user creates a project — via POST /api/projects, JSON import, or the MCP or chat-agent create_project tool — or unarchives one via DELETE /api/projects/[id]/archive, while already owning their configured maximum of unarchived projects (UserAiSettings.maxActiveProjects, default 3), the system shall reject the request with an error that names the limit, and concurrent creations or unarchives shall not exceed it."
     category: functional
     priority: must
     status: active
-    source: src/lib/project-limit.ts assertActiveProjectLimit, src/app/api/projects/route.ts, src/app/api/projects/import/route.ts, src/lib/controllers/projects.ts createProject, src/lib/import-json.ts, src/__tests__/projects-limit-route.test.ts, src/__tests__/project-limit-paths.test.ts
+    source: src/lib/project-limit.ts assertActiveProjectLimit, src/app/api/projects/route.ts, src/app/api/projects/import/route.ts, src/lib/controllers/projects.ts createProject, src/lib/import-json.ts, src/app/api/projects/[id]/archive/route.ts, src/__tests__/projects-limit-route.test.ts, src/__tests__/project-limit-paths.test.ts
     acceptance:
       - "At the limit, POST /api/projects and POST /api/projects/import return 403 with \"You've reached your N active project limit. Archive a project to create a new one.\", and MCP/chat-agent create_project reject with the same message; no project is created"
+      - "At the limit, DELETE /api/projects/[id]/archive returns 403 with the same message and the project stays archived"
       - "Archived projects do not count toward the limit, so archiving a project frees a slot"
       - "A user's maxActiveProjects setting overrides the default of 3"
-      - "The count and the create run in one Serializable transaction, so concurrent creations one slot below the limit create only one project; a serialization conflict on the REST routes returns 409"
+      - "The count and the create or unarchive run in one Serializable transaction, so concurrent creations or unarchives one slot below the limit activate only one project; a serialization conflict on the REST routes returns 409"
       - "Requests without a user id (API_TOKEN or auth-disabled mode) and the one-time onboarding sample import are not limited; the sample still counts toward the limit once created"
-    notes: "Extends WCA-001's create step. Only creation is limited: unarchiving a project (DELETE /api/projects/[id]/archive) does not check the limit, so it can leave a user above it."
+    notes: "Extends WCA-001's create and unarchive steps."
 
   - id: WCA-058
     title: Per-user AI provider and behavior settings
