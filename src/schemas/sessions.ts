@@ -5,10 +5,16 @@ import { z } from "zod";
 export const MAX_SESSION_WORDS = 1_000_000;
 export const MAX_SESSION_SECONDS = 86_400;
 
-const notFutureInstant = (value: string) => new Date(value).getTime() <= Date.now();
+// Sessions are stamped by the browser's clock, which may run ahead of the server's;
+// the scene editor ignores the response, so a rejection would silently lose the session.
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
+const latestAcceptable = () => new Date(Date.now() + CLOCK_SKEW_TOLERANCE_MS);
+
+const notFutureInstant = (value: string) => new Date(value) <= latestAcceptable();
 
 // `date` is the UTC calendar day the client recorded, so it is compared as a string.
-const notFutureDay = (value: string) => value <= new Date().toISOString().slice(0, 10);
+const notFutureDay = (value: string) => value <= latestAcceptable().toISOString().slice(0, 10);
 
 export const SessionCreateSchema = z.object({
   nodeId: z.string().min(1, "nodeId must be non-empty").nullable().optional(),

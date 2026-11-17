@@ -1110,7 +1110,7 @@ Record a writing session. Owner only — sessions count toward the owner's heatm
 
 **Response**: `201` with the created session.
 
-**Errors**: `400` invalid body, or a `date`, `startedAt` or `endedAt` in the future; `403` not the project owner; `404` project not found or `nodeId` from another project
+**Errors**: `400` invalid body, or a `date`, `startedAt` or `endedAt` in the future (beyond five minutes of client clock skew); `403` not the project owner; `404` project not found or `nodeId` from another project
 
 ---
 

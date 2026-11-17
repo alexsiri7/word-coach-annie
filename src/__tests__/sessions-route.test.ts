@@ -68,6 +68,14 @@ describe("POST /api/projects/[id]/sessions", () => {
     expect(await testPrisma.writingSession.count()).toBe(0);
   });
 
+  it.each([
+    ["dated today", { date: new Date().toISOString().slice(0, 10) }],
+    ["ended by a client clock a few seconds fast", { endedAt: new Date(Date.now() + 5000).toISOString() }],
+  ])("creates a session %s", async (_label, body) => {
+    const res = await post(projectId, body);
+    expect(res.status).toBe(201);
+  });
+
   it("returns 404 for a nodeId from another project", async () => {
     const other = await testPrisma.project.create({ data: { title: "Other", author: "Someone" } });
     const foreign = await testPrisma.structureNode.create({
