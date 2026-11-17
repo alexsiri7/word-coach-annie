@@ -79,8 +79,8 @@ function serializeUnlinkedSubmission(
 /**
  * A null `userId` is the deployment-level caller of a single-user install, not an anonymous
  * one: routes only pass it through when `isGoogleAuthMode()` is false, so it is unscoped and
- * matches every row — the same convention as `verifyProjectAccess` and MCP's
- * `verifyProjectOwnership`. A real userId is still matched exactly.
+ * matches every row — the same convention as `verifyProjectAccess` and
+ * `assertProjectOwner`. A real userId is still matched exactly.
  */
 async function requireOwnedOpportunity(id: string, userId: string | null) {
     const existing = await prisma.opportunity.findUnique({

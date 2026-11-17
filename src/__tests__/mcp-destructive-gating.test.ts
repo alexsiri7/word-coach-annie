@@ -265,7 +265,7 @@ describe("MCP project ownership checks", () => {
     const tool = getToolHandler(server, "get_outline");
     expect(tool).toBeDefined();
 
-    // verifyProjectOwnership throws — the OTEL span wrapper re-throws
+    // assertCanAccess throws — the OTEL span wrapper re-throws
     await expect(tool.handler({ projectId: "p1" })).rejects.toThrow("access denied");
   });
 

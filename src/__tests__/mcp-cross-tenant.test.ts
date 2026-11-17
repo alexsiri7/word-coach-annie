@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { prisma } from "@/lib/db";
 
 vi.mock("../lib/controllers/google-auth", () => ({
@@ -126,6 +128,59 @@ describe("MCP cross-tenant access (SEC-02)", () => {
 
             const result = await callTool("owner-a", "delete_relationship", { relationshipId: rel.id });
             expect(result.isError).toBeUndefined();
+        });
+    });
+
+    describe("batch tools", () => {
+        async function setup() {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const node = await prisma.structureNode.create({ data: { projectId: project.id, type: "SCENE", title: "S1" } });
+            const storyObject = await prisma.storyObject.create({ data: { projectId: project.id, type: "CHARACTER", name: "Hero" } });
+            return { project, node, storyObject };
+        }
+
+        it("denies batch node update/delete for another user's nodes", async () => {
+            const { node } = await setup();
+            for (const [tool, args] of [
+                ["batch_update_nodes", { updates: [{ nodeId: node.id, title: "Hijacked" }] }],
+                ["batch_delete_nodes", { nodeIds: [node.id] }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+        });
+
+        it("denies batch story-object update/delete for another user's story objects", async () => {
+            const { storyObject } = await setup();
+            for (const [tool, args] of [
+                ["batch_update_story_objects", { updates: [{ objectId: storyObject.id, name: "Hijacked" }] }],
+                ["batch_delete_story_objects", { objectIds: [storyObject.id] }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+        });
+
+        it("allows the owner to batch update their own nodes and story objects", async () => {
+            const { node, storyObject } = await setup();
+            const nodeResult = await callTool("owner-a", "batch_update_nodes", { updates: [{ nodeId: node.id, title: "Renamed" }] });
+            expect(nodeResult.isError).toBeUndefined();
+
+            const objectResult = await callTool("owner-a", "batch_update_story_objects", { updates: [{ objectId: storyObject.id, name: "Renamed" }] });
+            expect(objectResult.isError).toBeUndefined();
+        });
+
+        it("allows the owner to batch delete their own nodes and story objects", async () => {
+            const { node, storyObject } = await setup();
+            const nodeResult = await callTool("owner-a", "batch_delete_nodes", { nodeIds: [node.id] });
+            expect(nodeResult.isError).toBeUndefined();
+            expect(await prisma.structureNode.findUnique({ where: { id: node.id } })).toBeNull();
+
+            const objectResult = await callTool("owner-a", "batch_delete_story_objects", { objectIds: [storyObject.id] });
+            expect(objectResult.isError).toBeUndefined();
+            expect(await prisma.storyObject.findUnique({ where: { id: storyObject.id } })).toBeNull();
         });
     });
 
@@ -471,6 +526,26 @@ describe("MCP cross-tenant access (SEC-02)", () => {
             const result = await callTool("owner-a", "get_location_snapshot", {});
             expect(result.isError).toBe(true);
             expect(result.content[0].text).toContain("Provide exactly one of snapshotId or storyObjectId");
+        });
+    });
+
+    describe("scene prompts", () => {
+        async function getPrompt(userId: string, name: string, args: Record<string, string>) {
+            const { createServer } = await import("../mcp/index");
+            const server = createServer({ userId });
+            const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+            const client = new Client({ name: "test", version: "1.0.0" });
+            await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+            return client.getPrompt({ name, arguments: args });
+        }
+
+        it("refuses review and plan_beats on a scene in another user's project", async () => {
+            const project = await prisma.project.create({ data: { title: "P", userId: "owner-a" } });
+            const scene = await prisma.structureNode.create({ data: { projectId: project.id, type: "SCENE", title: "Secret scene" } });
+            for (const name of ["review", "plan_beats"]) {
+                await expect(getPrompt("owner-b", name, { sceneId: scene.id })).rejects.toThrow(/access denied/);
+                await expect(getPrompt("owner-a", name, { sceneId: scene.id })).resolves.toBeDefined();
+            }
         });
     });
 

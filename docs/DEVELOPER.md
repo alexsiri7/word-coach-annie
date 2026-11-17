@@ -119,18 +119,17 @@ Controllers live in `src/lib/controllers/` and contain all business logic. They 
 ## Adding an MCP Tool
 
 1. Add the implementation function to the appropriate file in `src/mcp/tools/`
-2. Register the tool in `src/mcp/index.ts` via `server.tool(name, schema, handler)`
+2. Register the tool in `src/mcp/index.ts` via `server.tool(name, description, schema, guarded(name, policy, handler))`: `policy.access` declares the resources the tool touches as `ResourceRef[]` (checked by `src/lib/access/resource-access.ts` before `handler` runs), and `policy.errorPrefix` renders a denial as an `isError` result instead of throwing. A tool registered without `guarded` gets no ownership check
 3. Use the same Zod schema as the corresponding controller method where possible
 4. Update tool count in `docs/ARCHITECTURE.md` if registering a new tool
 
 The MCP server uses `@modelcontextprotocol/sdk`. Tools are registered with Zod input schemas; the SDK handles JSON-Schema conversion.
 
-For destructive tools: check `process.env.MCP_ALLOW_DESTRUCTIVE` before registering:
+For destructive tools, set `destructive: true` in the policy; `guarded` refuses the call unless `MCP_ALLOW_DESTRUCTIVE` is `"true"`:
 
 ```typescript
-if (process.env.MCP_ALLOW_DESTRUCTIVE === "true") {
-  server.tool("delete_thing", schema, handler);
-}
+server.tool("delete_thing", description, schema,
+  guarded("delete_thing", { access: ({ thingId }) => [{ kind: "node", id: thingId }], destructive: true }, handler));
 ```
 
 ---
@@ -237,7 +236,7 @@ The in-app AI chat (`POST /api/chat`) loads tools from `src/lib/ai/adk-tools.ts`
 
 When adding a tool to the in-app chat:
 1. Add a `ToolDefinition` entry to the `tools` array in `adk-tools.ts`, with its Zod schema and its `category` (`core` for tier 1, any other category for tier 2)
-2. Add its handler to `buildToolExecutors` in the same file
+2. Add its entry to `buildChatTools` in the same file: `run` executes it, `access` declares the resources it touches (checked by `src/lib/access/resource-access.ts` before `run`), and `ownerOnly` refuses editors
 3. Mirror MCP's safety rules for the same mutation: use the shared `ContentHash` field from `src/schemas/content-hash.ts` and pass the hash to the controller, and name delete tools `delete_*` so `isChatDestructiveTool` gates them behind `MCP_ALLOW_DESTRUCTIVE`
 
 This two-tier approach saves ~81% token overhead vs loading all tools upfront.
