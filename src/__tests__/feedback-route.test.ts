@@ -63,6 +63,24 @@ describe("POST /api/feedback", () => {
     expect(body.title).toBe("Bug: @\u200Boctocat see #\u200B12");
   });
 
+  it("omits non-string context fields instead of crashing", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/42" }),
+    });
+
+    const res = await POST(
+      makeRequest({ type: "bug", message: "x", context: { userAgent: 12345, screenSize: { w: 1 } } })
+    );
+    expect(res.status).toBe(201);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.body).not.toContain("**Browser:**");
+    expect(body.body).not.toContain("**Screen:**");
+  });
+
   it("returns 400 when type is invalid", async () => {
     const res = await POST(
       makeRequest({ type: "invalid", message: "Hello" })

@@ -85,7 +85,7 @@ describe("escapeMarkdown", () => {
 
     it("escapes markdown link syntax", () => {
         expect(escapeMarkdown("[click](https://evil.com)")).toBe(
-            "\\[click\\]\\(https://evil.com\\)"
+            "\\[click\\]\\(https:\u200B//evil.com\\)"
         );
     });
 
@@ -136,6 +136,12 @@ describe("neutralizeGitHubReferences", () => {
         expect(neutralizeGitHubReferences("cc @octocat, see #12")).toBe(
             "cc @\u200Boctocat, see #\u200B12"
         );
+    });
+
+    it("breaks URL autolinks so a full issue URL is no cross-reference", () => {
+        expect(
+            neutralizeGitHubReferences("https://github.com/o/r/issues/12 or WWW.github.com")
+        ).toBe("https:\u200B//github.com/o/r/issues/12 or WWW\u200B.github.com");
     });
 });
 
