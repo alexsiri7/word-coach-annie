@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ANNIE_PERSONA } from "@/lib/ai/annie-voice";
 import {
   buildCoachSystemPrompt,
+  buildReviewSystemPrompt,
   formatStoryContext,
   formatToolLog,
   historyFetchLimit,
@@ -29,6 +30,23 @@ describe("buildCoachSystemPrompt", () => {
     expect(prompt.startsWith(ANNIE_PERSONA)).toBe(true);
     expect(prompt).toContain("Hard Rule: No Prose");
     expect(prompt).not.toContain("update_paragraph");
+  });
+});
+
+describe("buildReviewSystemPrompt", () => {
+  it("resolves the persona by conversation type and interpolates the project title", () => {
+    const prompt = buildReviewSystemPrompt("review-fan", "The Lighthouse");
+
+    expect(prompt).toContain("The Lighthouse");
+    expect(prompt).toContain("book club conversation");
+    expect(prompt).not.toContain("acquisitions editor");
+  });
+
+  it("falls back to the review-editor persona for an unrecognized conversation type", () => {
+    const prompt = buildReviewSystemPrompt("review-nonexistent", "The Lighthouse");
+
+    expect(prompt).toContain("The Lighthouse");
+    expect(prompt).toContain("acquisitions editor");
   });
 });
 
