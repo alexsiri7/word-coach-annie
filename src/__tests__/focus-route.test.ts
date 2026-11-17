@@ -90,6 +90,20 @@ describe("Focus API route", () => {
         });
     });
 
+    it.each(["OWNER", "EDITOR", null] as const)("keeps OUTLINE scenes for role %s", async (role) => {
+        vi.mocked(verifyProjectReadAccessByNode).mockResolvedValueOnce({ authorized: true, projectId, role });
+        const first = await StructureController.createNode({ projectId, type: "SCENE", title: "First", status: "DRAFT" });
+        const hidden = await StructureController.createNode({ projectId, type: "SCENE", title: "Hidden", status: "OUTLINE" });
+
+        const { GET } = await import("@/app/api/focus/[sceneId]/route");
+        const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: first.id }));
+
+        expect((res as any).status).toBe(200);
+        const body = await (res as any).json();
+        expect(body.timelineScenes.map((s: { title: string }) => s.title)).toEqual(["First", "Hidden"]);
+        expect(body.context.nextScene).toEqual({ id: hidden.id, title: "Hidden" });
+    });
+
     it("GET returns 500 for non-existent scene", async () => {
         const { GET } = await import("@/app/api/focus/[sceneId]/route");
         const res = await GET(new Request("http://localhost") as any, mockParams({ sceneId: "nonexistent" }));
