@@ -102,14 +102,7 @@ export async function revokeFamilyOnReuse(
         throw err;
     }
     if (!claim || Date.now() - claim.revokedAt.getTime() < REFRESH_REUSE_GRACE_MS) return false;
-    try {
-        await prisma.revokedToken.create({ data: { jti: familyKey(familyId), userId, expiresAt } });
-    } catch (err) {
-        // P2002: the family is already revoked.
-        if ((err as { code?: string }).code !== "P2002") {
-            logger.error("[token-blocklist] Failed to revoke token family:", err);
-            throw err;
-        }
-    }
+    // Either claim outcome leaves the family revoked; a false only means a concurrent caller got there first.
+    await claimToken(familyKey(familyId), userId, expiresAt);
     return true;
 }
