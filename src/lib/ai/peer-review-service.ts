@@ -178,7 +178,21 @@ function parseOrLog<T>(raw: string, role: string, fallback: T): T {
 export const MANUSCRIPT_EMPTY = "Manuscript is empty";
 export const AI_NOT_CONFIGURED = "AI not configured";
 
-export async function runPeerReview(projectId: string, userId?: string | null) {
+// Per process: a second request for a project whose review is still running receives
+// that pending run instead of starting another. Not shared across replicas.
+const inFlightReviews = new Map<string, ReturnType<typeof executePeerReview>>();
+
+export function runPeerReview(projectId: string, userId?: string | null) {
+  const pending = inFlightReviews.get(projectId);
+  if (pending) return pending;
+  const run = executePeerReview(projectId, userId).finally(() => {
+    inFlightReviews.delete(projectId);
+  });
+  inFlightReviews.set(projectId, run);
+  return run;
+}
+
+async function executePeerReview(projectId: string, userId?: string | null) {
   const manuscript = await exportManuscript(projectId);
   if (!manuscript.trim()) {
     throw new UserFacingError(MANUSCRIPT_EMPTY);

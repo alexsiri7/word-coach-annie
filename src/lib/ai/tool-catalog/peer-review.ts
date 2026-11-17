@@ -3,14 +3,14 @@ import { defineTool } from "./types";
 
 export const getPeerReviewPromptsSpec = defineTool({
     name: "get_peer_review_prompts",
-    description: "Return the prompt/lens text used by each of the four peer review agents (editor, fan, author, comedy writer). Useful for understanding what angle each reviewer takes.",
+    description: "Return the prompt/lens text used by each of the five peer review agents (editor, fan, author, comedy writer, acting coach). Useful for understanding what angle each reviewer takes.",
     destructive: false,
     parameters: z.object({}),
 });
 
 export const runPeerReviewSpec = defineTool({
     name: "run_peer_review",
-    description: "Trigger a full peer review of the project — runs four agents (editor, fan reader, peer author, comedy writer) in parallel and stores the result. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record.",
+    description: "Trigger a full peer review of the project — five reviewer personas (acquisitions editor, fan reader, peer author, acting coach, comedy writer) read it in parallel, then a consensus is synthesised and the result is stored. Equivalent to clicking Peer Review in the web UI. Returns the newly created PeerReview record; if a peer review is already running for this project, returns that run's record instead of starting another.",
     destructive: false,
     parameters: z.object({ projectId: z.string() }),
 });

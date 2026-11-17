@@ -250,3 +250,60 @@ describe("runPeerReview", () => {
     await expect(runPeerReview("proj-1")).rejects.toThrow("db down");
   });
 });
+
+describe("runPeerReview concurrency", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getAiConfig).mockResolvedValue({ apiKey: "test-key", model: "test-model" });
+    vi.mocked(exportManuscript).mockResolvedValue("Once upon a time in a land far away...");
+    vi.mocked(runSimpleCompletion).mockResolvedValue(JSON.stringify(DEFAULT_SAVED.publisher));
+    vi.mocked(prisma.peerReview.create).mockResolvedValue(DEFAULT_SAVED as never);
+  });
+
+  function holdManuscriptExport() {
+    let release!: () => void;
+    vi.mocked(exportManuscript).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = () => resolve("Once upon a time in a land far away...");
+      })
+    );
+    return () => release();
+  }
+
+  it("returns the in-progress run instead of starting another for the same project", async () => {
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1");
+    const second = runPeerReview("proj-1");
+    release();
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(b).toBe(a);
+    expect(exportManuscript).toHaveBeenCalledTimes(1);
+    expect(runSimpleCompletion).toHaveBeenCalledTimes(6);
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs reviews for different projects independently", async () => {
+    await Promise.all([runPeerReview("proj-1"), runPeerReview("proj-2")]);
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts a fresh run once the previous one has finished", async () => {
+    await runPeerReview("proj-1");
+    await runPeerReview("proj-1");
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects every waiter when the run fails, then lets a new run start", async () => {
+    vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1");
+    const second = runPeerReview("proj-1");
+    release();
+
+    await expect(first).rejects.toThrow("db down");
+    await expect(second).rejects.toThrow("db down");
+    await expect(runPeerReview("proj-1")).resolves.toMatchObject({ id: "rev-1" });
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
+  });
+});

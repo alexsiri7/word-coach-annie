@@ -275,6 +275,11 @@ describe("run_peer_review and get_peer_reviews tools", () => {
         expect(runSection).toContain("Error running peer review");
     });
 
+    it("run_peer_review description names all five personas", () => {
+        expect(runSection).toContain("acting coach");
+        expect(runSection).not.toContain("four agents");
+    });
+
     it("get_peer_reviews clamps limit with Math.min(Math.max(...))", () => {
         expect(getSection).toContain("Math.min(Math.max(limit");
     });
