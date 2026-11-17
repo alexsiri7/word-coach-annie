@@ -644,6 +644,23 @@ describe("middleware auth logic", () => {
             expect(res.headers.get("set-cookie")).toBeNull();
         });
 
+        it("refuses a wrong token in Google-auth mode with the same 403, not 401 (SEC-005)", async () => {
+            process.env.API_TOKEN = TEST_TOKEN;
+            vi.stubEnv("GOOGLE_CLIENT_ID", "test-client-id");
+            const { POST } = await import("@/app/api/auth/login/route");
+            const req = new Request("http://localhost/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: "wrong-token" }),
+            });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const res = await POST(req as any);
+            expect(res.status).toBe(403);
+            expect(await res.json()).toEqual({
+                error: "Token sign-in is disabled when Google sign-in is configured",
+            });
+        });
+
         it("sets session cookie on valid token", async () => {
             process.env.API_TOKEN = TEST_TOKEN;
             const { POST } = await import("@/app/api/auth/login/route");
