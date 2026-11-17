@@ -907,9 +907,11 @@ Event shapes:
 ## AI Settings
 
 ### `GET /api/ai-settings`
-Get current AI provider settings. Returns masked API key.
+Get current AI provider settings.
 
-**Response**: `{ baseUrl, apiKey (masked), model, hasApiKey, scope: "user|global" }`
+**Response**: `{ baseUrl, apiKey, model, hasApiKey, scope: "user|global" }`
+
+For `scope: "user"`, `apiKey` is the caller's own key masked to its first and last 4 characters. For `scope: "global"`, `apiKey` is the fixed placeholder `"****"` when a shared key is configured (never derived from the key) and `""` otherwise. `PUT` returns the same shape.
 
 ---
 
