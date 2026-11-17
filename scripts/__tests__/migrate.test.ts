@@ -460,7 +460,7 @@ describe('migrate.mjs — refuses destructive DDL on a populated database', () =
       expect(result.stdout).toContain('apply 20990101000000_drop_widgets');
 
       const [{ to_regclass }] = await setup.$queryRawUnsafe<{ to_regclass: string | null }[]>(
-        `SELECT to_regclass('public.widgets') AS to_regclass`
+        `SELECT to_regclass('public.widgets')::text AS to_regclass`
       );
       expect(to_regclass).toBeNull();
     } finally {
