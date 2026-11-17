@@ -699,6 +699,7 @@ coverage:
   - src/__tests__/project-limit-paths.test.ts
   - src/__tests__/project-import-route.test.ts
   - src/__tests__/project-settings-unarchive.test.tsx
+  - src/__tests__/dashboard-unarchive.test.tsx
   notes: All criteria tested against a real DB.
 - id: WCA-058
   status: partial
