@@ -1081,6 +1081,24 @@ Disconnect the Hashnode account (removes stored credential).
 
 ---
 
+### `POST /api/projects/[id]/publish-to-hashnode`
+Publish the project, or one node of it, to the caller's connected Hashnode account. Re-publishing updates the existing post.
+
+**Auth**: Project owner only.
+
+**Body**: `{ nodeId?: string, titleOverride?: string, publishStatus?: "draft" | "unlisted" | "public", tags?: string[], canonicalUrl?: string }`
+
+**Response**: `{ hashnodePostUrl, hashnodePostId, publishStatus }` (201), or with `updated: true` (200) when an existing post was updated.
+
+---
+
+### `GET /api/projects/[id]/publish-to-hashnode`
+List the project's existing Hashnode exports. Owner or editor.
+
+**Response**: `{ exports: [{ hashnodePostId, hashnodePostUrl, publishStatus, nodeId, lastSyncedAt }] }`
+
+---
+
 ## Writing Sessions
 
 ### `GET /api/sessions/heatmap`
