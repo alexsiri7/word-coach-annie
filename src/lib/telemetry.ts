@@ -8,6 +8,10 @@
  * Env vars:
  *   PHOENIX_COLLECTOR_ENDPOINT - OTLP endpoint (default: http://localhost:6006/v1/traces)
  *   OTEL_ENABLED              - Set to "true" to enable (default: disabled)
+ *
+ * Spans never carry manuscript content (the privacy policy promises this), so
+ * ADK's default of copying LLM requests/responses and tool args into its spans
+ * is switched off.
  */
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
@@ -20,6 +24,8 @@ let sdk: NodeSDK | null = null;
 export function initTelemetry() {
   const enabled = process.env.OTEL_ENABLED === "true";
   if (!enabled) return;
+
+  process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS = "false";
 
   const endpoint =
     process.env.PHOENIX_COLLECTOR_ENDPOINT || "http://localhost:6006/v1/traces";
