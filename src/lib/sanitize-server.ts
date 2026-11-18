@@ -48,12 +48,40 @@ export function sanitizeHtml(input: string): string {
  * when user-provided values are interpolated into issue bodies.
  */
 export function escapeMarkdown(input: string): string {
-  return input
-    .replace(/\\/g, "\\\\")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/[*_~#|{}\[\]()!`]/g, "\\$&");
+  return neutralizeGitHubReferences(
+    input
+      .replace(/\\/g, "\\\\")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/[*_~#|{}\[\]()!`]/g, "\\$&")
+  );
+}
+
+/**
+ * Insert a zero-width space after every `@`, `#`, the `GH` of `GH-<number>`,
+ * the `:` of `://` and a `www` before `.`, so GitHub cannot turn the text into
+ * @mentions (which notify people), #N or GH-N references, or autolinked URLs
+ * (a full issue or pull request URL is also a cross-reference). A backslash escape does not stop these: GitHub
+ * links them in rendered text.
+ */
+export function neutralizeGitHubReferences(input: string): string {
+  return input.replace(/[@#]|:(?=\/\/)|\bwww(?=\.)|\bgh(?=-\d)/gi, "$&\u200B");
+}
+
+/**
+ * Wrap free-form user text in a fenced code block for a GitHub issue body.
+ * Nothing inside renders as Markdown or HTML, and GitHub creates no @mentions
+ * or #N references from code. The fence is longer than any backtick run in the
+ * text, so the text cannot close it.
+ */
+export function fenceMarkdown(input: string): string {
+  const longestBacktickRun = (input.match(/`+/g) ?? []).reduce(
+    (longest, run) => Math.max(longest, run.length),
+    0
+  );
+  const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
+  return `${fence}text\n${input}\n${fence}`;
 }
 
 /**

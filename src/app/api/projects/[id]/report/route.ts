@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
+import { escapeMarkdown, fenceMarkdown } from "@/lib/sanitize-server";
 import { checkRateLimit, isRateLimitBypassed, RATE_LIMITS } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
 
@@ -55,6 +55,9 @@ export async function POST(
       { status: 400 }
     );
   }
+  if (details !== undefined && details !== null && typeof details !== "string") {
+    return NextResponse.json({ error: "Details must be a string" }, { status: 400 });
+  }
 
   // Verify the project exists (anyone can report, no auth required for read-accessible content)
   const project = await prisma.project.findUnique({
@@ -87,7 +90,7 @@ export async function POST(
       if (["http:", "https:"].includes(u.protocol)) safeUrl = escapeMarkdown(u.pathname);
     } catch { /* ignore invalid URLs */ }
   }
-  const safeDetails = details?.trim() ? sanitizeInput(details.trim()).slice(0, 4000) : "";
+  const trimmedDetails = details?.trim().slice(0, 4000);
 
   const title = `Content Report: ${categoryLabel} — ID: ${project.id}`;
 
@@ -98,8 +101,8 @@ export async function POST(
   ];
   if (safeUrl) bodyParts.push(`**URL:** ${safeUrl}`);
 
-  if (safeDetails) {
-    bodyParts.push("", "### Details", safeDetails);
+  if (trimmedDetails) {
+    bodyParts.push("", "### Details", fenceMarkdown(trimmedDetails));
   }
 
   bodyParts.push(
