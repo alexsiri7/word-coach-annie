@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import {
@@ -12,6 +12,10 @@ function solid(width: number, height: number) {
 }
 
 describe("processLocationImage", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it("re-encodes a large JPEG to WebP within 2048 px with a 400 px thumbnail and no metadata", async () => {
         const jpeg = await solid(3000, 2000)
             .withExif({ IFD0: { Artist: "secret" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "51/1 30/1 0/1" } })
@@ -75,5 +79,33 @@ describe("processLocationImage", () => {
     it("refuses images over 25 megapixels", async () => {
         const huge = await solid(6000, 4200).png().toBuffer();
         await expect(processLocationImage(huge)).rejects.toThrow("over 25 megapixels");
+    });
+
+    it("decodes concurrent uploads one at a time, even when one of them fails", async () => {
+        let running = 0;
+        let mostAtOnce = 0;
+        for (const method of ["metadata", "toBuffer"] as const) {
+            const original = sharp.prototype[method];
+            vi.spyOn(sharp.prototype, method).mockImplementation(async function (this: unknown, ...args: unknown[]) {
+                running++;
+                mostAtOnce = Math.max(mostAtOnce, running);
+                try {
+                    return await (original as (...a: unknown[]) => Promise<unknown>).apply(this, args);
+                } finally {
+                    running--;
+                }
+            } as never);
+        }
+        const jpeg = await solid(1200, 800).jpeg().toBuffer();
+
+        const results = await Promise.allSettled([
+            processLocationImage(jpeg),
+            processLocationImage(Buffer.from("not an image")),
+            processLocationImage(jpeg),
+            processLocationImage(jpeg),
+        ]);
+
+        expect(results.map((r) => r.status)).toEqual(["fulfilled", "rejected", "fulfilled", "fulfilled"]);
+        expect(mostAtOnce).toBe(1);
     });
 });
