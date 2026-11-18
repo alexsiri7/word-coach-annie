@@ -50,22 +50,30 @@ jobs:
           fi
           echo "CI succeeded for $MAIN_SHA (run $CI_RUN)"
 
-          # Check if pipeline has any non-failed run for this SHA (in_progress, queued, or success)
-          PIPELINE_EXISTING=$(gh run list \
+          # A failed run means the dispatch was not dropped, so never retry it here:
+          # retrying until an attempt passes would ship an intermittent regression (#1587).
+          PIPELINE_RUNS=$(gh run list \
             --repo "$REPO" \
             --workflow=staging-smoke.yml \
             --commit "$MAIN_SHA" \
             --limit 5 \
-            --json databaseId,status,conclusion \
-            --jq '[.[] | select(.status == "in_progress" or .status == "queued" or .conclusion == "success")] | .[0].databaseId // empty')
+            --json databaseId,status,conclusion)
 
+          PIPELINE_EXISTING=$(echo "$PIPELINE_RUNS" | jq -r '[.[] | select(.status != "completed" or .conclusion == "success")] | .[0].databaseId // empty')
           if [ -n "$PIPELINE_EXISTING" ]; then
             echo "Pipeline already exists for $MAIN_SHA (run $PIPELINE_EXISTING) — nothing to do"
             echo "redispatched=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "No successful or active pipeline run for $MAIN_SHA despite CI success — re-dispatching"
+          PIPELINE_FAILED=$(echo "$PIPELINE_RUNS" | jq -r '[.[] | select(.status == "completed" and .conclusion != "success")] | .[0].databaseId // empty')
+          if [ -n "$PIPELINE_FAILED" ]; then
+            echo "::warning::Pipeline run $PIPELINE_FAILED failed for $MAIN_SHA — not re-dispatching. Re-run it manually once the failure is understood."
+            echo "redispatched=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "No pipeline run for $MAIN_SHA despite CI success — re-dispatching"
           gh workflow run staging-smoke.yml --repo "$REPO" --ref main
           echo "Re-dispatch triggered"
           echo "redispatched=true" >> "$GITHUB_OUTPUT"
