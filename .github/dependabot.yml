@@ -25,6 +25,10 @@ updates:
       - "dependencies"
   - package-ecosystem: "docker"
     directory: "/"
+    # The Node major is set by package.json engines and CI; bump all three together by hand.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: "weekly"
       day: "monday"
