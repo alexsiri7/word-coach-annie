@@ -1,6 +1,6 @@
-import { spawnSync } from 'child_process';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { runJq, workflowJqFilter } from './workflow-jq';
 
 // The watchdog deploys whenever it finds a green CI run at main HEAD, so it
 // must ignore CI runs that were dispatched rather than pushed.
@@ -37,18 +37,11 @@ describe('pipeline watchdog CI lookup', () => {
 // ship an intermittent regression past the staging gate (#1587).
 describe('pipeline watchdog deploy-run lookup', () => {
   const watchdog = readFileSync(join(__dirname, '../../.github/workflows/pipeline-watchdog.yml'), 'utf-8');
-  const filter = (name: string) =>
-    watchdog.match(new RegExp(`${name}=\\$\\(echo "\\$PIPELINE_RUNS" \\| jq -r '([^']*)'\\)`))?.[1] ?? '';
-  const activeFilter = filter('PIPELINE_EXISTING');
-  const failedFilter = filter('PIPELINE_FAILED');
+  const activeFilter = workflowJqFilter(watchdog, 'PIPELINE_EXISTING');
+  const failedFilter = workflowJqFilter(watchdog, 'PIPELINE_FAILED');
 
-  const runJqFilter = (jqFilter: string, runs: unknown[]) => {
-    const result = spawnSync('jq', ['-r', jqFilter], { input: JSON.stringify(runs), encoding: 'utf-8' });
-    expect(result.status).toBe(0);
-    return result.stdout.trim();
-  };
-  const active = (runs: unknown[]) => runJqFilter(activeFilter, runs);
-  const failed = (runs: unknown[]) => runJqFilter(failedFilter, runs);
+  const active = (runs: unknown[]) => runJq(activeFilter, runs);
+  const failed = (runs: unknown[]) => runJq(failedFilter, runs);
   const run = (databaseId: number, status: string, conclusion = '') => ({ databaseId, status, conclusion });
 
   it('finds both deploy-run filters', () => {
