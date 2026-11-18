@@ -335,9 +335,9 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
         ? prev.map((p) => (p.id === saved.id ? saved : p))
         : [...prev, saved]
     );
-    setContestSubmissions((prev) =>
-      prev.map((s) => (s.providerId === saved.id ? { ...s, provider: { id: saved.id, name: saved.name } } : s))
-    );
+    const provider = { id: saved.id, name: saved.name };
+    setContestSubmissions((prev) => prev.map((s) => (s.providerId === saved.id ? { ...s, provider } : s)));
+    setOpportunities((prev) => prev.map((o) => (o.providerId === saved.id ? { ...o, provider } : o)));
   }
 
   function handleProviderDeleted(id: string) {
