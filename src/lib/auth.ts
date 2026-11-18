@@ -31,6 +31,7 @@ export interface SessionPayload {
     name: string;
     picture?: string;
     jti?: string; // present on tokens created after the blocklist was added
+    familyId?: string; // login lineage, revoked as a whole on refresh-token reuse; absent on older tokens
 }
 
 /**
@@ -107,6 +108,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
                 name: (payload.name as string) || "",
                 picture: payload.picture as string | undefined,
                 jti: payload.jti as string | undefined,
+                familyId: payload.familyId as string | undefined,
             };
 
             // Revocation blocklist check is intentionally absent here so that

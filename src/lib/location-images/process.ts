@@ -34,6 +34,17 @@ export interface ProcessedImage {
 sharp.cache(false);
 sharp.concurrency(1);
 
+/**
+ * The memory budget above covers one decode, so concurrent uploads (other tabs,
+ * other users, MCP callers) queue here instead of decoding side by side.
+ */
+let decodeQueue: Promise<unknown> = Promise.resolve();
+function oneDecodeAtATime<T>(task: () => Promise<T>): Promise<T> {
+    const run = decodeQueue.then(task);
+    decodeQueue = run.catch(() => undefined);
+    return run;
+}
+
 /** sharp's errors on untrusted input become a rejection the uploader can read. */
 async function decodeStep<T>(step: () => Promise<T>): Promise<T> {
     try {
@@ -54,7 +65,10 @@ async function decodeStep<T>(step: () => Promise<T>): Promise<T> {
  */
 export async function processLocationImage(input: Buffer): Promise<ProcessedImage> {
     if (input.length > MAX_IMAGE_BYTES) throw new ImageRejectedError("Image is larger than 20 MB");
+    return oneDecodeAtATime(() => decode(input));
+}
 
+async function decode(input: Buffer): Promise<ProcessedImage> {
     const options = { limitInputPixels: MAX_IMAGE_PIXELS, failOn: "error" as const };
     const metadata = await decodeStep(() => sharp(input, options).metadata());
     const { format } = metadata;

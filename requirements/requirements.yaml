@@ -736,7 +736,7 @@ requirements:
 
   - id: WCA-060
     title: Single-owner API_TOKEN authentication
-    statement: "While API_TOKEN is configured, the system shall authenticate the deployment owner by the API_TOKEN bearer header or by a token login that issues a signed session cookie, shall treat that owner as a caller without a user id who is unscoped over all projects, universes and tasks, and shall admit only the API_TOKEN bearer to the metrics endpoint."
+    statement: "While API_TOKEN is configured and GOOGLE_CLIENT_ID is not, the system shall authenticate the deployment owner by the API_TOKEN bearer header or by a token login that issues a signed session cookie, shall treat that owner as a caller without a user id who is unscoped over all projects, universes and tasks, and shall admit only the API_TOKEN bearer to the metrics endpoint."
     category: non-functional
     priority: must
     status: active
@@ -749,7 +749,8 @@ requirements:
       - "With no user id, project, universe and writing-task access checks grant every record, and project listing and export return every user's data"
       - "GET /api/metrics with auth enabled returns 401 for any credential other than the API_TOKEN bearer, including user sessions, token-login cookies and MCP access tokens"
       - "DELETE /api/auth/delete-account returns 403 when GOOGLE_CLIENT_ID is not set"
-    notes: "The audit draft scoped this to deployments without Google OAuth; the proxy accepts the API_TOKEN bearer and token-login cookie whether or not GOOGLE_CLIENT_ID is set. With GOOGLE_CLIENT_ID set, routes that create or export per-user records (for example POST /api/projects, POST /api/universes, project import, export-all, account data export, providers, opportunities and the writing-task dashboard) answer a caller without a user id with 401, but per-record access checks and GET /api/projects and /api/universes stay unscoped. With neither API_TOKEN nor GOOGLE_CLIENT_ID set, auth is disabled, every request including /api/metrics passes through without a user id, and production refuses to start. Per-user project limits do not apply to this caller (WCA-057); identity-header stripping is WCA-055's."
+      - "With GOOGLE_CLIENT_ID set, the proxy admits the API_TOKEN bearer only on /api/metrics and ignores the token-login cookie, POST /api/auth/login returns 403, and GET /api/auth/me reports the token-login cookie unauthenticated"
+    notes: "With GOOGLE_CLIENT_ID set every request must carry a user, so the userless API_TOKEN reaches only /api/metrics (DEC-022, #1561); routes that create or export per-user records also answer a caller without a user id with 401 as defence in depth. With neither API_TOKEN nor GOOGLE_CLIENT_ID set, auth is disabled, every request including /api/metrics passes through without a user id, and production refuses to start. Per-user project limits do not apply to this caller (WCA-057); identity-header stripping is WCA-055's."
 
   - id: WCA-061
     title: One sample project for new users

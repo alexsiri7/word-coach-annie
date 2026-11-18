@@ -4,9 +4,11 @@ import { prisma } from "@/lib/db";
 import { assertActiveProjectLimit } from "@/lib/project-limit";
 import { randomUUID } from "crypto";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
+import { countSceneWords } from "@/lib/scene-text";
 import { MAX_SCENE_VERSIONS } from "@/lib/controllers/structure";
 import { NodeType, SceneStatus } from "@/schemas/nodes";
 import { ProjectType } from "@/schemas/projects";
+import { hasExactlyOneEndpoint } from "@/schemas/relationships";
 
 interface ExportData {
   exportVersion: number;
@@ -196,11 +198,12 @@ export async function importProjectJson(
       const kept = versionsPerNode.get(newNodeId) ?? 0;
       if (kept >= MAX_SCENE_VERSIONS) continue;
       versionsPerNode.set(newNodeId, kept + 1);
+      const content = sanitizeHtml(cv.content ?? "");
       await tx.contentVersion.create({
         data: {
           nodeId: newNodeId,
-          content: sanitizeHtml(cv.content ?? ""),
-          wordCount: cv.wordCount,
+          content,
+          wordCount: countSceneWords(content),
         },
       });
     }
@@ -236,16 +239,23 @@ export async function importProjectJson(
       });
     }
 
-    // 6. Create relationships
+    // 6. Create relationships, skipping any whose from or to side doesn't
+    // resolve to exactly one node or object in this import
+    const resolve = (map: Map<string, string>, id: string | null) => (id ? map.get(id) ?? null : null);
     for (const rel of data.relationships) {
+      const fromNodeId = resolve(nodeIdMap, rel.fromNodeId);
+      const fromObjectId = resolve(objectIdMap, rel.fromObjectId);
+      const toNodeId = resolve(nodeIdMap, rel.toNodeId);
+      const toObjectId = resolve(objectIdMap, rel.toObjectId);
+      if (!hasExactlyOneEndpoint(fromNodeId, fromObjectId) || !hasExactlyOneEndpoint(toNodeId, toObjectId)) continue;
       await tx.relationship.create({
         data: {
           type: rel.type,
           label: sanitizeInput(rel.label ?? ""),
-          fromNodeId: rel.fromNodeId ? nodeIdMap.get(rel.fromNodeId) ?? null : null,
-          fromObjectId: rel.fromObjectId ? objectIdMap.get(rel.fromObjectId) ?? null : null,
-          toNodeId: rel.toNodeId ? nodeIdMap.get(rel.toNodeId) ?? null : null,
-          toObjectId: rel.toObjectId ? objectIdMap.get(rel.toObjectId) ?? null : null,
+          fromNodeId,
+          fromObjectId,
+          toNodeId,
+          toObjectId,
         },
       });
     }

@@ -11,7 +11,7 @@
 # Stale entries: scripts/audit-filter.mjs fails the gate on any entry that
 # `npm audit` no longer reports. Delete such entries rather than keeping them.
 #
-# Last reviewed: 2026-10-31
+# Last reviewed: 2026-11-17
 #
 # Source: glob (via @sentry/bundler-plugins, archiver-utils, workbox-build transitive chains)
 # Justification: AbortSignal cancellation bypass requires calling glob() with an
@@ -33,3 +33,14 @@ GHSA-3g3m-2fjr-6pw4
 # Upgrade path: no fix available without --force; same breaking downgrades/bumps as above.
 # App risk: LOW — no user-controlled glob patterns are evaluated at runtime.
 GHSA-g3hv-75wg-m249
+#
+# Source: picomatch 2.x and 4.x (via @sentry/nextjs's rollup/vite plugins, @ducanh2912/next-pwa's
+# fast-glob/workbox-build chains, vitest, and @fission-ai/openspec)
+# Justification: ReDoS via repeated single-branch extglobs in a crafted glob pattern. Every
+# consumer matches glob patterns from its own build/test configuration over the app's source
+# tree at build or test time; the app's own code never imports picomatch or evaluates a
+# user-supplied glob.
+# Upgrade path: no fixed release yet (4.0.7 is the latest and still vulnerable); npm's only
+# fix path is a semver-major bump of @fission-ai/openspec.
+# App risk: LOW — no user-controlled glob patterns are evaluated at runtime.
+GHSA-fc5q-39xc-vjpf

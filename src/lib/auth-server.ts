@@ -7,7 +7,7 @@
  *
  * Edge-safe functions (JWT creation/verification without DB) live in auth.ts.
  */
-import { isTokenRevoked } from "@/lib/token-blocklist";
+import { isTokenRevoked, isTokenFamilyRevoked } from "@/lib/token-blocklist";
 import { prisma } from "@/lib/db";
 import {
     verifySessionToken,
@@ -29,6 +29,7 @@ export interface RefreshPayload {
     name: string;
     picture?: string;
     jti?: string;
+    familyId?: string;
 }
 
 /**
@@ -62,7 +63,11 @@ export async function createRefreshToken(payload: RefreshPayload): Promise<strin
         .sign(key);
 }
 
-export async function verifyRefreshToken(token: string): Promise<RefreshPayload | null> {
+/**
+ * Signature and claims only — callers must enforce single use via claimToken
+ * and family revocation themselves (the refresh route does).
+ */
+export async function verifyRefreshTokenClaims(token: string): Promise<RefreshPayload | null> {
     try {
         const key = await getJwtKey();
         const { payload } = await jwtVerify(token, key, {
@@ -72,30 +77,33 @@ export async function verifyRefreshToken(token: string): Promise<RefreshPayload 
         });
         if (!payload.userId || !payload.email) return null;
 
-        const result: RefreshPayload = {
+        return {
             userId: payload.userId as string,
             email: payload.email as string,
             name: (payload.name as string) || "",
             picture: payload.picture as string | undefined,
             jti: payload.jti as string | undefined,
+            familyId: payload.familyId as string | undefined,
         };
-
-        if (result.jti) {
-            try {
-                if (await isTokenRevoked(result.jti)) return null;
-            } catch (blocklistErr) {
-                // DB unavailable — fail-closed: reject the token rather than accept it with unknown revocation status
-                logger.error("verifyRefreshToken: blocklist check failed, rejecting token as precaution", blocklistErr);
-                return null;
-            }
-        }
-
-        return result;
     } catch (err) {
         if (err instanceof JoseErrors.JOSEError) return null;
-        logger.error("verifyRefreshToken: unexpected error", err);
+        logger.error("verifyRefreshTokenClaims: unexpected error", err);
         return null;
     }
+}
+
+export async function verifyRefreshToken(token: string): Promise<RefreshPayload | null> {
+    const result = await verifyRefreshTokenClaims(token);
+    if (!result) return null;
+    try {
+        if (result.jti && (await isTokenRevoked(result.jti))) return null;
+        if (result.familyId && (await isTokenFamilyRevoked(result.familyId))) return null;
+    } catch (blocklistErr) {
+        // DB unavailable — fail-closed: reject the token rather than accept it with unknown revocation status
+        logger.error("verifyRefreshToken: blocklist check failed, rejecting token as precaution", blocklistErr);
+        return null;
+    }
+    return result;
 }
 
 export async function verifySessionTokenNode(token: string) {
@@ -103,6 +111,7 @@ export async function verifySessionTokenNode(token: string) {
     if (!session) return null;
     try {
         if (session.jti && (await isTokenRevoked(session.jti))) return null;
+        if (session.familyId && (await isTokenFamilyRevoked(session.familyId))) return null;
     } catch (err) {
         logger.error("verifySessionTokenNode: unexpected error checking blocklist", err);
         return null; // fail-safe: treat as unverifiable

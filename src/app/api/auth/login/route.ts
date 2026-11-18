@@ -3,6 +3,7 @@ import {
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     createLegacySessionCookie,
+    isGoogleAuthMode,
     safeEqual,
 } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -14,6 +15,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             { error: "Authentication not configured (API_TOKEN not set)" },
             { status: 501 }
+        );
+    }
+
+    // The token session carries no user, and Google-auth mode requires one on every request.
+    if (isGoogleAuthMode()) {
+        return NextResponse.json(
+            { error: "Token sign-in is disabled when Google sign-in is configured" },
+            { status: 403 }
         );
     }
 

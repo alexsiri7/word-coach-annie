@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SessionsController } from "@/lib/controllers/sessions";
 import { NotFoundError } from "@/lib/controllers/errors";
-import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
+import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { SessionCreateSchema } from "@/schemas/sessions";
 import { logger } from "@/lib/logger";
 
@@ -12,7 +12,8 @@ export async function POST(
   const { id: projectId } = await params;
   try {
     const userId = getCurrentUserId(req);
-    const access = await verifyProjectWriteAccess(projectId, userId, req.headers.get("x-user-email"));
+    // Owner-only: sessions feed the owner's personal writing heatmap, so editors may not add them.
+    const access = await verifyProjectAccess(projectId, userId);
     if (!access.authorized) return access.response;
 
     const body = await req.json().catch(() => null);

@@ -193,7 +193,7 @@ plotlines, relationships) and exports clean Markdown for distribution to beta re
 
 ### F20: Authentication & Role-Based Access Control
 - F20.1: Google OAuth 2.0 login with JWT session cookies (30-day max age)
-- F20.2: Static API_TOKEN for programmatic/MCP access
+- F20.2: Static API_TOKEN for programmatic access (restricted to `/api/metrics` once `GOOGLE_CLIENT_ID` is set — see DEC-022)
 - F20.3: Dev mode with auth disabled for local development
 - F20.4: Three project roles: OWNER (full control), EDITOR (read/write), READER (read-only)
 - F20.5: Project sharing UI (`share-dialog.tsx`) with role assignment

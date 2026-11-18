@@ -1,7 +1,7 @@
 import { listSkills } from "@/mcp/skills";
 import { logger } from "@/lib/logger";
 import { mcpRun, toolError } from "@/mcp/tool-errors";
-import { CLAUDE_COLLABORATION_INSTRUCTIONS } from "@/mcp/annie-voice";
+import { CLAUDE_COLLABORATION_INSTRUCTIONS } from "@/lib/ai/annie-voice";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
 import { prisma } from "@/lib/db";
 import { runPeerReview } from "@/lib/ai/peer-review-service";

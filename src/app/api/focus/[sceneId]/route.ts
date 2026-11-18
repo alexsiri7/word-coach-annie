@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { ForbiddenError } from "@/lib/controllers/errors";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 
 /**
@@ -21,7 +22,7 @@ export async function GET(
         const access = await verifyProjectReadAccessByNode(sceneId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
-        const result = await getSceneFocus(sceneId);
+        const result = await getSceneFocus(sceneId, { excludeOutlineScenes: access.role === "READER" });
 
         // Reshape to match the original API contract
         return NextResponse.json({
@@ -31,6 +32,9 @@ export async function GET(
             timelineScenes: result.timelineScenes,
         });
     } catch (error) {
+        if (error instanceof ForbiddenError) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
         logger.error("Focus API error", error);
         return new NextResponse("Internal Server Error", { status: 500 });
     }

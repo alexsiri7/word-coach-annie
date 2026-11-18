@@ -2,7 +2,7 @@
 
 All endpoints are REST JSON APIs under `/api/`. Requests that modify data require authentication when `API_TOKEN` is set (see [SETUP.md](SETUP.md)).
 
-**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`; a `mark-sent` token reaches only `POST /api/projects/:id/snapshot-annotations/sent`.
+**Authentication header**: `Authorization: Bearer <API_TOKEN>` or session cookie from `POST /api/auth/login`. When Google sign-in is configured, `API_TOKEN` is accepted only by `GET /api/metrics`; use a Google session, a personal API token or MCP OAuth. Other apps acting as a user send `Authorization: Bearer <personal API token>` (see [Personal API tokens](#personal-api-tokens)); `read`/`write` tokens reach only `/api/nodes/**` and `/api/mcp`; a `snapshots` token reaches only `POST /api/projects/:id/locations/:slug/snapshots`; a `mark-sent` token reaches only `POST /api/projects/:id/snapshot-annotations/sent`.
 
 **Base URL**: `http://localhost:3000` (dev) or your Cloudflare Tunnel URL (prod)
 
@@ -36,7 +36,7 @@ Authenticate with the API token and receive a session cookie.
 
 **Response**: Sets an `annie_session` cookie, unique to this login, that the server rejects after one hour (`SESSION_MAX_AGE`) or once `API_TOKEN` is rotated. Returns `{ "ok": true }`.
 
-**Error**: `501` if `API_TOKEN` not configured; `401` if token is wrong, missing, or not a string; `429` after 5 attempts per minute from one IP.
+**Error**: `501` if `API_TOKEN` not configured; `403` when Google sign-in is configured (`GOOGLE_CLIENT_ID` set); `401` if token is wrong, missing, or not a string; `429` after 5 attempts per minute from one IP.
 
 ---
 
@@ -57,11 +57,11 @@ Silently renew the session cookie. Called automatically by the client every 45 m
 
 Both paths re-load the user from the database and mint the new cookies from the current user row; a user whose account was deleted or whose email no longer passes `ALLOWED_EMAILS` gets `401`.
 
-**Path 1** (session still valid): Verifies the `annie_session` cookie and re-issues it with a fresh 1-hour `Max-Age`.
+**Path 1** (session still valid): Verifies the `annie_session` cookie and re-issues it with a fresh 1-hour `Max-Age`. Returns `401` if the session's token family was revoked by a refresh-token reuse detected elsewhere.
 
-**Path 2** (session expired): Falls back to the `annie_refresh` cookie (30-day lifetime, blocklist-checked). If valid, atomically claims the old refresh token (single use) and issues a new `annie_session` cookie and a rotated `annie_refresh` cookie. Presenting an already-claimed refresh token (e.g. a replayed or concurrently used cookie) returns `401`.
+**Path 2** (session expired): Falls back to the `annie_refresh` cookie (30-day lifetime, blocklist-checked). If valid, atomically claims the old refresh token (single use) and issues a new `annie_session` cookie and a rotated `annie_refresh` cookie. Presenting an already-claimed refresh token (e.g. a replayed or concurrently used cookie) returns `401`. If the claim is more than 30 seconds old (not a concurrent double-submit), the reuse also revokes the whole token family — every session and refresh token minted from the same login — so other tabs and devices on that login also get `401` until the user signs in again.
 
-**Response**: `200 { "ok": true }` with updated `Set-Cookie` header; `401 { "error": "Session expired or revoked" }` if the token is missing, expired, revoked, already used, or its user is deleted or no longer allowed (also when the revocation check itself fails — fail closed); `500 { "error": "Internal error" }` if the user lookup or refresh-token claim hits a database error.
+**Response**: `200 { "ok": true }` with updated `Set-Cookie` header; `401 { "error": "Session expired or revoked" }` if the token is missing, expired, revoked, already used, or its user is deleted or no longer allowed (also when the revocation check itself fails — fail closed); `500 { "error": "Internal error" }` if the user lookup refresh-token claim, or family revocation hits a database error.
 
 ---
 
@@ -907,9 +907,11 @@ Event shapes:
 ## AI Settings
 
 ### `GET /api/ai-settings`
-Get current AI provider settings. Returns masked API key.
+Get current AI provider settings.
 
-**Response**: `{ baseUrl, apiKey (masked), model, hasApiKey, scope: "user|global" }`
+**Response**: `{ baseUrl, apiKey, model, hasApiKey, scope: "user|global" }`
+
+For `scope: "user"`, `apiKey` is the caller's own key masked to its first and last 4 characters (`"****"` if the key is 8 characters or fewer), or `""` if the caller has no key of their own saved. For `scope: "global"`, `apiKey` is the fixed placeholder `"****"` when a shared key is configured (never derived from the key) and `""` otherwise. `PUT` returns the same shape.
 
 ---
 
@@ -1081,7 +1083,36 @@ Disconnect the Hashnode account (removes stored credential).
 
 ---
 
+### `POST /api/projects/[id]/publish-to-hashnode`
+Publish the project, or one node of it, to the caller's connected Hashnode account. Re-publishing updates the existing post.
+
+**Auth**: Project owner only.
+
+**Body**: `{ nodeId?: string, titleOverride?: string, publishStatus?: "draft" | "unlisted" | "public", tags?: string[], canonicalUrl?: string }`
+
+**Response**: `{ hashnodePostUrl, hashnodePostId, publishStatus }` (201), or with `updated: true` (200) when an existing post was updated.
+
+---
+
+### `GET /api/projects/[id]/publish-to-hashnode`
+List the project's existing Hashnode exports. Owner or editor.
+
+**Response**: `{ exports: [{ hashnodePostId, hashnodePostUrl, publishStatus, nodeId, lastSyncedAt }] }`
+
+---
+
 ## Writing Sessions
+
+### `POST /api/projects/[id]/sessions`
+Record a writing session. Owner only — sessions count toward the owner's heatmap, so editors cannot add them.
+
+**Body**: `{ nodeId?: string | null, startedAt?: string, endedAt?: string, wordsWritten?: number, durationSeconds?: number, date?: "YYYY-MM-DD" }`
+
+**Response**: `201` with the created session.
+
+**Errors**: `400` invalid body, or a `date`, `startedAt` or `endedAt` in the future (beyond five minutes of client clock skew; a `date` within that skew is stored as the server's current UTC day); `403` not the project owner; `404` project not found or `nodeId` from another project
+
+---
 
 ### `GET /api/sessions/heatmap`
 Get a 28-day activity heatmap (word counts per day).

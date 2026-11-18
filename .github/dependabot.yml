@@ -25,6 +25,11 @@ updates:
       - "dependencies"
   - package-ecosystem: "docker"
     directory: "/"
+    # The Node major is shared with package.json engines, CI's node-version and .nvmrc; bump them
+    # together with both Dockerfiles by hand (build-hygiene.test.ts checks they agree).
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: "weekly"
       day: "monday"

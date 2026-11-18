@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
     const decryptedKey = await readGlobalApiKey(settings);
     return NextResponse.json({
-      apiKey: decryptedKey ? maskKey(decryptedKey) : "",
+      apiKey: decryptedKey ? SHARED_KEY_PLACEHOLDER : "",
       model: settings.model,
       hasApiKey: !!decryptedKey,
       scope: "global",
@@ -135,7 +135,7 @@ export async function PUT(request: NextRequest) {
 
     const decryptedKey = await readGlobalApiKey(settings);
     return NextResponse.json({
-      apiKey: decryptedKey ? maskKey(decryptedKey) : "",
+      apiKey: decryptedKey ? SHARED_KEY_PLACEHOLDER : "",
       model: settings.model,
       hasApiKey: !!decryptedKey,
       scope: "global",
@@ -146,7 +146,11 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/** Mask an API key for display: show first 4 and last 4 chars */
+// The shared key is readable by every caller without a key of their own, so
+// it is reported only as present, never with any of its characters.
+const SHARED_KEY_PLACEHOLDER = "****";
+
+/** Mask a user's own API key for display: show first 4 and last 4 chars */
 function maskKey(key: string): string {
   if (key.length <= 8) return "****";
   return `${key.slice(0, 4)}...${key.slice(-4)}`;

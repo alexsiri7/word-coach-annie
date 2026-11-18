@@ -265,4 +265,61 @@ describe("exportProjectJson", () => {
     expect(result.relationships).toHaveLength(1);
     expect(result.relationships[0].label).toBe("Hero appears in Scene A");
   });
+  it("exports location images, maps, snapshots and snapshot annotations for this project only", async () => {
+    const location = await testPrisma.storyObject.create({
+      data: { projectId, type: "LOCATION", name: "Harbour" },
+    });
+    const image = await testPrisma.locationImage.create({
+      data: {
+        storyObjectId: location.id, caption: "Dock at dawn", storagePath: "p/l/full.webp",
+        thumbPath: "p/l/thumb.webp", width: 800, height: 600, bytes: 1234, sha256: "abc",
+      },
+    });
+    const map = await testPrisma.locationMap.create({
+      data: { storyObjectId: location.id, widthM: 40, heightM: 20, backgroundImageId: image.id },
+    });
+    const snapshot = await testPrisma.locationSnapshot.create({
+      data: {
+        storyObjectId: location.id, build: "1.0", takenAt: new Date("2026-11-01"),
+        storagePath: "p/l/snapshots/s.webp", sha256: "def", width: 1920, height: 1080, things: [],
+      },
+    });
+    await testPrisma.snapshotAnnotation.create({
+      data: { locationId: location.id, snapshotId: snapshot.id, kind: "note", text: "Add a lighthouse" },
+    });
+
+    const other = await testPrisma.project.create({ data: { title: "Other Project" } });
+    const otherLocation = await testPrisma.storyObject.create({
+      data: { projectId: other.id, type: "LOCATION", name: "Elsewhere" },
+    });
+    const otherImage = await testPrisma.locationImage.create({
+      data: {
+        storyObjectId: otherLocation.id, storagePath: "o/l/full.webp", thumbPath: "o/l/thumb.webp",
+        width: 10, height: 10, bytes: 1, sha256: "x",
+      },
+    });
+    await testPrisma.locationMap.create({
+      data: { storyObjectId: otherLocation.id, widthM: 5, heightM: 5, backgroundImageId: otherImage.id },
+    });
+    const otherSnapshot = await testPrisma.locationSnapshot.create({
+      data: {
+        storyObjectId: otherLocation.id, build: "9.9", takenAt: new Date("2026-11-02"),
+        storagePath: "o/l/snapshots/s.webp", sha256: "y", width: 10, height: 10, things: [],
+      },
+    });
+    await testPrisma.snapshotAnnotation.create({
+      data: { locationId: otherLocation.id, snapshotId: otherSnapshot.id, kind: "note", text: "Not mine" },
+    });
+
+    const result = await exportProjectJson(projectId);
+
+    expect(result.locationImages).toHaveLength(1);
+    expect(result.locationImages[0]).toMatchObject({ id: image.id, storyObjectId: location.id, caption: "Dock at dawn" });
+    expect(result.locationMaps).toHaveLength(1);
+    expect(result.locationMaps[0]).toMatchObject({ id: map.id, storyObjectId: location.id, backgroundImageId: image.id });
+    expect(result.locationSnapshots).toHaveLength(1);
+    expect(result.locationSnapshots[0]).toMatchObject({ id: snapshot.id, build: "1.0" });
+    expect(result.snapshotAnnotations).toHaveLength(1);
+    expect(result.snapshotAnnotations[0]).toMatchObject({ snapshotId: snapshot.id, text: "Add a lighthouse" });
+  });
 });

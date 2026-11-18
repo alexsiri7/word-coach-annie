@@ -180,6 +180,13 @@ describe("Google OAuth callback - verified_email check", () => {
         expect(refreshCookie?.toLowerCase()).toContain("httponly");
         expect(refreshCookie?.toLowerCase()).toContain("path=/api/auth/");
         expect(refreshCookie?.toLowerCase()).toContain("samesite=lax");
+
+        // The login starts one token family shared by the session and refresh tokens
+        const { createSessionToken } = await import("@/lib/auth");
+        const { createRefreshToken } = await import("@/lib/auth-server");
+        const familyId = vi.mocked(createSessionToken).mock.calls[0][0].familyId;
+        expect(familyId).toEqual(expect.any(String));
+        expect(vi.mocked(createRefreshToken).mock.calls[0][0].familyId).toBe(familyId);
     });
 
     it("should redirect to /login?error=invite_only when the email is not allowed", async () => {
