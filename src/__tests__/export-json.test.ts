@@ -275,7 +275,7 @@ describe("exportProjectJson", () => {
         thumbPath: "p/l/thumb.webp", width: 800, height: 600, bytes: 1234, sha256: "abc",
       },
     });
-    await testPrisma.locationMap.create({
+    const map = await testPrisma.locationMap.create({
       data: { storyObjectId: location.id, widthM: 40, heightM: 20, backgroundImageId: image.id },
     });
     const snapshot = await testPrisma.locationSnapshot.create({
@@ -292,16 +292,31 @@ describe("exportProjectJson", () => {
     const otherLocation = await testPrisma.storyObject.create({
       data: { projectId: other.id, type: "LOCATION", name: "Elsewhere" },
     });
+    const otherImage = await testPrisma.locationImage.create({
+      data: {
+        storyObjectId: otherLocation.id, storagePath: "o/l/full.webp", thumbPath: "o/l/thumb.webp",
+        width: 10, height: 10, bytes: 1, sha256: "x",
+      },
+    });
+    await testPrisma.locationMap.create({
+      data: { storyObjectId: otherLocation.id, widthM: 5, heightM: 5, backgroundImageId: otherImage.id },
+    });
+    const otherSnapshot = await testPrisma.locationSnapshot.create({
+      data: {
+        storyObjectId: otherLocation.id, build: "9.9", takenAt: new Date("2026-11-02"),
+        storagePath: "o/l/snapshots/s.webp", sha256: "y", width: 10, height: 10, things: [],
+      },
+    });
     await testPrisma.snapshotAnnotation.create({
-      data: { locationId: otherLocation.id, kind: "note", text: "Not mine" },
+      data: { locationId: otherLocation.id, snapshotId: otherSnapshot.id, kind: "note", text: "Not mine" },
     });
 
     const result = await exportProjectJson(projectId);
 
     expect(result.locationImages).toHaveLength(1);
-    expect(result.locationImages[0]).toMatchObject({ storyObjectId: location.id, caption: "Dock at dawn" });
+    expect(result.locationImages[0]).toMatchObject({ id: image.id, storyObjectId: location.id, caption: "Dock at dawn" });
     expect(result.locationMaps).toHaveLength(1);
-    expect(result.locationMaps[0]).toMatchObject({ storyObjectId: location.id, backgroundImageId: image.id });
+    expect(result.locationMaps[0]).toMatchObject({ id: map.id, storyObjectId: location.id, backgroundImageId: image.id });
     expect(result.locationSnapshots).toHaveLength(1);
     expect(result.locationSnapshots[0]).toMatchObject({ id: snapshot.id, build: "1.0" });
     expect(result.snapshotAnnotations).toHaveLength(1);
