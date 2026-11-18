@@ -1,6 +1,6 @@
-import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { runJq, workflowJqFilter } from './workflow-jq';
 
 // Railway sums every container instance of a service unless the metrics query is grouped, so a
 // rolling deploy's old and new containers read as one container at twice the usage (#1453).
@@ -10,21 +10,14 @@ describe('railway resource monitor', () => {
     'utf-8',
   );
   const query = monitor.match(/metrics\([^)]*\)/)?.[0] ?? '';
-  const memoryFilter = monitor.match(/MEMORY_GB=\$\(echo "\$METRICS_RESPONSE" \| jq -r '([^']*)'\)/)?.[1] ?? '';
-  const cpuFilter = monitor.match(/CPU_PCT=\$\(echo "\$METRICS_RESPONSE" \| jq -r '([^']*)'\)/)?.[1] ?? '';
+  const memoryFilter = workflowJqFilter(monitor, 'MEMORY_GB');
+  const cpuFilter = workflowJqFilter(monitor, 'CPU_PCT');
 
   const instance = (memory: number[], cpu: number[]) => [
     { measurement: 'MEMORY_USAGE_GB', values: memory.map((value) => ({ value })) },
     { measurement: 'CPU_USAGE', values: cpu.map((value) => ({ value })) },
   ];
-  const runJqFilter = (filter: string, metrics: unknown[]) => {
-    const result = spawnSync('jq', ['-r', filter], {
-      input: JSON.stringify({ data: { metrics } }),
-      encoding: 'utf-8',
-    });
-    expect(result.status).toBe(0);
-    return Number(result.stdout.trim());
-  };
+  const runJqFilter = (filter: string, metrics: unknown[]) => Number(runJq(filter, { data: { metrics } }));
   const memoryGb = (metrics: unknown[]) => runJqFilter(memoryFilter, metrics);
   const cpuPct = (metrics: unknown[]) => runJqFilter(cpuFilter, metrics);
 
