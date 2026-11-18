@@ -71,8 +71,9 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p>
-              Images you upload for locations, and map snapshots of them, are stored
-              in a private Cloudflare R2 storage bucket rather than the database.
+              Images you upload for locations, and screenshots of locations that a
+              game you connect with an API token posts, are stored in a private
+              Cloudflare R2 storage bucket rather than the database.
             </p>
             <p>
               We do not store passwords. Authentication is handled through Google
@@ -157,8 +158,8 @@ export default function PrivacyPage() {
               To delete your entire account and all associated data, go to{" "}
               <Link href="/settings" className="text-accent hover:underline">Settings → Privacy & Data → Delete account</Link>.
               Your projects, universes, and connected-service credentials are
-              removed from the database immediately, and your location images are
-              deleted from storage. The offline copy of your projects in the browser
+              removed from the database immediately, and your location images and
+              screenshots are deleted from storage. The offline copy of your projects in the browser
               you deleted the account from is cleared at the same time, as it is
               whenever you log out. A copy in another browser stays there until you
               log out of it or clear its storage for this site.
