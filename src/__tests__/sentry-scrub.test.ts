@@ -83,6 +83,18 @@ describe("sentry-scrub beforeSend", () => {
     expect(result.request!.headers!["content-type"]).toBe("text/html");
   });
 
+  it("keeps name and stack of an error Sentry normalized to a plain object", () => {
+    const stack = "Error: boom\n    at foo (/app/x.ts:1:1)";
+    const event = makeEvent({
+      extra: { meta: { error: { message: "boom", name: "Error", stack }, projectId: "p1" } },
+    });
+    const result = beforeSend(event)!;
+    expect(result.extra!.meta).toEqual({
+      error: { message: "[REDACTED]", name: "Error", stack },
+      projectId: "p1",
+    });
+  });
+
   it("preserves non-sensitive keys untouched", () => {
     const event = makeEvent({ extra: { userId: "u1", action: "click", count: 42 } });
     const result = beforeSend(event)!;

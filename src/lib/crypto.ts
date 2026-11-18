@@ -143,7 +143,7 @@ export async function readEncrypted(
         } catch (err) {
             logger.warn("[crypto] Failed to rewrite stored value under the current key", {
                 field: opts.field,
-                error: err instanceof Error ? err.name : "unknown",
+                errorName: err instanceof Error ? err.name : "unknown",
             });
         }
     }
