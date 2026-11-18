@@ -123,7 +123,7 @@ Start it with the dev tunnel overlay (see [Development](#development)).
 The `phoenix` service in `docker-compose.dev.yml` collects OpenTelemetry traces from the dev server:
 
 - The UI is at `http://127.0.0.1:6006`.
-- Tool-call spans record tool name, category, status, and input/output lengths — never tool content.
+- Tool-call spans record tool name, category, status, and input/output lengths — never tool content. `initTelemetry` also sets `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`, so the ADK library's own spans omit LLM requests, responses and tool arguments.
 
 ---
 

@@ -42,12 +42,51 @@ describe("logger", () => {
         expect(output.message).toBe("status update");
     });
 
-    it("includes Error metadata with message and stack", () => {
-        const err = new Error("test error");
-        logger.error("failed", err);
-        const output = JSON.parse((console.error as ReturnType<typeof vi.fn>).mock.calls[0][0]);
-        expect(output.error.message).toBe("test error");
-        expect(output.error.stack).toBeDefined();
+    it("logs an Error's name, code and stack frames but not its message", () => {
+        const err = Object.assign(
+            new Error("Hashnode API error (502): duplicate slug 'my-secret-chapter-title'"),
+            { code: "UPSTREAM" },
+        );
+        logger.error("publish failed", err);
+        const line = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("my-secret-chapter-title");
+        const output = JSON.parse(line);
+        expect(output.error).toMatchObject({ name: "Error", code: "UPSTREAM", message: "[REDACTED]" });
+        expect(output.error.stack).toMatch(/^\s+at /);
+        expect(Sentry.captureException).toHaveBeenCalledWith(err, { extra: { label: "publish failed" } });
+    });
+
+    it("redacts stringified and nested errors in metadata", () => {
+        const upstream = new Error("Object storage PUT failed: 502 <html>upstream secret body</html>");
+        logger.warn("cleanup failed", { count: 3, error: String(upstream), err: upstream });
+        const line = (console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("upstream secret body");
+        const output = JSON.parse(line);
+        expect(output.error).toMatchObject({ count: 3, error: "[REDACTED]", err: { name: "Error", message: "[REDACTED]" } });
+    });
+
+    it("keeps diagnostic names that are not stringified errors", () => {
+        logger.warn("rewrite failed", { field: "apiKey", errorName: "PrismaClientKnownRequestError" });
+        const output = JSON.parse((console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+        expect(output.error).toEqual({ field: "apiKey", errorName: "PrismaClientKnownRequestError" });
+    });
+
+    it("keeps identifiers and counts whose keys resemble sensitive names", () => {
+        logger.warn("token client mismatch", {
+            tokenClientId: "client-abc",
+            tokenId: "t1",
+            revokedTokens: 4,
+            messageCount: 12,
+            accessToken: "secret-value",
+        });
+        const output = JSON.parse((console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+        expect(output.error).toEqual({
+            tokenClientId: "client-abc",
+            tokenId: "t1",
+            revokedTokens: 4,
+            messageCount: 12,
+            accessToken: "[REDACTED]",
+        });
     });
 
     it("includes non-Error metadata as-is", () => {
@@ -55,6 +94,35 @@ describe("logger", () => {
         const output = JSON.parse((console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0]);
         expect(output.error).toEqual({ code: 42, reason: "timeout" });
     });
+
+    it("redacts manuscript-derived and upstream body fields from console output", () => {
+        logger.error("AI response parse failed", {
+            projectId: "p1",
+            rawContent: "She walked into the rain",
+            upstream: { status: 502, body: "<html>Bad gateway</html>" },
+        });
+        const line = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("She walked into the rain");
+        expect(line).not.toContain("Bad gateway");
+        expect(JSON.parse(line).error).toEqual({
+            projectId: "p1",
+            rawContent: "[REDACTED]",
+            upstream: { status: 502, body: "[REDACTED]" },
+        });
+    });
+
+    it("masks emails in console messages", () => {
+        logger.warn("lookup for jane@example.com failed", new Error("no user jane@example.com"));
+        const line = (console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(line).not.toContain("jane@example.com");
+        expect(JSON.parse(line).message).toBe("lookup for [EMAIL] failed");
+    });
+
+    it("masks emails in linear time on long runs of local-part characters", () => {
+        logger.info("%".repeat(200_000) + " jane@example.com");
+        const output = JSON.parse((console.log as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+        expect(output.message.endsWith(" [EMAIL]")).toBe(true);
+    }, 1000);
 
     it("omits error field when no metadata provided", () => {
         logger.info("clean");

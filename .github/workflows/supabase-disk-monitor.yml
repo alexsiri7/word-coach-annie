@@ -36,7 +36,11 @@ jobs:
             echo "::warning::${{ matrix.instance }} DATABASE_URL secret not configured — skipping disk check"
             exit 0
           fi
-          BYTES=$(psql "$DATABASE_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
+          # Appended last so it overrides any sslmode in the secret: libpq uses a repeated
+          # URI parameter's last value, and a URL sslmode beats PGSSLMODE (#1585).
+          SEP='?'; [[ "$DATABASE_URL" == *\?* ]] && SEP='&'
+          TLS_URL="${DATABASE_URL}${SEP}sslmode=require"
+          BYTES=$(psql "$TLS_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
           if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
             echo "::error::Failed to query ${{ matrix.instance }} disk usage: $BYTES"
             exit 1
