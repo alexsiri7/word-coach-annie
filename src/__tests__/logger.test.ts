@@ -65,6 +65,12 @@ describe("logger", () => {
         expect(output.error).toMatchObject({ count: 3, error: "[REDACTED]", err: { name: "Error", message: "[REDACTED]" } });
     });
 
+    it("keeps diagnostic names that are not stringified errors", () => {
+        logger.warn("rewrite failed", { field: "apiKey", errorName: "PrismaClientKnownRequestError" });
+        const output = JSON.parse((console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+        expect(output.error).toEqual({ field: "apiKey", errorName: "PrismaClientKnownRequestError" });
+    });
+
     it("keeps identifiers and counts whose keys resemble sensitive names", () => {
         logger.warn("token client mismatch", {
             tokenClientId: "client-abc",

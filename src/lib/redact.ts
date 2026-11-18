@@ -13,13 +13,16 @@ export function maskEmails(s: string): string {
     return s.replace(EMAIL, "[EMAIL]");
 }
 
-function isSensitiveKey(key: string): boolean {
-    return (SENSITIVE_KEY.test(key) && !IDENTIFIER_KEY.test(key)) || STRINGIFIED_ERROR_KEY.test(key);
-}
-
 // Counts and flags under a sensitive-looking key (`revokedTokens`, `messageCount`) stay readable.
 function carriesText(value: unknown): boolean {
     return typeof value === "string" || (typeof value === "object" && value !== null && !(value instanceof Error));
+}
+
+// Objects under `error`/`err` (Errors, or Sentry's plain-object normalization of
+// them) are recursed into instead, so their name and stack stay readable.
+function isSensitive(key: string, value: unknown): boolean {
+    if (typeof value === "string" && STRINGIFIED_ERROR_KEY.test(key)) return true;
+    return carriesText(value) && SENSITIVE_KEY.test(key) && !IDENTIFIER_KEY.test(key);
 }
 
 // An Error's message can embed AI output or an upstream response body (e.g. a
@@ -49,7 +52,7 @@ export function redact<T>(node: T, depth = 0): T {
     if (Array.isArray(node)) return node.map((n) => redact(n, depth + 1)) as unknown as T;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-        out[k] = carriesText(v) && isSensitiveKey(k) ? "[REDACTED]" : redact(v, depth + 1);
+        out[k] = isSensitive(k, v) ? "[REDACTED]" : redact(v, depth + 1);
     }
     return out as T;
 }
