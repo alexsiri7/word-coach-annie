@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import type { SceneBlock } from "@/lib/types";
 import { computeContentHash } from "@/mcp/content-hash";
@@ -45,10 +46,14 @@ function assertAnnotationWithinLimits(fields: { content: string; range?: string;
 
 export const MAX_SCENE_VERSIONS = 50;
 
+// The one definition of a scene's latest version: the hash a writer read and
+// the hash checked under the lock must come from the same row on a createdAt tie.
+const latestVersionFirst = [{ createdAt: "desc" }, { id: "desc" }] satisfies Prisma.ContentVersionOrderByWithRelationInput[];
+
 async function pruneSceneVersions(tx: DbClient, nodeId: string) {
     const allVersions = await tx.contentVersion.findMany({
         where: { nodeId },
-        orderBy: { createdAt: "desc" },
+        orderBy: latestVersionFirst,
         select: { id: true },
     });
 
@@ -453,7 +458,7 @@ export class StructureController {
 
         const version = await prisma.contentVersion.findFirst({
             where: { nodeId },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            orderBy: latestVersionFirst,
         });
 
         const annotations = await prisma.annotation.findMany({
@@ -510,7 +515,7 @@ export class StructureController {
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
                     where: { nodeId },
-                    orderBy: { createdAt: "desc" },
+                    orderBy: latestVersionFirst,
                     select: { content: true },
                 });
                 if (latest) {
@@ -540,9 +545,9 @@ export class StructureController {
         };
     }
 
-    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[]) {
+    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[], contentHash?: string | null) {
         const content = StructureController.serializeSceneContent(blocks);
-        return StructureController.writeSceneContent(nodeId, content);
+        return StructureController.writeSceneContent(nodeId, content, contentHash);
     }
 
     static async getSceneVersions(nodeId: string, limit: number = 20) {
