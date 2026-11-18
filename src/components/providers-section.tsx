@@ -16,6 +16,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { errorMessage } from "@/components/location-images";
 
 export interface Provider {
   id: string;
@@ -31,11 +32,6 @@ interface ProviderForm {
 }
 
 const EMPTY_FORM: ProviderForm = { name: "", website: "", notes: "" };
-
-async function errorMessage(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({}));
-  return typeof body.error === "string" ? body.error : fallback;
-}
 
 /**
  * Lists the user's providers — shared across all their projects — with create, edit and delete.
