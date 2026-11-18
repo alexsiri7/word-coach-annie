@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/auth/me/route";
 import { createLegacySessionCookie, createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
@@ -25,12 +25,20 @@ describe("GET /api/auth/me with a legacy API_TOKEN session cookie", () => {
         else delete process.env.API_TOKEN;
         if (origJwtSecret !== undefined) process.env.JWT_SECRET = origJwtSecret;
         else delete process.env.JWT_SECRET;
+        vi.unstubAllEnvs();
     });
 
     it("reports an anonymous authenticated session for a fresh cookie", async () => {
         const res = await GET(meRequest(await createLegacySessionCookie(API_TOKEN)));
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ authenticated: true, user: null });
+    });
+
+    it("rejects a fresh cookie in Google-auth mode (SEC-005)", async () => {
+        vi.stubEnv("GOOGLE_CLIENT_ID", "test-client-id");
+        const res = await GET(meRequest(await createLegacySessionCookie(API_TOKEN)));
+        expect(res.status).toBe(401);
+        expect(await res.json()).toEqual({ authenticated: false });
     });
 
     it("rejects a cookie older than SESSION_MAX_AGE", async () => {

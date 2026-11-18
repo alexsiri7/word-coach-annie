@@ -5,6 +5,7 @@ import {
     verifyLegacySessionCookie,
     verifySessionToken,
     isAuthEnabled,
+    isGoogleAuthMode,
     safeEqual,
 } from "@/lib/auth";
 import { verifyMcpToken } from "@/lib/oauth-tokens";
@@ -238,8 +239,10 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
     const authHeader = request.headers.get("authorization");
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-    // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks)
-    if (token && apiToken && safeEqual(token, apiToken)) {
+    // 1. Check static API_TOKEN (constant-time compare to prevent timing attacks).
+    // In Google-auth mode every request must carry a user, so the userless static token
+    // only reads metrics there (SEC-005).
+    if (token && apiToken && safeEqual(token, apiToken) && (!isGoogleAuthMode() || pathname === METRICS_PATH)) {
         const rateLimited = await applyRateLimit(request, "apitoken");
         if (rateLimited) return rateLimited;
         return nextWithNonce();
@@ -318,8 +321,8 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
             return nextWithNonce({ userId: session.userId, email: session.email });
         }
 
-        // Fall back to legacy API_TOKEN session cookie
-        if (apiToken && await verifyLegacySessionCookie(sessionCookie, apiToken)) {
+        // Fall back to legacy API_TOKEN session cookie — userless, so refused in Google-auth mode (SEC-005)
+        if (apiToken && !isGoogleAuthMode() && await verifyLegacySessionCookie(sessionCookie, apiToken)) {
             // Rate limit legacy sessions by token
             const rateLimited = await applyRateLimit(request, "apitoken");
             if (rateLimited) return rateLimited;

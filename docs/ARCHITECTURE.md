@@ -188,6 +188,8 @@ The app supports three auth modes (controlled by environment variables):
 | **Token auth** | `API_TOKEN` set | Send `Authorization: Bearer <token>` header, or use session cookie from `/api/auth/login` |
 | **Google OAuth** | `GOOGLE_CLIENT_ID/SECRET` set | Full OAuth flow with invite-list control via `ALLOWED_EMAILS` |
 
+When `GOOGLE_CLIENT_ID` is set, every request must carry a user: `API_TOKEN` carries none, so it is accepted only as a bearer on `/api/metrics`, and token sign-in (`/api/auth/login`) is refused.
+
 When auth is enabled, signed-in users can also issue [personal API tokens](#personal-api-tokens) for other apps.
 
 ### Session Security
