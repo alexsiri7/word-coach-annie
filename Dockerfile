@@ -1,6 +1,7 @@
 # --- Stage 1: Install dependencies ---
 # Pinned to multi-arch manifest list digest for node:22-slim (2026-11-18).
-# Keep the major in step with package.json engines and CI: .npmrc's engine-strict makes npm ci fail otherwise.
+# Keep the major in step with package.json engines, CI's node-version and .nvmrc (checked by build-hygiene.test.ts):
+# .npmrc's engine-strict makes npm ci fail otherwise.
 # To update: docker manifest inspect node:22-slim --verbose | jq '.[0].Descriptor.digest'
 FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS deps
 
