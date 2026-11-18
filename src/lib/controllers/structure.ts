@@ -52,7 +52,7 @@ const latestVersionFirst = [{ createdAt: "desc" }, { id: "desc" }] satisfies Pri
 async function pruneSceneVersions(tx: DbClient, nodeId: string) {
     const allVersions = await tx.contentVersion.findMany({
         where: { nodeId },
-        orderBy: { createdAt: "desc" },
+        orderBy: latestVersionFirst,
         select: { id: true },
     });
 
