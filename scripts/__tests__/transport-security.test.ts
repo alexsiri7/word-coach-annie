@@ -1,3 +1,5 @@
+import { X509Certificate } from 'crypto';
+import { readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { transportSecurityProblems } from '../transport-security.mjs';
 
@@ -6,10 +8,13 @@ const requireFromPg = createRequire(createRequire(import.meta.url).resolve('pg')
 const parsePgUrl: (url: string) => { ssl?: unknown } = requireFromPg('pg-connection-string').parse;
 
 const DB = 'postgresql://postgres.ref:s3cret-pw@aws-0-eu.pooler.supabase.com:6543/postgres';
+const SUPABASE_CA = 'certs/supabase-prod-ca-2021.crt';
+const VERIFYING_DB = `${DB}?sslmode=verify-full&sslrootcert=${SUPABASE_CA}`;
 
 describe('transportSecurityProblems()', () => {
   it.each([
     ['nothing set', {}],
+    ['the documented verify-full URL', { DATABASE_URL: VERIFYING_DB }],
     ['libpq-compatible require', { DATABASE_URL: `${DB}?sslmode=require&uselibpqcompat=true` }],
     ['verify-full after another param', { DATABASE_URL: `${DB}?uselibpqcompat=true&sslmode=verify-full` }],
     ['a rediss:// Redis URL', { REDIS_URL: 'rediss://u:p@h:6380' }],
@@ -19,6 +24,7 @@ describe('transportSecurityProblems()', () => {
   });
 
   it.each([
+    VERIFYING_DB,
     `${DB}?sslmode=require&uselibpqcompat=true`,
     `${DB}?uselibpqcompat=true&sslmode=verify-full`,
     `${DB}?sslmode=no-verify`,
@@ -53,5 +59,18 @@ describe('transportSecurityProblems()', () => {
     });
     expect(problems).toHaveLength(2);
     for (const problem of problems) expect(problem).not.toContain('s3cret-pw');
+  });
+});
+
+describe('the Supabase root CA in certs/', () => {
+  it('is the root Supabase publishes and its pooler chains to', () => {
+    const cert = new X509Certificate(readFileSync(SUPABASE_CA));
+    expect(cert.fingerprint256).toBe(
+      '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA',
+    );
+  });
+
+  it('ships in the Docker image', () => {
+    expect(readFileSync('Dockerfile', 'utf8')).toContain('COPY --from=builder /app/certs ./certs');
   });
 });

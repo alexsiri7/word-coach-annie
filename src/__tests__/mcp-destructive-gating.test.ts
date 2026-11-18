@@ -127,10 +127,6 @@ vi.mock("@/lib/ai/peer-review-service", () => ({
   runPeerReview: vi.fn(async () => ({})),
 }));
 
-vi.mock("@/lib/review-routing", () => ({
-  REVIEW_SKILL_BY_STATUS: { DRAFT: "developmental-edit", OUTLINE: "outline-review", REVISED: "line-edit", FINAL: "consistency-check" },
-}));
-
 vi.mock("@/lib/review-personas", () => ({
   REVIEW_PERSONAS: {},
 }));

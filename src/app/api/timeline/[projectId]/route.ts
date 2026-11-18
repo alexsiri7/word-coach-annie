@@ -14,7 +14,7 @@ export async function GET(
         const access = await verifyProjectReadAccess(projectId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
 
-        const data = await TimelineController.getTimelineData(projectId);
+        const data = await TimelineController.getTimelineData(projectId, { excludeOutlineScenes: access.role === "READER" });
         return NextResponse.json(data);
     } catch (error) {
         logger.error("Timeline data fetch error", error);

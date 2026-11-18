@@ -69,14 +69,14 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | For data access | PostgreSQL connection string (Supabase or local PG); production requires `sslmode=require&uselibpqcompat=true` (see `.env.example`). Startup does not refuse a missing value: migrations are skipped with a warning and every database-backed route fails |
+| `DATABASE_URL` | For data access | PostgreSQL connection string (Supabase or local PG); production requires an encrypting `sslmode`; use `sslmode=verify-full&sslrootcert=certs/supabase-prod-ca-2021.crt` (verifies Supabase's certificate; see `.env.example`). Startup does not refuse a missing value: migrations are skipped with a warning and every database-backed route fails |
 | `GEMINI_API_KEY` | For AI chat | Google AI API key (can also configure in Settings UI) |
 | `AI_MODEL` | No | Gemini model name (default: `gemini-2.0-flash-001`) |
 | `GOOGLE_CLIENT_ID` | For Google Docs | Google OAuth client ID; also satisfies the production auth requirement (see `API_TOKEN`) |
 | `GOOGLE_CLIENT_SECRET` | For Google Docs | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | For Google Docs | OAuth callback URL |
 | `APP_BASE_URL` | No | Public origin for absolute URLs (OAuth metadata, calendar feed); falls back to the `GOOGLE_REDIRECT_URI` origin — one of the two must be set |
-| `API_TOKEN` | Recommended | Bearer token for API/MCP access (32-byte hex); production refuses to start unless `API_TOKEN` or `GOOGLE_CLIENT_ID` is set |
+| `API_TOKEN` | Recommended | Bearer token for API access (32-byte hex); only `/api/metrics` accepts it once `GOOGLE_CLIENT_ID` is set; production refuses to start unless `API_TOKEN` or `GOOGLE_CLIENT_ID` is set |
 | `JWT_SECRET` | No | JWT signing secret for Google OAuth sessions |
 | `ENCRYPTION_KEY` | Production | Key for encrypting API keys at rest (see [docs/SETUP.md](docs/SETUP.md)) |
 | `ALLOWED_EMAILS` | No | Comma-separated list of allowed Google accounts |

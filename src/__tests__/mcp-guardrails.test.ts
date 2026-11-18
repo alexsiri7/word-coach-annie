@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { z } from "zod";
-import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "../mcp/annie-voice";
+import { ANNIE_HARD_RULE, CLAUDE_COLLABORATION_INSTRUCTIONS } from "../lib/ai/annie-voice";
 import { writeSceneContentSpec, updateParagraphSpec } from "../lib/ai/tool-catalog/structure";
 import { getPeerReviewsSpec } from "../lib/ai/tool-catalog/peer-review";
 

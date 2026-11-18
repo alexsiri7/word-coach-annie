@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import type { SceneBlock } from "@/lib/types";
 import { computeContentHash } from "@/mcp/content-hash";
@@ -6,6 +7,7 @@ import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
 import { NodeOrderIndex, NodeType, SceneStatus } from "@/schemas/nodes";
 import { UserFacingError } from "@/lib/controllers/errors";
+import { isHiddenOutlineScene } from "@/lib/outline-tree";
 
 export class ConflictError extends UserFacingError {
   constructor(public serverContent: string) {
@@ -44,10 +46,14 @@ function assertAnnotationWithinLimits(fields: { content: string; range?: string;
 
 export const MAX_SCENE_VERSIONS = 50;
 
+// The one definition of a scene's latest version: the hash a writer read and
+// the hash checked under the lock must come from the same row on a createdAt tie.
+const latestVersionFirst = [{ createdAt: "desc" }, { id: "desc" }] satisfies Prisma.ContentVersionOrderByWithRelationInput[];
+
 async function pruneSceneVersions(tx: DbClient, nodeId: string) {
     const allVersions = await tx.contentVersion.findMany({
         where: { nodeId },
-        orderBy: { createdAt: "desc" },
+        orderBy: latestVersionFirst,
         select: { id: true },
     });
 
@@ -452,7 +458,7 @@ export class StructureController {
 
         const version = await prisma.contentVersion.findFirst({
             where: { nodeId },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            orderBy: latestVersionFirst,
         });
 
         const annotations = await prisma.annotation.findMany({
@@ -509,7 +515,7 @@ export class StructureController {
             if (contentHash !== undefined) {
                 const latest = await tx.contentVersion.findFirst({
                     where: { nodeId },
-                    orderBy: { createdAt: "desc" },
+                    orderBy: latestVersionFirst,
                     select: { content: true },
                 });
                 if (latest) {
@@ -539,9 +545,9 @@ export class StructureController {
         };
     }
 
-    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[]) {
+    static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[], contentHash?: string | null) {
         const content = StructureController.serializeSceneContent(blocks);
-        return StructureController.writeSceneContent(nodeId, content);
+        return StructureController.writeSceneContent(nodeId, content, contentHash);
     }
 
     static async getSceneVersions(nodeId: string, limit: number = 20) {
@@ -687,7 +693,11 @@ export class StructureController {
         return { deleted: results, errors, totalDeleted: results.length, totalErrors: errors.length };
     }
 
-    static async getOpenAnnotations(projectId?: string, userId?: string | null) {
+    static async getOpenAnnotations(
+        projectId?: string,
+        userId?: string | null,
+        { excludeOutlineScenes = false }: { excludeOutlineScenes?: boolean } = {},
+    ) {
         const where: Record<string, unknown> = { resolved: false };
         if (projectId) {
             where.node = { projectId };
@@ -703,14 +713,19 @@ export class StructureController {
                     select: {
                         id: true,
                         title: true,
+                        type: true,
+                        status: true,
                         project: { select: { title: true } }
                     }
                 }
             },
             orderBy: { createdAt: "desc" }
         });
+        const visible = excludeOutlineScenes
+            ? annotations.filter((a) => !isHiddenOutlineScene(a.node))
+            : annotations;
 
-        return annotations.map((a: { id: string; content: string; nodeId: string; selectedText: string | null; createdAt: Date; node: { title: string; project: { title: string } } }) => ({
+        return visible.map((a) => ({
             id: a.id,
             content: a.content,
             nodeId: a.nodeId,

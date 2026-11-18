@@ -32,6 +32,8 @@ Use the HTTP proxy at `POST /api/mcp` (JSON-RPC). See [API.md](API.md) for detai
 
 Over HTTP, `/api/mcp` acts as a user, so each request needs a credential that carries one: an MCP OAuth access token (from the `/oauth/*` flow), a signed-in session, or a personal API token. The shared `API_TOKEN` bearer carries no user, so `/api/mcp` refuses it while auth is enabled; it is only useful with auth disabled for local development. The stdio server needs no credential.
 
+An MCP OAuth access token reaches only `/api/mcp`; any other authenticated route refuses it with 403 `MCP access tokens can only access the MCP endpoint`, except `/api/metrics`, which refuses every bearer other than the API token with 401.
+
 #### Personal API tokens
 
 For another app's backend (for example a game's scene editor), create a token in **Settings → API tokens** and send `Authorization: Bearer annie_pat_…` to `POST /api/mcp`. The server then registers only the scene tools the token's scope allows:
@@ -260,7 +262,7 @@ words (typos, punctuation, wording fixes) rather than replacing them with AI-gen
 | `index` | number | The paragraph index from the paragraphs array |
 | `content` | string | New content for this paragraph (must match existing type: CONTENT or BEAT) |
 | `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
-| `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
+| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content`. The whole scene is always re-checked against what the tool read before writing; this hash only adds an earlier check against the version you read |
 | `intent` | `"editorial"` \| `"creative"` | Optional. `"editorial"` signals the author's words are being corrected — prose-writing guard does not apply. Omit or use `"creative"` for standard behavior. |
 
 ---
@@ -275,7 +277,7 @@ tool over `write_scene_content` when adding structural waypoints without touchin
 | `nodeId` | string | The scene node ID |
 | `afterParagraphIndex` | number | Scene-level paragraph index (from `read_scene_content` paragraphs array). Each `<p>` element and each BEAT block counts as one paragraph. Use `-1` to insert before all paragraphs. When the target falls inside a CONTENT block, the block is split automatically. |
 | `beatContent` | string | The beat text to insert (structural waypoint — not prose) |
-| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content` for stale detection |
+| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content`. The whole scene is always re-checked against what the tool read before writing; this hash only adds an earlier check against the version you read |
 
 ---
 
@@ -288,7 +290,7 @@ new scene version, so `restore_scene_version` can undo it.
 | `nodeId` | string | The scene node ID |
 | `index` | number | The beat's paragraph index from the paragraphs array |
 | `paragraphContentHash` | string | The `contentHash` from `paragraphs[index]` in `read_scene_content` |
-| `sceneContentHash` | string? | Optional scene-level hash for additional stale protection |
+| `sceneContentHash` | string? | Optional scene-level `contentHash` from `read_scene_content`. The whole scene is always re-checked against what the tool read before writing; this hash only adds an earlier check against the version you read |
 
 ---
 

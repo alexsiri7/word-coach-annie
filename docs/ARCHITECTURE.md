@@ -134,6 +134,7 @@ Business logic is separated into controller classes under `src/lib/controllers/`
 | `FocusController` | Focus mode scene context + related elements |
 | `GoogleAuthController` | Google OAuth flow + Docs export |
 | `WritingTaskController` | Writing task CRUD, completion tracking |
+| `ChatController` | Chat history, compaction trigger, system-prompt assembly and agent turns for `/api/chat` |
 
 ## AI Architecture
 
@@ -187,6 +188,8 @@ The app supports three auth modes (controlled by environment variables):
 | **Token auth** | `API_TOKEN` set | Send `Authorization: Bearer <token>` header, or use session cookie from `/api/auth/login` |
 | **Google OAuth** | `GOOGLE_CLIENT_ID/SECRET` set | Full OAuth flow with invite-list control via `ALLOWED_EMAILS` |
 
+When `GOOGLE_CLIENT_ID` is set, every request must carry a user: `API_TOKEN` carries none, so it is accepted only as a bearer on `/api/metrics`, and token sign-in (`/api/auth/login`) is refused.
+
 When auth is enabled, signed-in users can also issue [personal API tokens](#personal-api-tokens) for other apps.
 
 ### Session Security
@@ -201,6 +204,8 @@ Google OAuth uses a two-token model:
 On logout and account deletion, both tokens' `jti` claims are written to the `RevokedToken` table (`src/lib/end-session.ts`). The client silently renews the session cookie every 45 minutes via `POST /api/auth/refresh`.
 
 Every refresh — both `/api/auth/refresh` paths and the `/oauth/token` refresh grant — re-loads the `User` row and re-applies `ALLOWED_EMAILS`, so deleted or de-invited accounts are cut off at their next renewal. Single-use refresh tokens are claimed atomically (`claimToken`) before new tokens are issued, and blocklist or user-lookup DB errors fail closed.
+
+Session, refresh and MCP tokens carry a `familyId` shared by everything minted from one login (Google sign-in or MCP `authorization_code` grant); tokens minted before this claim existed join a new family at their next rotation. Reusing a refresh token whose `jti` was claimed more than 30 seconds earlier (`REFRESH_REUSE_GRACE_MS`) means the chain has forked, so a `family:<id>` row is written to `RevokedToken` and the whole lineage stops working: `verifyRefreshToken`, `verifySessionTokenNode`, `/api/auth/refresh` and the `/oauth/token` refresh grant reject revoked families. A reuse inside that window is treated as a concurrent double-use (two tabs renewing together) and only that request is rejected. The Edge/proxy session check and MCP access tokens still rely on their 1-hour lifetime.
 
 ### Personal API Tokens
 

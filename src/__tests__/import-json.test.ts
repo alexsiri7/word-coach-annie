@@ -114,8 +114,8 @@ describe("importProjectJson", () => {
         {
           id: "cv1",
           nodeId: "sc1",
-          content: "<p>Hello world</p>",
-          wordCount: 2,
+          content: "<script>spam spam spam</script><p>Hello world</p>",
+          wordCount: 999_999,
         },
       ],
     };
@@ -251,6 +251,70 @@ describe("importProjectJson", () => {
     expect(rels).toHaveLength(1);
     expect(rels[0].toObjectId).toBe(watson.id);
     expect(rels[0].type).toBe("PARTNER");
+  });
+
+  it("skips relationships whose endpoints are not exactly one node or object in the import", async () => {
+    const holmes = {
+      id: "char1",
+      type: "CHARACTER",
+      name: "Holmes",
+      description: "",
+      notes: "",
+      role: null,
+      tags: "",
+    };
+    const data = {
+      ...minimalExport,
+      structureNodes: [
+        {
+          id: "sc1",
+          parentId: null,
+          type: "SCENE",
+          title: "Scene 1",
+          synopsis: "",
+          status: "DRAFT",
+          orderIndex: 0,
+        },
+      ],
+      storyObjects: [holmes],
+      relationships: [
+        {
+          id: "rel1",
+          type: "PARTNER",
+          label: "",
+          fromObjectId: "char1",
+          fromNodeId: null,
+          toObjectId: "missing",
+          toNodeId: null,
+        },
+        {
+          id: "rel2",
+          type: "PARTNER",
+          label: "",
+          fromObjectId: "missing",
+          fromNodeId: "also-missing",
+          toObjectId: "char1",
+          toNodeId: null,
+        },
+        {
+          id: "rel3",
+          type: "PARTNER",
+          label: "",
+          fromObjectId: "char1",
+          fromNodeId: "sc1",
+          toObjectId: "char1",
+          toNodeId: null,
+        },
+      ],
+    };
+
+    const { projectId } = await importProjectJson(data);
+
+    const objs = await testPrisma.storyObject.findMany({ where: { projectId } });
+    const rels = await testPrisma.relationship.findMany({
+      where: { OR: [{ fromObjectId: objs[0].id }, { toObjectId: objs[0].id }] },
+    });
+    expect(rels).toHaveLength(0);
   });
 
   it("imports annotations on nodes", async () => {

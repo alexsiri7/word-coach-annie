@@ -46,11 +46,12 @@ vi.mock("@/lib/auth", async (importOriginal) => {
         verifyLegacySessionCookie: actual.verifyLegacySessionCookie,
         verifySessionToken: vi.fn(async () => null),
         isAuthEnabled: vi.fn(() => false),
+        isGoogleAuthMode: vi.fn(() => false),
         safeEqual: (a: string, b: string) => a === b,
     };
 });
 
-import { isAuthEnabled, createLegacySessionCookie, verifySessionToken, SESSION_MAX_AGE } from "@/lib/auth";
+import { isAuthEnabled, isGoogleAuthMode, createLegacySessionCookie, verifySessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 
 function createRequest(path: string, options?: {
     method?: string;
@@ -76,6 +77,7 @@ describe("proxy", () => {
     beforeEach(() => {
         origApiToken = process.env.API_TOKEN;
         vi.clearAllMocks();
+        vi.mocked(isGoogleAuthMode).mockReturnValue(false);
         resetRateLimitStore();
     });
 
@@ -267,6 +269,58 @@ describe("proxy", () => {
         });
     });
 
+    describe("Google-auth mode (SEC-005)", () => {
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(isGoogleAuthMode).mockReturnValue(true);
+            vi.mocked(verifySessionToken).mockResolvedValue(null);
+            process.env.API_TOKEN = "my-token";
+        });
+
+        it("rejects the API_TOKEN bearer on API routes", async () => {
+            const res = await proxy(createRequest("/api/projects", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(401);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("redirects a page request carrying only the API_TOKEN bearer to login", async () => {
+            const res = await proxy(createRequest("/project/abc", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(307);
+            expect(res.headers.get("location")).toContain("/login");
+        });
+
+        it("still allows the API_TOKEN bearer on /api/metrics", async () => {
+            const res = await proxy(createRequest("/api/metrics", {
+                headers: { authorization: "Bearer my-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
+
+        it("rejects a valid API_TOKEN login cookie", async () => {
+            const res = await proxy(createRequest("/api/projects", {
+                cookies: { annie_session: await createLegacySessionCookie("my-token") },
+            }));
+            expect(res.status).toBe(401);
+        });
+
+        it("still allows a JWT session cookie with its user", async () => {
+            vi.mocked(verifySessionToken).mockResolvedValue({
+                userId: "user-123",
+                email: "test@example.com",
+                name: "Test",
+            });
+            const res = await proxy(createRequest("/api/projects", {
+                cookies: { annie_session: "valid-jwt-token" },
+            }));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("user-123");
+        });
+    });
+
     it("returns 401 for unauthenticated API requests", async () => {
         vi.mocked(isAuthEnabled).mockReturnValue(true);
         const req = createRequest("/api/projects");
@@ -338,7 +392,7 @@ describe("proxy", () => {
             jti: "mcp-jti-1",
             exp: Math.floor(Date.now() / 1000) + 3600,
         });
-        const req = createRequest("/api/projects", {
+        const req = createRequest("/api/mcp", {
             headers: { authorization: "Bearer mcp-token" },
         });
         await proxy(req);
@@ -346,6 +400,59 @@ describe("proxy", () => {
         expect(Sentry.setUser).not.toHaveBeenCalledWith(
             expect.objectContaining({ email: expect.any(String) })
         );
+    });
+
+    describe("MCP access tokens (SEC-002)", () => {
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifyMcpToken).mockResolvedValue({
+                userId: "mcp-user",
+                email: "mcp@example.com",
+                clientId: "test-client",
+                jti: "mcp-jti-3",
+                exp: Math.floor(Date.now() / 1000) + 3600,
+            });
+        });
+
+        it("reaches the MCP endpoint as its user", async () => {
+            const res = await proxy(createRequest("/api/mcp", {
+                method: "POST",
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("mcp-user");
+        });
+
+        it.each([
+            ["GET", "/api/projects"],
+            ["POST", "/api/account/api-tokens"],
+            ["GET", "/api/auth/export-data"],
+            ["DELETE", "/api/auth/delete-account"],
+            ["GET", "/api/mcp-other"],
+            ["GET", "/projects"],
+        ])("refuses %s %s with 403", async (method, path) => {
+            const res = await proxy(createRequest(path, {
+                method,
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(403);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("does not spend rate-limit quota on refused requests", async () => {
+            for (let i = 0; i < 70; i++) {
+                const refused = await proxy(createRequest("/api/account/api-tokens", {
+                    method: "POST",
+                    headers: { authorization: "Bearer mcp-token" },
+                }));
+                expect(refused.status).toBe(403);
+            }
+            const res = await proxy(createRequest("/api/mcp", {
+                method: "POST",
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
     });
 
     describe("identity header stripping (SEC-03)", () => {
@@ -416,7 +523,7 @@ describe("proxy", () => {
                 jti: "mcp-jti-2",
                 exp: Math.floor(Date.now() / 1000) + 3600,
             });
-            const req = createRequest("/api/projects", {
+            const req = createRequest("/api/mcp", {
                 headers: { authorization: "Bearer mcp-token", "x-user-id": "victim-id" },
             });
             const res = await proxy(req);

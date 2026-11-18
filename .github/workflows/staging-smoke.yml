@@ -193,8 +193,8 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+          COMMIT: ${{ steps.staging-check.outputs.commit }}
         run: |
-          COMMIT="${{ steps.staging-check.outputs.commit }}"
           if [ -z "$COMMIT" ]; then
             echo "::error::No commit SHA from staging check"
             exit 1
@@ -322,12 +322,11 @@ jobs:
         continue-on-error: true
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
+          STATUS: ${{ needs.health-check.outputs.status }}
+          ROLLBACK: ${{ steps.rollback.outputs.rollback_succeeded }}
         run: |
           if [ -z "$NTFY_URL" ]; then exit 0; fi
-          STATUS="${{ needs.health-check.outputs.status }}"
-          SHA="${{ github.sha }}"
-          SHORT_SHA="${SHA:0:7}"
-          ROLLBACK="${{ steps.rollback.outputs.rollback_succeeded }}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
           if [ "$ROLLBACK" = "true" ]; then
             MSG="Rollback initiated. Verify production is healthy."
           else
@@ -337,17 +336,21 @@ jobs:
             -H "Priority: urgent" \
             -H "Tags: warning,rotating_light" \
             -H "Title: Annie Deploy Failed (${SHORT_SHA})" \
-            -d "Health check: ${STATUS}. ${MSG} https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d "Health check: ${STATUS}. ${MSG} https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             "$NTFY_URL"
 
       - name: Create failure issue
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          STATUS: ${{ needs.health-check.outputs.status }}
+          ROLLBACK_ATTEMPTED: ${{ steps.rollback.outputs.rollback_attempted }}
+          ROLLBACK_SUCCEEDED: ${{ steps.rollback.outputs.rollback_succeeded }}
         with:
           script: |
-            const status = '${{ needs.health-check.outputs.status }}';
-            const rollbackAttempted = '${{ steps.rollback.outputs.rollback_attempted }}' === 'true';
-            const rollbackSucceeded = '${{ steps.rollback.outputs.rollback_succeeded }}' === 'true';
+            const status = process.env.STATUS;
+            const rollbackAttempted = process.env.ROLLBACK_ATTEMPTED === 'true';
+            const rollbackSucceeded = process.env.ROLLBACK_SUCCEEDED === 'true';
             const sha = context.sha || context.payload?.workflow_run?.head_sha || 'unknown';
             const shortSha = sha.substring(0, 7);
 

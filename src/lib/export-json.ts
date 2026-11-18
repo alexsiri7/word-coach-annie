@@ -9,6 +9,7 @@ export async function exportProjectJson(projectId: string) {
   const [
     structureNodes, storyObjects, chatMessages, annotations, relationships,
     writingSessions, conversations, googleDocExports, hashnodeExports,
+    locationImages, locationMaps, locationSnapshots, snapshotAnnotations,
   ] = await Promise.all([
       prisma.structureNode.findMany({
         where: { projectId },
@@ -54,6 +55,22 @@ export async function exportProjectJson(projectId: string) {
           id: true, nodeId: true, hashnodePostId: true, hashnodePostUrl: true,
           publishStatus: true, lastSyncedAt: true, createdAt: true, updatedAt: true,
         },
+      }),
+      prisma.locationImage.findMany({
+        where: { storyObject: { projectId } },
+        orderBy: [{ storyObjectId: "asc" }, { orderIndex: "asc" }],
+      }),
+      prisma.locationMap.findMany({
+        where: { storyObject: { projectId } },
+        orderBy: { storyObjectId: "asc" },
+      }),
+      prisma.locationSnapshot.findMany({
+        where: { storyObject: { projectId } },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.snapshotAnnotation.findMany({
+        where: { location: { projectId } },
+        orderBy: { createdAt: "asc" },
       }),
     ]);
 
@@ -166,6 +183,58 @@ export async function exportProjectJson(projectId: string) {
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),
       // credentialId intentionally excluded — points to raw OAuth token, metadata-only export
+    })),
+    // Image files stay in storage; the export references them by path.
+    locationImages: locationImages.map((i) => ({
+      id: i.id,
+      storyObjectId: i.storyObjectId,
+      kind: i.kind,
+      caption: i.caption,
+      orderIndex: i.orderIndex,
+      isCover: i.isCover,
+      storagePath: i.storagePath,
+      thumbPath: i.thumbPath,
+      width: i.width,
+      height: i.height,
+      bytes: i.bytes,
+      sha256: i.sha256,
+      createdAt: i.createdAt.toISOString(),
+      updatedAt: i.updatedAt.toISOString(),
+    })),
+    locationMaps: locationMaps.map((m) => ({
+      id: m.id,
+      storyObjectId: m.storyObjectId,
+      widthM: m.widthM,
+      heightM: m.heightM,
+      backgroundImageId: m.backgroundImageId,
+      items: m.items,
+      createdAt: m.createdAt.toISOString(),
+      updatedAt: m.updatedAt.toISOString(),
+    })),
+    locationSnapshots: locationSnapshots.map((s) => ({
+      id: s.id,
+      storyObjectId: s.storyObjectId,
+      build: s.build,
+      takenAt: s.takenAt.toISOString(),
+      storagePath: s.storagePath,
+      sha256: s.sha256,
+      width: s.width,
+      height: s.height,
+      things: s.things,
+      createdAt: s.createdAt.toISOString(),
+    })),
+    snapshotAnnotations: snapshotAnnotations.map((a) => ({
+      id: a.id,
+      locationId: a.locationId,
+      snapshotId: a.snapshotId,
+      kind: a.kind,
+      thingKey: a.thingKey,
+      region: a.region,
+      text: a.text,
+      storyObjectId: a.storyObjectId,
+      status: a.status,
+      createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
     })),
   };
 }

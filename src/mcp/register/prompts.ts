@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { listSkills, loadSkill } from "@/mcp/skills";
-import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
-import { REVIEW_SKILL_BY_STATUS } from "@/lib/review-routing";
+import { ANNIE_HARD_RULE } from "@/lib/ai/annie-voice";
+import { reviewSkillForStatus } from "@/lib/review-routing";
 import { REVIEW_PERSONAS } from "@/lib/review-personas";
 import { getSceneFocus } from "@/mcp/tools/coaching";
 import { assertProjectOwner as verifyProjectOwnership, projectIdForNode } from "@/lib/ownership";
@@ -126,7 +126,7 @@ Structure your response as:
             const focus = await getSceneFocus(args.sceneId);
             const status = focus.scene.status as string;
             const projectId = args.projectId || focus.scene.projectId;
-            const skillName = REVIEW_SKILL_BY_STATUS[status] ?? REVIEW_SKILL_BY_STATUS["DRAFT"];
+            const skillName = reviewSkillForStatus(status);
             const skill = loadSkill(skillName);
 
             if (!skill) {

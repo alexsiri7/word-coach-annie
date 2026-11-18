@@ -83,7 +83,7 @@ export async function deleteOpportunity(opportunityId: string, userId: string | 
 // ── Opportunity candidates ──────────────────────────────────────────────
 
 export async function listOpportunityCandidates(opportunityId: string, userId: string | null) {
-    const key = `opportunityCandidates:${opportunityId}`;
+    const key = `opportunityCandidates:${opportunityId}:${userId}`;
     return mcpCache.getOrSet(key, () =>
         OpportunityCandidateController.listCandidates(opportunityId, userId)
     );

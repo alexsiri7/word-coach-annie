@@ -4,7 +4,7 @@ import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { getManuscriptContext } from "@/mcp/tools/coaching";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
-import { ANNIE_HARD_RULE } from "@/mcp/annie-voice";
+import { ANNIE_HARD_RULE } from "@/lib/ai/annie-voice";
 import { MAX_PROMPT_LENGTH } from "./limits";
 
 export type ManuscriptAnalysisType =

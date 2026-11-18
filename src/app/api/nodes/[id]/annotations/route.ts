@@ -7,6 +7,7 @@ import {
 } from "@/lib/controllers/structure";
 import { getCurrentUserId, verifyProjectReadAccessByNode } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
+import { isHiddenOutlineSceneId } from "@/lib/outline-tree";
 
 export async function GET(
     request: NextRequest,
@@ -18,6 +19,9 @@ export async function GET(
         const userId = getCurrentUserId(request);
         const access = await verifyProjectReadAccessByNode(nodeId, userId, request.headers.get("x-user-email"));
         if (!access.authorized) return access.response;
+        if (access.role === "READER" && (await isHiddenOutlineSceneId(nodeId))) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
 
         const annotations = await prisma.annotation.findMany({
             where: { nodeId },

@@ -275,11 +275,16 @@ describe("crypto", () => {
             const stored = encryptUnder(KEY_A, "sk-rewrite-fails");
             process.env.ENCRYPTION_KEY = KEY_B;
             process.env.ENCRYPTION_KEY_PREVIOUS = KEY_A;
-            const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-            const rewrite = vi.fn(async () => { throw new Error("db down"); });
+            const rewrite = vi.fn(async () => {
+                throw Object.assign(new Error("db down"), { name: "PrismaClientKnownRequestError" });
+            });
             await expect(readEncrypted(stored, { field: "AiSettings.apiKey", rewrite })).resolves.toBe("sk-rewrite-fails");
             expect(warn).toHaveBeenCalledTimes(1);
+            const line = warn.mock.calls[0][0] as string;
+            expect(JSON.parse(line).error).toEqual({ field: "AiSettings.apiKey", errorName: "PrismaClientKnownRequestError" });
+            expect(line).not.toContain("db down");
             warn.mockRestore();
         });
 

@@ -1,17 +1,19 @@
 # --- Stage 1: Install dependencies ---
-# Pinned to multi-arch manifest list digest for node:22-slim (2026-10-04).
+# Pinned to multi-arch manifest list digest for node:22-slim (2026-11-18).
+# Keep the major in step with package.json engines, CI's node-version and .nvmrc (checked by build-hygiene.test.ts):
+# .npmrc's engine-strict makes npm ci fail otherwise.
 # To update: docker manifest inspect node:22-slim --verbose | jq '.[0].Descriptor.digest'
-FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS deps
+FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc ./
 COPY prisma ./prisma
 RUN npm ci
 
 # --- Stage 2: Build the application ---
-FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS builder
+FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
@@ -26,7 +28,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- Stage 3: Production runtime ---
-FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS runner
+FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
@@ -59,6 +61,8 @@ COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-secu
 COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
 COPY --from=builder /app/scripts/secret-strength.mjs ./scripts/secret-strength.mjs
 COPY --from=builder /app/scripts/database-schema.mjs ./scripts/database-schema.mjs
+# CA that verifies the Supabase pooler certificate, named by DATABASE_URL's sslrootcert (#1585)
+COPY --from=builder /app/certs ./certs
 # Encryption keyring (also read by migrate.mjs) and the startup re-encryption sweep
 COPY --from=builder /app/scripts/encryption-keyring.mjs ./scripts/encryption-keyring.mjs
 COPY --from=builder /app/scripts/reencrypt.mjs ./scripts/reencrypt.mjs
