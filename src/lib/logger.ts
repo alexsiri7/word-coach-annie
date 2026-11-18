@@ -11,10 +11,7 @@ function formatLog(level: LogLevel, message: string, meta?: unknown): void {
   };
 
   if (meta !== undefined) {
-    entry.error =
-      meta instanceof Error
-        ? { message: maskEmails(meta.message), stack: meta.stack && maskEmails(meta.stack) }
-        : redact(meta);
+    entry.error = redact(meta);
   }
 
   const json = JSON.stringify(entry);
