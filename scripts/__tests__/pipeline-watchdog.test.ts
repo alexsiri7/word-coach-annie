@@ -56,6 +56,12 @@ describe('pipeline watchdog deploy-run lookup', () => {
     expect(failedFilter).not.toBe('');
   });
 
+  it('builds fixtures with the fields the deploy-run lookup requests', () => {
+    const fields = watchdog.match(/PIPELINE_RUNS=\$\(gh run list[^)]*--json ([\w,]+)\)/)?.[1]?.split(',');
+    expect(fields).toBeDefined();
+    expect(Object.keys(run(1, 'completed', 'success'))).toEqual(fields);
+  });
+
   it('dispatches when no deploy run exists for the SHA', () => {
     expect(active([])).toBe('');
     expect(failed([])).toBe('');
@@ -75,11 +81,15 @@ describe('pipeline watchdog deploy-run lookup', () => {
     expect(active([run(9, 'completed', 'success'), run(7, 'completed', 'failure')])).toBe('9');
   });
 
-  it('exits on a failed run before reaching the dispatch', () => {
+  it('halts on a failed run with a warning and no re-dispatch', () => {
     const halt = watchdog.indexOf('if [ -n "$PIPELINE_FAILED" ]');
     const dispatch = watchdog.indexOf('gh workflow run staging-smoke.yml');
     expect(halt).toBeGreaterThan(-1);
     expect(halt).toBeLessThan(dispatch);
-    expect(watchdog.slice(halt, dispatch)).toContain('exit 0');
+    const branch = watchdog.slice(halt, watchdog.indexOf('\n          fi', halt)).split('\n').map((line) => line.trim());
+    expect(branch[1]).toMatch(/^echo "::warning::/);
+    expect(branch).toContain('echo "redispatched=false" >> "$GITHUB_OUTPUT"');
+    expect(branch).not.toContain('echo "redispatched=true" >> "$GITHUB_OUTPUT"');
+    expect(branch.at(-1)).toBe('exit 0');
   });
 });
