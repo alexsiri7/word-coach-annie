@@ -388,7 +388,7 @@ requirements:
 
   - id: WCA-032
     title: Destructive MCP tool gating
-    statement: "While the MCP server runs without destructive operations enabled (allowDestructive option or MCP_ALLOW_DESTRUCTIVE=true), the system shall block destructive tools (deletes, restores) while leaving non-destructive tools functional; the default with no configuration shall be blocking."
+    statement: "While the MCP server runs without destructive operations enabled (allowDestructive option or MCP_ALLOW_DESTRUCTIVE=true), the system shall block destructive tools (deletes) while leaving non-destructive tools functional; the default with no configuration shall be blocking. Scene-history operations that version history can undo (delete_beat, restore_scene_version) are not destructive and stay available, because restore_scene_version is the agents' recovery path (WCA-033)."
     category: functional
     priority: must
     status: active
@@ -396,6 +396,7 @@ requirements:
     acceptance:
       - "Destructive tools error when gating is off; succeed when enabled by option or env"
       - "Unset MCP_ALLOW_DESTRUCTIVE defaults to blocked"
+      - "delete_beat and restore_scene_version succeed with MCP_ALLOW_DESTRUCTIVE unset"
 
   - id: WCA-033
     title: Database snapshot and restore
