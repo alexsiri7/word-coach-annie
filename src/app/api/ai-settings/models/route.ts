@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       const body = await res.text();
-      logger.error("Google models API error", { status: res.status, body });
+      logger.warn("Google models API error", { status: res.status, body });
       return NextResponse.json(
         { error: `Google API returned ${res.status}` },
         { status: res.status }
