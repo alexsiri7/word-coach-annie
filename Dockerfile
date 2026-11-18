@@ -59,6 +59,8 @@ COPY --from=builder /app/scripts/transport-security.mjs ./scripts/transport-secu
 COPY --from=builder /app/scripts/auth-configuration.mjs ./scripts/auth-configuration.mjs
 COPY --from=builder /app/scripts/secret-strength.mjs ./scripts/secret-strength.mjs
 COPY --from=builder /app/scripts/database-schema.mjs ./scripts/database-schema.mjs
+# CA that verifies the Supabase pooler certificate, named by DATABASE_URL's sslrootcert (#1585)
+COPY --from=builder /app/certs ./certs
 # Encryption keyring (also read by migrate.mjs) and the startup re-encryption sweep
 COPY --from=builder /app/scripts/encryption-keyring.mjs ./scripts/encryption-keyring.mjs
 COPY --from=builder /app/scripts/reencrypt.mjs ./scripts/reencrypt.mjs
