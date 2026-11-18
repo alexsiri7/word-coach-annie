@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="text-sm text-text-muted mb-8">
-          Last updated: October 2026
+          Last updated: November 2026
         </p>
 
         <div className="space-y-8 text-sm text-text-secondary leading-relaxed">
@@ -47,8 +47,8 @@ export default function PrivacyPage() {
               What we store
             </h2>
             <p>
-              Your data is stored in a PostgreSQL database on the server that hosts
-              your instance. This includes:
+              Your data is stored in a PostgreSQL database hosted by Supabase.
+              This includes:
             </p>
             <ul className="list-disc pl-6 space-y-1">
               <li>Your account information (email address, display name)</li>
@@ -70,6 +70,11 @@ export default function PrivacyPage() {
                 hours to limit abuse and then cleared
               </li>
             </ul>
+            <p>
+              Images you upload for locations, and screenshots of locations that a
+              game you connect with an API token posts, are stored in a private
+              Cloudflare R2 storage bucket rather than the database.
+            </p>
             <p>
               We do not store passwords. Authentication is handled through Google
               OAuth or admin-issued access tokens.
@@ -102,6 +107,10 @@ export default function PrivacyPage() {
               use:
             </p>
             <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>Supabase</strong> and <strong>Cloudflare R2</strong> — host
+                the database and image storage described above
+              </li>
               <li>
                 <strong>Google OAuth</strong> — your email address, solely for
                 authentication
@@ -149,9 +158,11 @@ export default function PrivacyPage() {
               To delete your entire account and all associated data, go to{" "}
               <Link href="/settings" className="text-accent hover:underline">Settings → Privacy & Data → Delete account</Link>.
               Your projects, universes, and connected-service credentials are
-              removed from the database immediately. Any offline copy of your
-              projects stored in your browser is not cleared automatically — clear
-              your browser storage for this site if you&apos;d like to remove it.
+              removed from the database immediately, and your location images and
+              screenshots are deleted from storage. The offline copy of your projects in the browser
+              you deleted the account from is cleared at the same time, as it is
+              whenever you log out. A copy in another browser stays there until you
+              log out of it or clear its storage for this site.
             </p>
           </section>
 
