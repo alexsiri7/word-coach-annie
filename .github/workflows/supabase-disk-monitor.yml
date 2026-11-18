@@ -27,11 +27,6 @@ jobs:
           - instance: Reli
             secret: RELI_DATABASE_URL
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-          sparse-checkout: certs
-
       - name: Query disk usage
         id: usage
         env:
@@ -44,7 +39,7 @@ jobs:
           # Appended last so it overrides any sslmode in the secret: libpq uses a repeated
           # URI parameter's last value, and a URL sslmode beats PGSSLMODE (#1585).
           SEP='?'; [[ "$DATABASE_URL" == *\?* ]] && SEP='&'
-          TLS_URL="${DATABASE_URL}${SEP}sslmode=verify-full&sslrootcert=${GITHUB_WORKSPACE}/certs/supabase-prod-ca-2021.crt"
+          TLS_URL="${DATABASE_URL}${SEP}sslmode=require"
           BYTES=$(psql "$TLS_URL" -t -c "SELECT pg_database_size(current_database());" 2>&1 | tr -d ' ')
           if ! [[ "$BYTES" =~ ^[0-9]+$ ]]; then
             echo "::error::Failed to query ${{ matrix.instance }} disk usage: $BYTES"

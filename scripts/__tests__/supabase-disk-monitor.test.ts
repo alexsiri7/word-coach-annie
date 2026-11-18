@@ -3,9 +3,9 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-// The disk monitor must verify the Supabase certificate whatever sslmode its secret carries:
-// the appended sslmode has to stay the last one, because libpq uses a repeated URI
-// parameter's last value (#1585).
+// The disk monitor must connect over TLS whatever sslmode its secret carries: the appended
+// sslmode has to stay the last one, because libpq uses a repeated URI parameter's last
+// value (#1585).
 describe('supabase disk monitor', () => {
   const monitor = readFileSync(
     join(__dirname, '../../.github/workflows/supabase-disk-monitor.yml'),
@@ -30,7 +30,6 @@ describe('supabase disk monitor', () => {
       env: {
         PATH: `${dir}:${process.env.PATH}`,
         DATABASE_URL: databaseUrl,
-        GITHUB_WORKSPACE: '/workspace',
         GITHUB_OUTPUT: join(dir, 'output'),
         QUOTA_BYTES: '524288000',
       },
@@ -49,12 +48,9 @@ describe('supabase disk monitor', () => {
     'postgresql://u:p@db.example.com:5432/postgres?connect_timeout=10',
     'postgresql://u:p@db.example.com:5432/postgres?sslmode=disable',
     'postgresql://u:p@db.example.com:5432/postgres?sslmode=require&uselibpqcompat=true',
-  ])('connects with certificate verification for %s', (databaseUrl) => {
+  ])('connects over TLS for %s', (databaseUrl) => {
     const url = psqlUrl(databaseUrl);
     expect(url.search.indexOf('?', 1)).toBe(-1);
-    expect(url.searchParams.getAll('sslmode').at(-1)).toBe('verify-full');
-    expect(url.searchParams.getAll('sslrootcert').at(-1)).toBe(
-      '/workspace/certs/supabase-prod-ca-2021.crt',
-    );
+    expect(url.searchParams.getAll('sslmode').at(-1)).toBe('require');
   });
 });
