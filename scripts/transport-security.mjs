@@ -4,10 +4,11 @@ const DB_TLS_MODES = new Set(['require', 'verify-ca', 'verify-full', 'no-verify'
  * Report the production database and Redis URLs that would carry traffic
  * unencrypted (#1251).
  *
- * DATABASE_URL must name an sslmode that always encrypts. For Supabase that is
- * `sslmode=require&uselibpqcompat=true`: without `uselibpqcompat`, pg treats
- * `require` as verify-full, which rejects Supabase's private CA. REDIS_URL, when
- * set, must use the `rediss://` scheme.
+ * DATABASE_URL must name an sslmode that always encrypts. For Supabase, use
+ * `sslmode=verify-full&sslrootcert=certs/supabase-prod-ca-2021.crt`, which also
+ * verifies the server certificate against Supabase's root CA shipped in `certs/`
+ * (#1585); `sslmode=require&uselibpqcompat=true` still passes this check but
+ * encrypts without verifying. REDIS_URL, when set, must use the `rediss://` scheme.
  *
  * Messages name only the offending sslmode or scheme, never the URL, which
  * carries the password.
@@ -29,7 +30,7 @@ export function transportSecurityProblems(env) {
       const found = sslmode === undefined ? 'has no sslmode' : `has sslmode=${sslmode}`;
       problems.push(
         `DATABASE_URL ${found}; production requires TLS. ` +
-          'Append sslmode=require&uselibpqcompat=true (Supabase) — see .env.example.',
+          'Append sslmode=verify-full&sslrootcert=certs/supabase-prod-ca-2021.crt (Supabase) — see .env.example.',
       );
     }
   }
