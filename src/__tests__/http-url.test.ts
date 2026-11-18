@@ -53,6 +53,10 @@ describe("URL fields that are stored and shown as links", () => {
     it("still lets an opportunity update clear rulesUrl with null", () => {
         expect(OpportunityUpdateSchema.safeParse({ rulesUrl: null }).success).toBe(true);
     });
+
+    it("lets a provider update clear website with null", () => {
+        expect(ProviderUpdateSchema.safeParse({ website: null }).success).toBe(true);
+    });
 });
 
 describe("safeHref", () => {
