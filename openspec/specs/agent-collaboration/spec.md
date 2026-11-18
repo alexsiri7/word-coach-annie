@@ -50,7 +50,7 @@ An agent SHALL be able to replace a single paragraph or beat by index, supplying
 
 ### Requirement: Destructive tools are gated
 
-Destructive tools — deletes and restores — SHALL be refused unless destructive operations are explicitly enabled for the server; with no configuration they SHALL be refused. Non-destructive tools SHALL work either way.
+Destructive tools — deletes — SHALL be refused unless destructive operations are explicitly enabled for the server; with no configuration they SHALL be refused. Non-destructive tools SHALL work either way. Scene-history operations that version history can undo (`delete_beat`, `restore_scene_version`) are not destructive and SHALL stay available, because `restore_scene_version` is the agents' recovery path.
 
 #### Scenario: Default server
 - GIVEN a server started with no destructive setting
