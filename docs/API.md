@@ -292,6 +292,8 @@ Get the full hierarchical outline tree for a project.
 ### `GET /api/projects/:id/search`
 Full-text search across scenes and story objects.
 
+**Auth**: Project owner or shared reader/editor access required.
+
 **Query params**: `q` (required) — search query string
 
 **Response**: `{ scenes: SearchResult[], storyObjects: SearchResult[] }` where each result includes a highlighted `snippet`.
@@ -300,6 +302,8 @@ Full-text search across scenes and story objects.
 
 ### `GET /api/projects/:id/story-objects`
 List all story objects in a project.
+
+**Auth**: Project owner or shared reader/editor access required.
 
 **Query params**: `type` (optional filter: CHARACTER, LOCATION, PLOTLINE, WORLD_ELEMENT, NOTE)
 
@@ -310,6 +314,8 @@ Each project object carries `coverImageId`: the id of its cover location image, 
 ### `GET /api/projects/:id/relationships`
 List all relationships in a project, including edges touching a world object of the project's linked universe.
 
+**Auth**: Project owner or shared reader/editor access required.
+
 ---
 
 ### `GET /api/projects/:id/nodes`
@@ -319,6 +325,8 @@ List all structure nodes (non-nested) for a project.
 
 ### `GET /api/projects/:id/graph`
 Get the relationship graph for a project (nodes + edges for visualization).
+
+**Auth**: Project owner or shared reader/editor access required.
 
 ---
 
