@@ -451,7 +451,8 @@ coverage:
   - next.config.ts
   test_paths:
   - src/__tests__/pwa-reload-policy.test.ts
-  notes: next.config.ts sets reloadOnOnline false so the PWA registration script never reloads on an online event; location.reload() is only reachable from the update banner's refresh action.
+  - src/__tests__/update-banner-reload.test.tsx
+  notes: next.config.ts sets reloadOnOnline false so the PWA registration script never reloads on an online event; a service worker controllerchange only shows the update banner, and location.reload() is only reachable from its refresh action.
 - id: WCA-038
   status: covered
   code_paths:
