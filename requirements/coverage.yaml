@@ -444,13 +444,14 @@ coverage:
   - src/__tests__/cache-reads.test.ts
   notes: Keep-server conflict resolution, header chip states and service-worker replay untested.
 - id: WCA-037
-  status: stale
+  status: covered
   code_paths:
   - src/hooks/use-version-check.ts
   - src/components/update-banner.tsx
   - next.config.ts
-  test_paths: []
-  notes: next-pwa 10.2.9 defaults reloadOnOnline to true and next.config.ts does not disable it, so the page reloads on every online event; no tests.
+  test_paths:
+  - src/__tests__/pwa-reload-policy.test.ts
+  notes: next.config.ts sets reloadOnOnline false so the PWA registration script never reloads on an online event; location.reload() is only reachable from the update banner's refresh action.
 - id: WCA-038
   status: covered
   code_paths:
