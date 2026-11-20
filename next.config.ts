@@ -121,6 +121,10 @@ const pwaConfig = withPWA({
   disable: process.env.NODE_ENV === "development",
   customWorkerSrc: "src/worker",
   cacheOnFrontEndNav: true,
+  // The plugin defaults to reloading the page on every browser "online" event, which
+  // would discard unsaved editor content when the connection flaps (WCA-037). Updates
+  // are surfaced by the update banner instead, and reload only on its refresh action.
+  reloadOnOnline: false,
   fallbacks: {
     document: "/offline",
   },
