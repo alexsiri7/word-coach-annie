@@ -521,12 +521,14 @@ coverage:
   - src/__tests__/rate-limit.test.ts
   notes: All six limits, headers, production bypass guard, Redis and in-memory paths tested.
 - id: WCA-044
-  status: stale
+  status: covered
   code_paths:
   - src/app/api/chat/route.ts
   - src/app/api/ai-inline/route.ts
   - src/app/api/feedback/route.ts
   - src/app/api/projects/import/route.ts
+  - src/app/api/projects/[id]/search/route.ts
+  - src/lib/request-validation.ts
   - src/lib/sanitize.ts
   - src/lib/sanitize-server.ts
   - src/lib/sanitize-display.ts
@@ -535,7 +537,11 @@ coverage:
   - src/__tests__/sanitize.test.ts
   - src/__tests__/mcp-tools.test.ts
   - src/__tests__/structure-controller.test.ts
-  notes: Statement claims Zod validation but listed routes use hand-written checks (Zod only in consent, ai-settings, import-json); limits and sanitization are implemented and tested.
+  - src/__tests__/chat-route.test.ts
+  - src/__tests__/ai-inline-route.test.ts
+  - src/__tests__/feedback-route.test.ts
+  - src/__tests__/search-route.test.ts
+  notes: chat, ai-inline, feedback and search validate bodies with Zod schemas (oversize → 413 via src/lib/request-validation.ts); import via import-json.ts; sanitization tested.
 - id: WCA-045
   status: stale
   code_paths:

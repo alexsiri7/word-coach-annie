@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { escapeMarkdown, fenceMarkdown, neutralizeGitHubReferences } from "@/lib/sanitize-server";
-
-interface FeedbackBody {
-  type: "bug" | "feature" | "other";
-  message: string;
-  email?: string;
-  screenshot?: string; // data URL (image/jpeg;base64,...)
-  context?: {
-    url?: string;
-    userAgent?: string;
-    screenSize?: string;
-  };
-}
+import { validationErrorResponse } from "@/lib/request-validation";
 
 const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
 const MAX_EMAIL_LENGTH = 320; // RFC 5321 max
 const MAX_SCREENSHOT_LENGTH = Math.ceil(2 * 1024 * 1024 * (4 / 3)); // 2 MB binary limit expressed as base64 length (~2,796,203 chars)
+
+const FeedbackSchema = z.object({
+  type: z.enum(["bug", "feature", "other"], { error: "Type must be one of: bug, feature, other" }),
+  message: z
+    .string({ error: "Message is required" })
+    .refine((message) => message.trim().length > 0, "Message is required")
+    .max(MAX_FEEDBACK_MESSAGE_LENGTH, `Message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH} characters`),
+  email: z.string().max(MAX_EMAIL_LENGTH, `Email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters`).optional(),
+  screenshot: z.string().max(MAX_SCREENSHOT_LENGTH, "Screenshot exceeds maximum size of 2MB").optional(), // data URL (image/jpeg;base64,...)
+  // Context is best-effort diagnostics: malformed fields are dropped, not rejected.
+  context: z
+    .object({
+      url: z.string().optional().catch(undefined),
+      userAgent: z.string().optional().catch(undefined),
+      screenSize: z.string().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+});
 
 const LABEL_MAP: Record<string, string> = {
   bug: "bug",
@@ -112,47 +121,19 @@ async function getRepoId(token: string, repo: string): Promise<string> {
   return String(data.id);
 }
 
-function escapeContextField(value: unknown): string | undefined {
-  return typeof value === "string" && value ? escapeMarkdown(value) : undefined;
+function escapeContextField(value: string | undefined): string | undefined {
+  return value ? escapeMarkdown(value) : undefined;
 }
 
 export async function POST(request: NextRequest) {
-  const body: FeedbackBody | null = await request.json().catch(() => null);
-  if (!body) {
+  const json: unknown = await request.json().catch(() => null);
+  if (!json) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (typeof body.message !== "string" || !body.message.trim()) {
-    return NextResponse.json(
-      { error: "Message is required" },
-      { status: 400 }
-    );
-  }
-  if (body.message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
-    return NextResponse.json(
-      { error: `Message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH} characters` },
-      { status: 413 }
-    );
-  }
-  if (body.email && body.email.length > MAX_EMAIL_LENGTH) {
-    return NextResponse.json(
-      { error: `Email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters` },
-      { status: 413 }
-    );
-  }
-  if (body.screenshot && body.screenshot.length > MAX_SCREENSHOT_LENGTH) {
-    return NextResponse.json(
-      { error: "Screenshot exceeds maximum size of 2MB" },
-      { status: 413 }
-    );
-  }
-
-  if (!body.type || !["bug", "feature", "other"].includes(body.type)) {
-    return NextResponse.json(
-      { error: "Type must be one of: bug, feature, other" },
-      { status: 400 }
-    );
-  }
+  const parsed = FeedbackSchema.safeParse(json);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
+  const body = parsed.data;
 
   const token = env.GITHUB_FEEDBACK_TOKEN;
   const repo = env.GITHUB_FEEDBACK_REPO;

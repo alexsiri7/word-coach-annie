@@ -32,6 +32,7 @@ vi.mock("@/lib/auth", () => ({ isGoogleAuthMode: vi.fn(() => false) }));
 globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ id: 1 }) })) as unknown as typeof fetch;
 
 import { POST as chatPost } from "@/app/api/chat/route";
+import { runChatAgent } from "@/lib/ai/adk-agent";
 import { POST as inlinePost } from "@/app/api/ai-inline/route";
 import { POST as importPost } from "@/app/api/projects/import/route";
 import { importProjectJson, ImportValidationError } from "@/lib/import-json";
@@ -51,6 +52,7 @@ function postJson(url: string, body: unknown, headers?: Record<string, string>):
 // ── /api/chat ─────────────────────────────────────────────────────────────────
 describe("POST /api/chat — input size limits", () => {
   it("returns 413 when message exceeds 10,000 chars", async () => {
+    vi.mocked(runChatAgent).mockClear();
     const res = await chatPost(postJson("http://localhost/api/chat", {
       conversationId: "conv-1",
       message: "a".repeat(10_001),
@@ -58,6 +60,7 @@ describe("POST /api/chat — input size limits", () => {
     expect(res.status).toBe(413);
     const body = await res.json();
     expect(body).toHaveProperty("error");
+    expect(runChatAgent).not.toHaveBeenCalled();
   });
 
   it("passes when message is exactly 10,000 chars", async () => {

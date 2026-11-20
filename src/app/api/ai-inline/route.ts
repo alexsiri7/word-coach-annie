@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getAiConfig, getAiPreferences, buildPreferenceInstructions } from "@/lib/ai/settings";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
+import { validationErrorResponse } from "@/lib/request-validation";
 
-export type InlineAiAction =
-  | "rewrite-tighter"
-  | "rewrite-vivid"
-  | "rewrite-simpler"
-  | "continue"
-  | "expand"
-  | "voice-check"
-  | "ask";
+const INLINE_AI_ACTIONS = [
+  "rewrite-tighter",
+  "rewrite-vivid",
+  "rewrite-simpler",
+  "continue",
+  "expand",
+  "voice-check",
+  "ask",
+] as const;
+
+export type InlineAiAction = (typeof INLINE_AI_ACTIONS)[number];
 
 const ACTION_PROMPTS: Record<InlineAiAction, (text: string, context: string, ask?: string) => string> = {
   "rewrite-tighter": (text, context) =>
@@ -39,36 +44,29 @@ const ACTION_PROMPTS: Record<InlineAiAction, (text: string, context: string, ask
 
 const MAX_SELECTED_TEXT_LENGTH = 50_000;
 const MAX_ASK_PROMPT_LENGTH = 1_000;
+const INLINE_AI_REQUIRED = "selectedText and action are required";
+
+const InlineAiSchema = z.object({
+  selectedText: z
+    .string({ error: INLINE_AI_REQUIRED })
+    .min(1, INLINE_AI_REQUIRED)
+    .max(MAX_SELECTED_TEXT_LENGTH, `SelectedText exceeds maximum length of ${MAX_SELECTED_TEXT_LENGTH} characters`),
+  action: z.enum(INLINE_AI_ACTIONS, {
+    error: (issue) => (issue.input === undefined ? INLINE_AI_REQUIRED : "Unknown action"),
+  }),
+  sceneContext: z.string().optional(),
+  askPrompt: z
+    .string()
+    .max(MAX_ASK_PROMPT_LENGTH, `AskPrompt exceeds maximum length of ${MAX_ASK_PROMPT_LENGTH} characters`)
+    .optional(),
+});
 
 // POST /api/ai-inline — apply an AI action to selected text
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { selectedText, sceneContext, action, askPrompt } = body as {
-      selectedText: string;
-      sceneContext?: string;
-      action: InlineAiAction;
-      askPrompt?: string;
-    };
-
-    if (!selectedText || !action) {
-      return NextResponse.json(
-        { error: "selectedText and action are required" },
-        { status: 400 }
-      );
-    }
-    if (selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-      return NextResponse.json(
-        { error: `SelectedText exceeds maximum length of ${MAX_SELECTED_TEXT_LENGTH} characters` },
-        { status: 413 }
-      );
-    }
-    if (askPrompt && askPrompt.length > MAX_ASK_PROMPT_LENGTH) {
-      return NextResponse.json(
-        { error: `AskPrompt exceeds maximum length of ${MAX_ASK_PROMPT_LENGTH} characters` },
-        { status: 413 }
-      );
-    }
+    const parsed = InlineAiSchema.safeParse(await request.json());
+    if (!parsed.success) return validationErrorResponse(parsed.error);
+    const { selectedText, sceneContext, action, askPrompt } = parsed.data;
 
     const sanitizedText = sanitizeInput(selectedText);
     const sanitizedContext = sceneContext ? sanitizeInput(sceneContext.slice(0, 1000)) : "";
@@ -83,12 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promptFn = ACTION_PROMPTS[action];
-    if (!promptFn) {
-      return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-    }
-
-    const prompt = promptFn(sanitizedText, sanitizedContext, sanitizedAsk);
+    const prompt = ACTION_PROMPTS[action](sanitizedText, sanitizedContext, sanitizedAsk);
 
     // Load user preferences for system-level behavior guidance
     const prefs = await getAiPreferences(userId);
