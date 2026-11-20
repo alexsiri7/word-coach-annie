@@ -474,15 +474,16 @@ requirements:
 
   - id: WCA-039
     title: Authentication on all non-public routes
-    statement: "When a request arrives for any path outside the public allowlist (health, login/logout/refresh, landing, privacy/terms, OAuth metadata/register/token, version.json), the middleware shall require a valid session cookie, API bearer token, or MCP OAuth token, and shall reject unauthenticated requests."
+    statement: "While API_TOKEN or GOOGLE_CLIENT_ID is configured, when a request arrives for any path outside the public allowlist (/api/health, /api/calendar, /api/auth/login, /api/auth/logout, /api/auth/google, /api/auth/me, /api/auth/refresh, /login, /landing, /privacy, /terms, /dmca, /.well-known/oauth-authorization-server, /oauth/register, /oauth/token, /version.json, each with its subpaths), the middleware shall require a session-cookie JWT, an MCP OAuth access token, a personal API token, the static API_TOKEN bearer, or the legacy API_TOKEN session cookie, and shall answer an unauthenticated request with 401 on /api routes and a redirect to /login (from / to /landing) on pages."
     category: non-functional
     priority: must
     status: active
-    source: src/proxy.ts, src/__tests__/proxy.test.ts
+    source: src/proxy.ts PUBLIC_PATHS/route, scripts/auth-configuration.mjs, src/__tests__/proxy.test.ts
     acceptance:
       - "Unauthenticated request to a protected /api route is rejected; public paths pass"
       - "/api/mcp accepts a verified MCP OAuth token (mcp-route-auth tests)"
-    notes: "Sign-in is Google OAuth; docs/ARCHITECTURE.md and SECURITY-AUDIT.md predate auth and describe a no-auth SQLite era — they are stale, not authoritative."
+      - "With neither API_TOKEN nor GOOGLE_CLIENT_ID set, every request passes through unauthenticated"
+    notes: "Each credential is narrowed by its own requirement: MCP OAuth tokens reach only /api/mcp (WCA-051), personal tokens only their scope's routes (WCA-072), and the static API_TOKEN bearer and legacy cookie act without a user and, with GOOGLE_CLIENT_ID set, the bearer reaches only /api/metrics and the cookie is ignored (WCA-060). /api/calendar is public because calendar clients cannot sign in; the feed's unguessable URL token is its credential. The auth-disabled pass-through is local dev mode; production refuses to start without either variable (migrate.mjs). Next.js internals and static assets (_next/static, _next/image, favicons, icons, manifest, service worker) bypass the middleware. Sign-in is Google OAuth; docs/ARCHITECTURE.md and SECURITY-AUDIT.md predate auth and describe a no-auth SQLite era — they are stale, not authoritative."
 
   - id: WCA-040
     title: Session lifetime and revocation
