@@ -510,14 +510,14 @@ requirements:
 
   - id: WCA-042
     title: Per-project authorization
-    statement: "When any project-scoped operation executes (API or MCP), the system shall verify the requesting user owns or is shared on the project, returning 403 otherwise; when the MCP server runs with a null userId (single-user mode), ownership checks shall be bypassed."
+    statement: "When a project-scoped REST request carries a user, the system shall allow the project owner and users the project is shared with (reads for readers and editors, writes for editors), returning 403 otherwise; when an MCP tool call carries a user, the system shall allow only the owner of the project or universe, rejecting anyone else with an access-denied error. When a request carries no user (the single-user, no-auth deployment mode), ownership checks shall be bypassed for both REST and MCP."
     category: non-functional
     priority: must
     status: active
     source: src/__tests__/sharing.test.ts, mcp-destructive-gating.test.ts (ownership), null-userid-guard.test.ts
     acceptance:
-      - "MCP tool access with a non-owner userId is rejected; owner and null userId are allowed"
-      - "verifyProjectAccess/verifyProjectReadAccess gate project routes by role"
+      - "MCP tool access with a non-owner userId is rejected, including for users the project is shared with; owner and null userId are allowed"
+      - "verifyProjectAccess/verifyProjectReadAccess/verifyProjectWriteAccess gate project routes by role; shared readers and editors can GET a project's story objects, relationships, search, plot-thread status and graph"
 
   - id: WCA-043
     title: Per-user rate limiting
