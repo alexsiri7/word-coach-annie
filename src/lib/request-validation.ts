@@ -3,8 +3,8 @@ import type { z } from "zod";
 
 /**
  * 400 for a malformed request, else 413 for a size limit — the WCA-044 split.
- * A missing or invalid field outranks an oversized sibling, as the routes'
- * hand-written checks did before the Zod migration.
+ * Any missing or invalid field outranks an oversized sibling, so a request is
+ * 413 only when size is its sole problem.
  */
 export function validationErrorResponse(error: z.ZodError): NextResponse {
   const malformed = error.issues.find((issue) => issue.code !== "too_big");
