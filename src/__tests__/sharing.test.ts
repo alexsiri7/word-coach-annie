@@ -656,3 +656,54 @@ describe("Access control — verifyProjectAccess / verifyProjectReadAccess", () 
         }
     });
 });
+
+// ─── 4. Shared read access on project GET routes ─────────────────────
+
+describe("Shared read access — project GET routes", () => {
+    const routes = [
+        { name: "story-objects", load: () => import("@/app/api/projects/[id]/story-objects/route") },
+        { name: "relationships", load: () => import("@/app/api/projects/[id]/relationships/route") },
+        { name: "search?q=dark", load: () => import("@/app/api/projects/[id]/search/route") },
+        { name: "plot-thread-status", load: () => import("@/app/api/projects/[id]/plot-thread-status/route") },
+        { name: "graph", load: () => import("@/app/api/projects/[id]/graph/route") },
+    ];
+
+    let ownerId: string;
+    let projectId: string;
+
+    beforeEach(async () => {
+        const { owner, project } = await createOwnerAndProject();
+        ownerId = owner.id;
+        projectId = project.id;
+    });
+
+    async function get(route: (typeof routes)[number], userId: string, userEmail: string) {
+        const { GET } = await route.load();
+        const req = makeRequest(`http://localhost/api/projects/${projectId}/${route.name}`, { userId, userEmail });
+        return (await GET(req as never, mockParams({ id: projectId }))) as unknown as { status: number };
+    }
+
+    for (const route of routes) {
+        it(`${route.name} — owner gets 200`, async () => {
+            const res = await get(route, ownerId, "owner@example.com");
+            expect(res.status).toBe(200);
+        });
+
+        for (const role of ["READER", "EDITOR"] as const) {
+            it(`${route.name} — shared ${role} gets 200`, async () => {
+                const other = await createOtherUser();
+                await testPrisma.projectShare.create({
+                    data: { projectId, email: other.email, role },
+                });
+                const res = await get(route, other.id, other.email);
+                expect(res.status).toBe(200);
+            });
+        }
+
+        it(`${route.name} — non-shared user gets 403`, async () => {
+            const stranger = await createOtherUser();
+            const res = await get(route, stranger.id, stranger.email);
+            expect(res.status).toBe(403);
+        });
+    }
+});
