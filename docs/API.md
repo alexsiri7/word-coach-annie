@@ -330,6 +330,15 @@ Get the relationship graph for a project (nodes + edges for visualization).
 
 ---
 
+### `GET /api/projects/:id/plot-thread-status`
+Get plotline status indicators for each scene, in story order.
+
+**Auth**: Project owner or shared reader/editor access required.
+
+**Response**: `ScenePlotThreadStatus[]` — `{ sceneId, sceneTitle, indicators: { id, name, status, lastSeenTitle? }[] }` where `status` is `advancing` | `mentioned` | `dormant`.
+
+---
+
 ### `GET /api/projects/:id/export`
 Export the project manuscript.
 

@@ -6,6 +6,7 @@ vi.mock("@/lib/api-auth", () => ({
   getCurrentUserId: vi.fn(() => "user-1"),
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectAccess: vi.fn(async () => ({ authorized: true })),
+  verifyProjectReadAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectWriteAccessByNode: vi.fn(async () => ({ authorized: true })),
 }));
 vi.mock("@/lib/ai/adk-agent", () => ({
