@@ -474,7 +474,7 @@ requirements:
 
   - id: WCA-039
     title: Authentication on all non-public routes
-    statement: "While API_TOKEN or GOOGLE_CLIENT_ID is configured, when a request arrives for any path outside the public allowlist (/api/health, /api/calendar, /api/auth/login, /api/auth/logout, /api/auth/google, /api/auth/me, /api/auth/refresh, /login, /landing, /privacy, /terms, /dmca, /.well-known/oauth-authorization-server, /oauth/register, /oauth/token, /version.json, each with its subpaths), the middleware shall require a session-cookie JWT, an MCP OAuth access token, a personal API token, the static API_TOKEN bearer, or the legacy API_TOKEN session cookie, and shall answer an unauthenticated request with 401 on /api routes and a redirect to /login (from / to /landing) on pages."
+    statement: "While API_TOKEN or GOOGLE_CLIENT_ID is configured, when a request arrives for any path outside the public allowlist (/api/health, /api/calendar, /api/auth/login, /api/auth/logout, /api/auth/google, /api/auth/me, /api/auth/refresh, /login, /landing, /privacy, /terms, /dmca, /.well-known/oauth-authorization-server, /oauth/register, /oauth/token, /version.json, each with its subpaths), the middleware shall require a session-cookie JWT, an MCP OAuth access token, a personal API token, the static API_TOKEN bearer, or the legacy API_TOKEN session cookie, and shall answer an unauthenticated request with 401 on /api routes (and on any route for an unknown or revoked personal token bearer) and a redirect to /login (from / to /landing) on other pages."
     category: non-functional
     priority: must
     status: active
