@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
-vi.mock("@/lib/api-auth", () => ({
+vi.mock("@/lib/api-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api-auth")>()),
   getCurrentUserId: vi.fn(() => "user-1"),
   verifyProjectWriteAccess: vi.fn(async () => ({ authorized: true })),
   verifyProjectAccess: vi.fn(async () => ({ authorized: true })),
