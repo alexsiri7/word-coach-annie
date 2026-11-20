@@ -544,14 +544,16 @@ requirements:
 
   - id: WCA-045
     title: Security response headers
-    statement: "When any page is served, the middleware shall attach a Content-Security-Policy using a per-request script nonce (no unsafe-inline scripts), frame-ancestors 'none', and restricted connect/img/font sources."
+    statement: "When any page is served, the middleware shall attach a Content-Security-Policy whose script-src allows only 'self', a per-request nonce, and 'wasm-unsafe-eval' (no 'unsafe-inline' or 'unsafe-eval'), together with frame-ancestors 'none' and restricted connect/img/font sources."
     category: non-functional
     priority: should
     status: active
     source: src/proxy.ts buildCsp
     acceptance:
-      - "Responses carry a CSP whose script-src is 'self' plus a nonce"
+      - "Responses carry a CSP whose script-src is 'self' plus a nonce, with 'wasm-unsafe-eval' as the only eval exception"
+      - "Responses carry a CSP with frame-ancestors 'none'"
       - "The app functions with that CSP (no inline-script violations in normal use)"
+    notes: "'wasm-unsafe-eval' lets the harper.js spell-checker compile WebAssembly (#1158); it permits WebAssembly compilation only, not JavaScript eval."
 
   - id: WCA-046
     title: Secrets and manuscript privacy
