@@ -108,6 +108,12 @@ describe("POST /api/chat", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400, not 500, when conversationId is not a string", async () => {
+    const { POST } = await import("@/app/api/chat/route");
+    const res = await POST(makePostRequest({ conversationId: 5, message: "hi" }));
+    expect(res.status).toBe(400);
+  });
+
   it("returns 403 for unauthorized user", async () => {
     const mockResponse = new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
     vi.mocked(verifyProjectWriteAccess).mockResolvedValue({

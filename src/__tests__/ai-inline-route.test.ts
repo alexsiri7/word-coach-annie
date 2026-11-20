@@ -32,6 +32,7 @@ vi.mock("@/lib/sanitize-server", () => ({
 }));
 
 import { POST } from "@/app/api/ai-inline/route";
+import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/ai-inline", {
@@ -68,6 +69,15 @@ describe("POST /api/ai-inline", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/unknown action/i);
+  });
+
+  it("returns 400 for a prototype-key action", async () => {
+    const req = makeRequest({ selectedText: "Some text", action: "toString" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/unknown action/i);
+    expect(runSimpleCompletion).not.toHaveBeenCalled();
   });
 
   it("returns result for rewrite-tighter action", async () => {

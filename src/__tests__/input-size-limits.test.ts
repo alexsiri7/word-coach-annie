@@ -34,6 +34,7 @@ vi.mock("@/lib/auth", () => ({ isGoogleAuthMode: vi.fn(() => false) }));
 globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ id: 1 }) })) as unknown as typeof fetch;
 
 import { POST as chatPost } from "@/app/api/chat/route";
+import { runChatAgent } from "@/lib/ai/adk-agent";
 import { POST as inlinePost } from "@/app/api/ai-inline/route";
 import { POST as importPost } from "@/app/api/projects/import/route";
 import { importProjectJson, ImportValidationError } from "@/lib/import-json";
@@ -53,6 +54,7 @@ function postJson(url: string, body: unknown, headers?: Record<string, string>):
 // ── /api/chat ─────────────────────────────────────────────────────────────────
 describe("POST /api/chat — input size limits", () => {
   it("returns 413 when message exceeds 10,000 chars", async () => {
+    vi.mocked(runChatAgent).mockClear();
     const res = await chatPost(postJson("http://localhost/api/chat", {
       conversationId: "conv-1",
       message: "a".repeat(10_001),
@@ -60,6 +62,7 @@ describe("POST /api/chat — input size limits", () => {
     expect(res.status).toBe(413);
     const body = await res.json();
     expect(body).toHaveProperty("error");
+    expect(runChatAgent).not.toHaveBeenCalled();
   });
 
   it("passes when message is exactly 10,000 chars", async () => {
@@ -86,6 +89,14 @@ describe("POST /api/chat — input size limits", () => {
       message: "Hello",
     }));
     expect(res.status).not.toBe(413);
+  });
+
+  it("returns 400 for a missing conversationId even when message is oversized", async () => {
+    const res = await chatPost(postJson("http://localhost/api/chat", {
+      message: "a".repeat(10_001),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "conversationId and message are required" });
   });
 });
 
@@ -135,6 +146,15 @@ describe("POST /api/ai-inline — input size limits", () => {
       action: "rewrite-tighter",
     }));
     expect(res.status).not.toBe(413);
+  });
+
+  it("returns 400 for a missing selectedText even when askPrompt is oversized", async () => {
+    const res = await inlinePost(postJson("http://localhost/api/ai-inline", {
+      action: "ask",
+      askPrompt: "a".repeat(1_001),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "selectedText and action are required" });
   });
 });
 
@@ -239,6 +259,7 @@ describe("POST /api/nodes/[id]/content — input size limits", () => {
 // ── /api/feedback ─────────────────────────────────────────────────────────────
 describe("POST /api/feedback — input size limits", () => {
   it("returns 413 when message exceeds 10,000 chars", async () => {
+    vi.mocked(globalThis.fetch).mockClear();
     const res = await feedbackPost(postJson("http://localhost/api/feedback", {
       type: "bug",
       message: "a".repeat(10_001),
@@ -246,6 +267,17 @@ describe("POST /api/feedback — input size limits", () => {
     expect(res.status).toBe(413);
     const body = await res.json();
     expect(body).toHaveProperty("error");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a blank message even when email is oversized", async () => {
+    const res = await feedbackPost(postJson("http://localhost/api/feedback", {
+      type: "bug",
+      message: "   ",
+      email: "a".repeat(321),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Message is required" });
   });
 
   it("returns 413 when email exceeds 320 chars", async () => {

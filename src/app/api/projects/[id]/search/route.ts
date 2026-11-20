@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getLatestContent } from "@/lib/latest-content";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectReadAccess } from "@/lib/api-auth";
+import { validationErrorResponse } from "@/lib/request-validation";
 
 const MAX_SEARCH_QUERY_LENGTH = 200;
+const SEARCH_QUERY_REQUIRED = "Search query 'q' is required";
+
+const SearchQuerySchema = z
+    .string({ error: SEARCH_QUERY_REQUIRED })
+    .refine((q) => q.trim().length > 0, SEARCH_QUERY_REQUIRED)
+    .max(MAX_SEARCH_QUERY_LENGTH, `Search query exceeds maximum length of ${MAX_SEARCH_QUERY_LENGTH} characters`);
 
 function stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, "").replace(/&[a-zA-Z]+;/g, " ");
@@ -38,22 +46,9 @@ export async function GET(
     if (!access.authorized) return access.response;
 
     try {
-        const q = request.nextUrl.searchParams.get("q");
-
-        if (!q || q.trim().length === 0) {
-            return NextResponse.json(
-                { error: "Search query 'q' is required" },
-                { status: 400 }
-            );
-        }
-        if (q.length > MAX_SEARCH_QUERY_LENGTH) {
-            return NextResponse.json(
-                { error: `Search query exceeds maximum length of ${MAX_SEARCH_QUERY_LENGTH} characters` },
-                { status: 413 }
-            );
-        }
-
-        const query = q.trim();
+        const parsed = SearchQuerySchema.safeParse(request.nextUrl.searchParams.get("q"));
+        if (!parsed.success) return validationErrorResponse(parsed.error);
+        const query = parsed.data.trim();
 
         // Verify project exists
         const project = await prisma.project.findUnique({

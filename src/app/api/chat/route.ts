@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getAiConfig } from "@/lib/ai/settings";
 import { getCurrentUserId, verifyProjectWriteAccess } from "@/lib/api-auth";
 import { logger } from "@/lib/logger";
 import { sanitizeInput } from "@/lib/sanitize-server";
 import { summarizeToolResult } from "@/lib/ai/chat-context";
 import { ChatController } from "@/lib/controllers/chat";
+import { validationErrorResponse } from "@/lib/request-validation";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const MAX_ID_LENGTH = 100;
+const CHAT_POST_REQUIRED = "conversationId and message are required";
+
+const ChatPostSchema = z.object({
+  conversationId: z
+    .string({ error: CHAT_POST_REQUIRED })
+    .min(1, CHAT_POST_REQUIRED)
+    .max(MAX_ID_LENGTH, `ConversationId exceeds maximum length of ${MAX_ID_LENGTH} characters`),
+  message: z
+    .string({ error: CHAT_POST_REQUIRED })
+    .min(1, CHAT_POST_REQUIRED)
+    .max(MAX_MESSAGE_LENGTH, `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters`),
+  sceneContext: z.string().optional(),
+  reviewSceneId: z.string().optional(),
+});
 
 // GET /api/chat?conversationId=X or ?projectId=X — load conversation + chat history
 export async function GET(request: NextRequest) {
@@ -53,32 +69,9 @@ export async function GET(request: NextRequest) {
 // POST /api/chat — send message, get streaming AI response with tool use
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { conversationId, message, sceneContext, reviewSceneId } = body as {
-      conversationId: string;
-      message: string;
-      sceneContext?: string;
-      reviewSceneId?: string;
-    };
-
-    if (!conversationId || !message) {
-      return NextResponse.json(
-        { error: "conversationId and message are required" },
-        { status: 400 }
-      );
-    }
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      return NextResponse.json(
-        { error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
-        { status: 413 }
-      );
-    }
-    if (conversationId.length > MAX_ID_LENGTH) {
-      return NextResponse.json(
-        { error: `ConversationId exceeds maximum length of ${MAX_ID_LENGTH} characters` },
-        { status: 413 }
-      );
-    }
+    const parsed = ChatPostSchema.safeParse(await request.json());
+    if (!parsed.success) return validationErrorResponse(parsed.error);
+    const { conversationId, message, sceneContext, reviewSceneId } = parsed.data;
 
     const userId = getCurrentUserId(request);
 
