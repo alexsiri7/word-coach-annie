@@ -701,6 +701,13 @@ describe("proxy", () => {
             expect(csp).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
         });
 
+        it("forbids framing the app with frame-ancestors 'none'", async () => {
+            vi.mocked(isAuthEnabled).mockReturnValue(false);
+            const res = await proxy(createRequest("/api/health"));
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            expect(csp).toMatch(/(^|; )frame-ancestors 'none'(;|$)/);
+        });
+
         it("sets Content-Security-Policy on authenticated responses", async () => {
             vi.mocked(isAuthEnabled).mockReturnValue(true);
             vi.mocked(verifySessionToken).mockResolvedValue({
