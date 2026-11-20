@@ -8,12 +8,13 @@ vi.mock("@/lib/ai/settings", () => ({
   getAiConfig: vi.fn(),
 }));
 vi.mock("@/lib/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
 import { GET } from "@/app/api/ai-settings/models/route";
 import { getCurrentUserId } from "@/lib/api-auth";
 import { getAiConfig } from "@/lib/ai/settings";
+import { logger } from "@/lib/logger";
 
 const API_KEY = "test-api-key-12345";
 
@@ -66,6 +67,20 @@ describe("GET /api/ai-settings/models", () => {
     const res = await GET(makeGetRequest());
 
     expect(res.status).toBe(401);
+  });
+
+  it("logs upstream failures at warn, not error, so they don't open Sentry issues", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response("Unauthorized", { status: 401 })
+    );
+
+    await GET(makeGetRequest());
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Google models API error",
+      expect.objectContaining({ status: 401 })
+    );
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("filters out non-generateContent models", async () => {
