@@ -88,6 +88,14 @@ describe("POST /api/chat — input size limits", () => {
     }));
     expect(res.status).not.toBe(413);
   });
+
+  it("returns 400 for a missing conversationId even when message is oversized", async () => {
+    const res = await chatPost(postJson("http://localhost/api/chat", {
+      message: "a".repeat(10_001),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "conversationId and message are required" });
+  });
 });
 
 // ── /api/ai-inline ────────────────────────────────────────────────────────────
@@ -136,6 +144,15 @@ describe("POST /api/ai-inline — input size limits", () => {
       action: "rewrite-tighter",
     }));
     expect(res.status).not.toBe(413);
+  });
+
+  it("returns 400 for a missing selectedText even when askPrompt is oversized", async () => {
+    const res = await inlinePost(postJson("http://localhost/api/ai-inline", {
+      action: "ask",
+      askPrompt: "a".repeat(1_001),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "selectedText and action are required" });
   });
 });
 
@@ -240,6 +257,7 @@ describe("POST /api/nodes/[id]/content — input size limits", () => {
 // ── /api/feedback ─────────────────────────────────────────────────────────────
 describe("POST /api/feedback — input size limits", () => {
   it("returns 413 when message exceeds 10,000 chars", async () => {
+    vi.mocked(globalThis.fetch).mockClear();
     const res = await feedbackPost(postJson("http://localhost/api/feedback", {
       type: "bug",
       message: "a".repeat(10_001),
@@ -247,6 +265,17 @@ describe("POST /api/feedback — input size limits", () => {
     expect(res.status).toBe(413);
     const body = await res.json();
     expect(body).toHaveProperty("error");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a blank message even when email is oversized", async () => {
+    const res = await feedbackPost(postJson("http://localhost/api/feedback", {
+      type: "bug",
+      message: "   ",
+      email: "a".repeat(321),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Message is required" });
   });
 
   it("returns 413 when email exceeds 320 chars", async () => {
