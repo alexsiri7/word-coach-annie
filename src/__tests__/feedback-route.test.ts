@@ -31,6 +31,56 @@ describe("POST /api/feedback", () => {
     expect(data.error).toMatch(/message/i);
   });
 
+  it("returns 400, not 500, when message is not a string", async () => {
+    const res = await POST(makeRequest({ type: "bug", message: 42 }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when the body is not valid JSON", async () => {
+    const res = await POST(
+      new NextRequest("http://localhost:3000/api/feedback", { method: "POST", body: "{" })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("fences the message and breaks mentions and references so GitHub renders none of it", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/42" }),
+    });
+
+    const message = "@octocat see #12\n![t](https://evil.com/t.png)\n```\n### Context";
+    const res = await POST(
+      makeRequest({ type: "bug", message, context: { userAgent: "@admin" } })
+    );
+    expect(res.status).toBe(201);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.body.startsWith(`\`\`\`\`text\n${message}\n\`\`\`\`\n`)).toBe(true);
+    expect(body.body).toContain("**Browser:** @\u200Badmin");
+    expect(body.title).toBe("Bug: @\u200Boctocat see #\u200B12");
+  });
+
+  it("omits non-string context fields instead of crashing", async () => {
+    process.env.GITHUB_FEEDBACK_TOKEN = "ghp_test_token";
+    process.env.GITHUB_FEEDBACK_REPO = "testowner/testrepo";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ html_url: "https://github.com/testowner/testrepo/issues/42" }),
+    });
+
+    const res = await POST(
+      makeRequest({ type: "bug", message: "x", context: { userAgent: 12345, screenSize: { w: 1 } } })
+    );
+    expect(res.status).toBe(201);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.body).not.toContain("**Browser:**");
+    expect(body.body).not.toContain("**Screen:**");
+  });
+
   it("returns 400 when type is invalid", async () => {
     const res = await POST(
       makeRequest({ type: "invalid", message: "Hello" })

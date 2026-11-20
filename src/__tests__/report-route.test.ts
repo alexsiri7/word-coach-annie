@@ -150,6 +150,26 @@ describe("POST /api/projects/[id]/report", () => {
     expect(body.title).not.toContain("My Story");
   });
 
+  it("returns 400, not 500, when details is not a string", async () => {
+    const res = await POST(
+      makeRequest({ category: "other", details: { trim: 1 } }),
+      { params: Promise.resolve({ id: "proj1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("fences details so GitHub renders no Markdown, mentions, or references", async () => {
+    const details = "@octocat #12 [x](https://evil.com)\n````\n### Fake section";
+    const res = await POST(
+      makeRequest({ category: "other", details }),
+      { params: Promise.resolve({ id: "proj1" }) }
+    );
+    expect(res.status).toBe(201);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.body).toContain(`### Details\n\`\`\`\`\`text\n${details}\n\`\`\`\`\``);
+  });
+
   it("returns 429 when rate limit exceeded", async () => {
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, resetMs: 3600000 });
     const res = await POST(

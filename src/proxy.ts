@@ -12,6 +12,7 @@ import { verifyMcpToken } from "@/lib/oauth-tokens";
 import {
     PERSONAL_TOKEN_PREFIX,
     isPersonalTokenRequestAllowed,
+    isUnder,
     verifyPersonalToken,
     type PersonalTokenScope,
 } from "@/lib/personal-tokens";
@@ -278,10 +279,18 @@ async function route(request: NextRequest, nonce: string): Promise<NextResponse>
     }
 
     if (authHeader) {
-        // 3. Check MCP OAuth access token (JWT with type: "mcp_access")
+        // 3. Check MCP OAuth access token (JWT with type: "mcp_access"): the user approved the
+        // client for MCP tools only, so the token reaches nothing but the MCP endpoint (SEC-002).
         if (token) {
             const mcpSession = await verifyMcpToken(token, "mcp_access");
             if (mcpSession) {
+                if (!isUnder(pathname, "/api/mcp")) {
+                    return NextResponse.json(
+                        { error: "MCP access tokens can only access the MCP endpoint" },
+                        { status: 403 }
+                    );
+                }
+
                 const rateLimited = await applyRateLimit(request, mcpSession.userId);
                 if (rateLimited) return rateLimited;
 

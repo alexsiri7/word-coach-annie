@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import { sanitizeInput, escapeMarkdown } from "@/lib/sanitize-server";
+import { escapeMarkdown, fenceMarkdown, neutralizeGitHubReferences } from "@/lib/sanitize-server";
 
 interface FeedbackBody {
   type: "bug" | "feature" | "other";
@@ -112,10 +112,17 @@ async function getRepoId(token: string, repo: string): Promise<string> {
   return String(data.id);
 }
 
-export async function POST(request: NextRequest) {
-  const body: FeedbackBody = await request.json();
+function escapeContextField(value: unknown): string | undefined {
+  return typeof value === "string" && value ? escapeMarkdown(value) : undefined;
+}
 
-  if (!body.message?.trim()) {
+export async function POST(request: NextRequest) {
+  const body: FeedbackBody | null = await request.json().catch(() => null);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (typeof body.message !== "string" || !body.message.trim()) {
     return NextResponse.json(
       { error: "Message is required" },
       { status: 400 }
@@ -164,7 +171,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Sanitize and escape user-provided fields before embedding in GitHub Markdown
-  const safeMessage = sanitizeInput(body.message.trim());
+  const message = body.message.trim();
   // Extract only the pathname — drop origin, query params, and hash
   let safeUrl: string | undefined;
   try {
@@ -172,8 +179,8 @@ export async function POST(request: NextRequest) {
   } catch {
     safeUrl = undefined;
   }
-  const safeUserAgent = body.context?.userAgent ? escapeMarkdown(body.context.userAgent) : undefined;
-  const safeScreenSize = body.context?.screenSize ? escapeMarkdown(body.context.screenSize) : undefined;
+  const safeUserAgent = escapeContextField(body.context?.userAgent);
+  const safeScreenSize = escapeContextField(body.context?.screenSize);
 
   // Build issue body with app context
   const contextLines: string[] = [];
@@ -184,7 +191,7 @@ export async function POST(request: NextRequest) {
     contextLines.push(`**Screen:** ${safeScreenSize}`);
   contextLines.push(`**App version:** ${process.env.npm_package_version || "unknown"}`);
 
-  const bodyParts = [safeMessage];
+  const bodyParts = [fenceMarkdown(message)];
 
   if (screenshotUrl) {
     bodyParts.push("", "### Screenshot", `![Screenshot](${screenshotUrl})`);
@@ -196,7 +203,7 @@ export async function POST(request: NextRequest) {
 
   const typePrefix =
     body.type === "bug" ? "Bug: " : body.type === "feature" ? "Feature: " : "";
-  const titleSnippet = safeMessage.split("\n")[0].slice(0, 80);
+  const titleSnippet = neutralizeGitHubReferences(message.split("\n")[0].slice(0, 80));
   const title = `${typePrefix}${titleSnippet}`;
 
   const labels = [LABEL_MAP[body.type] || "feedback"];

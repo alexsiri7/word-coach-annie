@@ -392,7 +392,7 @@ describe("proxy", () => {
             jti: "mcp-jti-1",
             exp: Math.floor(Date.now() / 1000) + 3600,
         });
-        const req = createRequest("/api/projects", {
+        const req = createRequest("/api/mcp", {
             headers: { authorization: "Bearer mcp-token" },
         });
         await proxy(req);
@@ -400,6 +400,59 @@ describe("proxy", () => {
         expect(Sentry.setUser).not.toHaveBeenCalledWith(
             expect.objectContaining({ email: expect.any(String) })
         );
+    });
+
+    describe("MCP access tokens (SEC-002)", () => {
+        beforeEach(() => {
+            vi.mocked(isAuthEnabled).mockReturnValue(true);
+            vi.mocked(verifyMcpToken).mockResolvedValue({
+                userId: "mcp-user",
+                email: "mcp@example.com",
+                clientId: "test-client",
+                jti: "mcp-jti-3",
+                exp: Math.floor(Date.now() / 1000) + 3600,
+            });
+        });
+
+        it("reaches the MCP endpoint as its user", async () => {
+            const res = await proxy(createRequest("/api/mcp", {
+                method: "POST",
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(200);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBe("mcp-user");
+        });
+
+        it.each([
+            ["GET", "/api/projects"],
+            ["POST", "/api/account/api-tokens"],
+            ["GET", "/api/auth/export-data"],
+            ["DELETE", "/api/auth/delete-account"],
+            ["GET", "/api/mcp-other"],
+            ["GET", "/projects"],
+        ])("refuses %s %s with 403", async (method, path) => {
+            const res = await proxy(createRequest(path, {
+                method,
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(403);
+            expect(res.headers.get("x-middleware-request-x-user-id")).toBeNull();
+        });
+
+        it("does not spend rate-limit quota on refused requests", async () => {
+            for (let i = 0; i < 70; i++) {
+                const refused = await proxy(createRequest("/api/account/api-tokens", {
+                    method: "POST",
+                    headers: { authorization: "Bearer mcp-token" },
+                }));
+                expect(refused.status).toBe(403);
+            }
+            const res = await proxy(createRequest("/api/mcp", {
+                method: "POST",
+                headers: { authorization: "Bearer mcp-token" },
+            }));
+            expect(res.status).toBe(200);
+        });
     });
 
     describe("identity header stripping (SEC-03)", () => {
@@ -470,7 +523,7 @@ describe("proxy", () => {
                 jti: "mcp-jti-2",
                 exp: Math.floor(Date.now() / 1000) + 3600,
             });
-            const req = createRequest("/api/projects", {
+            const req = createRequest("/api/mcp", {
                 headers: { authorization: "Bearer mcp-token", "x-user-id": "victim-id" },
             });
             const res = await proxy(req);

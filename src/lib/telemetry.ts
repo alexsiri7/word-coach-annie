@@ -22,10 +22,12 @@ import { trace, type Tracer } from "@opentelemetry/api";
 let sdk: NodeSDK | null = null;
 
 export function initTelemetry() {
+  // @google/adk attaches full prompts, responses and tool args to its own spans
+  // unless this is "false"; the privacy policy promises traces carry no manuscript text.
+  process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS = "false";
+
   const enabled = process.env.OTEL_ENABLED === "true";
   if (!enabled) return;
-
-  process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS = "false";
 
   const endpoint =
     process.env.PHOENIX_COLLECTOR_ENDPOINT || "http://localhost:6006/v1/traces";

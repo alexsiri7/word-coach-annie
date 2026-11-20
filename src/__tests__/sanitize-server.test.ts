@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeInput, sanitizeHtml, escapeMarkdown, escapeHtml, wrapUserContent } from "@/lib/sanitize-server";
+import { sanitizeInput, sanitizeHtml, escapeMarkdown, escapeHtml, fenceMarkdown, neutralizeGitHubReferences, wrapUserContent } from "@/lib/sanitize-server";
 
 describe("sanitizeInput", () => {
     it("strips HTML tags from input", () => {
@@ -85,7 +85,7 @@ describe("escapeMarkdown", () => {
 
     it("escapes markdown link syntax", () => {
         expect(escapeMarkdown("[click](https://evil.com)")).toBe(
-            "\\[click\\]\\(https://evil.com\\)"
+            "\\[click\\]\\(https:\u200B//evil.com\\)"
         );
     });
 
@@ -115,7 +115,7 @@ describe("escapeMarkdown", () => {
     });
 
     it("escapes hash", () => {
-        expect(escapeMarkdown("# heading")).toBe("\\# heading");
+        expect(escapeMarkdown("# heading")).toBe("\\#\u200B heading");
     });
 
     it("escapes pipe", () => {
@@ -124,6 +124,44 @@ describe("escapeMarkdown", () => {
 
     it("escapes curly braces", () => {
         expect(escapeMarkdown("{key}")).toBe("\\{key\\}");
+    });
+
+    it("breaks GitHub @mentions and #N references", () => {
+        expect(escapeMarkdown("@octocat #12")).toBe("@\u200Boctocat \\#\u200B12");
+    });
+});
+
+describe("neutralizeGitHubReferences", () => {
+    it("inserts a zero-width space after @ and #", () => {
+        expect(neutralizeGitHubReferences("cc @octocat, see #12")).toBe(
+            "cc @\u200Boctocat, see #\u200B12"
+        );
+    });
+
+    it("breaks the GH-N alias for #N", () => {
+        expect(neutralizeGitHubReferences("GH-12 and gh-3, not GHz-1 or GH-x")).toBe(
+            "GH\u200B-12 and gh\u200B-3, not GHz-1 or GH-x"
+        );
+    });
+
+    it("breaks URL autolinks so a full issue URL is no cross-reference", () => {
+        expect(
+            neutralizeGitHubReferences("https://github.com/o/r/issues/12 or WWW.github.com")
+        ).toBe("https:\u200B//github.com/o/r/issues/12 or WWW\u200B.github.com");
+    });
+});
+
+describe("fenceMarkdown", () => {
+    it("wraps text in a code fence", () => {
+        expect(fenceMarkdown("![x](https://evil.com/t.png) @octocat")).toBe(
+            "```text\n![x](https://evil.com/t.png) @octocat\n```"
+        );
+    });
+
+    it("uses a fence longer than any backtick run so the text cannot close it", () => {
+        expect(fenceMarkdown("a\n```\n### Context\n````")).toBe(
+            "`````text\na\n```\n### Context\n````\n`````"
+        );
     });
 });
 
