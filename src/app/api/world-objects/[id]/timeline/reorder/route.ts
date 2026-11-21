@@ -32,9 +32,9 @@ export async function POST(
                 { status: 400 }
             );
         }
-        if (orderedIds.length > 50) {
+        if (orderedIds.length > 500) {
             return NextResponse.json(
-                { error: "orderedIds must contain at most 50 entries" },
+                { error: "orderedIds must contain at most 500 entries" },
                 { status: 400 }
             );
         }

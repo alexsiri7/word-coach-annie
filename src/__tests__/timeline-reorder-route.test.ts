@@ -111,13 +111,13 @@ describe("POST /api/world-objects/[id]/timeline/reorder — route-level ownershi
     expect(body.error).toBe("orderedIds must be an array");
   });
 
-  it("returns 400 when orderedIds exceeds the 50-entry cap", async () => {
-    const tooMany = Array.from({ length: 51 }, (_, i) => `entry-${i}`);
+  it("returns 400 when orderedIds exceeds the 500-entry cap", async () => {
+    const tooMany = Array.from({ length: 501 }, (_, i) => `entry-${i}`);
     const res = await POST(makeRequest({ orderedIds: tooMany }), mockParams);
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("orderedIds must contain at most 50 entries");
+    expect(body.error).toBe("orderedIds must contain at most 500 entries");
     expect(prisma.worldObjectTimelineEntry.findMany).not.toHaveBeenCalled();
   });
 });

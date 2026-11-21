@@ -52,11 +52,11 @@ describe("AI tool catalog", () => {
         }
     });
 
-    it("caps reorder_timeline_entries.orderedIds at 50 entries", () => {
+    it("caps reorder_timeline_entries.orderedIds at 500 entries", () => {
         const spec = specsByName.get("reorder_timeline_entries")!;
-        const tooMany = Array.from({ length: 51 }, (_, i) => `id-${i}`);
+        const tooMany = Array.from({ length: 501 }, (_, i) => `id-${i}`);
         expect(spec.parameters.safeParse({ worldObjectId: "wo-1", orderedIds: tooMany }).success).toBe(false);
-        expect(spec.parameters.safeParse({ worldObjectId: "wo-1", orderedIds: tooMany.slice(0, 50) }).success).toBe(true);
+        expect(spec.parameters.safeParse({ worldObjectId: "wo-1", orderedIds: tooMany.slice(0, 500) }).success).toBe(true);
     });
 
     it("refuses every destructive MCP tool before its handler runs when destructive tools are off", async () => {

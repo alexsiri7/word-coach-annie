@@ -163,7 +163,7 @@ export const reorderTimelineEntriesSpec = defineTool({
     category: "world_building",
     parameters: z.object({
         worldObjectId: z.string().describe("The world object ID"),
-        orderedIds: z.array(z.string()).max(50).describe("Ordered entry IDs"),
+        orderedIds: z.array(z.string()).max(500).describe("Ordered entry IDs"),
     }),
 });
 
