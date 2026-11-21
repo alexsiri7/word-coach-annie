@@ -933,3 +933,17 @@ requirements:
       - "Picking an annotation opens /project/{id}?scene={sceneId}"
       - "A READER does not see annotations on Outline scenes"
     notes: "The audit draft said each annotation can be opened, resolved or deleted from this page; the page only lists and links, and resolving or deleting happens in the scene editor (WCA-015). Resolved annotations are not shown. Known gap: no test renders the page itself."
+
+  - id: WCA-074
+    title: Connect Claude Code setup page
+    statement: "When a signed-in user opens the Connect Claude Code page, the system shall show the command that adds Annie's MCP server to Claude Code with a control to copy it, explain that Claude Code then opens a Google sign-in to approve access to the user's projects, and list what a connected client can do."
+    category: functional
+    priority: may
+    status: active
+    source: src/app/setup/page.tsx, src/components/user-menu.tsx Connect AI item, src/proxy.ts PUBLIC_PATHS, src/lib/auth.ts ALLOWED_REDIRECT_PATTERNS
+    acceptance:
+      - "/setup is not a public path, so while auth is configured a visitor without a session is redirected to /login?from=/setup, and /setup is an allowed post-login redirect"
+      - "The page shows \"claude mcp add annie --transport http https://annie.interstellarai.net/api/mcp\", and the copy button puts it on the clipboard"
+      - "The page lists reading and writing scenes, managing characters and world-building, exporting manuscripts and story bibles, tracking relationships and managing universes"
+      - "The user menu's Connect AI item opens /setup"
+    notes: "The audit draft spoke of \"the instructions and endpoint needed to connect an MCP client\"; the page only covers Claude Code, and the endpoint in the command is hardcoded to the production host rather than the deployment's own URL. The page is static: it does not check whether a client is already connected. The approval it describes is the OAuth flow of \"Remote clients authorise with OAuth\". This is not the dashboard AI setup wizard (WCA-062). Known gap: no test renders the page."
