@@ -146,7 +146,7 @@ vi.mock("../lib/export/google-docs-exporter", () => ({
   },
 }));
 
-import { deleteBeat, deleteNode } from "../mcp/tools/structure";
+import { deleteBeat, deleteNode, restoreSceneVersion } from "../mcp/tools/structure";
 import { listProjects } from "../mcp/tools/projects";
 import { deleteRelationship } from "../mcp/tools/relationships";
 import { prisma } from "@/lib/db";
@@ -229,6 +229,16 @@ describe("MCP destructive tool gating", () => {
     const result = await getToolHandler(server, "delete_beat").handler({ nodeId: "n1", index: 2, paragraphContentHash: "h" }) as { isError?: boolean };
     expect(result.isError).toBeUndefined();
     expect(deleteBeat).toHaveBeenCalledWith("n1", 2, "h", undefined);
+  });
+
+  it("restore_scene_version works when MCP_ALLOW_DESTRUCTIVE is unset, since it is the recovery path for scene edits", async () => {
+    delete process.env.MCP_ALLOW_DESTRUCTIVE;
+    const { createServer } = await import("../mcp/index");
+    const server = createServer();
+
+    const result = await getToolHandler(server, "restore_scene_version").handler({ nodeId: "n1", versionId: "v1" }) as { isError?: boolean };
+    expect(result.isError).toBeUndefined();
+    expect(restoreSceneVersion).toHaveBeenCalledWith("n1", "v1");
   });
 
   it("non-destructive tools work regardless of allowDestructive=false", async () => {

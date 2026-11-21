@@ -19,7 +19,7 @@ import { registerSkillTools } from "./register/skills";
 import { registerPrompts } from "./register/prompts";
 
 interface McpServerOptions {
-    /** Allow destructive tools (delete, restore). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
+    /** Allow destructive tools (deletes; restore_scene_version and delete_beat are undoable and never gated). Default: check MCP_ALLOW_DESTRUCTIVE env var. */
     allowDestructive?: boolean;
     /** Authenticated user ID, extracted from x-user-id header by the MCP route handler. */
     userId?: string | null;
