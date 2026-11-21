@@ -52,10 +52,13 @@ export async function PATCH(
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });
         }
 
-        const data = { ...parsed.data };
-        if (data.name !== undefined) data.name = sanitizeInput(data.name);
-        if (data.website !== undefined) data.website = sanitizeInput(data.website);
-        if (data.notes !== undefined) data.notes = sanitizeInput(data.notes);
+        const { name, website, notes } = parsed.data;
+        const data = {
+            name: name === undefined ? undefined : sanitizeInput(name),
+            // null clears the website; the column stores an empty string for "none"
+            website: website === undefined ? undefined : website === null ? "" : sanitizeInput(website),
+            notes: notes === undefined ? undefined : sanitizeInput(notes),
+        };
 
         const provider = await ProviderController.updateProvider(id, userId, data);
         return NextResponse.json(provider);

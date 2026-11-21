@@ -12,7 +12,7 @@ export const ProviderCreateSchema = z.object({
 
 export const ProviderUpdateSchema = z.object({
     name: z.string().min(1, "name must be non-empty").optional(),
-    website: HttpUrl.optional(),
+    website: HttpUrl.nullable().optional(),
     notes: z.string().optional(),
 });
 

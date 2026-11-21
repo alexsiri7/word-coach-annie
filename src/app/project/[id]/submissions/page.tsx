@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { daysUntilClose, formatCloseDate, closeCountdown, type Opportunity } from "@/lib/opportunity-state";
 import { CandidateStateBadge } from "@/components/opportunity-state-badge";
+import { ProvidersSection, type Provider } from "@/components/providers-section";
 
 interface ContestSubmission {
   id: string;
@@ -47,11 +48,6 @@ interface PublicationSubmission {
   status: string;
   createdAt: string;
   updatedAt: string;
-}
-
-interface Provider {
-  id: string;
-  name: string;
 }
 
 type DialogMode = "create" | "edit";
@@ -331,6 +327,23 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  // ── Provider handlers ─────────────────────────────────────
+
+  function handleProviderSaved(saved: Provider) {
+    setProviders((prev) =>
+      prev.some((p) => p.id === saved.id)
+        ? prev.map((p) => (p.id === saved.id ? saved : p))
+        : [...prev, saved]
+    );
+    const provider = { id: saved.id, name: saved.name };
+    setContestSubmissions((prev) => prev.map((s) => (s.providerId === saved.id ? { ...s, provider } : s)));
+    setOpportunities((prev) => prev.map((o) => (o.providerId === saved.id ? { ...o, provider } : o)));
+  }
+
+  function handleProviderDeleted(id: string) {
+    setProviders((prev) => prev.filter((p) => p.id !== id));
+  }
+
   // ── Delete handler ────────────────────────────────────────
 
   async function handleDelete() {
@@ -605,6 +618,13 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                 </section>
               )}
             </div>
+          )}
+          {!loading && !error && (
+            <ProvidersSection
+              providers={providers}
+              onSaved={handleProviderSaved}
+              onDeleted={handleProviderDeleted}
+            />
           )}
         </div>
       </main>
