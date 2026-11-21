@@ -94,3 +94,17 @@ For remote MCP clients the system SHALL act as an OAuth 2.0 authorisation server
 - GIVEN an MCP client that has never connected
 - WHEN it registers, the user approves, and it exchanges the code
 - THEN its token is accepted by the MCP endpoint
+
+### Requirement: Connect Claude Code setup page
+
+The Connect AI item in the user menu SHALL open a Connect Claude Code page that shows the `claude mcp add` command for Annie's MCP endpoint with a copy control, explains that Claude Code then asks the user to approve access through Google sign-in, and lists what a connected client can do. While authentication is configured, the page SHALL require a session.
+
+#### Scenario: Copy the connect command
+- GIVEN a signed-in user
+- WHEN they choose Connect AI in the user menu and copy the command
+- THEN the clipboard holds the `claude mcp add annie --transport http` command for the MCP endpoint
+
+#### Scenario: Visitor without a session
+- GIVEN authentication is configured and a visitor is not signed in
+- WHEN they open the Connect Claude Code page
+- THEN they are sent to sign in first
