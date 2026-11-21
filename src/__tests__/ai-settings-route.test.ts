@@ -234,6 +234,7 @@ describe("PUT /api/ai-settings", () => {
     ["unknown responseLength", { responseLength: "endless" }],
     ["oversized model", { model: "m".repeat(201) }],
     ["oversized compressionModel", { compressionModel: "m".repeat(201) }],
+    ["oversized customInstructions", { customInstructions: "m".repeat(5001) }],
     ["non-string apiKey", { apiKey: 123 }],
   ])("rejects %s with 400 and writes nothing", async (_label, body) => {
     for (const userId of ["user-123", undefined]) {
