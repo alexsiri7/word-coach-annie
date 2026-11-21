@@ -704,11 +704,14 @@ coverage:
   - src/app/api/projects/import/route.ts
   - src/lib/controllers/projects.ts
   - src/lib/import-json.ts
+  - src/app/api/projects/[id]/archive/route.ts
   test_paths:
   - src/__tests__/projects-limit-route.test.ts
   - src/__tests__/project-limit-paths.test.ts
   - src/__tests__/project-import-route.test.ts
-  notes: All criteria tested against a real DB; known gap (unarchive skips the limit) confirmed.
+  - src/__tests__/project-settings-unarchive.test.tsx
+  - src/__tests__/dashboard-unarchive.test.tsx
+  notes: All criteria tested against a real DB.
 - id: WCA-058
   status: partial
   code_paths:

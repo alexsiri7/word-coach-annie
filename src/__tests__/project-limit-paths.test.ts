@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { testPrisma } from "./setup";
 import { NextRequest } from "next/server";
 
-// Every project-creation path other than POST /api/projects (covered in
-// projects-limit-route.test.ts) must enforce UserAiSettings.maxActiveProjects.
+// Every path that makes a project active, other than POST /api/projects (covered
+// in projects-limit-route.test.ts), must enforce UserAiSettings.maxActiveProjects.
 
-vi.mock("@/lib/api-auth", () => ({
+vi.mock("@/lib/api-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api-auth")>()),
   getCurrentUserId: vi.fn(() => null),
 }));
 
@@ -151,5 +152,63 @@ describe("active project limit on non-REST creation paths", () => {
 
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(await projectCount(user.id)).toBe(3);
+  });
+});
+
+describe("active project limit on unarchive", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function unarchive(projectId: string) {
+    const { DELETE } = await import("@/app/api/projects/[id]/archive/route");
+    const url = `http://localhost/api/projects/${projectId}/archive`;
+    return DELETE(new NextRequest(url, { method: "DELETE" }), {
+      params: Promise.resolve({ id: projectId }),
+    });
+  }
+
+  it("returns 403 with the limit message and leaves the project archived when at the limit", async () => {
+    const user = await userAtLimit();
+    const archived = await testPrisma.project.create({
+      data: { title: "Archived", userId: user.id, archivedAt: new Date() },
+    });
+
+    const res = await unarchive(archived.id);
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe(LIMIT_MESSAGE);
+    const after = await testPrisma.project.findUniqueOrThrow({ where: { id: archived.id } });
+    expect(after.archivedAt).not.toBeNull();
+  });
+
+  it("unarchives below the limit", async () => {
+    const user = await userWithProjects(2);
+    const archived = await testPrisma.project.create({
+      data: { title: "Archived", userId: user.id, archivedAt: new Date() },
+    });
+
+    const res = await unarchive(archived.id);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "unarchived" });
+    const after = await testPrisma.project.findUniqueOrThrow({ where: { id: archived.id } });
+    expect(after.archivedAt).toBeNull();
+  });
+
+  it("concurrent unarchives one slot below the limit activate only one project", async () => {
+    const user = await userWithProjects(2);
+    const [a, b] = await Promise.all(
+      ["A", "B"].map((title) =>
+        testPrisma.project.create({ data: { title, userId: user.id, archivedAt: new Date() } })
+      )
+    );
+
+    const responses = await Promise.all([unarchive(a.id), unarchive(b.id)]);
+
+    const statuses = responses.map((r) => r.status).sort();
+    expect(statuses[0]).toBe(200);
+    expect([403, 409]).toContain(statuses[1]);
+    expect(await testPrisma.project.count({ where: { userId: user.id, archivedAt: null } })).toBe(3);
   });
 });

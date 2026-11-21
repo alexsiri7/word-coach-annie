@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getCurrentUserId, verifyProjectAccess } from "@/lib/api-auth";
+import { isSerializationConflict } from "@/lib/controllers/serializable";
+import { ActiveProjectLimitError, assertActiveProjectLimit } from "@/lib/project-limit";
 
 // POST /api/projects/[id]/archive - Archive a project
 export async function POST(
@@ -53,13 +56,28 @@ export async function DELETE(
       return NextResponse.json({ error: "Project is not archived" }, { status: 400 });
     }
 
-    await prisma.project.update({
-      where: { id },
-      data: { archivedAt: null },
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await assertActiveProjectLimit(tx, userId);
+        await tx.project.update({
+          where: { id },
+          data: { archivedAt: null },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
 
     return NextResponse.json({ status: "unarchived" });
   } catch (error) {
+    if (error instanceof ActiveProjectLimitError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (isSerializationConflict(error)) {
+      return NextResponse.json(
+        { error: "Request conflict, please try again." },
+        { status: 409 }
+      );
+    }
     logger.error("DELETE /api/projects/[id]/archive error", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
