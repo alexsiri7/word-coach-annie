@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { API_TOKEN_CACHE_OWNER, claimOfflineCache } from "@/lib/offline/cache-owner";
 import { clearClientData } from "@/lib/offline/clear-client-data";
 import { RATE_LIMITS } from "@/lib/rate-limit-config";
 
@@ -33,6 +34,12 @@ interface CurrentUser {
 let cachedCurrentUser: { fetchedAt: number; result: Promise<CurrentUser> } | null = null;
 
 async function requestCurrentUser(): Promise<CurrentUser> {
+    const current = await askServerForCurrentUser();
+    if (current.authenticated) await claimOfflineCache(current.user?.userId ?? API_TOKEN_CACHE_OWNER);
+    return current;
+}
+
+async function askServerForCurrentUser(): Promise<CurrentUser> {
     try {
         const res = await fetch("/api/auth/me");
         if (!res.ok) return { authenticated: false, user: null };

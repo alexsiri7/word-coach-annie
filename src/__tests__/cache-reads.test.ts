@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("@/hooks/use-auth", () => ({
+  fetchCurrentUser: vi.fn(async () => ({ authenticated: false, user: null })),
+}));
+
 vi.mock("@/lib/offline/idb", () => ({
+  deleteProjectData: vi.fn(async () => {}),
+  idbGet: vi.fn(async () => undefined),
   idbPut: vi.fn(async () => "id"),
   idbGetAll: vi.fn(async () => []),
   idbGetNodesByProject: vi.fn(async () => []),
@@ -17,8 +23,13 @@ import {
   getCachedContent,
   cacheStoryObjects,
   getCachedStoryObjects,
+  getCachedProject,
+  purgeCachedProject,
 } from "@/lib/offline/cache-reads";
+import { fetchCurrentUser } from "@/hooks/use-auth";
 import {
+  deleteProjectData,
+  idbGet,
   idbPut,
   idbGetAll,
   idbGetNodesByProject,
@@ -54,6 +65,34 @@ describe("cache-reads", () => {
 
     expect(idbGetAll).toHaveBeenCalledWith("projects");
     expect(result).toBe(mockProjects);
+  });
+
+  it("getCachedProjects reads the cache only after the signed-in user has claimed it", async () => {
+    let resolveUser!: (u: { authenticated: boolean; user: null }) => void;
+    vi.mocked(fetchCurrentUser).mockImplementationOnce(() => new Promise((r) => (resolveUser = r)));
+
+    const read = getCachedProjects();
+    await Promise.resolve();
+    expect(idbGetAll).not.toHaveBeenCalled();
+
+    resolveUser({ authenticated: false, user: null });
+    await read;
+    expect(idbGetAll).toHaveBeenCalledWith("projects");
+  });
+
+  it("getCachedProject reads one claimed project record", async () => {
+    const project = { id: "p1", title: "Cached" };
+    vi.mocked(idbGet).mockResolvedValue(project as never);
+
+    expect(await getCachedProject("p1")).toBe(project);
+    expect(fetchCurrentUser).toHaveBeenCalled();
+    expect(idbGet).toHaveBeenCalledWith("projects", "p1");
+  });
+
+  it("purgeCachedProject deletes the project's cached data", async () => {
+    await purgeCachedProject("p1");
+
+    expect(deleteProjectData).toHaveBeenCalledWith("p1");
   });
 
   // ─── cacheStructureNodes / getCachedOutline ───────────────────
