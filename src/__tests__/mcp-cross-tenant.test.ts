@@ -462,6 +462,40 @@ describe("MCP cross-tenant access (SEC-02)", () => {
         });
     });
 
+    describe("game objects", () => {
+        async function setupGame() {
+            const project = await prisma.project.create({ data: { title: "G", userId: "owner-a", projectType: "GAME" } });
+            await prisma.gameObject.create({ data: { projectId: project.id, kind: "flag", key: "door-open", data: {} } });
+            return project;
+        }
+
+        it("denies every game object tool on another user's project", async () => {
+            const project = await setupGame();
+            for (const [tool, args] of [
+                ["list_game_objects", { projectId: project.id, kind: "flag" }],
+                ["get_game_object", { projectId: project.id, kind: "flag", id: "door-open" }],
+                ["save_game_object", { projectId: project.id, kind: "flag", object: { id: "hijacked" } }],
+                ["delete_game_object", { projectId: project.id, kind: "flag", id: "door-open", confirm: true }],
+            ] as const) {
+                const result = await callTool("owner-b", tool, args);
+                expect(result.isError, tool).toBe(true);
+                expect(result.content[0].text).toContain("access denied");
+            }
+            expect((await prisma.gameObject.findMany({ where: { projectId: project.id } })).map((o) => o.key)).toEqual(["door-open"]);
+        });
+
+        it("gates delete_game_object behind MCP_ALLOW_DESTRUCTIVE", async () => {
+            const project = await setupGame();
+            const { createServer } = await import("../mcp/index");
+            const server = createServer({ userId: "owner-a", allowDestructive: false });
+            const tools = (server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<ToolResult> }> })._registeredTools;
+            const result = await tools.delete_game_object.handler({ projectId: project.id, kind: "flag", id: "door-open", confirm: true });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("MCP_ALLOW_DESTRUCTIVE");
+            expect(await prisma.gameObject.count({ where: { projectId: project.id } })).toBe(1);
+        });
+    });
+
     describe("location snapshots", () => {
         const THINGS = [{ key: "lamp", name: "Lamp", description: "Old", kind: "", box: { x: 1, y: 2, w: 3, h: 4 } }];
 

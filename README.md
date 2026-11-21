@@ -33,8 +33,11 @@ A local-first, AI-powered writing assistant for novelists and article writers. M
 - **Writing skills**: 6 curated MCP Prompts — developmental edit, line edit, consistency check, plot structure analysis, character arc review, scene drafting assistant
 
 ### Article / Non-Fiction
-- **Project types**: FICTION, ARTICLE_COLLECTION, GENERAL with dynamic UI labels (Chapter→Article, Scene→Section, etc.)
+- **Project types**: FICTION, ARTICLE_COLLECTION, GENERAL, GAME with dynamic UI labels (Chapter→Article, Scene→Section, etc.)
 - **Medium export**: Article-optimized Markdown with front matter
+
+### Adventure Games
+- **Game world model**: a GAME project's story bible holds items, flags, stats, acts with goals, worlds, puzzles and hotspot interactions, with conditions and effects limited to the Punland engine's vocabulary — through the `*_game_object` MCP tools and `/api/projects/[id]/game/objects` (see [docs/MCP.md](docs/MCP.md))
 
 ## Tech Stack
 

@@ -1,3 +1,4 @@
+import type { ProjectType } from "@/lib/types";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { mcpCache } from "@/lib/cache";
 import { computeContentHash, verifyContentHash } from "@/mcp/content-hash";
@@ -43,6 +44,7 @@ export async function createProject(params: {
     author?: string;
     synopsis?: string;
     genre?: string;
+    projectType?: ProjectType;
     userId?: string | null;
 }) {
     const result = await ProjectsController.createProject(params);

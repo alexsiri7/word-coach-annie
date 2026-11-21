@@ -1,6 +1,6 @@
 # MCP Server Reference
 
-Annie exposes a Model Context Protocol (MCP) server with **106 tools** and **17 prompts** for full read/write access to all project data.
+Annie exposes a Model Context Protocol (MCP) server with **114 tools** and **17 prompts** for full read/write access to all project data.
 
 ## Connection
 
@@ -95,6 +95,7 @@ Create a new writing project.
 | `author` | string? | Author name |
 | `synopsis` | string? | Project synopsis |
 | `genre` | string? | Genre |
+| `projectType` | string? | `FICTION` (default), `ARTICLE_COLLECTION`, `GENERAL` or `GAME` |
 
 ---
 
@@ -607,6 +608,80 @@ Change an annotation's text or status, or a note's region or linked story object
 | `status` | enum? | `open`, `sent` (exported by the story sync), `done` (resolved) |
 | `region` | object? | Notes only: new region |
 | `storyObjectId` | string \| null? | Notes only: story object to link, or `null` to unlink |
+
+---
+
+### Game Objects
+
+A `GAME` project's world model: the objects an adventure game for the Punland engine is made of, in the engine's shapes plus an `id`. Owner only. Ids are unique per kind, so a world and a room may share one.
+
+| Kind | Shape |
+|------|-------|
+| `game` | `{ id: "game", name, start: { room, items }, protagonist: { name, model } }` |
+| `item` | `{ id, name, noUse, uses?: [{ item, when?, effects }], onUse?: [{ when?, effects }] }` |
+| `flag` | `{ id, description? }` |
+| `stat` | `{ id, name, start }` |
+| `act` | `{ id, name, goals: [{ id, name }], next?: [{ act, when? }] }` |
+| `world` | `{ id, name, start, locked?, unlockWhen? }` |
+| `puzzle` | `{ id, name, requires, solvedWhen, grants }` |
+| `character` | `{ id, name, model, onGoal? }` |
+| `object` | `{ id, name, model }` |
+| `model` | `{ id, kind: scene \| character \| object, file, height?, artSpec: { prompt, notes, referenceImages }, status }` |
+| `room` | `{ id, world, model, label, place, hint, start, walkable, hotspots, onStart? }`; a hotspot's `interactions` are `{ verb, item?, when?, effects }` |
+| `conversation` | `{ id, character, entry, nodes }` (line, choice, action, branch and improv nodes) |
+
+Rules use only the engine's vocabulary, each condition or effect an object keyed by its name:
+
+- **Conditions**: `has`, `pickedUp`, `gathered`, `flag` (with optional `is`), `stat` (with `atLeast`), `act`, `goal`, `visited`, `world`, `not`.
+- **Effects**: `say` (optional `by`), `goTo` (optional `at` floor point), `goBack`, `wait`, `pickUp`, `give`, `take`, `gather`, `set` (with `to`), `talk`, `changeStat` (with `by`), `reachGoal`.
+
+A save is refused, with the field and the problem, when an object has an unknown or misspelt field, a condition or effect outside the vocabulary, or a rule naming an item, flag, stat, act, goal, room, world or character the game does not have. Also refused: an interaction whose verb is not `look`, `use`, `talk`, `pickup` or `go`; an item on any verb but `use`, or none on `use`; a goal id another act already has, or one listed twice; an act saved without a goal that a rule still names; an act whose last `next` entry has a condition (it could get stuck); `unlockWhen` on a world that is not `locked`; any object in a project that is not a `GAME`. A world's start room and the models objects use are not checked on save.
+
+Reads add fields Annie derives; writes ignore them: an act's `final` (it has no `next` entries — an ending), and a puzzle's `dependsOn` and `unlocks` (puzzle ids, through the flags one's `grants` set and another's `requires` read).
+
+#### `list_game_objects`
+List a project's objects of one kind, in the order they were added.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The GAME project ID |
+| `kind` | string | One of the kinds above |
+
+Returns `{ objects }`.
+
+---
+
+#### `get_game_object`
+Read one object.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The GAME project ID |
+| `kind` | string | The object's kind |
+| `id` | string | The object's id |
+
+---
+
+#### `save_game_object`
+Create an object, or replace the one with the same kind and id whole. Returns the saved object.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The GAME project ID |
+| `kind` | string | The object's kind |
+| `object` | object | The object, with its `id` |
+
+---
+
+#### `delete_game_object`
+Delete an object. When other objects' rules name it, nothing is deleted unless `confirm` is true; the result lists where it is used, as `{ deleted, usedBy: [{ kind, id, field }] }` (e.g. `field: "hotspots[door].interactions[0].when[0].flag"`). Requires `MCP_ALLOW_DESTRUCTIVE=true`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The GAME project ID |
+| `kind` | string | The object's kind |
+| `id` | string | The object's id |
+| `confirm` | boolean? | Delete even though other objects use it |
 
 ---
 

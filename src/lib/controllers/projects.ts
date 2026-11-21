@@ -182,7 +182,12 @@ export class ProjectsController {
         if (data.author !== undefined) updateData.author = sanitizeInput(data.author.trim());
         if (data.synopsis !== undefined) updateData.synopsis = sanitizeInput(data.synopsis.trim());
         if (data.genre !== undefined) updateData.genre = sanitizeInput(data.genre.trim());
-        if (data.projectType !== undefined) updateData.projectType = data.projectType;
+        if (data.projectType !== undefined) {
+            if (existing.projectType === "GAME" && data.projectType !== "GAME" && (await prisma.gameObject.count({ where: { projectId } })) > 0) {
+                throw new UserFacingError("A game project keeps its type while it has game objects");
+            }
+            updateData.projectType = data.projectType;
+        }
         if (data.universeId !== undefined) (updateData as Record<string, unknown>).universeId = data.universeId;
 
         if (Object.keys(updateData).length === 0) {

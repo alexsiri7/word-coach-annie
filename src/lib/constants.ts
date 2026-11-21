@@ -54,6 +54,16 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, Record<string, string>> = 
         WORLD_ELEMENT: "Element",
         NOTE: "Note",
     },
+    GAME: {
+        PART: "Part",
+        CHAPTER: "Chapter",
+        SCENE: "Scene",
+        CHARACTER: "Character",
+        LOCATION: "Location",
+        PLOTLINE: "Plotline",
+        WORLD_ELEMENT: "World Element",
+        NOTE: "Note",
+    },
 };
 
 /** localStorage flag recording this browser's Sentry session-replay consent. */

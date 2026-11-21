@@ -1,5 +1,6 @@
 // Acceptance tests for openspec/specs/game-scenes-and-hotspots (#1501), one per scenario. Each is
-// `it.fails` until #1503 (and, for exported behavior, #1507) makes it pass; then it becomes `it`.
+// `it.fails` until #1503 (or #1502, which stores rooms; and, for exported behavior, #1507) makes
+// it pass; then it becomes `it`.
 import { describe, it, expect, vi } from "vitest";
 import { NextRequest } from "next/server";
 import sharp from "sharp";
@@ -52,7 +53,7 @@ async function snapshot(projectId: string, storyObjectId: string, build: number,
 
 describe("game-scenes-and-hotspots", () => {
     describe("Requirement: Rooms", () => {
-        it.fails("Creating a room", async () => {
+        it("Creating a room", async () => {
             const { game, projectId } = await seededGame();
             await game.save(projectId, "model", model("scene/cellar"));
 
@@ -96,7 +97,7 @@ describe("game-scenes-and-hotspots", () => {
             expect(exported).toEqual(bar);
         });
 
-        it.fails("A part of the scene", async () => {
+        it("A part of the scene", async () => {
             const { game, projectId } = await seededGame();
 
             await game.save(projectId, "room", streetWith(hotspot("window", { node: "window" })));

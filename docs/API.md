@@ -92,6 +92,7 @@ Export all personal data for the authenticated user as a ZIP archive (GDPR Artic
   - `writing-tasks.json` — practice tasks not tied to a project
   - `projects/<title>-<id>.json` — full project JSON for each project (the id keeps titles that sanitize alike from colliding), including:
     - structure nodes, story objects, chat messages, annotations, relationships
+    - `gameObjects` — a GAME project's world model, each as `{ kind, object, createdAt }` with the object in the shape `save_game_object` takes
     - `writingSessions` — word count and duration records per scene
     - `conversations` — AI chat threads (title, type, summary; messages excluded)
     - `googleDocExports` — Google Docs sync records (credential tokens **omitted**)
@@ -231,7 +232,7 @@ List all projects (scoped to current user when authenticated via Google).
       "author": "string",
       "synopsis": "string",
       "genre": "string",
-      "projectType": "FICTION | ARTICLE_COLLECTION | GENERAL",
+      "projectType": "FICTION | ARTICLE_COLLECTION | GENERAL | GAME",
       "isSample": false,
       "archivedAt": "ISO8601 | null",
       "createdAt": "ISO8601",
@@ -251,7 +252,7 @@ List all projects (scoped to current user when authenticated via Google).
 ### `POST /api/projects`
 Create a new project.
 
-**Body**: `{ "title": "string", "author"?: "string", "synopsis"?: "string", "genre"?: "string", "projectType"?: "FICTION|ARTICLE_COLLECTION|GENERAL" }`
+**Body**: `{ "title": "string", "author"?: "string", "synopsis"?: "string", "genre"?: "string", "projectType"?: "FICTION|ARTICLE_COLLECTION|GENERAL|GAME" }`
 
 **Response**: Project object (201)
 
@@ -274,6 +275,8 @@ Get a project by ID.
 Update project metadata.
 
 **Body**: Any subset of `{ title, author, synopsis, genre, projectType }`
+
+**Errors**: `400` changing the type of a `GAME` project that still has game objects
 
 ---
 
@@ -308,6 +311,31 @@ List all story objects in a project.
 **Query params**: `type` (optional filter: CHARACTER, LOCATION, PLOTLINE, WORLD_ELEMENT, NOTE)
 
 Each project object carries `coverImageId`: the id of its cover location image, or `null`.
+
+---
+
+### `GET /api/projects/:id/game/objects`
+List a `GAME` project's objects of one kind, in the order they were added. Owner only. The kinds, shapes, rules and derived fields are those of the MCP game object tools (see [MCP.md](MCP.md#game-objects)).
+
+**Query params**: `kind` (required): `game`, `item`, `flag`, `stat`, `act`, `world`, `puzzle`, `character`, `object`, `model`, `room` or `conversation`
+
+**Response**: `{ "objects": [...] }`; 400 `{ error }` for an unknown kind.
+
+---
+
+### `PUT /api/projects/:id/game/objects/:kind/:objectId`
+Create an object, or replace the one with the same kind and id whole. Owner only.
+
+**Body**: the object, with `id` equal to `:objectId` (URL-encoded, e.g. `scene%2Fstreet`).
+
+**Response**: `{ "object": {...} }`; 400 `{ error }` naming the field and the problem, with the same message as `save_game_object`.
+
+---
+
+### `DELETE /api/projects/:id/game/objects/:kind/:objectId`
+Delete an object. Owner only. When other objects' rules name it, nothing is deleted unless `?confirm=true`.
+
+**Response**: `{ "deleted": boolean, "usedBy": [{ "kind", "id", "field" }] }`; 404 when the game has no such object.
 
 ---
 
@@ -1163,9 +1191,9 @@ Create the sample project (Sherlock Holmes) for new users. No-op if the user alr
 ### `POST /api/projects/import`
 Import a project from a JSON export file.
 
-**Body**: JSON export data (project object). A story object with a missing or blank `type` is imported as `NOTE`; any other `type` is kept as-is.
+**Body**: JSON export data (project object). A story object with a missing or blank `type` is imported as `NOTE`; any other `type` is kept as-is. `gameObjects` keep their ids and are validated as `save_game_object` validates them, except that a rule may name an object the game no longer has (as a confirmed delete leaves it); no object may appear twice and no goal in two acts.
 
-**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
+**Errors**: `400` invalid JSON, an unknown node `type`/`status` or `projectType`, an invalid game object or one in a project that is not `GAME`, more than 20,000 game objects, a non-integer `orderIndex` or one outside the 32-bit integer range, a non-object entry in any collection, or more than 5,000 structure nodes or story objects / 20,000 content versions, annotations or relationships; `401` unauthenticated (Google OAuth mode only); `413` body over 5 MB
 
 ---
 

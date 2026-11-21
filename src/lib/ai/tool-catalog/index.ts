@@ -6,6 +6,7 @@
 import type { ToolCategory, ToolSpec } from "./types";
 import * as coaching from "./coaching";
 import * as exportTools from "./export";
+import * as gameObjects from "./game-objects";
 import * as googleAuth from "./google-auth";
 import * as locationImages from "./location-images";
 import * as locationMaps from "./location-maps";
@@ -26,6 +27,7 @@ export type { ToolCategory, ToolSpec } from "./types";
 export const TOOL_SPECS: readonly ToolSpec[] = [
     projects, structure, storyObjects, relationships, locationImages, locationMaps, locationSnapshots,
     writingTasks, submissions, opportunities, exportTools, universes, googleAuth, coaching, skills, peerReview,
+    gameObjects,
 ].flatMap((module): ToolSpec[] => Object.values(module));
 
 export type ChatToolSpec = ToolSpec & { category: ToolCategory };
