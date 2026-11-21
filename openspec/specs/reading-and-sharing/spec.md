@@ -29,6 +29,20 @@ A user with access SHALL be able to select text in the Read view or editor and a
 - WHEN the author resolves it
 - THEN its highlight disappears
 
+### Requirement: Project annotations overview
+
+A project's annotations page SHALL list the project's unresolved annotations, newest first and grouped under their scene's title, each showing its note, its selected text when it has one and how long ago it was made. Picking an annotation SHALL open the project workspace on its scene, where it can be resolved or deleted; the page itself SHALL NOT resolve or delete annotations. Readers SHALL NOT see annotations on Outline scenes.
+
+#### Scenario: Open an annotation's scene from the overview
+- GIVEN a project with an open annotation on the scene "Harbour at dusk"
+- WHEN the author opens the project's annotations page and picks that annotation
+- THEN the annotation is listed under "Harbour at dusk" and the workspace opens on that scene
+
+#### Scenario: Resolved annotations are not listed
+- GIVEN a project whose only annotation has been resolved
+- WHEN the author opens the project's annotations page
+- THEN the page shows no open annotations
+
 ### Requirement: Writing tasks are reachable from the Read view
 
 The Read view selection popover SHALL offer adding a writing task for the selected passage, and the Read view SHALL offer a tasks drawer — as easy to find as annotations — listing the project's tasks with name and completion status and letting the author mark tasks complete without leaving the page.

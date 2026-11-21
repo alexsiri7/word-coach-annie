@@ -919,3 +919,17 @@ requirements:
       - "Tokens are stored hashed; no token appears in logs."
       - "Existing browser and MCP OAuth auth keep working; tests cover token auth."
     notes: "Read and write tokens reach only /api/nodes/** and /api/mcp; a snapshots token reaches only POST /api/projects/:id/locations/:slug/snapshots (#1486) and gets 403 'This API token can only post location snapshots' elsewhere, MCP included. A mark-sent token reaches only POST /api/projects/:id/snapshot-annotations/sent (#1498), which skips the CSRF header check for it, and gets 403 'This API token can only mark snapshot annotations sent' elsewhere, MCP included. Over MCP a read token sees list_projects, get_project, get_outline, read_scene_content and get_scene_versions, and a write token adds write_scene_content, update_paragraph, insert_beat, delete_beat and restore_scene_version. Each token has its own rate-limit buckets (pat:<tokenId>), and lastUsedAt is written at most once a minute. The token's user must still pass ALLOWED_EMAILS. Tokens do not expire. The shared API_TOKEN (WCA-060) is unchanged."
+
+  - id: WCA-073
+    title: Project annotations overview
+    statement: "When a user with read access opens a project's annotations page, the system shall list the project's unresolved annotations, newest first and grouped under their scene's title, each showing its note, its selected text when it has one and how long ago it was made, and shall open the project workspace on that annotation's scene when the user picks it."
+    category: functional
+    priority: may
+    status: active
+    source: src/app/project/[id]/annotations/page.tsx, src/app/api/annotations/route.ts, src/lib/controllers/structure.ts getOpenAnnotations, src/app/project/[id]/page.tsx Annotations header button, src/__tests__/reader-outline-scene-routes.test.ts
+    acceptance:
+      - "GET /api/annotations?projectId= returns the project's unresolved annotations with their scene id and title, note, selected text and creation time, newest first; without projectId it returns 400"
+      - "The page shows the count of open annotations and scenes, one section per scene, and \"No open annotations\" when there are none"
+      - "Picking an annotation opens /project/{id}?scene={sceneId}"
+      - "A READER does not see annotations on Outline scenes"
+    notes: "The audit draft said each annotation can be opened, resolved or deleted from this page; the page only lists and links, and resolving or deleting happens in the scene editor (WCA-015). Resolved annotations are not shown. Known gap: no test renders the page itself."
