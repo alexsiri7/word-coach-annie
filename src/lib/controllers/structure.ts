@@ -1,7 +1,14 @@
 import type { Prisma } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db";
 import type { SceneBlock } from "@/lib/types";
-import { computeContentHash } from "@/mcp/content-hash";
+import { computeContentHash } from "@/lib/content-hash";
+import {
+    flattenToParagraphs,
+    paragraphHash,
+    parseSceneContent,
+    serializeSceneContent,
+    validateSceneContent,
+} from "@/lib/scene-document";
 import { sanitizeHtml, sanitizeInput } from "@/lib/sanitize-server";
 import { countSceneWords } from "@/lib/scene-text";
 import { assertValidParent, lockProject } from "@/lib/node-tree";
@@ -75,6 +82,69 @@ async function lockSceneNode(tx: DbClient, projectId: string, nodeId: string) {
     });
 }
 
+async function findSceneNode(nodeId: string) {
+    const node = await prisma.structureNode.findUnique({
+        where: { id: nodeId },
+        select: { id: true, type: true, title: true, projectId: true },
+    });
+    if (!node) throw new UserFacingError("Node not found");
+    if (node.type !== "SCENE") throw new UserFacingError("Content can only be written to SCENE nodes");
+    return node;
+}
+
+function assertSceneContentSize(rawContent: string) {
+    if (rawContent.length > MAX_SCENE_CONTENT_LENGTH) {
+        throw new InputTooLargeError("Scene content", MAX_SCENE_CONTENT_LENGTH);
+    }
+}
+
+function prepareSceneContent(rawContent: string) {
+    validateSceneContent(rawContent);
+    const content = sanitizeHtml(rawContent);
+    return { content, wordCount: countSceneWords(content) };
+}
+
+// The one definition of a scene's current version: readers and the stale-write check must agree on it, ties included.
+async function latestSceneVersion(db: DbClient, nodeId: string) {
+    return db.contentVersion.findFirst({
+        where: { nodeId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+}
+
+function assertSeenLatest(latest: { content: string } | null, contentHash: string | null) {
+    if (!latest) return;
+    const seenLatest = contentHash === null
+        ? latest.content === ""
+        : computeContentHash(latest.content) === contentHash;
+    if (!seenLatest) throw new ConflictError(latest.content);
+}
+
+async function createSceneVersion(tx: DbClient, nodeId: string, content: string, wordCount: number) {
+    const version = await tx.contentVersion.create({
+        data: { nodeId, content, wordCount },
+    });
+    await pruneSceneVersions(tx, nodeId);
+    return version;
+}
+
+function sceneWriteResult(
+    node: { title: string },
+    nodeId: string,
+    version: { id: string; createdAt: Date },
+    content: string,
+    wordCount: number,
+) {
+    return {
+        nodeId,
+        title: node.title,
+        versionId: version.id,
+        wordCount,
+        contentHash: computeContentHash(content),
+        createdAt: version.createdAt.toISOString(),
+    };
+}
+
 export interface OutlineNode {
     id: string;
     type: string;
@@ -110,69 +180,6 @@ async function runBatch<T, R>(
 }
 
 export class StructureController {
-    static parseSceneContent(content: string): SceneBlock[] {
-        const blocks: SceneBlock[] = [];
-        const regex = /(<!-- beat:[\s\S]*?-->)/g;
-        let lastIndex = 0;
-        let match;
-
-        while ((match = regex.exec(content)) !== null) {
-            // Content before the beat
-            if (match.index > lastIndex) {
-                const text = content.substring(lastIndex, match.index);
-                if (text) {
-                    blocks.push({ type: "CONTENT", content: text });
-                }
-            }
-
-            // The beat itself
-            const beatComment = match[1];
-            // Extract content inside <!-- beat: ... -->
-            const beatContent = beatComment.replace(/^<!-- beat:\s*/, "").replace(/\s*-->$/, "");
-            blocks.push({ type: "BEAT", content: beatContent });
-
-            lastIndex = regex.lastIndex;
-        }
-
-        // Remaining content
-        if (lastIndex < content.length) {
-            blocks.push({ type: "CONTENT", content: content.substring(lastIndex) });
-        }
-
-        return blocks;
-    }
-
-    static serializeSceneContent(blocks: SceneBlock[]): string {
-        return blocks.map(block => {
-            if (block.type === "BEAT") {
-                return `<!-- beat: ${block.content.trim()} -->`;
-            }
-            return block.content;
-        }).join("");
-    }
-
-    private static validateSceneContent(content: string) {
-        // Validate beats: ensure they don't contain nested comments or broken syntax
-        // Simple check: count of "<!-- beat:" must match count of "-->" (roughly)
-        // Better: ensure every "<!-- beat:" is closed by "-->" and no nesting.
-
-        if (content.includes("<!-- beat:")) {
-            // Basic structure check
-            const segments = content.split("<!-- beat:");
-            for (let i = 1; i < segments.length; i++) {
-                const segment = segments[i];
-                const closeIndex = segment.indexOf("-->");
-                if (closeIndex === -1) {
-                    throw new UserFacingError("Malformed scene content: Unclosed beat annotation found.");
-                }
-                // Check for nesting
-                if (segment.substring(0, closeIndex).includes("<!--")) {
-                    throw new UserFacingError("Malformed scene content: Nested comments in beats are not allowed.");
-                }
-            }
-        }
-    }
-
     static async getOutline(projectId: string): Promise<OutlineNode[]> {
         const project = await prisma.project.findUnique({
             where: { id: projectId },
@@ -456,10 +463,7 @@ export class StructureController {
         });
         if (!node) throw new UserFacingError("Node not found");
 
-        const version = await prisma.contentVersion.findFirst({
-            where: { nodeId },
-            orderBy: latestVersionFirst,
-        });
+        const version = await latestSceneVersion(prisma, nodeId);
 
         const annotations = await prisma.annotation.findMany({
             where: { nodeId },
@@ -472,7 +476,7 @@ export class StructureController {
             nodeId,
             title: node.title,
             content: content,
-            blocks: StructureController.parseSceneContent(content),
+            blocks: parseSceneContent(content),
             wordCount: version?.wordCount ?? 0,
             versionId: version?.id ?? null,
             lastModified: version?.createdAt.toISOString() ?? null,
@@ -494,60 +498,62 @@ export class StructureController {
      * mismatch; a write with no stored version is always allowed.
      */
     static async writeSceneContent(nodeId: string, rawContent: string, contentHash?: string | null) {
-        if (rawContent.length > MAX_SCENE_CONTENT_LENGTH) {
-            throw new InputTooLargeError("Scene content", MAX_SCENE_CONTENT_LENGTH);
-        }
-        const node = await prisma.structureNode.findUnique({
-            where: { id: nodeId },
-            select: { id: true, type: true, title: true, projectId: true },
-        });
-        if (!node) throw new UserFacingError("Node not found");
-        if (node.type !== "SCENE") throw new UserFacingError("Content can only be written to SCENE nodes");
-
-        StructureController.validateSceneContent(rawContent);
-        const content = sanitizeHtml(rawContent);
-
-        const wordCount = countSceneWords(content);
+        assertSceneContentSize(rawContent);
+        const node = await findSceneNode(nodeId);
+        const { content, wordCount } = prepareSceneContent(rawContent);
 
         const version = await prisma.$transaction(async (tx) => {
             await lockSceneNode(tx, node.projectId, nodeId);
-
             if (contentHash !== undefined) {
-                const latest = await tx.contentVersion.findFirst({
-                    where: { nodeId },
-                    orderBy: latestVersionFirst,
-                    select: { content: true },
-                });
-                if (latest) {
-                    const seenLatest = contentHash === null
-                        ? latest.content === ""
-                        : computeContentHash(latest.content) === contentHash;
-                    if (!seenLatest) throw new ConflictError(latest.content);
-                }
+                assertSeenLatest(await latestSceneVersion(tx, nodeId), contentHash);
             }
-
-            const newVersion = await tx.contentVersion.create({
-                data: { nodeId, content, wordCount },
-            });
-
-            await pruneSceneVersions(tx, nodeId);
-
-            return newVersion;
+            return createSceneVersion(tx, nodeId, content, wordCount);
         });
 
-        return {
-            nodeId,
-            title: node.title,
-            versionId: version.id,
-            wordCount,
-            contentHash: computeContentHash(content),
-            createdAt: version.createdAt.toISOString(),
-        };
+        return sceneWriteResult(node, nodeId, version, content, wordCount);
     }
 
     static async writeSceneContentFromBlocks(nodeId: string, blocks: SceneBlock[], contentHash?: string | null) {
-        const content = StructureController.serializeSceneContent(blocks);
-        return StructureController.writeSceneContent(nodeId, content, contentHash);
+        return StructureController.writeSceneContent(nodeId, serializeSceneContent(blocks), contentHash);
+    }
+
+    /**
+     * Applies `edit` to the scene's latest blocks under the scene's row lock, so
+     * the snapshot that is hash-checked is the one that is edited. `expected`
+     * carries the hashes the writer read: `sceneContentHash` follows
+     * writeSceneContent's rules, and `paragraph` must match that paragraph's
+     * current hash (an out-of-range index is left for `edit` to reject).
+     * Either mismatch throws ConflictError.
+     */
+    static async editScene(
+        nodeId: string,
+        edit: (blocks: SceneBlock[]) => SceneBlock[],
+        expected: { sceneContentHash?: string; paragraph?: { index: number; contentHash: string } } = {},
+    ) {
+        const node = await findSceneNode(nodeId);
+
+        const { version, content, wordCount } = await prisma.$transaction(async (tx) => {
+            await lockSceneNode(tx, node.projectId, nodeId);
+            const latest = await latestSceneVersion(tx, nodeId);
+            if (expected.sceneContentHash !== undefined) assertSeenLatest(latest, expected.sceneContentHash);
+
+            const current = latest?.content ?? "";
+            const blocks = parseSceneContent(current);
+            if (expected.paragraph) {
+                const target = flattenToParagraphs(blocks)[expected.paragraph.index];
+                if (target && paragraphHash(target) !== expected.paragraph.contentHash) {
+                    throw new ConflictError(current);
+                }
+            }
+
+            const rawContent = serializeSceneContent(edit(blocks));
+            assertSceneContentSize(rawContent);
+            const prepared = prepareSceneContent(rawContent);
+            const created = await createSceneVersion(tx, nodeId, prepared.content, prepared.wordCount);
+            return { version: created, ...prepared };
+        });
+
+        return sceneWriteResult(node, nodeId, version, content, wordCount);
     }
 
     static async getSceneVersions(nodeId: string, limit: number = 20) {

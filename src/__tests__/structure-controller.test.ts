@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
-import { StructureController } from "@/lib/controllers/structure";
+import { InputTooLargeError, MAX_SCENE_CONTENT_LENGTH, StructureController } from "@/lib/controllers/structure";
+import { parseSceneContent, serializeSceneContent } from "@/lib/scene-document";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { deleteBeat, insertBeat, readSceneContent } from "@/mcp/tools/structure";
 import { computeContentHash, StaleWriteError } from "@/mcp/content-hash";
@@ -8,14 +9,14 @@ import { computeContentHash, StaleWriteError } from "@/mcp/content-hash";
 describe("StructureController", () => {
     describe("parseSceneContent", () => {
         it("parses plain content with no beats", () => {
-            const blocks = StructureController.parseSceneContent("<p>Hello world</p>");
+            const blocks = parseSceneContent("<p>Hello world</p>");
             expect(blocks).toHaveLength(1);
             expect(blocks[0]).toEqual({ type: "CONTENT", content: "<p>Hello world</p>" });
         });
 
         it("parses content with beats", () => {
             const content = "<p>Before</p><!-- beat: Action beat --><p>After</p>";
-            const blocks = StructureController.parseSceneContent(content);
+            const blocks = parseSceneContent(content);
             expect(blocks).toHaveLength(3);
             expect(blocks[0]).toEqual({ type: "CONTENT", content: "<p>Before</p>" });
             expect(blocks[1]).toEqual({ type: "BEAT", content: "Action beat" });
@@ -24,7 +25,7 @@ describe("StructureController", () => {
 
         it("parses multiple beats", () => {
             const content = "<!-- beat: Beat 1 -->text<!-- beat: Beat 2 -->";
-            const blocks = StructureController.parseSceneContent(content);
+            const blocks = parseSceneContent(content);
             expect(blocks).toHaveLength(3);
             expect(blocks[0].type).toBe("BEAT");
             expect(blocks[1].type).toBe("CONTENT");
@@ -32,7 +33,7 @@ describe("StructureController", () => {
         });
 
         it("handles empty content", () => {
-            const blocks = StructureController.parseSceneContent("");
+            const blocks = parseSceneContent("");
             expect(blocks).toHaveLength(0);
         });
     });
@@ -44,14 +45,14 @@ describe("StructureController", () => {
                 { type: "BEAT" as const, content: "Action beat" },
                 { type: "CONTENT" as const, content: "<p>World</p>" }
             ];
-            const result = StructureController.serializeSceneContent(blocks);
+            const result = serializeSceneContent(blocks);
             expect(result).toBe("<p>Hello</p><!-- beat: Action beat --><p>World</p>");
         });
 
         it("roundtrips with parseSceneContent", () => {
             const original = "<p>Before</p><!-- beat: Action --><p>After</p>";
-            const blocks = StructureController.parseSceneContent(original);
-            const serialized = StructureController.serializeSceneContent(blocks);
+            const blocks = parseSceneContent(original);
+            const serialized = serializeSceneContent(blocks);
             expect(serialized).toBe(original);
         });
     });
@@ -576,6 +577,49 @@ describe("StructureController", () => {
                 await expect(insertBeat(scene.id, 3, "Bad")).rejects.toThrow("out of range");
                 await expect(insertBeat(scene.id, -2, "Bad")).rejects.toThrow("out of range");
             });
+
+            it("rejects an edit that makes the scene too large, leaving it unchanged", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+                const before = await StructureController.getSceneVersions(scene.id);
+
+                await expect(insertBeat(scene.id, 0, "x".repeat(MAX_SCENE_CONTENT_LENGTH + 1))).rejects.toThrow(InputTooLargeError);
+
+                expect((await StructureController.readSceneContent(scene.id)).content).toBe("<p>Hello</p>");
+                expect((await StructureController.getSceneVersions(scene.id)).versions).toHaveLength(before.versions.length);
+            });
+
+            it("rejects an edit that makes the scene malformed, leaving it unchanged", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+                const before = await StructureController.getSceneVersions(scene.id);
+
+                await expect(insertBeat(scene.id, 0, "evil <!-- nested")).rejects.toThrow("Malformed scene content");
+
+                expect((await StructureController.readSceneContent(scene.id)).content).toBe("<p>Hello</p>");
+                expect((await StructureController.getSceneVersions(scene.id)).versions).toHaveLength(before.versions.length);
+            });
+
+            it("accepts only one of two concurrent inserts based on the same scene hash", async () => {
+                const scene = await StructureController.createNode({ projectId, type: "SCENE", title: "S1" });
+                await StructureController.writeSceneContent(scene.id, "<p>Hello</p>");
+                const { contentHash } = await readSceneContent(scene.id);
+
+                const results = await Promise.allSettled([
+                    insertBeat(scene.id, 0, "Beat A", contentHash),
+                    insertBeat(scene.id, 0, "Beat B", contentHash),
+                ]);
+
+                expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+                const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+                expect(rejected).toHaveLength(1);
+                expect(rejected[0].reason).toBeInstanceOf(StaleWriteError);
+                const beats = (await StructureController.readSceneContent(scene.id)).blocks
+                    .filter((b) => b.type === "BEAT")
+                    .map((b) => b.content);
+                expect(beats).toHaveLength(1);
+                expect(["Beat A", "Beat B"]).toContain(beats[0]);
+            });
         });
 
         describe("deleteBeat", () => {
@@ -625,6 +669,16 @@ describe("StructureController", () => {
                 await expect(
                     deleteBeat(scene.id, 1, paragraphs[1].contentHash, computeContentHash("stale-content"))
                 ).rejects.toThrow(StaleWriteError);
+            });
+
+            it("rejects a paragraph hash taken before the beat became prose", async () => {
+                const scene = await sceneWithBeat();
+                const { paragraphs } = await readSceneContent(scene.id);
+                await StructureController.writeSceneContent(scene.id, "<p>Before</p><p>Now prose</p><p>After</p>");
+
+                await expect(deleteBeat(scene.id, 1, paragraphs[1].contentHash)).rejects.toThrow(StaleWriteError);
+                expect((await StructureController.readSceneContent(scene.id)).content)
+                    .toBe("<p>Before</p><p>Now prose</p><p>After</p>");
             });
 
             it("rejects an out-of-range index", async () => {

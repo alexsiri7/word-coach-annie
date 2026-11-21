@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectsController } from "@/lib/controllers/projects";
 import { StructureController, ConflictError } from "@/lib/controllers/structure";
 import { computeContentHash } from "@/mcp/content-hash";
+import { insertBeatAfter } from "@/lib/scene-document";
 import { testPrisma } from "./setup";
 
 // Note: The controllers use the global prisma instance. 
@@ -202,6 +203,44 @@ describe("Controller Integrity Tests", () => {
             expect(rejected).toHaveLength(1);
             expect(rejected[0].reason).toBeInstanceOf(ConflictError);
             expect(await testPrisma.contentVersion.count({ where: { nodeId: scene.id } })).toBe(versionsBefore + 1);
+        });
+
+        it("lets only one of two concurrent scene edits based on the same version succeed", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Concurrent Edit Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+            const baseHash = computeContentHash("<p>Version 1</p>");
+            const versionsBefore = await testPrisma.contentVersion.count({ where: { nodeId: scene.id } });
+
+            const results = await Promise.allSettled(["A", "B"].map((text) =>
+                StructureController.editScene(scene.id, (blocks) => insertBeatAfter(blocks, -1, text), {
+                    sceneContentHash: baseHash,
+                })
+            ));
+
+            expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+            const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+            expect(await testPrisma.contentVersion.count({ where: { nodeId: scene.id } })).toBe(versionsBefore + 1);
+        });
+
+        it("rejects a block write based on a stale version", async () => {
+            const scene = await StructureController.createNode({
+                projectId,
+                type: "SCENE",
+                title: "Stale Blocks Scene"
+            });
+            await StructureController.writeSceneContent(scene.id, "<p>Version 1</p>");
+
+            await expect(StructureController.writeSceneContentFromBlocks(
+                scene.id,
+                [{ type: "CONTENT", content: "<p>Version 2</p>" }],
+                computeContentHash("<p>Something else</p>"),
+            )).rejects.toBeInstanceOf(ConflictError);
         });
     });
 });

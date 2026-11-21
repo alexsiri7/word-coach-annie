@@ -1,4 +1,5 @@
 import DOMPurify from "isomorphic-dompurify";
+import { BEAT_COMMENT_CLOSE, BEAT_COMMENT_OPEN, findBeatComments } from "@/lib/beat-comment";
 
 /**
  * Strip all HTML tags from input — for plain text fields like chat messages,
@@ -25,12 +26,17 @@ export function sanitizeHtml(input: string): string {
   // Extract beat comments before DOMPurify strips them,
   // but sanitize their inner content to prevent XSS bypass.
   const beats: string[] = [];
-  const withPlaceholders = input.replace(/<!-- beat:([\s\S]*?)-->/g, (_match, content) => {
+  let withPlaceholders = "";
+  let lastIndex = 0;
+  for (const match of findBeatComments(input)) {
+    withPlaceholders += input.slice(lastIndex, match.start);
     const idx = beats.length;
-    const safeContent = DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-    beats.push(`<!-- beat:${safeContent}-->`);
-    return `<span data-beat-placeholder="${idx}"></span>`;
-  });
+    const safeContent = DOMPurify.sanitize(match.content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+    beats.push(`${BEAT_COMMENT_OPEN}${safeContent}${BEAT_COMMENT_CLOSE}`);
+    withPlaceholders += `<span data-beat-placeholder="${idx}"></span>`;
+    lastIndex = match.end;
+  }
+  withPlaceholders += input.slice(lastIndex);
 
   const sanitized = DOMPurify.sanitize(withPlaceholders, {
     ADD_ATTR: ["data-beat-placeholder"],

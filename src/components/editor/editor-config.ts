@@ -4,6 +4,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { BeatAnnotation } from "@/components/editor/extensions/beat";
 import { HarperSpellcheck, type SuggestionOpenPayload } from "@/components/editor/extensions/harper-spellcheck";
+import { beatCommentData, findBeatComments } from "@/lib/beat-comment";
 
 // Custom Highlight extension to support IDs
 export const AnnotationMark = Highlight.extend({
@@ -55,14 +56,27 @@ export function getEditorExtensions(options?: {
 
 // Helper to convert HTML comments to beat nodes for Tiptap
 export const commentsToBeats = (html: string) => {
-  return html.replace(/<!-- beat: ([\s\S]*?) -->/g, (_match, content) => {
-    const safe = content
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-    return `<div data-type="beat-annotation">${safe}</div>`;
-  });
+  let result = "";
+  let lastIndex = 0;
+  for (const match of findBeatComments(html)) {
+    const inner = match.content;
+    result += html.slice(lastIndex, match.start);
+    // The editor only recognises the canonical `<!-- beat: text -->` spacing.
+    if (inner.length < 2 || !inner.startsWith(" ") || !inner.endsWith(" ")) {
+      result += html.slice(match.start, match.end);
+    } else {
+      const safe = inner
+        .slice(1, -1)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      result += `<div data-type="beat-annotation">${safe}</div>`;
+    }
+    lastIndex = match.end;
+  }
+  result += html.slice(lastIndex);
+  return result;
 };
 
 // Helper to convert beat nodes back to HTML comments for storage
@@ -74,7 +88,7 @@ export const beatsToComments = (html: string) => {
 
   beats.forEach((beat) => {
     const content = beat.innerHTML;
-    const comment = doc.createComment(` beat: ${content} `);
+    const comment = doc.createComment(beatCommentData(content));
     beat.replaceWith(comment);
   });
 
