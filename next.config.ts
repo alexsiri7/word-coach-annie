@@ -23,13 +23,14 @@ writeFileSync(join(__dirname, "public", "version.json"), JSON.stringify({ versio
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
-  // isomorphic-dompurify: externalized because its ESM/CJS hybrid does not bundle correctly
-  // under webpack in Next.js 16 (peer issue with dompurify's jsdom path).
+  // isomorphic-dompurify must stay bundled: loaded externally, its jsdom chain require()s the
+  // ESM-only @exodus/bytes, and Node 22's require(esm) throws ERR_INTERNAL_ASSERTION when
+  // that races an import() of the same module at startup (#1625).
   // ioredis: uses node:diagnostics_channel (Node.js built-in) which webpack cannot bundle
   // @google/adk: dynamically requires optional peer deps (@mikro-orm/postgresql,
   // @mikro-orm/sqlite, GCS/OTel exporters) for session backends this app doesn't use.
   // Next.js's bundler tries to statically resolve those requires and fails the build.
-  serverExternalPackages: ["@prisma/adapter-pg", "isomorphic-dompurify", "ioredis", "@google/adk"],
+  serverExternalPackages: ["@prisma/adapter-pg", "ioredis", "@google/adk"],
   experimental: {
     // src/proxy.ts makes Next buffer request bodies, silently truncating them past this
     // limit (default 10 MB). Location image uploads allow 20 MB, which is ~26.7 MB as
