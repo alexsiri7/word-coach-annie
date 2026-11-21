@@ -1,8 +1,9 @@
 import { wrapUserContent } from "@/lib/sanitize-server";
 
 /**
- * Peer review persona definitions — single source of truth used by both
- * the MCP server (mcp/index.ts) and in-app chat (lib/ai/chat-context.ts).
+ * Peer review persona definitions — single source of truth used by the
+ * peer-review run (lib/ai/peer-review-service.ts), the MCP server
+ * (mcp/index.ts) and in-app chat (lib/ai/chat-context.ts).
  *
  * Each `lens` is a function that accepts the project title so the AI can
  * reference the work by name in its feedback, preserving the per-call title

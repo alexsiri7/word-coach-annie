@@ -39,6 +39,9 @@ vi.mock("@/lib/db", () => ({
       findFirst: vi.fn(),
       count: vi.fn(),
     },
+    project: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ title: "Test Novel" }),
+    },
   },
 }));
 

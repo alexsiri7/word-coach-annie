@@ -29,6 +29,9 @@ vi.mock("@/lib/db", () => ({
     peerReview: {
       create: vi.fn(),
     },
+    project: {
+      findUniqueOrThrow: vi.fn(),
+    },
   },
 }));
 
@@ -38,6 +41,7 @@ import { exportManuscript } from "@/mcp/tools/export";
 import { runSimpleCompletion } from "@/lib/ai/adk-agent";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
+import { REVIEW_PERSONAS } from "@/lib/review-personas";
 
 const DEFAULT_SAVED = {
   id: "rev-1",
@@ -66,6 +70,7 @@ describe("runPeerReview", () => {
       })
     );
     vi.mocked(prisma.peerReview.create).mockResolvedValue(DEFAULT_SAVED as never);
+    vi.mocked(prisma.project.findUniqueOrThrow).mockResolvedValue({ title: "Test Novel" } as never);
   });
 
   it("throws when manuscript is empty", async () => {
@@ -112,6 +117,15 @@ describe("runPeerReview", () => {
       expect(arg.systemPrompt).not.toBe("");
       expect(arg.userMessage).toContain("<manuscript>");
     }
+  });
+
+  it("builds every reviewer's system prompt from the shared persona lens", async () => {
+    await runPeerReview("proj-1");
+    const systemPrompts = vi.mocked(runSimpleCompletion).mock.calls.slice(0, 5).map(([arg]) => arg.systemPrompt);
+    const lenses = ["review-editor", "review-fan", "review-author", "review-comedy", "review-actor"].map((id) =>
+      REVIEW_PERSONAS[id].lens("Test Novel")
+    );
+    expect(systemPrompts.map((prompt, i) => prompt?.startsWith(lenses[i]))).toEqual([true, true, true, true, true]);
   });
 
   it("synthesis call uses only userMessage with no systemPrompt", async () => {
@@ -248,5 +262,74 @@ describe("runPeerReview", () => {
   it("propagates DB failure without swallowing", async () => {
     vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
     await expect(runPeerReview("proj-1")).rejects.toThrow("db down");
+  });
+});
+
+describe("runPeerReview concurrency", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getAiConfig).mockResolvedValue({ apiKey: "test-key", model: "test-model" });
+    vi.mocked(exportManuscript).mockResolvedValue("Once upon a time in a land far away...");
+    vi.mocked(runSimpleCompletion).mockResolvedValue(JSON.stringify(DEFAULT_SAVED.publisher));
+    vi.mocked(prisma.peerReview.create).mockResolvedValue(DEFAULT_SAVED as never);
+    vi.mocked(prisma.project.findUniqueOrThrow).mockResolvedValue({ title: "Test Novel" } as never);
+  });
+
+  function holdManuscriptExport() {
+    let release!: () => void;
+    vi.mocked(exportManuscript).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = () => resolve("Once upon a time in a land far away...");
+      })
+    );
+    return () => release();
+  }
+
+  it("returns the in-progress run instead of starting another for the same project", async () => {
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1");
+    const second = runPeerReview("proj-1");
+    release();
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(b).toBe(a);
+    expect(exportManuscript).toHaveBeenCalledTimes(1);
+    expect(runSimpleCompletion).toHaveBeenCalledTimes(6);
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a joined review with the first caller's AI config, not the joiner's", async () => {
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1", "user-A");
+    const second = runPeerReview("proj-1", "user-B");
+    release();
+
+    await Promise.all([first, second]);
+    expect(getAiConfig).toHaveBeenCalledTimes(1);
+    expect(getAiConfig).toHaveBeenCalledWith("user-A");
+  });
+
+  it("runs reviews for different projects independently", async () => {
+    await Promise.all([runPeerReview("proj-1"), runPeerReview("proj-2")]);
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts a fresh run once the previous one has finished", async () => {
+    await runPeerReview("proj-1");
+    await runPeerReview("proj-1");
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects every waiter when the run fails, then lets a new run start", async () => {
+    vi.mocked(prisma.peerReview.create).mockRejectedValueOnce(new Error("db down"));
+    const release = holdManuscriptExport();
+    const first = runPeerReview("proj-1");
+    const second = runPeerReview("proj-1");
+    release();
+
+    await expect(first).rejects.toThrow("db down");
+    await expect(second).rejects.toThrow("db down");
+    await expect(runPeerReview("proj-1")).resolves.toMatchObject({ id: "rev-1" });
+    expect(prisma.peerReview.create).toHaveBeenCalledTimes(2);
   });
 });

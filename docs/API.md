@@ -1018,8 +1018,10 @@ Run a manuscript-level AI analysis across the full project.
 ## Peer Review
 
 ### `POST /api/projects/:id/peer-review`
-Run **four** parallel AI reviewer personas (Publisher, Avid Reader, Experienced Writer, Comedy Writer) against
-the full manuscript and synthesize a consensus.
+Run **five** parallel AI reviewer personas (Acquisitions Editor, Fan Reader, Peer Author, Comedy Writer, Acting Coach) against
+the full manuscript and synthesize a consensus. If a peer review is already running for the project, the
+in-progress run is returned instead of starting another (within one server process only, not across
+replicas; the run uses the AI config of the request that started it).
 
 No request body required.
 
@@ -1036,6 +1038,7 @@ No request body required.
   "reader": { "...same shape as publisher..." },
   "writer": { "...same shape as publisher..." },
   "comedy": { "...same shape as publisher, nullable — absent on pre-comedy reviews..." },
+  "actor": { "...same shape as publisher, nullable — absent on pre-actor reviews..." },
   "consensus": {
     "pointsOfAgreement": ["string"],
     "pointsOfDisagreement": ["string"],
