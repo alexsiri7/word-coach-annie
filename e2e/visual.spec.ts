@@ -923,6 +923,19 @@ async function mockPublishingApi(page: Page) {
   await page.route('**/api/publishing', route => route.fulfill({ json: MOCK_PUBLISHING, status: 200 }))
 }
 
+/** Intercept every API call the settings page makes on load, with each section populated. */
+async function mockSettingsApi(page: Page) {
+  const json = (pattern: string, body: unknown) =>
+    page.route(pattern, route => route.fulfill({ json: body, status: 200 }))
+  await json('**/api/ai-settings', { apiKey: 'AIza...wxyz', model: 'gemini-2.0-flash-001', hasApiKey: true, scope: 'global' })
+  await json('**/api/ai-settings/models', { models: [{ id: 'gemini-2.0-flash-001', displayName: 'Gemini 2.0 Flash' }] })
+  await json('**/api/integrations/hashnode', { connected: true, username: 'annie-writes' })
+  await json('**/api/integrations/google-docs', { connected: false })
+  await json('**/api/account/consent', [{ feature: 'sentry_replay', consentGiven: true }])
+  await json('**/api/account/calendar-feed', { feedPath: '/api/calendar/opportunities/mock-token.ics' })
+  await json('**/api/account/api-tokens', { tokens: [] })
+}
+
 const AMBER = { id: 'proj-1', title: 'The Amber Throne' }
 const MARS = { id: 'proj-2', title: 'Echoes of Mars' }
 
@@ -1418,6 +1431,22 @@ test.describe('Visual regression – Annie', () => {
 
     await expect(page).toHaveScreenshot('contest-detail.png', {
       animations: 'disabled',
+    })
+  })
+
+  test('settings page', async ({ page }) => {
+    await mockSettingsApi(page)
+    await page.goto('/settings')
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await disableAnimations(page)
+    await expect(page.getByText('Connected as @annie-writes')).toHaveCount(2, { timeout: 5_000 })
+    await page.getByLabel('Calendar subscription URL').waitFor({ state: 'visible', timeout: 5_000 })
+    await page.getByText('Session recording (Sentry replay)').waitFor({ state: 'visible', timeout: 5_000 })
+    await page.getByText('No tokens yet.').waitFor({ state: 'visible', timeout: 5_000 })
+
+    await expect(page).toHaveScreenshot('settings.png', {
+      animations: 'disabled',
+      fullPage: true,
     })
   })
 })

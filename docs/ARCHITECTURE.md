@@ -56,6 +56,7 @@ src/
 ├── components/                 # React components
 │   ├── editor/                 # Tiptap extensions (beats, links, highlight)
 │   ├── focus-mode/             # Focus mode panels
+│   ├── settings/               # Settings page sections, each with its own hook
 │   ├── timeline/               # Timeline view
 │   └── ui/                     # Shadcn/ui primitives
 ├── lib/
