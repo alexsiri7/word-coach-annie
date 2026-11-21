@@ -32,6 +32,12 @@ export async function POST(
                 { status: 400 }
             );
         }
+        if (orderedIds.length > 500) {
+            return NextResponse.json(
+                { error: "orderedIds must contain at most 500 entries" },
+                { status: 400 }
+            );
+        }
 
         // Verify all IDs belong to this world object before reordering
         if (orderedIds.length > 0) {

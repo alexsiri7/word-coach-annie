@@ -11,7 +11,7 @@ import { COACHING_STYLES, RESPONSE_LENGTHS, readGlobalApiKey, readUserApiKey } f
 const AiSettingsUpdateSchema = z.object({
   apiKey: z.string().max(500).optional(),
   model: z.string().max(200).optional(),
-  customInstructions: z.string().optional(),
+  customInstructions: z.string().max(5000).optional(),
   coachingStyle: z.enum(COACHING_STYLES).optional(),
   responseLength: z.enum(RESPONSE_LENGTHS).optional(),
   chatWindowSize: z.number().int().min(3).max(20).optional(),
