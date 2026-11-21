@@ -6,11 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isAllowedRedirect } from "@/lib/auth";
 
-function sanitizeRedirect(from: string | null): string {
-    if (!from) return "/";
-    if (!from.startsWith("/") || from.startsWith("//") || from.includes("://"))
-        return "/";
-    return from;
+function postLoginRedirect(from: string | null): string {
+    return from && isAllowedRedirect(from) ? from : "/";
 }
 
 function LoginForm() {
@@ -26,8 +23,7 @@ function LoginForm() {
         fetch("/api/auth/refresh", { method: "POST" })
             .then((res) => {
                 if (res.ok) {
-                    const from = searchParams.get("from");
-                    router.replace(from && isAllowedRedirect(from) ? from : "/");
+                    router.replace(postLoginRedirect(searchParams.get("from")));
                 } else {
                     setCheckingRefresh(false);
                 }
@@ -52,8 +48,7 @@ function LoginForm() {
             });
 
             if (res.ok) {
-                const from = sanitizeRedirect(searchParams.get("from"));
-                router.push(from);
+                router.push(postLoginRedirect(searchParams.get("from")));
             } else {
                 const data = await res.json().catch(() => null);
                 setError(data?.error || "Authentication failed");

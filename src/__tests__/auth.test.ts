@@ -518,6 +518,10 @@ describe("isAllowedRedirect", () => {
         expect(isAllowedRedirect("/read/abc123")).toBe(true);
         expect(isAllowedRedirect("/universe")).toBe(true);
         expect(isAllowedRedirect("/universe/abc123")).toBe(true);
+        expect(isAllowedRedirect("/tasks")).toBe(true);
+        expect(isAllowedRedirect("/opportunities")).toBe(true);
+        expect(isAllowedRedirect("/opportunities/abc123")).toBe(true);
+        expect(isAllowedRedirect("/publishing")).toBe(true);
     });
 
     it("allows query strings on known routes", () => {
@@ -529,6 +533,7 @@ describe("isAllowedRedirect", () => {
         expect(isAllowedRedirect("//evil.com")).toBe(false);
         expect(isAllowedRedirect("javascript:alert(1)")).toBe(false);
         expect(isAllowedRedirect("/\\evil.com")).toBe(false);
+        expect(isAllowedRedirect("/%09/evil.com")).toBe(false);
         expect(isAllowedRedirect("/path?redirect=http://evil.com")).toBe(false);
     });
 
